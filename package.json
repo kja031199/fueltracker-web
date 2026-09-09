@@ -1,0 +1,21 @@
+{
+  "name": "fueltracker-web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.0"
+  },
+  "description": "Track gas fill-ups and fuel economy in your browser. Local-first, no account, no server.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kja031199/fueltracker-web.git"
+  }
+}

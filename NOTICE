@@ -1,0 +1,53 @@
+FuelTracker Web
+Copyright 2026 kja031199
+
+This product is licensed under the Apache License, Version 2.0 (the
+"License"). You may obtain a copy of the License in the LICENSE file
+distributed with this work, or at:
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+------------------------------------------------------------------------
+Origin
+------------------------------------------------------------------------
+
+This is a web rewrite of FuelTracker, an iOS and watchOS app by the same
+copyright holder:
+
+    https://github.com/kja031199/FuelTrackingApp
+
+The domain logic here — the MPG segment algorithm, the missed-fill-up
+detector, the unit conversions, the OCR text parsers, and the accessible
+colour palette — is ported from that project, whose test suite serves as
+this one's specification. The original remains under the same Apache-2.0
+licence and the same copyright holder.
+
+------------------------------------------------------------------------
+Trademarks
+------------------------------------------------------------------------
+
+The Apache License does not grant permission to use the trade names,
+trademarks, service marks, or product names of the licensor (Section 6).
+
+That exclusion is intentional here. The name "FuelTracker", the app icon,
+and any associated branding are NOT licensed for reuse. You are free to
+use, modify, and redistribute this source code under the terms of the
+License, including commercially — but a derivative work must be
+distributed under a different name and its own branding, and must not
+imply endorsement by or affiliation with this project.
+
+------------------------------------------------------------------------
+Authorship
+------------------------------------------------------------------------
+
+The great majority of the code, tests, and documentation in this
+repository was written by Claude, an AI assistant, under the direction,
+review, and architectural control of the copyright holder. Individual
+commits record this in their Co-Authored-By trailers.
+
+This is disclosed for transparency. It may also affect what portions of
+this work are eligible for copyright protection in a given jurisdiction,
+since some — including the United States — require human authorship for
+a work to be protected. Nothing in this notice is a representation about
+the scope of that protection, and nothing in it should be read as legal
+advice.
