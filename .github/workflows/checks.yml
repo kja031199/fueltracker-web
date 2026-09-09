@@ -1,0 +1,81 @@
+name: Checks
+
+# Two cheap checks that always report a status, so they are safe to require.
+# Independent of each other and of ci.yml.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GITLEAKS_VERSION: 8.24.3
+    steps:
+      # Full history, not the diff: a secret committed and then deleted in a
+      # later commit is still leaked.
+      - name: Check out
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        run: |
+          set -euo pipefail
+          curl -sSfL \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz gitleaks
+          chmod +x gitleaks
+          ./gitleaks version
+
+      - name: Scan every commit
+        run: |
+          set -euo pipefail
+          # If this ever fires, allowlisting is NOT the fix: rotate the
+          # credential first — it is in the history and must be treated as
+          # compromised — then purge, then re-scan.
+          ./gitleaks git . --redact --no-banner --verbose
+
+  links:
+    name: Docs links (lychee)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      LYCHEE_VERSION: v0.15.1
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Install lychee
+        run: |
+          set -euo pipefail
+          curl -sSfL \
+            "https://github.com/lycheeverse/lychee/releases/download/${LYCHEE_VERSION}/lychee-${LYCHEE_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+            | tar -xz lychee
+          chmod +x lychee
+          ./lychee --version
+
+      - name: Check relative links and anchors
+        run: |
+          set -euo pipefail
+          # --offline validates on-disk targets and heading anchors only.
+          # External URLs are skipped on purpose: a third party's server being
+          # down should never stand between a correct change and main.
+          #
+          # node_modules is excluded explicitly rather than relying on this job
+          # happening not to install dependencies: `**/*.md` otherwise globs 42
+          # vendored READMEs whose broken links are not ours to fix, and the
+          # check would start failing the day anyone adds an install step here.
+          ./lychee --offline --no-progress --include-fragments \
+            --exclude-path node_modules '**/*.md'

@@ -1,0 +1,51 @@
+name: CI
+
+# Typechecks and runs the test suite on every pull request and every push to
+# main. This is the gate: the ported domain logic is only trustworthy because
+# its assertions run, and a red suite must be able to block a merge.
+#
+# Deliberately **no `paths-ignore`**. A skipped run reports no status at all,
+# and a check that sometimes reports nothing can never be a *required* check —
+# a docs-only PR would wait forever for a result that never arrives. The
+# upstream Swift project learned this the expensive way; don't reintroduce it
+# here without also giving up required-check status.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Typecheck & test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` installs exactly what package-lock.json pins and fails if the
+      # lockfile and manifest disagree — the right call for CI, unlike
+      # `npm install` which would silently resolve a different tree.
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test

@@ -1,5 +1,7 @@
 # FuelTracker Web
 
+[![CI](https://github.com/kja031199/fueltracker-web/actions/workflows/ci.yml/badge.svg)](https://github.com/kja031199/fueltracker-web/actions/workflows/ci.yml)
+
 Track gas fill-ups and fuel economy in your browser. **Local-first: no account, no server, no analytics.** Your data stays in your browser.
 
 > **Status: early.** The domain layer is being ported and tested; there is no user interface yet. Not usable for real fuel logging.
@@ -44,6 +46,26 @@ npm install
 npm test           # vitest
 npm run typecheck  # tsc --noEmit
 ```
+
+## Automated checks
+
+Three checks run on every pull request and every push to `main`. None of them
+skip, so all three always report a status — which is what makes them safe to
+require.
+
+| Check | What fails it |
+|---|---|
+| **Typecheck & test** | A type error, or any ported assertion no longer holding |
+| **Secret scan** (gitleaks) | A credential-shaped string in **any commit**, not just the diff |
+| **Docs links** (lychee) | A broken relative link or `#heading-anchor` in Markdown |
+
+The link check is `--offline` on purpose: it validates on-disk targets and
+anchors, and skips external URLs so a third party's server being down can never
+stand between a correct change and `main`.
+
+`npm ci` is used rather than `npm install` — it installs exactly what the
+lockfile pins and fails if the lockfile and manifest disagree, instead of
+silently resolving a different tree.
 
 ## Licence
 
