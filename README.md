@@ -25,6 +25,30 @@ The iOS app ships 425 tests. They are the most precise description of this app's
 
 Those assertions are being ported alongside the code, not rewritten. A change in an assertion is treated as a bug in the port.
 
+## Contrast is enforced, not asserted
+
+The accent colours are not `orange` and `teal`. Stock palettes are tuned to look
+right, not to pass a threshold, and measured against a white card the usual ones
+land between **2.20:1 and 4.13:1** — every one of them below the 4.5:1 that WCAG
+2.2 AA requires for text, and three below even the 3:1 that applies to chart
+marks. So the lines and bars were unreadable, not just the labels.
+
+`src/domain/accessiblePalette.ts` replaces them with values that clear the bar on
+all three surfaces a colour can land on: the card, the page behind it, and its
+own 15% tint wash. Colours are stored as **numeric components rather than CSS
+strings**, for one reason — a string cannot be measured. `contrast.ts` recomputes
+every ratio from those components on each CI run, against both the 4.5 standard
+and the palette's own 4.7 margin, so a palette edit that breaks the promise fails
+the build.
+
+The wash is the trap worth knowing about. It is mixed from *the colour being
+chosen*, so darkening the ink darkens its own background and the pair moves
+together — it is the binding constraint every time, and the measured worst case
+in the whole palette is **4.80:1**. Score a candidate against a wash mixed from
+the stock colour instead and it reads 0.4 higher than what the app renders. That
+mistake shipped once upstream and only CI caught it; two tests now pin the
+recursion so a re-derivation cannot quietly optimise the looser problem.
+
 ## What this version cannot do
 
 Stated up front rather than discovered later:
