@@ -25,6 +25,26 @@ The iOS app ships 425 tests. They are the most precise description of this app's
 
 Those assertions are being ported alongside the code, not rewritten. A change in an assertion is treated as a bug in the port.
 
+## Where the port deliberately differs
+
+The iOS app is the specification, so a difference is a decision, not an
+accident. Each one is recorded here and pinned by a test.
+
+- **The weekday price insight requires a *finite* spread.** The original guards
+  with `delta * 100 >= 1`, which is false for `NaN` but true for `+Infinity` —
+  so an infinite price would render "You pay about $∞/gal less on Tuesdays than
+  Fridays." iOS never shows it, because non-finite values are rejected at the
+  write boundary and cannot reach the statistics layer. That makes it latent
+  rather than live, but the point of the write guard is that a corrupted record
+  must not poison a statistic, so the port closes the second hole as well.
+- **Calendar and locale are parameters, not ambient globals.** The original
+  reads `Calendar.current` and `DateFormatter()`. Here the week's first day and
+  the locale are arguments with deterministic defaults, so tests assert a literal
+  expected week order rather than recomputing their expectation from the
+  platform — the only way an assertion can catch a *numbering* mistake and not
+  just a *rotation* one. (`Intl` reports the first weekday in ISO numbering,
+  1 = Monday; everything else here uses 1 = Sunday.)
+
 ## Contrast is enforced, not asserted
 
 The accent colours are not `orange` and `teal`. Stock palettes are tuned to look

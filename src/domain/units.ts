@@ -156,17 +156,26 @@ const NON_METRIC_REGIONS = new Set(['US', 'LR', 'MM', 'AS', 'GU', 'MP', 'PR', 'V
  * everything else seeds US.
  */
 export function unitPreferencesForLocale(locale: string): UnitPreferences {
-  let region: string | undefined;
-  try {
-    region = new Intl.Locale(locale).region ?? undefined;
-  } catch {
-    region = undefined;
-  }
-  if (region === undefined) {
-    // Fall back to parsing the tag directly, so "en_US" (Swift's separator)
-    // and malformed tags still resolve rather than silently seeding metric.
-    const parts = locale.split(/[-_]/);
-    region = parts.find((p) => /^[A-Za-z]{2}$/.test(p) && p === p.toUpperCase());
-  }
+  const region = regionForLocale(locale);
   return region !== undefined && NON_METRIC_REGIONS.has(region) ? US : METRIC;
+}
+
+/**
+ * The region subtag of a locale, or `undefined` if there isn't one.
+ *
+ * Exported because currency resolution needs the same answer, and the fallback
+ * below is the part worth sharing rather than reimplementing: `Intl.Locale`
+ * rejects some tags outright, so a malformed or underscore-separated tag —
+ * `"en_US"`, which is how Swift writes it — has to be parsed directly instead
+ * of being silently treated as region-less.
+ */
+export function regionForLocale(locale: string): string | undefined {
+  try {
+    const region = new Intl.Locale(locale).region;
+    if (region !== undefined && region !== null) return region;
+  } catch {
+    // Fall through to direct parsing.
+  }
+  const parts = locale.split(/[-_]/);
+  return parts.find((p) => /^[A-Za-z]{2}$/.test(p) && p === p.toUpperCase());
 }
