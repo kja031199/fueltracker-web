@@ -1,15 +1,24 @@
 /**
  * Number formatting for display, ported from `Shared/Support/Formatters.swift`.
  *
- * **Deliberately one function.** Upstream's `Format` enum has a dozen helpers,
- * but only `plainCurrency` has a caller in the domain layer — the weekday price
- * insight builds a sentence around it. The rest describe UI that does not exist
- * here yet and will port in Phase 3 alongside the screens that need them.
- * Untested formatters with no callers are exactly the dead weight this phase is
- * meant to avoid.
+ * **Only the helpers with callers.** Upstream's `Format` enum has a dozen; this
+ * file carries the six the ported domain modules actually use — `plainCurrency`
+ * for the weekday insight, and `currency` / `economy` / `fuelPrice` /
+ * `costPerDistance` / `distance` for the vehicle showdown's rows. The rest
+ * (`volume`, `compactMiles`, `odometer`, …) describe screens that do not exist
+ * here yet and port in Phase 3 with the views that call them. Untested
+ * formatters with no callers are exactly the dead weight this phase avoids.
+ *
+ * ## The unit-aware half
+ *
+ * These take a value in the app's **canonical** unit — gallons, miles, MPG —
+ * and render it in the unit the reader chose. Storage never changes with that
+ * choice and neither does any ranking; conversion happens here, at the display
+ * boundary, and nowhere else.
  */
 
-import { regionForLocale } from './units';
+import type { DistanceUnit, EconomyUnit, VolumeUnit } from './units';
+import { distance as distanceUnits, economy as economyUnits, regionForLocale, volume as volumeUnits } from './units';
 
 /**
  * Currency for a locale's region, defaulting to USD.
@@ -67,4 +76,85 @@ export function plainCurrency(value: number, options: CurrencyOptions = {}): str
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
+}
+
+/**
+ * Currency at the locale's own precision — two places for most currencies, none
+ * for JPY. Upstream's `Format.currency`, used for totals where the extra
+ * pinning `plainCurrency` does would be wrong.
+ */
+export function currency(value: number, options: CurrencyOptions = {}): string {
+  const locale = options.locale ?? 'en-US';
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: options.currency ?? currencyForLocale(locale),
+    // No explicit fraction digits: the locale decides.
+  }).format(value);
+}
+
+/**
+ * A canonical **MPG** value in the given economy unit, or `null` where economy
+ * is undefined.
+ *
+ * `null` rather than a placeholder string: the caller decides what an absent
+ * value looks like, and a showdown row needs to tell "no data" apart from a
+ * formatted zero in order to call the row no-contest.
+ */
+export function economy(mpg: number, unit: EconomyUnit): string | null {
+  const converted = economyUnits[unit].fromMPG(mpg);
+  if (converted === null) return null;
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(converted);
+}
+
+/**
+ * A canonical **price per gallon** shown per the given volume unit, with the
+ * extra tenth-of-a-cent digit fuel prices use ("$3.499"/gal, or its per-litre
+ * equivalent).
+ *
+ * That third digit is not decoration: pump prices genuinely carry it, and
+ * rounding it away would make two different prices display identically — which
+ * the showdown would then have to call a tie.
+ */
+export function fuelPrice(
+  pricePerGallon: number,
+  unit: VolumeUnit,
+  options: CurrencyOptions = {},
+): string {
+  const locale = options.locale ?? 'en-US';
+  const perUnit = pricePerGallon / volumeUnits[unit].fromGallons(1);
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: options.currency ?? currencyForLocale(locale),
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  }).format(perUnit);
+}
+
+/** A canonical **cost per mile** shown per the given distance unit. */
+export function costPerDistance(
+  costPerMile: number,
+  unit: DistanceUnit,
+  options: CurrencyOptions = {},
+): string {
+  const locale = options.locale ?? 'en-US';
+  const perUnit = costPerMile / distanceUnits[unit].fromMiles(1);
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: options.currency ?? currencyForLocale(locale),
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 3,
+  }).format(perUnit);
+}
+
+/** A canonical **miles** value in the given distance unit, optionally suffixed. */
+export function distance(miles: number, unit: DistanceUnit, withUnit = false): string {
+  const spec = distanceUnits[unit];
+  const number = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1,
+  }).format(spec.fromMiles(miles));
+  return withUnit ? `${number} ${spec.abbreviation}` : number;
 }

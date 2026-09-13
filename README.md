@@ -37,6 +37,11 @@ accident. Each one is recorded here and pinned by a test.
   write boundary and cannot reach the statistics layer. That makes it latent
   rather than live, but the point of the write guard is that a corrupted record
   must not poison a statistic, so the port closes the second hole as well.
+- **The vehicle showdown carries no `icon` field.** The original names SF
+  Symbols (`"leaf.fill"`, `"fuelpump.fill"`), which mean nothing off Apple's
+  platforms. Each row's `id` already identifies it uniquely and its order is
+  pinned by a test, so the interface layer maps `id` to whatever icon set it
+  uses and the domain module stays platform-free.
 - **Calendar and locale are parameters, not ambient globals.** The original
   reads `Calendar.current` and `DateFormatter()`. Here the week's first day and
   the locale are arguments with deterministic defaults, so tests assert a literal
