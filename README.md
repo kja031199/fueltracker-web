@@ -88,6 +88,13 @@ Stated up front rather than discovered later:
 
 Gained in exchange: it runs on any device with a browser, costs nothing to publish, and needs no account.
 
+One more limit worth stating plainly: **scanning is US-only by design.** The
+pump and receipt parsers are tuned to US pumps — the plausible value bands are
+gallons and dollars, distances are miles, and the `9/10` fraction-of-a-cent
+notation is a US convention. That caveat is inherited from the iOS app, but it
+matters more here, because a web app reaches people an iPhone-only app never
+did. Manual entry supports every unit; only scanning is narrow.
+
 ## Development
 
 ```bash
