@@ -4,7 +4,7 @@
 
 Track gas fill-ups and fuel economy in your browser. **Local-first: no account, no server, no analytics.** Your data stays in your browser.
 
-> **Status: early.** The domain layer is being ported and tested; there is no user interface yet. Not usable for real fuel logging.
+> **Status: early.** The domain layer is complete and tested — 354 assertions covering every rule below — but there is no user interface yet, and nothing is stored anywhere. Not usable for real fuel logging.
 
 ## What this is
 
@@ -22,6 +22,7 @@ The iOS app ships 425 tests. They are the most precise description of this app's
 - **A missed fill-up breaks the chain rather than producing a wrong number**, and the skipped fuel still counts toward spending.
 - **Every write is validated once, in one place**, rejecting non-positive *and* non-finite values. `+Infinity` passes a `> 0` check; it must be rejected explicitly.
 - **Storage is canonical** — miles, US gallons, US MPG — with conversion only at the display boundary. L/100km is the reciprocal of MPG, so a better car reads *lower*.
+- **Date arithmetic clamps rather than rolling over.** Subtracting three months from 31 May gives 28 February, not 3 March. Swift's `Calendar` does this for you; JavaScript's `Date` does the opposite, and the difference is invisible — a rolled-over cutoff is simply *later* than intended, so a filtered list quietly drops its oldest rows and still looks right.
 
 Those assertions are being ported alongside the code, not rewritten. A change in an assertion is treated as a bug in the port.
 
