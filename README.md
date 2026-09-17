@@ -4,7 +4,7 @@
 
 Track gas fill-ups and fuel economy in your browser. **Local-first: no account, no server, no analytics.** Your data stays in your browser.
 
-> **Status: early.** The domain and storage layers are complete and tested — 410 assertions — but there is **no user interface yet**, so there is no way to actually use it. Not ready for real fuel logging.
+> **Status: early.** The domain and storage layers are complete and tested, and the interface is being built on top of them. You can add vehicles and change units; logging a fill-up is next. **There is still no export**, so don't put anything in it you would mind losing.
 
 ## What this is
 
@@ -140,9 +140,16 @@ did. Manual entry supports every unit; only scanning is narrow.
 
 ```bash
 npm install
+npm run dev        # vite dev server
 npm test           # vitest
 npm run typecheck  # tsc --noEmit
+npm run build      # typecheck, then a production build
 ```
+
+Component tests opt into a DOM per file with a `@vitest-environment jsdom`
+docblock. The domain and storage suites stay on the node environment, which
+starts faster and needs nothing a browser provides — the cost of a DOM is paid
+only where it buys something.
 
 ## Automated checks
 
@@ -152,7 +159,7 @@ require.
 
 | Check | What fails it |
 |---|---|
-| **Typecheck & test** | A type error, or any ported assertion no longer holding |
+| **Typecheck, test & build** | A type error, a ported assertion no longer holding, or an app that no longer builds |
 | **Secret scan** (gitleaks) | A credential-shaped string in **any commit**, not just the diff |
 | **Docs links** (lychee) | A broken relative link or `#heading-anchor` in Markdown |
 
