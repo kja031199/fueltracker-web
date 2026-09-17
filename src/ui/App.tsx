@@ -8,6 +8,8 @@ import { loadHasOnboarded, loadUnitPreferences, saveHasOnboarded, saveUnitPrefer
 import { useAppData } from './useAppData';
 import { VehiclesScreen } from './VehiclesScreen';
 import { SettingsScreen } from './SettingsScreen';
+import { DashboardScreen } from './DashboardScreen';
+import { FillUpsScreen } from './FillUpsScreen';
 
 type Tab = 'dashboard' | 'fillups' | 'vehicles' | 'settings';
 
@@ -114,8 +116,23 @@ export function App({ store, initialTab = 'dashboard' }: AppProps): ReactElement
           />
         )}
         {tab === 'settings' && <SettingsScreen units={units} onChange={changeUnits} />}
-        {(tab === 'dashboard' || tab === 'fillups') && (
-          <p className="empty">Coming next.</p>
+        {tab === 'dashboard' && (
+          <DashboardScreen
+            vehicles={data.vehicles}
+            selectedVehicleId={data.selectedVehicleId}
+            onSelect={data.selectVehicle}
+            fillUps={data.fillUps}
+            units={units}
+          />
+        )}
+        {tab === 'fillups' && (
+          <FillUpsScreen
+            store={store}
+            vehicleId={data.selectedVehicleId}
+            fillUps={data.fillUps}
+            units={units}
+            onChanged={data.reload}
+          />
         )}
       </main>
       <nav className="tabs" aria-label="Sections">

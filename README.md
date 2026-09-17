@@ -4,7 +4,7 @@
 
 Track gas fill-ups and fuel economy in your browser. **Local-first: no account, no server, no analytics.** Your data stays in your browser.
 
-> **Status: early.** The domain and storage layers are complete and tested, and the interface is being built on top of them. You can add vehicles and change units; logging a fill-up is next. **There is still no export**, so don't put anything in it you would mind losing.
+> **Status: usable, barely.** You can add vehicles, log and edit fill-ups, search and filter them, and see your real economy, spending and price trends. Charts, scanning and a PWA install are still to come. **There is still no export**, so don't put anything in it you would mind losing.
 
 ## What this is
 
@@ -43,6 +43,13 @@ accident. Each one is recorded here and pinned by a test.
   platforms. Each row's `id` already identifies it uniquely and its order is
   pinned by a test, so the interface layer maps `id` to whatever icon set it
   uses and the domain module stays platform-free.
+- **Numeric fields keep the text you typed, not a re-rendered number.** A
+  controlled input that round-trips through `Number` on every keystroke destroys
+  a decimal as it is being entered: typing `3.5` parses `3.` to `3`, renders
+  `3`, and the next keystroke appends to that — recording a price ten times too
+  high, silently. The form holds the raw text and derives the number from it.
+  There is no Swift equivalent because SwiftUI's `TextField` handles this; on
+  the web it has to be done deliberately.
 - **Demo data is deterministic.** The original's preview fixture calls
   `Double.random`, so every preview differs. That is fine for eyeballing a
   layout and wrong for everything else here: a demo that shows different numbers

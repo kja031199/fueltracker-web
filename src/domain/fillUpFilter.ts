@@ -81,12 +81,16 @@ function matchesSearch(entry: FilterableEntry, query: string): boolean {
  *
  * Order matters: the list hands these straight to the view, and re-sorting here
  * would silently override whatever ordering the caller chose.
+ *
+ * Generic over the entry type so a caller can filter richer objects — a stored
+ * record carried alongside the four fields read here — and get the same type
+ * back rather than having to cast its own values out again.
  */
-export function applyFilter(
+export function applyFilter<T extends FilterableEntry>(
   filter: FillUpFilter,
-  entries: readonly FilterableEntry[],
+  entries: readonly T[],
   now: Date = new Date(),
-): FilterableEntry[] {
+): T[] {
   const query = trimmedSearch(filter);
   const cutoff = cutoffFrom(filter.range, now);
   return entries.filter(
