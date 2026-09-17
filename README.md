@@ -4,7 +4,7 @@
 
 Track gas fill-ups and fuel economy in your browser. **Local-first: no account, no server, no analytics.** Your data stays in your browser.
 
-> **Status: early.** The domain layer is complete and tested — 354 assertions covering every rule below — but there is no user interface yet, and nothing is stored anywhere. Not usable for real fuel logging.
+> **Status: early.** The domain and storage layers are complete and tested — 410 assertions — but there is **no user interface yet**, so there is no way to actually use it. Not ready for real fuel logging.
 
 ## What this is
 
@@ -43,6 +43,12 @@ accident. Each one is recorded here and pinned by a test.
   platforms. Each row's `id` already identifies it uniquely and its order is
   pinned by a test, so the interface layer maps `id` to whatever icon set it
   uses and the domain module stays platform-free.
+- **Demo data is deterministic.** The original's preview fixture calls
+  `Double.random`, so every preview differs. That is fine for eyeballing a
+  layout and wrong for everything else here: a demo that shows different numbers
+  on each visit is confusing, and a fixture that changes between runs turns a
+  real regression into a flake. A seeded generator produces the same twelve
+  fill-ups every time, still scattered enough to look like a real car.
 - **Calendar and locale are parameters, not ambient globals.** The original
   reads `Calendar.current` and `DateFormatter()`. Here the week's first day and
   the locale are arguments with deterministic defaults, so tests assert a literal
@@ -74,6 +80,40 @@ in the whole palette is **4.80:1**. Score a candidate against a wash mixed from
 the stock colour instead and it reads 0.4 higher than what the app renders. That
 mistake shipped once upstream and only CI caught it; two tests now pin the
 recursion so a re-derivation cannot quietly optimise the looser problem.
+
+## How storage works
+
+Everything lives in the browser, in IndexedDB via [Dexie](https://dexie.org).
+There is no server and no account, which is the whole privacy posture — and also
+the reason [export matters more than it looks](#what-this-version-cannot-do):
+browser storage can be cleared by the user, by the browser under pressure, or by
+a privacy setting.
+
+Sync is deferred, not designed away. Every stored row carries four fields from
+its very first write, even though three of them are not read yet, because they
+cost nothing now and cannot be retrofitted later without migrating real data:
+
+| Field | Why it has to exist from day one |
+|---|---|
+| `id` | A **client-generated UUID**. A server-assigned id cannot be reconciled with a row created offline. |
+| `updatedAt` | Epoch ms, stamped on every write — the basis for last-write-wins. |
+| `deletedAt` | A **tombstone, not a row deletion**. A hard delete leaves nothing to propagate, so a row deleted on one device reappears from another. |
+| `schemaVersion` | Stamped at write time so a future migration knows what shape it is reading. |
+
+The persistence abstraction is four methods — `list`, `get`, `put`, `remove` —
+and there are two implementations: one over Dexie, one over a plain `Map`. The
+second is not busywork. Both are held to the same contract by the same tests, so
+the interface cannot quietly grow a Dexie-shaped hole, and the store's own tests
+stay fast and deterministic while a separate integration suite exercises the
+real IndexedDB path — including whether receipt bytes survive a structured
+clone, which a `Map` could never tell you.
+
+**Every fill-up that reaches storage is built from a validated draft.** That is
+inherited from the original architecture and it is enforced by the signature:
+`addFillUp` takes a `FuelEntryDraft`, never loose fields, so there is no
+function here that *could* write an unvalidated entry. A submission from another
+person passes the same gate twice — once on submission and again on approval,
+because the record sat in storage in between.
 
 ## What this version cannot do
 

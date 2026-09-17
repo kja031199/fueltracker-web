@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "fake-indexeddb": "^6.2.5",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
   },
@@ -17,5 +18,8 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/kja031199/fueltracker-web.git"
+  },
+  "dependencies": {
+    "dexie": "^4.4.6"
   }
 }
