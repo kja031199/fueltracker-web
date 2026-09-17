@@ -149,6 +149,21 @@ export function costPerDistance(
   }).format(perUnit);
 }
 
+/**
+ * A canonical **gallons** value in the given volume unit, optionally suffixed.
+ *
+ * Up to three fraction digits and no trailing zeros: a pump reads 9.5 gallons,
+ * not 9.500, and 12.345 litres keeps every digit it printed.
+ */
+export function volume(gallons: number, unit: VolumeUnit, withUnit = false): string {
+  const spec = volumeUnits[unit];
+  const number = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 3,
+  }).format(spec.fromGallons(gallons));
+  return withUnit ? `${number} ${spec.abbreviation}` : number;
+}
+
 /** A canonical **miles** value in the given distance unit, optionally suffixed. */
 export function distance(miles: number, unit: DistanceUnit, withUnit = false): string {
   const spec = distanceUnits[unit];

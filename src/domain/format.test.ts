@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   DEFAULT_CURRENCY,
+  volume,
   costPerDistance,
   currency,
   currencyForLocale,
@@ -157,5 +158,25 @@ describe('distance', () => {
   test('does not throw on a non-finite distance', () => {
     expect(() => distance(Number.NaN, 'miles')).not.toThrow();
     expect(() => distance(Number.POSITIVE_INFINITY, 'kilometers')).not.toThrow();
+  });
+});
+
+describe('volume', () => {
+  test('keeps up to three digits and drops trailing zeros', () => {
+    // A pump reads 9.5 gallons, not 9.500 — but 12.345 keeps every digit it
+    // printed, because that third one is real precision.
+    expect(volume(9.5, 'gallons')).toBe('9.5');
+    expect(volume(12.345, 'gallons')).toBe('12.345');
+    expect(volume(10, 'gallons')).toBe('10');
+  });
+
+  test('converts to litres and can carry its unit', () => {
+    expect(volume(1, 'liters')).toBe('3.785');
+    expect(volume(1, 'gallons', true)).toBe('1 gal');
+    expect(volume(1, 'liters', true)).toBe('3.785 L');
+  });
+
+  test('does not throw on a non-finite volume', () => {
+    expect(() => volume(Number.NaN, 'gallons')).not.toThrow();
   });
 });
