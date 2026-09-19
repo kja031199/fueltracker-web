@@ -4,7 +4,7 @@
 
 Track gas fill-ups and fuel economy in your browser. **Local-first: no account, no server, no analytics.** Your data stays in your browser.
 
-> **Status: usable.** Add vehicles, log and edit fill-ups, search and filter them, see your economy, spending and price trends as **KPIs and charts**, and **export a backup you can restore**. Scanning and a PWA install are still to come.
+> **Status: usable.** Add vehicles, log and edit fill-ups, search and filter them, see your economy, spending and price trends as KPIs and charts, **export a backup you can restore**, and **install it and use it with no network at all**. Camera scanning is the only thing still to come.
 
 ## What this is
 
@@ -171,6 +171,19 @@ And the economy chart is **converted, not relabelled**. L/100km is the
 reciprocal of MPG, so the same car's curve genuinely inverts: 35 → 45 MPG
 "trending up" is 6.7 → 5.2 L/100km "trending down". Swapping the axis label over
 the same points would draw the opposite of the truth.
+
+## Installing it, and using it offline
+
+It is a progressive web app: install it from your browser's menu and it gets a
+home-screen icon and its own window, with no app store in between. Once
+installed it works with **no network at all** — the shell is precached and the
+data was never on a server to begin with. Verified rather than assumed: with the
+network cut, the app loads, shows your history, and logs a new fill-up.
+
+Updates **ask before they apply**. The conventional setting activates a new
+version and reloads the moment one arrives, which would discard a fill-up
+someone was halfway through typing — and since this app holds the only copy of
+their data, that is a bad trade for saving them a click.
 
 ## What this version cannot do
 

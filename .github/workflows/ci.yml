@@ -47,11 +47,13 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Test
-        run: npm test
-
-      # A suite that passes while the app fails to build is a green check over
-      # something nobody can load. Vite's build is the only thing that
-      # exercises the real module graph, JSX transform and CSS pipeline.
+      # Built **before** the tests, not after. A suite that passes while the app
+      # fails to build is a green check over something nobody can load — and
+      # the manifest tests read the built output, so running the build second
+      # would leave them silently skipping on every CI run, which is barely
+      # different from not having written them.
       - name: Build
         run: npx vite build
+
+      - name: Test
+        run: npm test

@@ -238,3 +238,17 @@ body {
   white-space: nowrap;
   border: 0;
 }
+
+/* The service-worker banner ---------------------------------------------- */
+
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap);
+  flex-wrap: wrap;
+  padding: 10px var(--gap);
+  background: var(--accent-blue-wash);
+  color: var(--accent-blue);
+  font-size: 0.9rem;
+}

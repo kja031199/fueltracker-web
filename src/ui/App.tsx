@@ -6,6 +6,8 @@ import { shouldOnboard } from '../domain/onboardingGate';
 import { applyPalette, preferredColorScheme, watchColorScheme } from './theme';
 import { loadHasOnboarded, loadUnitPreferences, saveHasOnboarded, saveUnitPreferences } from './unitSettings';
 import { useAppData } from './useAppData';
+import { useServiceWorker } from './useServiceWorker';
+import { UpdateBanner } from './UpdateBanner';
 import { VehiclesScreen } from './VehiclesScreen';
 import { SettingsScreen } from './SettingsScreen';
 import { DashboardScreen } from './DashboardScreen';
@@ -31,6 +33,7 @@ export function App({ store, initialTab = 'dashboard' }: AppProps): ReactElement
   const [units, setUnits] = useState<UnitPreferences>(() => loadUnitPreferences());
   const [hasOnboarded, setHasOnboarded] = useState<boolean>(() => loadHasOnboarded());
   const data = useAppData(store);
+  const serviceWorker = useServiceWorker();
 
   // The palette is applied from the ported values rather than written as CSS,
   // so what the browser paints is what the contrast tests measure.
@@ -104,6 +107,7 @@ export function App({ store, initialTab = 'dashboard' }: AppProps): ReactElement
 
   return (
     <div className="app">
+      <UpdateBanner state={serviceWorker} />
       <h1 className="app__title">FuelTracker</h1>
       <main className="app__main">
         {tab === 'vehicles' && (
