@@ -7,8 +7,18 @@ import { dashboardKPIs, kpiAccessibilityLabel } from '../domain/kpi';
 import { hueFor } from '../domain/metric';
 import { cutoffFrom, DASHBOARD_TIME_RANGES } from '../domain/dashboardTimeRange';
 import type { DashboardTimeRange } from '../domain/dashboardTimeRange';
-import { weekdayPriceInsight } from '../domain/weekdayPricePattern';
+import {
+  cheapestWeekday,
+  weekdayPriceInsight,
+  weekdayPrices,
+} from '../domain/weekdayPricePattern';
 import type { UnitPreferences } from '../domain/units';
+import { distance as distanceUnits, economy as economyUnits, volume as volumeUnits } from '../domain/units';
+import { currency, distance, fuelPrice } from '../domain/format';
+import { mapValues } from '../domain/models';
+import { MetricLineChart } from './charts/MetricLineChart';
+import { MonthlyBarChart } from './charts/MonthlyBarChart';
+import { WeekdayPriceChart } from './charts/WeekdayPriceChart';
 
 interface Props {
   readonly vehicles: readonly VehicleRecord[];
@@ -53,6 +63,28 @@ export function DashboardScreen({
     () => weekdayPriceInsight(toStats(inRange), { units }),
     [inRange, units],
   );
+
+  const weekdays = useMemo(() => weekdayPrices(toStats(inRange)), [inRange]);
+  const cheapest = useMemo(() => cheapestWeekday(toStats(inRange)), [inRange]);
+
+  const economySpec = economyUnits[units.economy];
+  const distanceSpec = distanceUnits[units.distance];
+  const volumeSpec = volumeUnits[units.volume];
+
+  /**
+   * Economy is the one series that is **converted, not relabelled**.
+   *
+   * L/100km is the reciprocal of MPG, so the curve's shape genuinely changes
+   * with the unit — a rising line becomes a falling one. Swapping the axis
+   * label over the same points would draw the opposite of the truth. Price and
+   * distance are linear, so those only need their labels changed.
+   */
+  const economySeries = useMemo(
+    () => mapValues(stats.mpgSeries, (mpg) => economySpec.fromMPG(mpg) ?? 0),
+    [stats.mpgSeries, economySpec],
+  );
+  const averageEconomy =
+    stats.averageMPG === null ? null : economySpec.fromMPG(stats.averageMPG);
 
   if (selectedVehicleId === null) {
     return <p className="empty">Add a vehicle to see its numbers here.</p>;
@@ -147,6 +179,56 @@ export function DashboardScreen({
               </li>
             ))}
           </ul>
+
+          <MetricLineChart
+            title={`Fuel economy (${economySpec.abbreviation})`}
+            points={economySeries}
+            metric="economy"
+            unit={economySpec.abbreviation}
+            formatValue={(value) => value.toFixed(1)}
+            average={averageEconomy}
+          />
+
+          <MetricLineChart
+            title={`Price per ${volumeSpec.singularNoun.toLowerCase()}`}
+            points={stats.priceSeries}
+            metric="price"
+            unit={`per ${volumeSpec.abbreviation}`}
+            formatValue={(value) => fuelPrice(value, units.volume)}
+            average={stats.averagePricePerGallon}
+          />
+
+          <MetricLineChart
+            title="Odometer"
+            points={stats.odometerSeries}
+            metric="distance"
+            unit={distanceSpec.abbreviation}
+            formatValue={(value) => distance(value, units.distance)}
+          />
+
+          <MonthlyBarChart
+            title="Monthly spending"
+            totals={stats.monthlyTotals}
+            value={(total) => total.totalSpent}
+            metric="spending"
+            unit="spent"
+            formatValue={(value) => currency(value)}
+          />
+
+          <MonthlyBarChart
+            title={`Monthly ${distanceSpec.name.toLowerCase()}`}
+            totals={stats.monthlyTotals}
+            value={(total) => total.miles}
+            metric="distance"
+            unit={distanceSpec.abbreviation}
+            formatValue={(value) => distance(value, units.distance)}
+          />
+
+          <WeekdayPriceChart
+            prices={weekdays}
+            cheapestWeekday={cheapest?.weekday ?? null}
+            formatPrice={(value) => fuelPrice(value, units.volume)}
+          />
 
           {stats.suspectSegmentIds.size > 0 && (
             <p className="warning" style={{ marginTop: 'var(--gap)' }}>

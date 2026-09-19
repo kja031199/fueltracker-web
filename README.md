@@ -4,7 +4,7 @@
 
 Track gas fill-ups and fuel economy in your browser. **Local-first: no account, no server, no analytics.** Your data stays in your browser.
 
-> **Status: usable.** Add vehicles, log and edit fill-ups, search and filter them, see your real economy, spending and price trends, and **export a backup you can restore**. Charts, scanning and a PWA install are still to come.
+> **Status: usable.** Add vehicles, log and edit fill-ups, search and filter them, see your economy, spending and price trends as **KPIs and charts**, and **export a backup you can restore**. Scanning and a PWA install are still to come.
 
 ## What this is
 
@@ -137,6 +137,40 @@ inherited from the original architecture and it is enforced by the signature:
 function here that *could* write an unvalidated entry. A submission from another
 person passes the same gate twice — once on submission and again on approval,
 because the record sat in storage in between.
+
+## Charts, and why they are hand-drawn
+
+Six charts, in plain SVG, for **2.5 KB gzipped**. A charting library would have
+been roughly forty times that — about double the whole bundle — for six simple
+series, on an app meant to work offline on a phone.
+
+The other reason is the accessibility tree. The iOS app pairs each chart with an
+**audio graph**: VoiceOver plays the shape of a series as sound. The web has no
+equivalent, so that has to be made up elsewhere, and owning the markup is what
+makes it possible:
+
+- the drawing is one `role="img"` labelled with a **spoken summary** — how many
+  points, the range, the average, the latest value, and the direction — so the
+  gist arrives in one sentence instead of after walking every mark;
+- the SVG itself is `aria-hidden`, because dozens of unlabelled `path` and
+  `circle` nodes are an obstacle, not information;
+- beside it sits a real `<table>` of every point, behind a "Show the numbers"
+  disclosure. A table announces its own row and column headers and can be read
+  in any order, which a bag of labelled SVG marks cannot.
+
+Three drawing decisions are about honesty rather than looks. **Lines are
+straight**, not splined — a smooth curve invents values between marks that were
+never measured. **Bars start at zero**, because a bar's length is read as a
+quantity and a truncated one lies about proportion. **The weekday price plot
+uses dots on a zoomed axis**, because gas is never $0: a zero-based bar chart
+would bury the cent-level differences that are the entire point, while a
+truncated bar would exaggerate them. A dot makes no claim about proportion, so
+the axis is free to start where the data does.
+
+And the economy chart is **converted, not relabelled**. L/100km is the
+reciprocal of MPG, so the same car's curve genuinely inverts: 35 → 45 MPG
+"trending up" is 6.7 → 5.2 L/100km "trending down". Swapping the axis label over
+the same points would draw the opposite of the truth.
 
 ## What this version cannot do
 
