@@ -115,7 +115,14 @@ export function App({ store, initialTab = 'dashboard' }: AppProps): ReactElement
             onChanged={data.reload}
           />
         )}
-        {tab === 'settings' && <SettingsScreen units={units} onChange={changeUnits} />}
+        {tab === 'settings' && (
+          <SettingsScreen
+            units={units}
+            onChange={changeUnits}
+            store={store}
+            onImported={data.reload}
+          />
+        )}
         {tab === 'dashboard' && (
           <DashboardScreen
             vehicles={data.vehicles}

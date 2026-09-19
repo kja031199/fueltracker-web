@@ -134,9 +134,10 @@ describe('settings', () => {
 
   test('says plainly that clearing browser data loses the log', async () => {
     // The most likely way this app hurts someone, so it is stated rather than
-    // buried — and it will stay stated until export exists.
+    // buried. Now that export exists the warning points at it; the warning
+    // itself stays, because a backup nobody takes is no protection.
     await renderSettings();
-    expect(screen.getByText(/clearing your browser data will delete your fuel log/i))
+    expect(screen.getByText(/clearing your browser data deletes your fuel log/i))
       .toBeInTheDocument();
   });
 });

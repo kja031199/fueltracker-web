@@ -4,7 +4,7 @@
 
 Track gas fill-ups and fuel economy in your browser. **Local-first: no account, no server, no analytics.** Your data stays in your browser.
 
-> **Status: usable, barely.** You can add vehicles, log and edit fill-ups, search and filter them, and see your real economy, spending and price trends. Charts, scanning and a PWA install are still to come. **There is still no export**, so don't put anything in it you would mind losing.
+> **Status: usable.** Add vehicles, log and edit fill-ups, search and filter them, see your real economy, spending and price trends, and **export a backup you can restore**. Charts, scanning and a PWA install are still to come.
 
 ## What this is
 
@@ -92,9 +92,25 @@ recursion so a re-derivation cannot quietly optimise the looser problem.
 
 Everything lives in the browser, in IndexedDB via [Dexie](https://dexie.org).
 There is no server and no account, which is the whole privacy posture — and also
-the reason [export matters more than it looks](#what-this-version-cannot-do):
-browser storage can be cleared by the user, by the browser under pressure, or by
-a privacy setting.
+why export is not a nice-to-have: browser storage can be cleared by the reader,
+by the browser under pressure, or by a privacy setting, and there is nobody to
+ask for a copy. **Export a backup now and again.**
+
+Two formats, two jobs. The **JSON backup** is the complete one — every vehicle,
+every fill-up, receipt bytes, and the deletions too — and importing it **merges
+rather than replaces**, matching rows by id and keeping whichever was edited
+more recently. So restoring last week's backup cannot destroy this morning's
+correction, and importing the same file twice does nothing the second time. The
+**CSV** is for spreadsheets: fill-ups only, in canonical miles and US gallons
+whatever units you have selected, with the unit named in every column heading —
+because a file whose meaning depends on a setting that is not in the file is a
+file you will misread a year from now.
+
+Imported fill-ups go through the same validated draft as anything typed in. An
+import file is a new input source and an untrusted one — hand-edited, written by
+another app, or truncated — so a row with impossible numbers is rejected and
+reported rather than written, and one bad row does not cost you the other nine
+hundred.
 
 Sync is deferred, not designed away. Every stored row carries four fields from
 its very first write, even though three of them are not read yet, because they

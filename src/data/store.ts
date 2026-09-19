@@ -21,6 +21,9 @@ import type { FuelEntryStats } from '../domain/models';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records';
 import { SCHEMA_VERSION } from './records';
 import type { Repository } from './repository';
+import type { BackupSnapshot } from '../domain/backupFormat';
+import type { ImportSummary } from './backup';
+import { exportSnapshot, importBackup } from './backup';
 
 /**
  * Injected rather than read from globals, so tests are deterministic and a
@@ -204,6 +207,24 @@ export class FuelTrackerStore {
 
   async rejectPendingFillUp(id: string): Promise<void> {
     await this.repos.pendingFillUps.remove(id);
+  }
+
+  // MARK: Backup
+
+  /**
+   * Everything in storage, tombstones included, for an export.
+   *
+   * Delegated rather than exposing the repositories as a property: handing them
+   * out would give a caller a way to `put` a fill-up straight into storage,
+   * which is precisely the door `addFillUp` exists to be the only one of.
+   */
+  async exportSnapshot(): Promise<BackupSnapshot> {
+    return exportSnapshot(this.repos);
+  }
+
+  /** Merges a parsed backup in. See `data/backup.ts` for the rules. */
+  async importBackup(snapshot: BackupSnapshot): Promise<ImportSummary> {
+    return importBackup(this.repos, snapshot);
   }
 
   private recordFromDraft(
