@@ -4,11 +4,22 @@
 
 Track gas fill-ups and fuel economy in your browser. **Local-first: no account, no server, no analytics.** Your data stays in your browser.
 
-> **Status: usable.** Add vehicles, log and edit fill-ups, search and filter them, see your economy, spending and price trends as KPIs and charts, **export a backup you can restore**, and **install it and use it with no network at all**. Camera scanning is the only thing still to come.
+> **Status: complete.** Everything that was planned is built. Add vehicles, log
+> and edit fill-ups, search and filter them, see your economy, spending and price
+> trends as KPIs and charts, **export a backup you can restore**, **install it and
+> use it with no network at all**, and **photograph a receipt** to fill the form in.
+> 598 tests. What is *not* here was left out on purpose, not left unfinished — see
+> [What was deliberately not built](#what-was-deliberately-not-built).
 
 ## What this is
 
 A web rewrite of [FuelTracker](https://github.com/kja031199/FuelTrackingApp), a native iOS + watchOS app by the same author. The iOS app is complete and works — but shipping it requires a paid Apple Developer account, which gates the App Store, iCloud sync, and two features outright. A web app is a URL.
+
+**The rewrite is finished, and the iOS repository is now frozen.** It is not
+abandoned: it still builds, its tests still run, and it remains the specification
+this port was written against. It is simply no longer where work happens. Feature
+ideas that were open there have been moved here as issues; the ones that were
+blocked on a paid Apple account are no longer blocked.
 
 The rewrite is not a port of the UI. SwiftUI does not run on the web and SwiftData does not exist there, so the interface is built fresh. What carries over is the part worth carrying: roughly 1,500 lines of domain logic, and the test suite that specifies it.
 
@@ -200,6 +211,45 @@ Stated up front rather than discovered later:
 | **Bounded image decode** | **Degraded.** iOS decodes an untrusted photo straight to a bounded size and never builds the full bitmap, which is what stops a decompression bomb. The web has no equivalent primitive, so the defence is a byte ceiling checked *before* any decode plus a bounded re-encode after. A large-but-legitimate-looking file that expands hugely remains a gap. |
 
 Gained in exchange: it runs on any device with a browser, costs nothing to publish, and needs no account.
+
+## What was deliberately not built
+
+The table above is what the platform took away. This is the shorter, more
+honest list: things that were possible and were **chosen against**.
+
+- **No sync and no accounts.** The founding decision was local-first, and sync
+  reverses it — it means a server, an account, somebody's login to lose, and a
+  bill that arrives every month whether anyone is using the app or not. The
+  four sync fields are stamped on every row from the first write precisely so
+  this stays reversible; nothing has to be migrated to add it later. Until then
+  the privacy claim at the top of this file is structural rather than a promise:
+  there is no server to trust.
+- **No pump-display scanning.** Dropped on measurement, not on principle. A
+  seven-segment pump display rendered *pristinely* — no glare, no angle, no
+  blur — came back at confidence 36 with the output `GAL =, ( (CZ`. A scanner
+  that is wrong is worse than no scanner, because a plausible wrong number is
+  harder to notice than a blank field.
+- **No PDF export.** CSV and JSON cover the two real jobs — a spreadsheet and a
+  restore — and a PDF is neither.
+- **No shareable submission link.** The submit → review → approve data model is
+  built and tested; only the transport is missing, and on the web a URL *is* the
+  transport, so this is now genuinely buildable. It is
+  [issue #3](https://github.com/kja031199/fueltracker-web/issues/3) rather than
+  something abandoned — but a public endpoint anyone can open raises questions
+  (scope, revocation, rate limiting) that `CKShare` used to answer for free.
+
+## One thing inherited that is probably wrong
+
+Worth writing down where someone will find it, because the port did not
+introduce it and did not fix it either.
+
+**`monthlyTotals` reports the odometer span *within* a calendar month.** So a
+month containing a single fill-up reports **0 miles driven**, even though the car
+plainly moved in order to be at a pump. It is faithful to the original — the KPI
+cards simply never displayed it, and the monthly-distance chart does, which is
+how it surfaced. Fixing it means deciding what "miles in January" should mean for
+a car driven across a month boundary, and that is a product decision rather than
+a bug fix, so it is recorded rather than quietly changed.
 
 One more limit worth stating plainly: **scanning is US-only by design.** The
 pump and receipt parsers are tuned to US pumps — the plausible value bands are
