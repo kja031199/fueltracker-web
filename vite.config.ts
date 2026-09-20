@@ -42,6 +42,12 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,woff2}'],
+        // The scanner is the one thing deliberately left out of the precache.
+        // Tesseract and the EXIF parser together are far larger than the whole
+        // rest of the app, and precaching them would make every install pay for
+        // a screen many people never open. They load on demand instead — which
+        // is why scanning is the only part of this app that needs a network.
+        globIgnores: ['**/scanner-*.js', '**/exif-*.js'],
         // Nothing here is fetched from a network at runtime — no API, no CDN,
         // no fonts — so precaching the shell is the whole offline story.
         navigateFallback: `${base}index.html`,
@@ -52,6 +58,19 @@ export default defineConfig({
   ],
   // Built for GitHub Pages, which serves from a repository subpath.
   base,
+  build: {
+    rollupOptions: {
+      output: {
+        // Named rather than hashed-only, so the precache can exclude them by
+        // pattern instead of by a hash that changes every build.
+        manualChunks: (id: string) => {
+          if (id.includes('tesseract.js')) return 'scanner';
+          if (id.includes('exifr')) return 'exif';
+          return undefined;
+        },
+      },
+    },
+  },
   test: {
     globals: true,
     // Node by default: the domain and data suites need no DOM and start

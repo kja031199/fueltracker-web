@@ -196,6 +196,8 @@ Stated up front rather than discovered later:
 | **Encryption at rest** | **Gone.** iOS gives per-file encryption keyed to the device passcode. Browser storage has no equivalent. |
 | **Biometric app lock** | **Degraded.** WebAuthn is a different primitive with no passcode fallback. |
 | **GPS station detection** | **Dropped.** Receipt brand-name matching still works — that's text, not location. |
+| **Pump display scanning** | **Dropped on evidence.** Seven-segment digits defeat the recogniser even undegraded — confidence 36, no usable output. The pump parser stays, because it costs nothing and reads a receipt's fuel line. |
+| **Bounded image decode** | **Degraded.** iOS decodes an untrusted photo straight to a bounded size and never builds the full bitmap, which is what stops a decompression bomb. The web has no equivalent primitive, so the defence is a byte ceiling checked *before* any decode plus a bounded re-encode after. A large-but-legitimate-looking file that expands hugely remains a gap. |
 
 Gained in exchange: it runs on any device with a browser, costs nothing to publish, and needs no account.
 

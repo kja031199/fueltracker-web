@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { FillUpFormState } from '../domain/fillUpForm';
 import {
   canSaveForm,
@@ -16,6 +16,7 @@ import type { UnitPreferences } from '../domain/units';
 import { distance, volume } from '../domain/units';
 import type { FillUpRecord } from '../data/records';
 import type { FuelTrackerStore } from '../data/store';
+import { importReceiptPhoto } from './importReceipt';
 
 interface Props {
   readonly store: FuelTrackerStore;
@@ -103,6 +104,10 @@ export function FillUpForm({
     editing === null ? emptyFillUpForm() : formFrom(editing),
   );
   const [saving, setSaving] = useState(false);
+  const [touchedDate, setTouchedDate] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [scanNote, setScanNote] = useState<string | null>(null);
+  const photoInput = useRef<HTMLInputElement>(null);
 
   const volumeSpec = volume[units.volume];
   const distanceSpec = distance[units.distance];
@@ -163,6 +168,55 @@ export function FillUpForm({
   const total = formTotalCost(form);
   const canSave = canSaveForm(form) && !saving;
 
+  /**
+   * Applies a scan **into blanks only**.
+   *
+   * What someone typed outranks what a camera guessed. A scanner that
+   * overwrites a hand-entered price is worse than one that does nothing,
+   * because the correction is invisible — the field just quietly holds a
+   * different number than the person put there.
+   */
+  async function importPhoto(file: File): Promise<void> {
+    setScanning(true);
+    setScanNote(null);
+    try {
+      const outcome = await importReceiptPhoto(file);
+      if (!outcome.ok) {
+        setScanNote(outcome.message);
+        return;
+      }
+      const { suggestion } = outcome;
+
+      setForm((current) => ({
+        ...current,
+        gallons: current.gallons ?? suggestion.gallons,
+        pricePerGallon: current.pricePerGallon ?? suggestion.pricePerGallon,
+        station: current.station === '' ? (suggestion.station ?? '') : current.station,
+        receiptImageData: suggestion.receiptImageData,
+        ...(suggestion.date !== null && !touchedDate ? { date: suggestion.date } : {}),
+      }));
+
+      setNumericText((current) => ({
+        ...current,
+        gallons:
+          current.gallons === '' && suggestion.gallons !== null
+            ? displayText(suggestion.gallons, volumeSpec.fromGallons)
+            : current.gallons,
+        price:
+          current.price === '' && suggestion.pricePerGallon !== null
+            ? displayText(
+                suggestion.pricePerGallon,
+                (canonical) => canonical / volumeSpec.fromGallons(1),
+              )
+            : current.price,
+      }));
+
+      setScanNote(suggestion.note);
+    } finally {
+      setScanning(false);
+    }
+  }
+
   async function save(): Promise<void> {
     const draft = draftFromForm(form);
     if (draft === null) return;
@@ -197,6 +251,39 @@ export function FillUpForm({
       </h2>
 
       <div className="field">
+        <button
+          className="button button--secondary"
+          type="button"
+          onClick={() => photoInput.current?.click()}
+          disabled={scanning}
+        >
+          {scanning ? 'Reading the photo…' : 'Fill in from a receipt photo'}
+        </button>
+        <input
+          ref={photoInput}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = '';
+            if (file !== undefined) void importPhoto(file);
+          }}
+        />
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0 }}>
+          Photograph a paper receipt and the gallons, price, date and station are filled in for
+          you — into empty fields only, so nothing you typed is overwritten. Pump displays are not
+          supported; their segment digits are not readable by this. Needs a connection the first
+          time.
+        </p>
+        {scanNote !== null && (
+          <p className="warning" role="status" style={{ marginTop: 6 }}>
+            {scanNote}
+          </p>
+        )}
+      </div>
+
+      <div className="field">
         <label className="field__label" htmlFor="fillup-date">
           Date
         </label>
@@ -206,7 +293,10 @@ export function FillUpForm({
           value={dateValue}
           onChange={(event) => {
             const parsed = new Date(event.target.value);
-            if (!Number.isNaN(parsed.getTime())) update('date', parsed);
+            if (!Number.isNaN(parsed.getTime())) {
+              setTouchedDate(true);
+              update('date', parsed);
+            }
           }}
         />
       </div>
