@@ -11,7 +11,10 @@
  * Run it locally with:
  *
  * ```
- * npx firebase emulators:exec --only firestore "npx vitest run src/data/firebase/rules.test.ts"
+ * npx --yes firebase-tools emulators:exec --only firestore \
+ *   "npx vitest run src/data/firebase/rules.test.ts"
+ *
+ * `firebase-tools`, not `firebase` — the latter is the SDK and has no binary.
  * ```
  *
  * ## Why it exists at all

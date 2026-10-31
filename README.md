@@ -187,9 +187,20 @@ allowlisting a credential pattern is never the fix. Copy `.env.example` to
 with no config still builds, starts and passes its tests — the sign-in screen
 says what is missing instead of offering a dead button.
 
+Deploying needs the **`firebase-tools`** CLI, which is a different npm package
+from the `firebase` SDK this app depends on. `npx firebase` resolves to the SDK,
+which ships no executable, and fails with "could not determine executable to
+run" — so name the CLI explicitly:
+
 ```bash
-npx firebase deploy --only hosting,firestore:rules
+npm i -g firebase-tools
+firebase login
+firebase deploy --only hosting,firestore:rules --project <your-project-id>
 ```
+
+The rules deploy is not optional. A database created in production mode denies
+everything until they are uploaded, so sign-in succeeds and then every read
+fails with permission-denied.
 
 Two formats, two jobs. The **JSON backup** is the complete one — every vehicle,
 every fill-up, receipt bytes, and the deletions too — and importing it **merges
