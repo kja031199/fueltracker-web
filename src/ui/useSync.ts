@@ -79,13 +79,17 @@ export function useSync(
         setMessage(result.reason);
         return;
       }
-      const { pulled, pushed, skippedNewerSchema, at } = result.outcome;
+      const { pulled, pushed, skippedNewerSchema, invalid, at } = result.outcome;
       setLastSyncedAt(at);
       saveLastSynced(at);
 
       const notes: string[] = [];
-      if (pulled.rejected.length > 0) {
-        notes.push(`${pulled.rejected.length} row(s) from your account were invalid and skipped`);
+      // Two different kinds of bad row, counted together because the reader
+      // does not care which: `invalid` failed shape validation, `rejected`
+      // passed shape and then failed the draft gate on its numbers.
+      const unusable = invalid.length + pulled.rejected.length;
+      if (unusable > 0) {
+        notes.push(`${unusable} row(s) from your account were unusable and skipped`);
       }
       if (pushed.receiptsOmitted > 0) {
         notes.push(

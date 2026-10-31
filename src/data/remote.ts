@@ -26,9 +26,26 @@ export interface PushSummary {
   readonly receiptsOmitted: number;
 }
 
+/**
+ * What a pull returns: documents, not records.
+ *
+ * Typed as `unknown[]` on purpose. The account's contents may have been written
+ * by a different build of this app, half-written, or edited by hand in the
+ * Firebase console — so a remote implementation is not in a position to promise
+ * that what it read is a `VehicleRecord`. Saying `BackupSnapshot` here would be
+ * the lie that lets an unchecked document reach the statistics layer, and
+ * putting the honest type in the interface is what forces `syncOnce` to
+ * validate it. Every implementation gets that for free, including future ones.
+ */
+export interface RawSnapshot {
+  readonly vehicles: readonly unknown[];
+  readonly fillUps: readonly unknown[];
+  readonly pendingFillUps: readonly unknown[];
+}
+
 export interface RemoteStore {
-  /** Everything the account holds, tombstones included. */
-  pull(): Promise<BackupSnapshot>;
+  /** Everything the account holds, tombstones included and unvalidated. */
+  pull(): Promise<RawSnapshot>;
   /** Writes these rows, replacing by id. */
   push(snapshot: BackupSnapshot): Promise<PushSummary>;
 }
@@ -62,7 +79,7 @@ export class InMemoryRemoteStore implements RemoteStore {
     for (const row of seed.pendingFillUps) this.pendingFillUps.set(row.id, row);
   }
 
-  async pull(): Promise<BackupSnapshot> {
+  async pull(): Promise<RawSnapshot> {
     if (this.failPull) throw new Error('offline');
     return {
       vehicles: [...this.vehicles.values()],

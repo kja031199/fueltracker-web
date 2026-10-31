@@ -6,25 +6,165 @@ rules_version = '2';
 // read. This file IS the check. If it is wrong, every signed-in person can read
 // everyone else's fuel log, and nothing else in the codebase would notice.
 //
-// Which is why it is one rule. The data is laid out as users/{uid}/... (see
-// firebase/remoteStore.ts) specifically so that a single match block covers
-// every collection, now and later. The common alternative — top-level
-// collections with an ownerId field — needs a rule per collection plus a
-// matching constraint on every query, and that is one clause more than fits in
-// a reader's head, which is how this class of app leaks data.
+// The data is laid out as users/{uid}/... (see firebase/remoteStore.ts)
+// specifically so that one identity check covers every collection. The common
+// alternative — top-level collections with an ownerId field — needs a rule per
+// collection plus a matching constraint on every query, and that is one clause
+// more than fits in a reader's head, which is how this class of app leaks data.
 //
 // Everything not matched here is denied: Firestore's default is deny, and there
 // is no catch-all allow anywhere below.
+//
+// ## Two jobs, not one
+//
+// Identity — "is this your tree?" — was the only question this file used to
+// ask. That is enough to stop another *user*, and useless against a bad build,
+// a half-finished write, or a hand edit in the console. So writes now also have
+// to be the right shape.
+//
+// It is defence in depth rather than the primary check: recordValidation.ts
+// re-checks everything on read, because a document can predate any rule. What
+// the rules add is a limit on what can get *in*, including the size limits that
+// keep one bad write from eating a day's quota or the 1 GiB allowance.
+//
+// ## Adding a field means editing this file first
+//
+// `hasOnly` means an unknown field is refused. That is the point — it is what
+// stops a junk field being inflated to the 1 MiB document cap — but it couples
+// the schema to these rules. A new field must be deployed here *before* a build
+// that writes it, or writes fail until it is. Change both in the same pull
+// request.
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Your own documents, and nothing else. `request.auth.uid == uid` is both
-    // halves of the check: signed in, and signed in as the owner of this path.
-    // The null check is not redundant — an unauthenticated request has
-    // request.auth == null, and reading .uid off null would make the whole
-    // condition an error rather than a denial.
-    match /users/{uid}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+    match /users/{uid} {
+
+      // Signed in, and signed in as the owner of this path. The null check is
+      // not redundant: an unauthenticated request has request.auth == null, and
+      // reading .uid off null makes the whole condition an error rather than a
+      // denial.
+      function owner() {
+        return request.auth != null && request.auth.uid == uid;
+      }
+
+      // The four fields every row carries, plus the document id matching the
+      // record's own id — so a row cannot be filed under a name that disagrees
+      // with its contents, which is the shape a merge would reconcile wrongly.
+      function syncFields(id) {
+        return request.resource.data.id is string
+          && request.resource.data.id == id
+          && request.resource.data.id.size() > 0
+          && request.resource.data.id.size() <= 200
+          && request.resource.data.updatedAt is number
+          && (request.resource.data.deletedAt == null
+              || request.resource.data.deletedAt is number)
+          && request.resource.data.schemaVersion is number;
+      }
+
+      function label(field, max) {
+        return field is string && field.size() <= max;
+      }
+
+      function number(field) {
+        return field is number;
+      }
+
+      function optionalNumber(field) {
+        return field == null || field is number;
+      }
+
+      // Bounded well under the 1 MiB document cap, matching
+      // MAX_SYNCED_RECEIPT_BYTES in firebase/remoteStore.ts. A receipt larger
+      // than this is pushed without its image rather than rejected, so this
+      // bound should never be hit by the app — it is here for everything that
+      // is not the app.
+      function receipt(field) {
+        return field == null || (field is bytes && field.size() <= 716800);
+      }
+
+      // Measurements shared by fill-ups and submissions. Positivity is NOT
+      // checked here: the draft gate owns that rule, it is tested there, and a
+      // second copy in a language without tests would drift from it. Shape and
+      // size are what rules are good at.
+      function measurements() {
+        return number(request.resource.data.date)
+          && number(request.resource.data.odometer)
+          && number(request.resource.data.gallons)
+          && number(request.resource.data.pricePerGallon)
+          && request.resource.data.isFullTank is bool
+          && label(request.resource.data.fuelGrade, 40)
+          && label(request.resource.data.station, 200)
+          && label(request.resource.data.notes, 4000)
+          && optionalNumber(request.resource.data.latitude)
+          && optionalNumber(request.resource.data.longitude)
+          && receipt(request.resource.data.receiptImageData);
+      }
+
+      allow read: if owner();
+
+      match /vehicles/{id} {
+        allow read: if owner();
+        allow write: if owner()
+          && syncFields(id)
+          && request.resource.data.keys().hasOnly([
+            'id', 'updatedAt', 'deletedAt', 'schemaVersion',
+            'name', 'make', 'model', 'year', 'createdAt'
+          ])
+          && request.resource.data.keys().hasAll([
+            'id', 'updatedAt', 'deletedAt', 'schemaVersion',
+            'name', 'make', 'model', 'year', 'createdAt'
+          ])
+          && label(request.resource.data.name, 200)
+          && label(request.resource.data.make, 200)
+          && label(request.resource.data.model, 200)
+          && number(request.resource.data.year)
+          && number(request.resource.data.createdAt);
+      }
+
+      match /fillUps/{id} {
+        allow read: if owner();
+        allow write: if owner()
+          && syncFields(id)
+          && request.resource.data.keys().hasOnly([
+            'id', 'updatedAt', 'deletedAt', 'schemaVersion', 'vehicleId',
+            'date', 'odometer', 'gallons', 'pricePerGallon', 'isFullTank',
+            'missedPreviousFillUp', 'fuelGrade', 'station', 'notes',
+            'latitude', 'longitude', 'receiptImageData'
+          ])
+          && request.resource.data.keys().hasAll([
+            'id', 'updatedAt', 'deletedAt', 'schemaVersion', 'vehicleId',
+            'date', 'odometer', 'gallons', 'pricePerGallon', 'isFullTank',
+            'missedPreviousFillUp', 'fuelGrade', 'station', 'notes',
+            'latitude', 'longitude', 'receiptImageData'
+          ])
+          && label(request.resource.data.vehicleId, 200)
+          && request.resource.data.vehicleId.size() > 0
+          && request.resource.data.missedPreviousFillUp is bool
+          && measurements();
+      }
+
+      match /pendingFillUps/{id} {
+        allow read: if owner();
+        allow write: if owner()
+          && syncFields(id)
+          && request.resource.data.keys().hasOnly([
+            'id', 'updatedAt', 'deletedAt', 'schemaVersion', 'vehicleId',
+            'submittedAt', 'submitterName', 'date', 'odometer', 'gallons',
+            'pricePerGallon', 'isFullTank', 'fuelGrade', 'station', 'notes',
+            'latitude', 'longitude', 'receiptImageData'
+          ])
+          && request.resource.data.keys().hasAll([
+            'id', 'updatedAt', 'deletedAt', 'schemaVersion', 'vehicleId',
+            'submittedAt', 'submitterName', 'date', 'odometer', 'gallons',
+            'pricePerGallon', 'isFullTank', 'fuelGrade', 'station', 'notes',
+            'latitude', 'longitude', 'receiptImageData'
+          ])
+          && label(request.resource.data.vehicleId, 200)
+          && request.resource.data.vehicleId.size() > 0
+          && number(request.resource.data.submittedAt)
+          && label(request.resource.data.submitterName, 200)
+          && measurements();
+      }
     }
   }
 }
