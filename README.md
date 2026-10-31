@@ -131,6 +131,29 @@ out the simpler-looking alternative of keeping one JSON file in the user's Googl
 Drive: `drive.appdata` is a sensitive scope, which caps an unverified app at 100
 lifetime users and expires its tokens weekly.
 
+### Local storage is separated by account
+
+The IndexedDB database is named after the signed-in uid
+(`fueltracker-u-<uid>`), and it is opened only once auth has resolved. That is a
+fix, not a flourish: the first version of sign-in opened one database called
+`fueltracker` for everyone, at module load, and never cleared it on sign-out. On
+a shared computer that meant person B signing in got a store still holding
+person A's rows — and the first sync exported them **into B's account**, where
+they propagated to B's other devices.
+
+Per-account names rather than clearing on sign-out, because clearing would
+destroy local edits made before someone signed out and before a sync could carry
+them up — turning a privacy fix into a data-loss one. Each person's rows stay on
+the device under their own name, so signing back in finds them.
+
+Data written before accounts existed is adopted once, into the first account to
+sign in, and the legacy database is deleted only after the copy is verified by
+row count. The adoption declines if the account already has rows, so it is a
+one-time rescue rather than a rule that whoever signs in inherits whatever was
+lying around. `accountStore.test.ts` covers all of that, including the leak
+itself — and that test was checked by reverting the fix, to confirm it fails
+against the old behaviour rather than merely passing against the new one.
+
 ### How sync works, and why it is so little code
 
 Pull, merge, push — reusing the backup machinery rather than inventing a second
