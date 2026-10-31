@@ -1,0 +1,154 @@
+name: Deploy
+
+# Publishes to Firebase Hosting on every merge to main.
+#
+# Deploys used to be manual, and went wrong twice in a week: once with no
+# `dist/` at all, and once nearly with a *stale* one — which is the quieter
+# failure, because it serves last week's code and nothing says so.
+#
+# Not a required check, and deliberately not in the branch ruleset: it runs
+# after merge, and a deploy that fails should not retroactively block the commit
+# that caused it. The four checks on `ci.yml` and `checks.yml` are the gate.
+
+on:
+  push:
+    branches: [main]
+  # So a deploy can be re-run without inventing a commit — after fixing a
+  # misconfigured variable, for instance.
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-main
+  # Deliberately NOT cancel-in-progress, unlike ci.yml. Cancelling a build is
+  # free; cancelling a half-finished deploy is not.
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to Firebase Hosting
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      # Repository **variables**, not secrets. The Firebase web config is public
+      # by design — Google documents it as such, and it necessarily ships inside
+      # the JavaScript bundle where anyone can read it. Putting it in Secrets
+      # would imply a confidentiality the deployed site does not have. The
+      # service account key below is a real secret and is treated as one.
+      VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+      VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+      VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+      VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # The trap this workflow exists to not fall into. Vite inlines VITE_* at
+      # build time, so with these unset the build succeeds and produces a bundle
+      # with no backend — and publishing that gives a live site that loads and
+      # then says it has no Firebase configuration. Failing here is the correct
+      # outcome: a red deploy beats a published site that cannot sign anyone in.
+      - name: Check the configuration is present
+        run: |
+          missing=""
+          for name in VITE_FIREBASE_API_KEY VITE_FIREBASE_AUTH_DOMAIN \
+                      VITE_FIREBASE_PROJECT_ID VITE_FIREBASE_APP_ID; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository variable(s):$missing — set them under"\
+                 "Settings → Secrets and variables → Actions → Variables."
+            exit 1
+          fi
+
+      # Built before the tests, because the manifest tests read dist/ and would
+      # otherwise skip silently — the same ordering, for the same reason, as
+      # ci.yml. Merges to main are already gated on four required checks with no
+      # bypass actors, so this is belt-and-braces; it also makes a manual
+      # workflow_dispatch safe.
+      - name: Build
+        run: npx vite build
+
+      - name: Test
+        run: npm test
+
+      # Hand-rolled rather than google-github-actions/auth: it is three lines,
+      # and it keeps a third-party action from ever holding the credential.
+      # `printf` rather than `echo` so nothing in the JSON is interpreted.
+      - name: Authenticate to Firebase
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error::Missing secret FIREBASE_SERVICE_ACCOUNT."
+            exit 1
+          fi
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-key.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-key.json" >> "$GITHUB_ENV"
+
+      # Rules first, and separately. firestore.rules uses `hasOnly`, so an
+      # unknown field is refused — if a build that writes a new field went live
+      # before the rules knew about it, writes would fail until they caught up.
+      # A single `firebase deploy` does not promise this order.
+      - name: Deploy security rules
+        run: >
+          npx --yes firebase-tools deploy
+          --only firestore:rules
+          --project "$VITE_FIREBASE_PROJECT_ID"
+          --non-interactive
+
+      # The predeploy hook in firebase.json rebuilds here. That is a second
+      # build of a few seconds, accepted rather than removing the hook — the
+      # hook is what stops a *manual* deploy shipping a stale dist/.
+      - name: Deploy hosting
+        run: >
+          npx --yes firebase-tools deploy
+          --only hosting
+          --project "$VITE_FIREBASE_PROJECT_ID"
+          --non-interactive
+
+      # End-to-end proof, and the only one available: the authoring environment
+      # cannot reach *.web.app. Checks the site answers, and that the served
+      # JavaScript actually carries the project id — which is what proves the
+      # configuration was baked in rather than merely present on the runner.
+      - name: Smoke-test the deployed site
+        run: |
+          url="https://$VITE_FIREBASE_PROJECT_ID.web.app"
+          status=$(curl -sS -o page.html -w '%{http_code}' "$url/")
+          if [ "$status" != "200" ]; then
+            echo "::error::$url returned HTTP $status"
+            exit 1
+          fi
+          if ! grep -q 'id="root"' page.html; then
+            echo "::error::$url did not serve the app shell"
+            exit 1
+          fi
+          bundle=$(grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' page.html | head -1)
+          if [ -z "$bundle" ]; then
+            echo "::error::could not find the main bundle in the served page"
+            exit 1
+          fi
+          if ! curl -sS "$url$bundle" | grep -q "$VITE_FIREBASE_PROJECT_ID"; then
+            echo "::error::the deployed bundle carries no Firebase configuration"
+            exit 1
+          fi
+          echo "Deployed and serving: $url"
+
+      # Always, including after a failed deploy, so a credential is never left
+      # behind on the runner.
+      - name: Remove the credential
+        if: always()
+        run: rm -f "$RUNNER_TEMP/firebase-key.json"

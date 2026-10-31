@@ -275,6 +275,33 @@ root. Either use `npx` as above, or point npm somewhere you own:
 npm config set prefix ~/.npm-global   # then add ~/.npm-global/bin to PATH
 ```
 
+#### Deploys happen on merge
+
+`.github/workflows/deploy.yml` publishes to Hosting on every push to `main`,
+so the commands above are now the fallback rather than the routine. Two details
+in it are load-bearing:
+
+- **The four `VITE_FIREBASE_*` values are repository Variables, not Secrets.**
+  They are public by design and ship inside the bundle, so storing them as
+  secrets would imply a confidentiality the deployed site does not have. The
+  service account key is a real secret and lives in Secrets as
+  `FIREBASE_SERVICE_ACCOUNT`.
+- **The workflow refuses to deploy if any of them is missing.** Vite inlines
+  `VITE_*` at build time, so without them the build *succeeds* and produces a
+  bundle with no backend — a live site that loads and then says it has no
+  configuration. A red deploy is the better outcome, and a post-deploy smoke
+  test greps the served JavaScript for the project id to confirm the
+  configuration really was baked in rather than merely present on the runner.
+
+Rules are deployed in a step of their own, **before** hosting, for the `hasOnly`
+reason below. It is not a required check: it runs after merge, and a failed
+deploy should not retroactively block the commit that caused it.
+
+To set it up on a fork: generate a private key under Firebase console → Project
+settings → Service accounts, paste the whole JSON into the
+`FIREBASE_SERVICE_ACCOUNT` secret, add the four variables, and delete the
+downloaded file — it is a long-lived credential with deploy rights.
+
 Hosting carries a **`predeploy` hook** that runs `npm run build`, so a deploy
 cannot ship a `dist/` that does not match the source. That guard is there for
 the quiet failure rather than the loud one: a missing `dist/` stops the deploy
