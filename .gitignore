@@ -4,3 +4,12 @@ coverage/
 *.local
 .DS_Store
 .vite/
+
+# Firebase. `.env.local` is already covered by `*.local`, but spelled out here
+# because the cost of it slipping is a project's config in a public repo.
+.env
+.env.local
+.env.*.local
+.firebase/
+firebase-debug.log
+firestore-debug.log

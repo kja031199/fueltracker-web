@@ -1,0 +1,30 @@
+rules_version = '2';
+
+// The security boundary of the entire application.
+//
+// There is no server, so there is no code path that checks permission before a
+// read. This file IS the check. If it is wrong, every signed-in person can read
+// everyone else's fuel log, and nothing else in the codebase would notice.
+//
+// Which is why it is one rule. The data is laid out as users/{uid}/... (see
+// firebase/remoteStore.ts) specifically so that a single match block covers
+// every collection, now and later. The common alternative — top-level
+// collections with an ownerId field — needs a rule per collection plus a
+// matching constraint on every query, and that is one clause more than fits in
+// a reader's head, which is how this class of app leaks data.
+//
+// Everything not matched here is denied: Firestore's default is deny, and there
+// is no catch-all allow anywhere below.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Your own documents, and nothing else. `request.auth.uid == uid` is both
+    // halves of the check: signed in, and signed in as the owner of this path.
+    // The null check is not redundant — an unauthenticated request has
+    // request.auth == null, and reading .uid off null would make the whole
+    // condition an error rather than a denial.
+    match /users/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}

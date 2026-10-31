@@ -1,0 +1,235 @@
+// @vitest-environment jsdom
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { InMemoryRepository } from '../data/repository';
+import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
+import { FuelTrackerStore } from '../data/store';
+import { StubAuthProvider } from '../data/auth';
+import { InMemoryRemoteStore } from '../data/remote';
+import { App } from './App';
+import { describeSyncTime } from './SettingsScreen';
+
+function makeStore(): FuelTrackerStore {
+  return new FuelTrackerStore({
+    vehicles: new InMemoryRepository<VehicleRecord>(),
+    fillUps: new InMemoryRepository<FillUpRecord>(),
+    pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
+  });
+}
+
+const USER = { uid: 'u1', email: 'driver@example.com', displayName: 'Driver' };
+
+beforeEach(() => {
+  localStorage.clear();
+});
+
+afterEach(cleanup);
+
+describe('the sign-in gate', () => {
+  test('a restoring session shows neither the app nor the sign-in screen', () => {
+    // Firebase restores a persisted session asynchronously. Treating that
+    // moment as "signed out" would flash this screen at an already-signed-in
+    // reader on every single load, including offline where the restore
+    // succeeds from IndexedDB.
+    render(<App store={makeStore()} auth={new StubAuthProvider({ status: 'loading' })} />);
+    expect(screen.getByText(/checking your account/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /continue with google/i })).not.toBeInTheDocument();
+  });
+
+  test('a signed-out reader is asked to sign in and sees no data', async () => {
+    render(
+      <App
+        store={makeStore()}
+        auth={new StubAuthProvider({ status: 'signedOut', error: null })}
+      />,
+    );
+    expect(await screen.findByRole('button', { name: /continue with google/i })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: /sections/i })).not.toBeInTheDocument();
+  });
+
+  test('signing in opens the app', async () => {
+    const user = userEvent.setup();
+    const auth = new StubAuthProvider({ status: 'signedOut', error: null }, USER);
+    render(<App store={makeStore()} auth={auth} />);
+
+    await user.click(await screen.findByRole('button', { name: /continue with google/i }));
+
+    // No vehicles yet, so the first-run welcome is what should appear — the
+    // gate hands over to the normal flow rather than replacing it.
+    expect(await screen.findByRole('heading', { name: /welcome/i })).toBeInTheDocument();
+  });
+
+  test('a failed sign-in says why and leaves the button usable', async () => {
+    const user = userEvent.setup();
+    const auth = new StubAuthProvider(
+      { status: 'signedOut', error: null },
+      USER,
+      'Your browser blocked the sign-in window.',
+    );
+    render(<App store={makeStore()} auth={auth} />);
+
+    await user.click(await screen.findByRole('button', { name: /continue with google/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/blocked the sign-in window/i);
+    // Still clickable: a cancelled popup is the most common failure and must
+    // not leave the only control dead.
+    expect(screen.getByRole('button', { name: /continue with google/i })).toBeEnabled();
+  });
+
+  test('a build with no Firebase config explains itself instead of offering a dead button', async () => {
+    render(
+      <App
+        store={makeStore()}
+        auth={new StubAuthProvider({ status: 'signedOut', error: null })}
+        configured={false}
+      />,
+    );
+    expect(await screen.findByText(/no firebase configuration/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /continue with google/i })).not.toBeInTheDocument();
+  });
+
+  test('signing out from Settings returns to the gate', async () => {
+    const user = userEvent.setup();
+    const auth = new StubAuthProvider({ status: 'signedIn', user: USER }, USER);
+    const store = makeStore();
+    await store.addVehicle({ name: 'Civic' });
+
+    render(<App store={store} auth={auth} initialTab="settings" />);
+
+    expect(await screen.findByText(/driver@example\.com/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /sign out/i }));
+
+    expect(await screen.findByRole('button', { name: /continue with google/i })).toBeInTheDocument();
+  });
+});
+
+describe('the account section', () => {
+  test('a build with no backend says nothing is syncing', async () => {
+    const store = makeStore();
+    await store.addVehicle({ name: 'Civic' });
+    render(
+      <App
+        store={store}
+        auth={new StubAuthProvider({ status: 'signedIn', user: USER }, USER)}
+        initialTab="settings"
+      />,
+    );
+    expect(await screen.findByText(/no backend configured/i)).toBeInTheDocument();
+  });
+
+  test('a sync on open pulls the account down and the screens show it', async () => {
+    const store = makeStore();
+    const remote = new InMemoryRemoteStore({
+      vehicles: [
+        {
+          id: 'v-remote',
+          updatedAt: 500,
+          deletedAt: null,
+          schemaVersion: 1,
+          name: 'Account Car',
+          make: 'Honda',
+          model: 'Civic',
+          year: 2019,
+          createdAt: 500,
+        },
+      ],
+      fillUps: [],
+      pendingFillUps: [],
+    });
+
+    render(
+      <App
+        store={store}
+        auth={new StubAuthProvider({ status: 'signedIn', user: USER }, USER)}
+        remote={remote}
+        initialTab="vehicles"
+      />,
+    );
+
+    // Arrives through the sync on mount, not from local storage — the store
+    // started empty.
+    expect(await screen.findByText(/Account Car/)).toBeInTheDocument();
+  });
+
+  test('a sync failure is reported without taking the app down', async () => {
+    const store = makeStore();
+    await store.addVehicle({ name: 'Civic' });
+    const remote = new InMemoryRemoteStore();
+    remote.failPull = true;
+
+    render(
+      <App
+        store={store}
+        auth={new StubAuthProvider({ status: 'signedIn', user: USER }, USER)}
+        remote={remote}
+        initialTab="settings"
+      />,
+    );
+
+    // Being unreachable is the ordinary condition of an offline-first app, so
+    // it is a status line and the local data keeps working.
+    expect(await screen.findByRole('status')).toHaveTextContent(/could not reach your account/i);
+    expect(screen.getByRole('navigation', { name: /sections/i })).toBeInTheDocument();
+  });
+
+  test('a large receipt is reported as staying on the device', async () => {
+    const store = makeStore();
+    const added = await store.addVehicle({ name: 'Civic' });
+    const { makeFuelEntryDraft } = await import('../domain/fuelEntryDraft');
+    const draft = makeFuelEntryDraft({
+      date: new Date(1_700_000_000_000),
+      odometer: 10_000,
+      gallons: 10,
+      pricePerGallon: 3.5,
+      receiptImageData: new Uint8Array(900 * 1024),
+    });
+    await store.addFillUp(draft!, added.id);
+
+    const remote = new InMemoryRemoteStore();
+    remote.receiptByteLimit = 700 * 1024;
+
+    render(
+      <App
+        store={store}
+        auth={new StubAuthProvider({ status: 'signedIn', user: USER }, USER)}
+        remote={remote}
+        initialTab="settings"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(/too large to sync/i),
+    );
+  });
+});
+
+describe('describeSyncTime', () => {
+  const now = new Date('2026-03-10T12:00:00Z').getTime();
+
+  test('says so plainly when nothing has synced yet', () => {
+    expect(describeSyncTime(null, now)).toBe('not yet');
+  });
+
+  test('reads as just now inside a minute', () => {
+    expect(describeSyncTime(now - 5_000, now)).toBe('just now');
+  });
+
+  test('counts minutes, then hours', () => {
+    expect(describeSyncTime(now - 3 * 60_000, now)).toBe('3 minutes ago');
+    expect(describeSyncTime(now - 60_000, now)).toBe('1 minute ago');
+    expect(describeSyncTime(now - 2 * 3_600_000, now)).toBe('2 hours ago');
+    expect(describeSyncTime(now - 3_600_000, now)).toBe('1 hour ago');
+  });
+
+  test('falls back to a date once it stops being recent', () => {
+    expect(describeSyncTime(now - 3 * 24 * 3_600_000, now)).toBe(
+      new Date(now - 3 * 24 * 3_600_000).toLocaleDateString(),
+    );
+  });
+
+  test('does not read a clock-skewed future timestamp as a negative age', () => {
+    // A device whose clock is ahead would otherwise produce "-4 minutes ago".
+    expect(describeSyncTime(now + 240_000, now)).toBe('just now');
+  });
+});
