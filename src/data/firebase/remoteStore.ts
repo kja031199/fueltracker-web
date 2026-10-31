@@ -51,8 +51,8 @@ import {
   type Firestore,
 } from 'firebase/firestore';
 import type { BackupSnapshot } from '../../domain/backupFormat';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../records';
-import type { PushSummary, RemoteStore } from '../remote';
+import type { FillUpRecord, PendingFillUpRecord } from '../records';
+import type { PushSummary, RawSnapshot, RemoteStore } from '../remote';
 import { firebaseApp, type FirebaseSettings } from './config';
 
 /**
@@ -76,11 +76,20 @@ export class FirestoreRemoteStore implements RemoteStore {
     this.db = getFirestore(firebaseApp(settings));
   }
 
-  async pull(): Promise<BackupSnapshot> {
+  /**
+   * Everything the account holds, **as documents rather than as records**.
+   *
+   * The return type is deliberately `RawSnapshot` and not `BackupSnapshot`:
+   * what comes back is whatever is in the account, which may have been written
+   * by a different build, half-written, or hand-edited in the console. Calling
+   * it a typed record here would be the lie that lets it reach the statistics
+   * layer unchecked. `syncOnce` validates it — see `recordValidation.ts`.
+   */
+  async pull(): Promise<RawSnapshot> {
     const [vehicles, fillUps, pendingFillUps] = await Promise.all([
-      this.read<VehicleRecord>('vehicles'),
-      this.read<FillUpRecord>('fillUps'),
-      this.read<PendingFillUpRecord>('pendingFillUps'),
+      this.read('vehicles'),
+      this.read('fillUps'),
+      this.read('pendingFillUps'),
     ]);
     return { vehicles, fillUps, pendingFillUps };
   }
@@ -114,9 +123,10 @@ export class FirestoreRemoteStore implements RemoteStore {
     return { written: writes.length, receiptsOmitted };
   }
 
-  private async read<T>(path: Collection): Promise<T[]> {
+  /** Raw documents, with only the receipt bytes converted. */
+  private async read(path: Collection): Promise<Record<string, unknown>[]> {
     const snapshot = await getDocs(collection(this.db, 'users', this.uid, path));
-    return snapshot.docs.map((document) => decode(document.data()) as T);
+    return snapshot.docs.map((document) => decode(document.data()));
   }
 
   private encodeReceipt(
@@ -134,13 +144,13 @@ export class FirestoreRemoteStore implements RemoteStore {
 }
 
 /**
- * Turns a stored document back into a record.
+ * Converts the one field whose wire form differs from its in-memory form.
  *
- * Only `receiptImageData` needs converting — everything else is a number,
- * string, boolean or null on both sides. The field is read defensively because
- * what comes back is whatever is in the account, which may have been written by
- * a different build or edited in the console; anything that is not a `Bytes`
- * becomes `null` rather than an object that later code would treat as an image.
+ * Firestore hands back `Bytes`; the records hold `Uint8Array`. Everything else
+ * is a number, string, boolean or null on both sides — and is *not* checked
+ * here. Shape validation belongs to `recordValidation.ts`, which runs over the
+ * result: keeping the two apart means the type conversion cannot quietly become
+ * the place where validation is assumed to have happened.
  */
 function decode(data: Record<string, unknown>): Record<string, unknown> {
   const receipt = data.receiptImageData;

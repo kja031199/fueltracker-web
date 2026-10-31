@@ -31,7 +31,8 @@ import type { BackupSnapshot } from '../domain/backupFormat';
 import type { ImportSummary } from './backup';
 import type { FillUpRecord } from './records';
 import { SCHEMA_VERSION } from './records';
-import type { PushSummary, RemoteStore } from './remote';
+import { validateSnapshot } from './recordValidation';
+import type { PushSummary, RawSnapshot, RemoteStore } from './remote';
 import { rowsToPush } from './remote';
 import type { FuelTrackerStore, StoreClock } from './store';
 import { systemClock } from './store';
@@ -41,6 +42,11 @@ export interface SyncOutcome {
   readonly pushed: PushSummary;
   /** Rows the remote held in a newer schema than this build understands. */
   readonly skippedNewerSchema: number;
+  /**
+   * Documents in the account that were not the shape they claimed, and were
+   * refused before anything downstream could treat them as records.
+   */
+  readonly invalid: readonly string[];
   readonly at: number;
 }
 
@@ -113,12 +119,19 @@ export async function syncOnce(
   remote: RemoteStore,
   clock: StoreClock = systemClock,
 ): Promise<SyncResult> {
-  let remoteSnapshot: BackupSnapshot;
+  let raw: RawSnapshot;
   try {
-    remoteSnapshot = await remote.pull();
+    raw = await remote.pull();
   } catch (cause) {
     return { ok: false, reason: describe(cause, 'Could not reach your account.') };
   }
+
+  // **Shape first, before anything else looks at it.** The account's contents
+  // are untrusted input in exactly the way an imported file is, and the one
+  // guarantee that mattered — that a fill-up's numbers are finite and positive
+  // — only covered numbers. A document with a string `date` or an object
+  // `vehicleId` used to flow straight into the statistics layer.
+  const { snapshot: remoteSnapshot, rejected: invalid } = validateSnapshot(raw);
 
   const vehicles = partitionBySchema(remoteSnapshot.vehicles);
   const fillUps = partitionBySchema(remoteSnapshot.fillUps);
@@ -147,7 +160,7 @@ export async function syncOnce(
     return { ok: false, reason: describe(cause, 'Changes are saved here but not uploaded yet.') };
   }
 
-  return { ok: true, outcome: { pulled, pushed, skippedNewerSchema, at: clock.now() } };
+  return { ok: true, outcome: { pulled, pushed, skippedNewerSchema, invalid, at: clock.now() } };
 }
 
 function describe(cause: unknown, fallback: string): string {

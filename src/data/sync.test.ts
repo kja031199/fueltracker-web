@@ -3,6 +3,7 @@ import { InMemoryRepository } from './repository';
 import { InMemoryRemoteStore, emptySnapshot, rowsToPush } from './remote';
 import { FuelTrackerStore, type StoreClock } from './store';
 import { SCHEMA_VERSION, type FillUpRecord, type VehicleRecord } from './records';
+import { validateSnapshot } from './recordValidation';
 import { partitionBySchema, preserveLocalReceipts, syncOnce } from './sync';
 import type { BackupSnapshot } from '../domain/backupFormat';
 
@@ -65,6 +66,18 @@ function fillUp(overrides: Partial<FillUpRecord> = {}): FillUpRecord {
 
 function snapshot(overrides: Partial<BackupSnapshot> = {}): BackupSnapshot {
   return { ...emptySnapshot(), ...overrides };
+}
+
+/**
+ * Reads the remote back as typed records.
+ *
+ * `pull()` returns `RawSnapshot` — `unknown[]` — because the account's contents
+ * are not something a remote can vouch for. Tests that want to assert on a
+ * field have to validate first, same as the app does, which means these
+ * assertions exercise the validator rather than bypassing it.
+ */
+async function pulled(remote: InMemoryRemoteStore): Promise<BackupSnapshot> {
+  return validateSnapshot(await remote.pull()).snapshot;
 }
 
 describe('rowsToPush', () => {
@@ -156,7 +169,7 @@ describe('syncOnce', () => {
     const result = await syncOnce(store, remote, fakeClock());
 
     expect(result.ok).toBe(true);
-    expect((await remote.pull()).vehicles).toHaveLength(1);
+    expect((await pulled(remote)).vehicles).toHaveLength(1);
   });
 
   it('is a no-op the second time', async () => {
@@ -182,7 +195,7 @@ describe('syncOnce', () => {
 
     const [stored] = await store.vehicles();
     expect(stored?.name).toBe('Local name');
-    expect((await remote.pull()).vehicles[0]?.name).toBe('Local name');
+    expect((await pulled(remote)).vehicles[0]?.name).toBe('Local name');
   });
 
   it('propagates a remote tombstone into local storage', async () => {
@@ -207,38 +220,62 @@ describe('syncOnce', () => {
 
     await syncOnce(store, remote, fakeClock());
 
-    expect((await remote.pull()).vehicles[0]?.deletedAt).not.toBeNull();
+    expect((await pulled(remote)).vehicles[0]?.deletedAt).not.toBeNull();
   });
 
   describe('hostile and degenerate input', () => {
-    it('refuses a remote fill-up with non-finite gallons', async () => {
-      const { store, repos: r } = storeWith();
-      await r.vehicles.put(vehicle());
-      const remote = new InMemoryRemoteStore(
-        snapshot({ fillUps: [fillUp({ gallons: Number.POSITIVE_INFINITY })] }),
-      );
-
-      const result = await syncOnce(store, remote, fakeClock());
-
-      // +Infinity passes a `> 0` check, which is exactly why the draft gate
-      // tests isFinite explicitly. Reusing importBackup is what gets this for
-      // free on the network path.
-      expect(result.ok && result.outcome.pulled.rejected).toHaveLength(1);
-      expect(await store.fillUps('v1')).toEqual([]);
-    });
-
+    // Two gates, and which one catches a bad number is worth asserting rather
+    // than blurring. Shape validation refuses anything **non-finite**; the
+    // draft gate refuses anything **non-positive**. A test that accepted
+    // either would still pass if one of them stopped working.
     it.each([
       ['NaN', Number.NaN],
-      ['negative', -5],
-      ['zero', 0],
-    ])('refuses a remote fill-up with %s gallons', async (_label, gallons) => {
+      ['+Infinity', Number.POSITIVE_INFINITY],
+      ['-Infinity', Number.NEGATIVE_INFINITY],
+    ])('refuses %s gallons as the wrong shape', async (_label, gallons) => {
       const { store, repos: r } = storeWith();
       await r.vehicles.put(vehicle());
       const remote = new InMemoryRemoteStore(snapshot({ fillUps: [fillUp({ gallons })] }));
 
       const result = await syncOnce(store, remote, fakeClock());
 
+      // +Infinity passes a `> 0` check, which is why finiteness is tested
+      // explicitly and not left to the positivity check downstream.
+      expect(result.ok && result.outcome.invalid).toHaveLength(1);
+      expect(await store.fillUps('v1')).toEqual([]);
+    });
+
+    it.each([
+      ['negative', -5],
+      ['zero', 0],
+    ])('refuses %s gallons at the draft gate', async (_label, gallons) => {
+      const { store, repos: r } = storeWith();
+      await r.vehicles.put(vehicle());
+      const remote = new InMemoryRemoteStore(snapshot({ fillUps: [fillUp({ gallons })] }));
+
+      const result = await syncOnce(store, remote, fakeClock());
+
+      // Finite, so shape validation passes it on; it is the draft gate that
+      // knows a fill-up cannot have zero gallons.
+      expect(result.ok && result.outcome.invalid).toEqual([]);
       expect(result.ok && result.outcome.pulled.rejected).toHaveLength(1);
+      expect(await store.fillUps('v1')).toEqual([]);
+    });
+
+    it('refuses a document whose fields are the wrong types entirely', async () => {
+      const { store, repos: r } = storeWith();
+      await r.vehicles.put(vehicle());
+      const remote = new InMemoryRemoteStore();
+      // Written straight past the typed push, the way a console edit or an
+      // older build would leave it.
+      await remote.push({
+        ...emptySnapshot(),
+        fillUps: [{ ...fillUp(), date: 'yesterday' } as never],
+      });
+
+      const result = await syncOnce(store, remote, fakeClock());
+
+      expect(result.ok && result.outcome.invalid).toHaveLength(1);
       expect(await store.fillUps('v1')).toEqual([]);
     });
 
@@ -324,8 +361,8 @@ describe('syncOnce', () => {
 
       expect(result.ok && result.outcome.pushed.receiptsOmitted).toBe(1);
       // The fill-up itself still synced — only the photo stayed behind.
-      expect((await remote.pull()).fillUps).toHaveLength(1);
-      expect((await remote.pull()).fillUps[0]?.receiptImageData).toBeNull();
+      expect((await pulled(remote)).fillUps).toHaveLength(1);
+      expect((await pulled(remote)).fillUps[0]?.receiptImageData).toBeNull();
     });
 
     it('does not let a photoless round trip destroy the local photo', async () => {
@@ -348,10 +385,10 @@ describe('syncOnce', () => {
       // Another device edits the row, so the account's photoless copy becomes
       // the newer one. Without preserveLocalReceipts this is where the only
       // remaining copy of the image would be overwritten with null.
-      const pulled = await remote.pull();
+      const current = await pulled(remote);
       await remote.push({
         ...emptySnapshot(),
-        fillUps: [{ ...pulled.fillUps[0]!, updatedAt: Date.now() + 10_000, station: 'Edited' }],
+        fillUps: [{ ...current.fillUps[0]!, updatedAt: Date.now() + 10_000, station: 'Edited' }],
       });
 
       await syncOnce(store, remote, fakeClock());
@@ -373,7 +410,7 @@ describe('syncOnce', () => {
       expect(result.ok && result.outcome.skippedNewerSchema).toBe(1);
       expect(await store.vehicles()).toEqual([]);
       // Still there for the newer build that wrote it.
-      expect((await remote.pull()).vehicles).toHaveLength(1);
+      expect((await pulled(remote)).vehicles).toHaveLength(1);
     });
 
     it('survives an account with nothing in it', async () => {

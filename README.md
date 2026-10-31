@@ -186,6 +186,47 @@ a day, which is enormous for one person's fuel log right up until something
 syncs in a loop, and an app that stops working at 4pm because it burned its
 quota is a worse failure than one that is a few seconds stale.
 
+### Nothing from the account is trusted
+
+Two independent checks, because they fail in different ways.
+
+**On read**, `recordValidation.ts` checks the shape of every document before
+anything treats it as a record. The account's contents can predate any rule — a
+different build wrote them, a write was interrupted, somebody edited a document
+in the console — so a `date` of `"yesterday"`, a `vehicleId` that is an object,
+or a 900 KB `station` string used to flow straight into the statistics layer.
+The split it applies:
+
+- **Reject the row** when something structural is wrong: a missing `id`, a
+  non-finite `updatedAt`, a measurement that is not a number, a fill-up with no
+  vehicle. Guessing would invent data.
+- **Repair the field** when the problem is cosmetic: text beyond any plausible
+  human entry is truncated, an unrecognised fuel grade becomes `Other`, a
+  non-boolean full-tank flag becomes `false` (it is truthy in JavaScript, and
+  accepting `"no"` as true would silently change the whole MPG chain). Losing a
+  fill-up's odometer reading because somebody pasted an essay into its notes
+  would be the worse outcome.
+
+Rejections are counted and shown, never silently dropped. The two gates are
+distinct and tested separately: shape validation refuses anything **non-finite**,
+and the draft gate refuses anything **non-positive**.
+
+**On write**, `firestore.rules` now validates shape as well as identity — field
+names, types, string lengths and receipt size. Identity alone stops another
+*user* and does nothing about a bad build or a console edit, and the size bounds
+are what stop one junk field being inflated to the 1 MiB document cap and eating
+the daily quota.
+
+One consequence worth knowing before adding a field: the rules use `hasOnly`, so
+an unknown field is refused. **New fields must be deployed to the rules before a
+build that writes them** — change both in the same pull request.
+
+The rules suite is 25 assertions against the emulator, including the positive
+cases built from records the app itself produces rather than hand-written
+literals, which is what stops the rules and the schema drifting apart. It has
+been mutation-tested twice: with the shape checks removed 13 assertions fail,
+and with the rules wide open 20 do.
+
 ### Receipt photos are the exception
 
 Since 3 February 2026 Firebase Cloud Storage requires a linked billing account
