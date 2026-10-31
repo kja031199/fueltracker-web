@@ -166,8 +166,11 @@ describe('importing', () => {
 });
 
 describe('the storage warning', () => {
-  test('now points at export rather than admitting there is none', async () => {
+  test('still recommends export even though an account copy exists', async () => {
+    // Syncing makes export less critical and not pointless: a backup file is
+    // the only copy that does not depend on someone else's service staying up,
+    // or on the reader keeping access to that Google account.
     await renderSettings(makeStore());
-    expect(screen.getByText(/export a backup now and again/i)).toBeInTheDocument();
+    expect(screen.getByText(/only copy that does not depend on anyone else/i)).toBeInTheDocument();
   });
 });

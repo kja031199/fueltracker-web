@@ -2,6 +2,8 @@ import type { ReactElement } from 'react';
 import { useRef, useState } from 'react';
 import type { UnitPreferences } from '../domain/units';
 import type { FuelTrackerStore } from '../data/store';
+import type { AuthUser } from '../data/auth';
+import type { SyncStatus } from './useSync';
 import { backupFilename } from '../data/backup';
 import { parseCsv, parseJsonBackup, toCsv, toJsonBackup } from '../domain/backupFormat';
 import { downloadText } from './download';
@@ -19,16 +21,43 @@ interface Props {
   readonly onChange: (units: UnitPreferences) => void;
   readonly store: FuelTrackerStore;
   readonly onImported: () => Promise<void>;
+  /** Omitted by tests that are not about the account. */
+  readonly account?: AuthUser;
+  readonly onSignOut?: () => void;
+  readonly sync?: SyncStatus;
+  /** False when this build has no backend configured, so nothing syncs. */
+  readonly syncEnabled?: boolean;
+}
+
+/** "3 minutes ago", falling back to a date once it stops being recent. */
+export function describeSyncTime(at: number | null, now: number = Date.now()): string {
+  if (at === null) return 'not yet';
+  const seconds = Math.max(0, Math.round((now - at) / 1000));
+  if (seconds < 60) return 'just now';
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  return new Date(at).toLocaleDateString();
 }
 
 /**
- * Units, and the honest note about where the data lives.
+ * The account, units, and the honest note about where the data lives.
  *
  * Changing a unit changes only what is shown and what typed numbers are read
  * as; every stored value stays canonical, so nothing is rewritten and nothing
  * can be lost in a conversion.
  */
-export function SettingsScreen({ units, onChange, store, onImported }: Props): ReactElement {
+export function SettingsScreen({
+  units,
+  onChange,
+  store,
+  onImported,
+  account,
+  onSignOut,
+  sync,
+  syncEnabled = false,
+}: Props): ReactElement {
   const fileInput = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [problems, setProblems] = useState<readonly string[]>([]);
@@ -146,17 +175,67 @@ export function SettingsScreen({ units, onChange, store, onImported }: Props): R
         </p>
       </section>
 
+      {account !== undefined && (
+        <section className="card" aria-labelledby="account-heading">
+          <h2 className="card__title" id="account-heading">
+            Account
+          </h2>
+          <p style={{ margin: '0 0 8px' }}>
+            Signed in as <strong>{account.email === '' ? account.displayName : account.email}</strong>.
+          </p>
+
+          {syncEnabled && sync !== undefined ? (
+            <>
+              <p style={{ margin: '0 0 8px' }}>
+                Last synced {describeSyncTime(sync.lastSyncedAt)}.
+              </p>
+              <button
+                className="button"
+                type="button"
+                onClick={() => void sync.syncNow()}
+                disabled={sync.syncing}
+              >
+                {sync.syncing ? 'Syncing…' : 'Sync now'}
+              </button>
+              {sync.message !== null && (
+                <p className="warning" style={{ margin: '8px 0 0' }} role="status">
+                  {sync.message}
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="warning" style={{ margin: '0 0 8px' }}>
+              This build has no backend configured, so nothing is syncing — your fuel log is only on
+              this device.
+            </p>
+          )}
+
+          {onSignOut !== undefined && (
+            <p style={{ margin: '12px 0 0' }}>
+              <button className="button button--secondary" type="button" onClick={onSignOut}>
+                Sign out
+              </button>
+            </p>
+          )}
+        </section>
+      )}
+
       <section className="card" aria-labelledby="storage-heading">
         <h2 className="card__title" id="storage-heading">
           Where your data lives
         </h2>
         <p style={{ margin: '0 0 8px' }}>
-          Everything is stored in this browser, on this device. There is no account and no server,
-          so nothing is uploaded anywhere.
+          Your fuel log is stored in this browser and kept in your Google account. Nobody else can
+          read it — not another signed-in person, and not anyone without your account.
+        </p>
+        <p style={{ margin: '0 0 8px' }}>
+          Because there is a copy in your account, clearing your browser data no longer loses your
+          history: signing in again pulls it back.
         </p>
         <p className="warning" style={{ margin: 0 }}>
-          That also means clearing your browser data deletes your fuel log, and nobody can get it
-          back for you. Export a backup now and again — it is the only copy there is.
+          Receipt photos are the exception. A large one stays on the device that took it rather than
+          syncing, so it is the one thing a cleared browser can still lose. Exporting a backup is
+          still worth doing — it is the only copy that does not depend on anyone else's service.
         </p>
       </section>
 

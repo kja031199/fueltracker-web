@@ -48,8 +48,19 @@ export default defineConfig({
         // a screen many people never open. They load on demand instead — which
         // is why scanning is the only part of this app that needs a network.
         globIgnores: ['**/scanner-*.js', '**/exif-*.js'],
-        // Nothing here is fetched from a network at runtime — no API, no CDN,
-        // no fonts — so precaching the shell is the whole offline story.
+        // The Firebase chunks are deliberately **not** in that ignore list,
+        // even though they are large and lazily imported. Sign-in is required,
+        // and the auth provider is what restores the persisted session — so if
+        // its chunk were missing from the cache, an offline reload would fail
+        // its dynamic import and the app would not open at all. Paying ~170 KB
+        // gzipped of precache is the price of the gate working offline.
+        //
+        // No runtime caching rule is added for Firestore or Google's auth
+        // endpoints, and none should be: workbox only precaches same-origin
+        // build output, so it never sits between the SDK and its own servers.
+        // Firestore does its own offline handling, and a service worker
+        // replaying stale auth responses from a cache is a security problem
+        // rather than a feature.
         navigateFallback: `${base}index.html`,
         cleanupOutdatedCaches: true,
       },

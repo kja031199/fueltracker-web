@@ -132,13 +132,23 @@ describe('settings', () => {
     expect(localStorage.getItem('fueltracker.units')).toContain('litersPer100km');
   });
 
-  test('says plainly that clearing browser data loses the log', async () => {
-    // The most likely way this app hurts someone, so it is stated rather than
-    // buried. Now that export exists the warning points at it; the warning
-    // itself stays, because a backup nobody takes is no protection.
+  test('says plainly that an account copy now survives a cleared browser', async () => {
+    // This assertion used to read "clearing your browser data deletes your fuel
+    // log", which was the most likely way this app could hurt someone and was
+    // stated rather than buried. Syncing to an account made it false, so the
+    // claim changed rather than the test being loosened — a warning that is no
+    // longer true trains people to ignore the ones that are.
     await renderSettings();
-    expect(screen.getByText(/clearing your browser data deletes your fuel log/i))
+    expect(screen.getByText(/clearing your browser data no longer loses your history/i))
       .toBeInTheDocument();
+  });
+
+  test('still names the one thing a cleared browser can lose', async () => {
+    // Receipt photos are the exception, because a large one does not fit in a
+    // document and stays on the device that took it. The honest warning is now
+    // narrower, not absent.
+    await renderSettings();
+    expect(screen.getByText(/receipt photos are the exception/i)).toBeInTheDocument();
   });
 });
 

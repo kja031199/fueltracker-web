@@ -57,3 +57,42 @@ jobs:
 
       - name: Test
         run: npm test
+
+  rules:
+    name: Firestore security rules
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # A separate job because it needs the Firestore emulator, which needs Java
+    # and a downloaded JAR. The main suite needs nothing but Node and that is
+    # worth keeping, so `rules.test.ts` skips itself when the emulator is
+    # absent — which makes this job the only thing that actually runs those
+    # eight assertions.
+    #
+    # It reports a status unconditionally, like the others, so it is safe to
+    # add to the required set — and it should be. `firestore.rules` is the
+    # entire security boundary of an app with no server, and the failure it
+    # guards against is silent: one wrong clause and every signed-in person can
+    # read everyone else's fuel log with nothing else behaving any differently.
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Java is preinstalled on ubuntu-latest. The emulator JAR is fetched on
+      # first run, which takes a few seconds.
+      - name: Test rules against the emulator
+        run: >
+          npx --yes firebase-tools emulators:exec
+          --only firestore
+          --project fueltracker-rules-test
+          "npx vitest run src/data/firebase/rules.test.ts"

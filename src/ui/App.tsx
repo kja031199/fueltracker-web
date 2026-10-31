@@ -1,13 +1,19 @@
 import type { ReactElement } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import type { FuelTrackerStore } from '../data/store';
+import type { AuthProvider } from '../data/auth';
+import { StubAuthProvider } from '../data/auth';
+import type { RemoteStore } from '../data/remote';
 import type { UnitPreferences } from '../domain/units';
 import { shouldOnboard } from '../domain/onboardingGate';
 import { applyPalette, preferredColorScheme, watchColorScheme } from './theme';
 import { loadHasOnboarded, loadUnitPreferences, saveHasOnboarded, saveUnitPreferences } from './unitSettings';
 import { useAppData } from './useAppData';
+import { useAuth } from './useAuth';
+import { useSync } from './useSync';
 import { useServiceWorker } from './useServiceWorker';
 import { UpdateBanner } from './UpdateBanner';
+import { SignInScreen } from './SignInScreen';
 import { VehiclesScreen } from './VehiclesScreen';
 import { SettingsScreen } from './SettingsScreen';
 import { DashboardScreen } from './DashboardScreen';
@@ -22,17 +28,52 @@ const TABS: readonly { readonly id: Tab; readonly label: string }[] = [
   { id: 'settings', label: 'Settings' },
 ];
 
+/**
+ * A signed-in stub, used when no provider is passed.
+ *
+ * This mirrors the iOS render harness, which defaults to
+ * `StubAuthenticator(canAuthenticate: true, result: true)` for the same reason:
+ * so a test about the dashboard is a test about the dashboard, not about
+ * authentication. `main.tsx` always passes the real provider, and a test that
+ * cares about the gate passes its own stub in whichever state it wants.
+ */
+function defaultAuth(): AuthProvider {
+  return new StubAuthProvider({
+    status: 'signedIn',
+    user: { uid: 'local', email: '', displayName: '' },
+  });
+}
+
 export interface AppProps {
   readonly store: FuelTrackerStore;
   /** Test seam: pins the palette instead of reading the system preference. */
   readonly initialTab?: Tab;
+  /** Omitted in tests, where it defaults to a signed-in stub. */
+  readonly auth?: AuthProvider;
+  /**
+   * The account's copy of the data, or `null` for a build with no Firebase
+   * configuration — in which case the app is local-only and says so.
+   */
+  readonly remote?: RemoteStore | null;
+  /** False when this build has no Firebase config, so sign-in cannot work. */
+  readonly configured?: boolean;
 }
 
-export function App({ store, initialTab = 'dashboard' }: AppProps): ReactElement {
+export function App({
+  store,
+  initialTab = 'dashboard',
+  auth,
+  remote = null,
+  configured = true,
+}: AppProps): ReactElement {
+  // Memoised, or a new stub on every render would resubscribe forever.
+  const authProvider = useMemo(() => auth ?? defaultAuth(), [auth]);
+  const authState = useAuth(authProvider);
   const [tab, setTab] = useState<Tab>(initialTab);
   const [units, setUnits] = useState<UnitPreferences>(() => loadUnitPreferences());
   const [hasOnboarded, setHasOnboarded] = useState<boolean>(() => loadHasOnboarded());
   const data = useAppData(store);
+  const sync = useSync(store, authState.status === 'signedIn' ? remote : null, data.reload);
   const serviceWorker = useServiceWorker();
 
   // The palette is applied from the ported values rather than written as CSS,
@@ -60,6 +101,23 @@ export function App({ store, initialTab = 'dashboard' }: AppProps): ReactElement
     () => !data.loading && shouldOnboard(hasOnboarded, data.vehicles.length),
     [data.loading, data.vehicles.length, hasOnboarded],
   );
+
+  // The auth gate comes before everything, and `loading` is a state of its own
+  // rather than being folded into "signed out". Firebase restores a persisted
+  // session asynchronously, so treating "not signed in yet" as "signed out"
+  // would flash this screen at an already-signed-in reader on every load —
+  // including offline, where the restore still succeeds.
+  if (authState.status === 'loading') {
+    return (
+      <div className="app">
+        <p className="empty">Checking your account…</p>
+      </div>
+    );
+  }
+
+  if (authState.status === 'signedOut') {
+    return <SignInScreen auth={authProvider} error={authState.error} configured={configured} />;
+  }
 
   if (data.loading) {
     return (
@@ -94,7 +152,8 @@ export function App({ store, initialTab = 'dashboard' }: AppProps): ReactElement
               and which day of the week you tend to catch the cheapest price.
             </p>
             <p>
-              Everything stays in this browser. No account, no server, nothing uploaded.
+              Your fuel log is saved on this device and kept in your Google account, so it survives
+              clearing your browser data and follows you to your phone. Only you can read it.
             </p>
             <button className="button" type="button" onClick={finishOnboarding}>
               Get started
@@ -125,6 +184,10 @@ export function App({ store, initialTab = 'dashboard' }: AppProps): ReactElement
             onChange={changeUnits}
             store={store}
             onImported={data.reload}
+            account={authState.user}
+            onSignOut={() => void authProvider.signOut()}
+            sync={sync}
+            syncEnabled={remote !== null}
           />
         )}
         {tab === 'dashboard' && (

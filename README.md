@@ -2,13 +2,15 @@
 
 [![CI](https://github.com/kja031199/fueltracker-web/actions/workflows/ci.yml/badge.svg)](https://github.com/kja031199/fueltracker-web/actions/workflows/ci.yml)
 
-Track gas fill-ups and fuel economy in your browser. **Local-first: no account, no server, no analytics.** Your data stays in your browser.
+Track gas fill-ups and fuel economy in your browser. **Sign in with Google; your fuel log is stored on your device and synced to your own account.** No analytics, no third party, and nobody but you can read it.
 
-> **Status: complete.** Everything that was planned is built. Add vehicles, log
-> and edit fill-ups, search and filter them, see your economy, spending and price
-> trends as KPIs and charts, **export a backup you can restore**, **install it and
-> use it with no network at all**, and **photograph a receipt** to fill the form in.
-> 598 tests. What is *not* here was left out on purpose, not left unfinished — see
+> **Status: complete, now with an account.** Add vehicles, log and edit fill-ups,
+> search and filter them, see your economy, spending and price trends as KPIs and
+> charts, **export a backup you can restore**, **install it and use it with no
+> network at all**, **photograph a receipt** to fill the form in, and **sign in
+> with Google so your log survives a cleared browser and follows you to your
+> phone**. 650 tests, plus eight that run the security rules against the Firestore
+> emulator. What is *not* here was left out on purpose, not left unfinished — see
 > [What was deliberately not built](#what-was-deliberately-not-built).
 
 ## What this is
@@ -101,11 +103,93 @@ recursion so a re-derivation cannot quietly optimise the looser problem.
 
 ## How storage works
 
-Everything lives in the browser, in IndexedDB via [Dexie](https://dexie.org).
-There is no server and no account, which is the whole privacy posture — and also
-why export is not a nice-to-have: browser storage can be cleared by the reader,
-by the browser under pressure, or by a privacy setting, and there is nobody to
-ask for a copy. **Export a backup now and again.**
+Everything lives in the browser, in IndexedDB via [Dexie](https://dexie.org),
+**and is synced to a per-user tree in Firestore**. The local copy is the one the
+app reads and writes; the account copy is what makes it durable. Browser storage
+can be cleared by the reader, by the browser under pressure, or by a privacy
+setting — before there was an account, that was total data loss, and the whole
+reason export shipped before the charts did.
+
+**Export is still worth doing.** A backup file is the only copy that does not
+depend on somebody else's service staying up, or on you keeping access to that
+Google account.
+
+### Signing in
+
+Google sign-in, via Firebase Auth, and it is **required**. That reverses this
+project's founding local-first decision, deliberately and at the owner's
+request, and the cost is worth stating: a brand-new device with no network
+cannot get in. After the first sign-in on a device it works fully offline,
+because the session is persisted in IndexedDB and restored without a network
+round-trip — which is also why the Firebase chunks are precached by the service
+worker rather than excluded for their size. Without them an offline reload could
+not restore the session, and the app would not open at all.
+
+Only non-sensitive profile scopes are requested (email and display name), so
+there is no OAuth verification screen and no seven-day token expiry. That ruled
+out the simpler-looking alternative of keeping one JSON file in the user's Google
+Drive: `drive.appdata` is a sensitive scope, which caps an unverified app at 100
+lifetime users and expires its tokens weekly.
+
+### How sync works, and why it is so little code
+
+Pull, merge, push — reusing the backup machinery rather than inventing a second
+reconciliation:
+
+| Step | What runs |
+|---|---|
+| Pull | `importBackup`, the same function a restored file goes through |
+| Merge | `shouldReplace` — last-write-wins on `updatedAt` |
+| Push | `exportSnapshot`, then only the rows the account holds an older copy of |
+
+That reuse was planned from the first commit: every stored row has carried
+`id`, `updatedAt`, `deletedAt` and `schemaVersion` since before anything read
+three of them, and `backup.ts` already described its merge rule as "the same
+rule sync will use."
+
+It buys more than brevity. **Every fill-up arriving from the network goes
+through the `FuelEntryDraft` gate**, because that is what `importBackup` does to
+anything it writes. Remote data is untrusted input in exactly the way an
+imported file is, so a row claiming `NaN` or `+Infinity` gallons is rejected and
+counted rather than quietly poisoning every statistic computed from it.
+
+Deletions travel as tombstones and are never hard-deleted: a removed row has to
+exist as a fact, or a second device has nothing to learn from and the row simply
+reappears on its next push.
+
+Sync runs on sign-in, on window focus, and on demand from Settings. There is no
+realtime listener and no sync-per-keystroke — the free tier allows 20,000 writes
+a day, which is enormous for one person's fuel log right up until something
+syncs in a loop, and an app that stops working at 4pm because it burned its
+quota is a worse failure than one that is a few seconds stale.
+
+### Receipt photos are the exception
+
+Since 3 February 2026 Firebase Cloud Storage requires a linked billing account
+even at zero usage, so the natural home for image blobs is off the free tier.
+Receipts ride inside their fill-up document as Firestore `Bytes` instead, which
+works because `receiptImage.ts` already bounds them at 1600px and quality 0.7 —
+usually 200–500 KB, against a 1 MiB document cap.
+
+Usually is not always. A receipt over 700 KB is pushed **without** the image and
+reported, so the fill-up syncs and the photo stays on the device that took it.
+Two consequences, both deliberate: a large photo is the one thing a cleared
+browser can still lose, and an incoming row never *removes* a receipt the local
+copy has — otherwise an edit made on a second device would overwrite the only
+remaining copy of the image with null.
+
+### Setting it up for your own project
+
+The Firebase web config is public by design and still is not committed: the API
+key matches gitleaks' Google-API-key pattern, and this project's policy is that
+allowlisting a credential pattern is never the fix. Copy `.env.example` to
+`.env.local` and fill in the four values from the Firebase console. A checkout
+with no config still builds, starts and passes its tests — the sign-in screen
+says what is missing instead of offering a dead button.
+
+```bash
+npx firebase deploy --only hosting,firestore:rules
+```
 
 Two formats, two jobs. The **JSON backup** is the complete one — every vehicle,
 every fill-up, receipt bytes, and the deletions too — and importing it **merges
@@ -205,7 +289,7 @@ Stated up front rather than discovered later:
 | **Live camera scanning** | **Gone.** The iOS app reads a pump display in real time via on-device Vision. Browser OCR is orders of magnitude slower and weaker on seven-segment digits, so scanning becomes snap-a-photo. |
 | **Apple Watch app** | **Gone.** No equivalent. |
 | **Encryption at rest** | **Gone.** iOS gives per-file encryption keyed to the device passcode. Browser storage has no equivalent. |
-| **Biometric app lock** | **Degraded.** WebAuthn is a different primitive with no passcode fallback. |
+| **Biometric app lock** | **Degraded.** WebAuthn is a different primitive with no passcode fallback. Google sign-in is now the gate instead, which is a different thing: it protects the account, not the open tab. |
 | **GPS station detection** | **Dropped.** Receipt brand-name matching still works — that's text, not location. |
 | **Pump display scanning** | **Dropped on evidence.** Seven-segment digits defeat the recogniser even undegraded — confidence 36, no usable output. The pump parser stays, because it costs nothing and reads a receipt's fuel line. |
 | **Bounded image decode** | **Degraded.** iOS decodes an untrusted photo straight to a bounded size and never builds the full bitmap, which is what stops a decompression bomb. The web has no equivalent primitive, so the defence is a byte ceiling checked *before* any decode plus a bounded re-encode after. A large-but-legitimate-looking file that expands hugely remains a gap. |
@@ -217,13 +301,21 @@ Gained in exchange: it runs on any device with a browser, costs nothing to publi
 The table above is what the platform took away. This is the shorter, more
 honest list: things that were possible and were **chosen against**.
 
-- **No sync and no accounts.** The founding decision was local-first, and sync
-  reverses it — it means a server, an account, somebody's login to lose, and a
-  bill that arrives every month whether anyone is using the app or not. The
-  four sync fields are stamped on every row from the first write precisely so
-  this stays reversible; nothing has to be migrated to add it later. Until then
-  the privacy claim at the top of this file is structural rather than a promise:
-  there is no server to trust.
+- **~~No sync and no accounts.~~ Built after all, and the entry above is kept
+  rather than deleted because the reasoning is still the honest account of what
+  it cost.** The founding decision was local-first, and sync reverses it: there
+  is now an account to lose access to, and a Google dependency where there was
+  none. What the original note got right is that it would be cheap when it came
+  — the four sync fields were stamped on every row from the first write, nothing
+  had to be migrated, and the merge rule was already written and tested. What it
+  got wrong is the bill: Firestore's free tier needs no card and stops serving
+  rather than charging, so the monthly bill never materialised. The privacy
+  claim at the top of this file is no longer structural — there is now a server
+  to trust, and `firestore.rules` is what makes it trustworthy.
+- **No multi-user sharing.** Sync is strictly one person's data across their own
+  devices. The rules grant access to `users/{uid}` and nothing else, so the
+  shareable-submission link (issue #3) still needs its transport designed; the
+  data model for it is built and tested, with no UI on it.
 - **No pump-display scanning.** Dropped on measurement, not on principle. A
   seven-segment pump display rendered *pristinely* — no glare, no angle, no
   blur — came back at confidence 36 with the output `GAL =, ( (CZ`. A scanner
