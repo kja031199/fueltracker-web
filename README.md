@@ -187,20 +187,40 @@ allowlisting a credential pattern is never the fix. Copy `.env.example` to
 with no config still builds, starts and passes its tests — the sign-in screen
 says what is missing instead of offering a dead button.
 
-Deploying needs the **`firebase-tools`** CLI, which is a different npm package
-from the `firebase` SDK this app depends on. `npx firebase` resolves to the SDK,
-which ships no executable, and fails with "could not determine executable to
-run" — so name the CLI explicitly:
+**The config is baked in at build time.** Vite inlines `VITE_*` values into the
+bundle, so the deployed site carries whatever environment was present when
+`vite build` ran — not whatever is in `.env.local` now. Building without it
+produces a site that loads and then says it has no backend.
+
+### Deploying
+
+Two package names matter here. The CLI is **`firebase-tools`**; `firebase` is
+the SDK this app depends on and it ships no executable, so `npx firebase`
+fails with "could not determine executable to run".
 
 ```bash
-npm i -g firebase-tools
-firebase login
-firebase deploy --only hosting,firestore:rules --project <your-project-id>
+npx --yes firebase-tools login
+npx --yes firebase-tools deploy --project <your-project-id>
 ```
+
+Global installs land in a root-owned directory under a stock Node `.pkg`, which
+fails with `EACCES`. Don't reach for `sudo` — it runs package install scripts as
+root. Either use `npx` as above, or point npm somewhere you own:
+
+```bash
+npm config set prefix ~/.npm-global   # then add ~/.npm-global/bin to PATH
+```
+
+Hosting carries a **`predeploy` hook** that runs `npm run build`, so a deploy
+cannot ship a `dist/` that does not match the source. That guard is there for
+the quiet failure rather than the loud one: a missing `dist/` stops the deploy
+with an obvious error, but a *stale* one deploys perfectly happily and serves
+last week's code with no sign that anything is wrong. The hook is scoped to the
+hosting target, so `--only firestore:rules` stays fast and skips the build.
 
 The rules deploy is not optional. A database created in production mode denies
 everything until they are uploaded, so sign-in succeeds and then every read
-fails with permission-denied.
+fails with permission-denied. `firebase deploy` with no `--only` covers both.
 
 Two formats, two jobs. The **JSON backup** is the complete one — every vehicle,
 every fill-up, receipt bytes, and the deletions too — and importing it **merges
