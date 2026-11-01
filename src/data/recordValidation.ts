@@ -36,6 +36,7 @@
  */
 
 import { fuelGradeFromRaw } from '../domain/fuelGrade';
+import { MAX_RECEIPT_BYTES } from '../domain/fuelEntryDraft';
 import type { BackupSnapshot } from '../domain/backupFormat';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records';
 
@@ -90,8 +91,22 @@ function coordinate(value: unknown): number | null {
   return finite(value) ? value : null;
 }
 
+/**
+ * Receipt bytes, bounded by the same ceiling every write path applies.
+ *
+ * Firestore's 1 MiB document cap means an oversized photo cannot reach here
+ * through sync today, so this is defence in depth — but the rule worth holding
+ * is "every path that admits a receipt applies the same bound", not "the bound
+ * applies except where some other system happens to cap it". A future remote,
+ * or a future document limit, should not be what decides this.
+ *
+ * Oversized drops the photo and keeps the row, as everywhere else: the
+ * odometer reading is what the statistics are built on.
+ */
 function receipt(value: unknown): Uint8Array | null {
-  return value instanceof Uint8Array && value.byteLength > 0 ? value : null;
+  if (!(value instanceof Uint8Array)) return null;
+  if (value.byteLength === 0 || value.byteLength > MAX_RECEIPT_BYTES) return null;
+  return value;
 }
 
 /** The four fields every row must carry, or it cannot be reconciled at all. */
