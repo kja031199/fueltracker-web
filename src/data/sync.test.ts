@@ -1,29 +1,40 @@
 import { describe, expect, it } from 'vitest';
 import { InMemoryRepository } from './repository';
 import { InMemoryRemoteStore, emptySnapshot, rowsToPush } from './remote';
-import { FuelTrackerStore, type StoreClock } from './store';
+import { FuelTrackerStore } from './store';
+import { MonotonicClock } from './syncClock';
 import { SCHEMA_VERSION, type FillUpRecord, type VehicleRecord } from './records';
 import { validateSnapshot } from './recordValidation';
 import { partitionBySchema, preserveLocalReceipts, syncOnce } from './sync';
 import type { BackupSnapshot } from '../domain/backupFormat';
 
-/** A clock that advances by a millisecond per call, so ids and times are distinct. */
-function fakeClock(start = 1_000_000): StoreClock {
-  let now = start;
+/**
+ * A monotonic clock over a wall clock the test controls.
+ *
+ * Deterministic ids and a wall clock that advances a millisecond per read, so
+ * assertions do not depend on real time. It is a real `MonotonicClock` rather
+ * than a stub because the skew behaviour under test lives in that class.
+ */
+function fakeClock(start = 1_000_000): MonotonicClock {
+  let wall = start;
   let n = 0;
-  return {
-    now: () => (now += 1),
-    newId: () => `id-${++n}`,
-  };
+  return new MonotonicClock(
+    () => (wall += 1),
+    () => `id-${++n}`,
+  );
 }
 
-function storeWith(clock: StoreClock = fakeClock()) {
+function storeWith(clock: MonotonicClock = fakeClock()) {
   const r = {
     vehicles: new InMemoryRepository<VehicleRecord>(),
     fillUps: new InMemoryRepository<FillUpRecord>(),
     pendingFillUps: new InMemoryRepository<import('./records').PendingFillUpRecord>(),
   };
-  return { store: new FuelTrackerStore(r, clock), repos: r };
+  // The clock is returned so a test can hand the *same* instance to
+  // `syncOnce`. Sharing it is the point: the store issues local timestamps and
+  // sync observes remote ones, and a device only outbids a fast clock if those
+  // are the same clock.
+  return { store: new FuelTrackerStore(r, clock), repos: r, clock };
 }
 
 function vehicle(overrides: Partial<VehicleRecord> = {}): VehicleRecord {
@@ -298,21 +309,97 @@ describe('syncOnce', () => {
       expect(await store.fillUps('v1')).toHaveLength(2);
     });
 
-    it('accepts a remote updatedAt in the future rather than discarding the row', async () => {
-      const { store, repos: r } = storeWith();
+    it('accepts a remote row dated in the future rather than discarding it', async () => {
+      const clock = fakeClock();
+      const { store, repos: r } = storeWith(clock);
       await r.vehicles.put(vehicle({ name: 'Local', updatedAt: 1_000 }));
-      const skewed = Date.now() + 10 * 365 * 24 * 60 * 60 * 1000;
+      const ahead = clock.now() + 60 * 60 * 1000;
       const remote = new InMemoryRemoteStore(
-        snapshot({ vehicles: [vehicle({ name: 'Skewed', updatedAt: skewed })] }),
+        snapshot({ vehicles: [vehicle({ name: 'Ahead', updatedAt: ahead })] }),
       );
 
-      await syncOnce(store, remote, fakeClock());
+      await syncOnce(store, remote, clock);
 
-      // A device with a wrong clock wins under last-write-wins, and that is the
-      // documented cost of the rule rather than a bug. What matters is that it
-      // converges and loses nothing: the row is intact and both sides agree.
+      // Arriving first, it wins — which is correct, and is all this test used
+      // to assert. What it also used to say was that a device with a wrong
+      // clock winning "is the documented cost of the rule rather than a bug".
+      // That was wrong: see the next test for what it costs.
       const [stored] = await store.vehicles();
-      expect(stored?.name).toBe('Skewed');
+      expect(stored?.name).toBe('Ahead');
+    });
+
+    it('does not let a device with a fast clock eat this device’s later edit', async () => {
+      // The bug, in four steps:
+      //   1. a device whose clock is an hour fast writes a row,
+      //   2. it syncs to the account,
+      //   3. this device edits the same row afterwards,
+      //   4. this device pulls — and its own edit is overwritten, because the
+      //      skewed row still compares as newer. rowsToPush then declines to
+      //      push the edit, since local is no longer greater than remote.
+      // The edit did not conflict, did not warn, and did not come back.
+      const clock = fakeClock();
+      const { store, repos: r } = storeWith(clock);
+      const skewed = clock.now() + 60 * 60 * 1000;
+      const remote = new InMemoryRemoteStore(
+        snapshot({ vehicles: [vehicle({ id: 'v1', name: 'From the fast phone', updatedAt: skewed })] }),
+      );
+
+      await syncOnce(store, remote, clock);
+
+      // Step 3: the correction, made on this device, after seeing that row.
+      const seen = await store.vehicles();
+      expect(seen[0]?.name).toBe('From the fast phone');
+      await r.vehicles.put({ ...seen[0]!, name: 'Corrected here', updatedAt: clock.now() });
+
+      await syncOnce(store, remote, clock);
+
+      // It survives locally...
+      expect((await store.vehicles())[0]?.name).toBe('Corrected here');
+      // ...and reaches the account, which is the half that used to fail
+      // silently.
+      expect((await pulled(remote)).vehicles[0]?.name).toBe('Corrected here');
+    });
+
+    it('reports a row too far ahead to outbid instead of losing to it silently', async () => {
+      const clock = fakeClock();
+      const { store } = storeWith(clock);
+      const absurd = clock.now() + 10 * 365 * 24 * 60 * 60 * 1000;
+      const remote = new InMemoryRemoteStore(
+        snapshot({ vehicles: [vehicle({ name: 'Decade ahead', updatedAt: absurd })] }),
+      );
+
+      const result = await syncOnce(store, remote, clock);
+
+      // Adopting a decade of skew would push the clock toward the edge of
+      // integer precision, so it is refused — and that means this row keeps
+      // winning. Saying so is the only honest option left.
+      expect(result.ok && result.outcome.unbeatable).toBe(1);
+      expect((await store.vehicles())[0]?.name).toBe('Decade ahead');
+    });
+
+    it('still deletes a row that a fast clock wrote', async () => {
+      // Tombstones used to be stamped with Date.now() inside the repository,
+      // bypassing the injected clock — so a delete went on losing even after
+      // edits stopped losing.
+      const clock = fakeClock();
+      const { store } = storeWith(clock);
+      const skewed = clock.now() + 60 * 60 * 1000;
+      const remote = new InMemoryRemoteStore(
+        snapshot({ vehicles: [vehicle({ id: 'v1', updatedAt: skewed })] }),
+      );
+
+      await syncOnce(store, remote, clock);
+      expect(await store.vehicles()).toHaveLength(1);
+
+      await store.removeVehicle('v1');
+      await syncOnce(store, remote, clock);
+
+      expect(await store.vehicles()).toEqual([]);
+      expect((await remote.pull()).vehicles).toHaveLength(1);
+      expect((await pulled(remote)).vehicles[0]?.deletedAt).not.toBeNull();
+      // And it stays deleted on the next sync rather than being resurrected.
+      await syncOnce(store, remote, clock);
+      expect(await store.vehicles()).toEqual([]);
     });
 
     it('leaves local storage untouched when the pull fails', async () => {

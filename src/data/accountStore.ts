@@ -29,6 +29,7 @@
 import Dexie from 'dexie';
 import { DexieRepository, FuelTrackerDatabase } from './db';
 import { FuelTrackerStore } from './store';
+import { sharedSyncClock } from './syncClock';
 
 /**
  * What the database was called before accounts existed.
@@ -63,12 +64,23 @@ export interface AccountStore {
   close(): void;
 }
 
+/**
+ * Built on the shared monotonic clock, not the wall clock.
+ *
+ * The store stamps local writes and the sync engine observes remote ones, so
+ * they have to be the same instance — otherwise the floor the sync engine
+ * learns never reaches the timestamps the store issues, and a device with a
+ * fast clock goes on winning. See `syncClock.ts`.
+ */
 function storeOver(db: FuelTrackerDatabase): FuelTrackerStore {
-  return new FuelTrackerStore({
-    vehicles: new DexieRepository(db.vehicles),
-    fillUps: new DexieRepository(db.fillUps),
-    pendingFillUps: new DexieRepository(db.pendingFillUps),
-  });
+  return new FuelTrackerStore(
+    {
+      vehicles: new DexieRepository(db.vehicles),
+      fillUps: new DexieRepository(db.fillUps),
+      pendingFillUps: new DexieRepository(db.pendingFillUps),
+    },
+    sharedSyncClock,
+  );
 }
 
 /** Opens (creating if needed) the store for one account. */

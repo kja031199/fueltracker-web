@@ -198,6 +198,27 @@ a day, which is enormous for one person's fuel log right up until something
 syncs in a loop, and an app that stops working at 4pm because it burned its
 quota is a worse failure than one that is a few seconds stale.
 
+### A wrong clock cannot eat your edits
+
+Merges are last-write-wins on `updatedAt`, which was simply `Date.now()` on
+whichever device wrote the row. A phone an hour fast therefore beat every edit
+made anywhere else: the laptop's correction was overwritten on the next pull,
+and the push was then declined because local was no longer greater than remote.
+The edit did not conflict, did not warn, and did not come back.
+
+`updatedAt` is now a **logical** clock — `max(wallClock, highestSeen + 1)` — so
+a local write is always strictly newer than every row this device has seen.
+That is what makes last-write-wins mean *last edit* rather than *furthest-ahead
+clock*. It is safe precisely because `updatedAt` is never displayed: the date
+you see is the separate `date` field, so inflating the ordering value costs
+nothing.
+
+Adoption is bounded at 30 days. A row claiming `Number.MAX_SAFE_INTEGER` would
+push the clock to the edge of integer precision, where `+ 1` stops producing a
+larger number and every later write ties — and under a `>` comparison a tie
+means the newer write loses. Beyond the bound the timestamp is refused, which
+means that row keeps winning, so sync says so rather than losing to it quietly.
+
 ### Nothing from the account is trusted
 
 Two independent checks, because they fail in different ways.

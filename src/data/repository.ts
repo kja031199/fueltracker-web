@@ -24,8 +24,14 @@ export interface Repository<T extends SyncFields> {
    * Soft-delete: stamps `deletedAt` rather than dropping the row, so the
    * deletion is itself a fact that can be synced. A record that is already
    * gone is a no-op, never an error.
+   *
+   * `now` exists so a deletion is stamped by the **same clock as every other
+   * write**. Reading `Date.now()` here instead would leave tombstones on the
+   * wall clock while edits moved to the monotonic one, and a delete would go
+   * on losing to a row from a device whose clock is ahead — which is the whole
+   * failure `syncClock.ts` exists to close.
    */
-  remove(id: string): Promise<void>;
+  remove(id: string, now?: number): Promise<void>;
   /**
    * Tombstoned records, for a future sync push. Nothing reads this yet; it
    * exists because a tombstone nobody can enumerate is just a leak.
@@ -61,10 +67,10 @@ export class InMemoryRepository<T extends SyncFields> implements Repository<T> {
     this.rows.set(record.id, record);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, now: number = Date.now()): Promise<void> {
     const row = this.rows.get(id);
     if (row === undefined || row.deletedAt !== null) return;
-    this.rows.set(id, { ...row, deletedAt: Date.now(), updatedAt: Date.now() });
+    this.rows.set(id, { ...row, deletedAt: now, updatedAt: now });
   }
 
   async listDeleted(): Promise<T[]> {
