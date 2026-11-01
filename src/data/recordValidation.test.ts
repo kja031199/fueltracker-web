@@ -87,6 +87,11 @@ describe('structural problems reject the row', () => {
     ['an empty id', { ...FILL_UP, id: '' }],
     ['a non-string id', { ...FILL_UP, id: 7 }],
     ['an id longer than any uuid', { ...FILL_UP, id: 'x'.repeat(500) }],
+    // #26: these three reach `doc(db, …, id)` and break the whole push batch
+    // — one throws in the SDK, the others are refused by the server.
+    ['an id containing a slash', { ...FILL_UP, id: 'a/b' }],
+    ['an id Firestore reserves', { ...FILL_UP, id: '__proto__' }],
+    ['an id that is a path traversal', { ...FILL_UP, id: '..' }],
     ['a non-numeric updatedAt', { ...FILL_UP, updatedAt: 'yesterday' }],
     ['a NaN updatedAt', { ...FILL_UP, updatedAt: Number.NaN }],
     ['an infinite updatedAt', { ...FILL_UP, updatedAt: Number.POSITIVE_INFINITY }],
@@ -105,6 +110,26 @@ describe('structural problems reject the row', () => {
 
   it('says what was wrong, for a count the reader can see', () => {
     expect(validateFillUp({ ...FILL_UP, odometer: null })).toContain('odometer');
+  });
+
+  it('refuses a vehicle whose id cannot be stored', () => {
+    expect(typeof validateVehicle({ ...VEHICLE, id: 'a/b' })).toBe('string');
+  });
+
+  it('refuses a submission whose id cannot be stored', () => {
+    expect(typeof validatePending({ ...PENDING, id: '__name__' })).toBe('string');
+  });
+
+  it('keeps the rest of the account when one id is unusable', () => {
+    // The rule this file exists for, applied to ids: one bad document must not
+    // cost the other nine hundred.
+    const result = validateSnapshot({
+      vehicles: [VEHICLE],
+      fillUps: [FILL_UP, { ...FILL_UP, id: 'a/b' }, { ...FILL_UP, id: 'f3' }],
+      pendingFillUps: [],
+    });
+    expect(result.snapshot.fillUps).toHaveLength(2);
+    expect(result.rejected).toHaveLength(1);
   });
 
   it('refuses a vehicle with a non-numeric createdAt', () => {

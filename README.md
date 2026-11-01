@@ -302,6 +302,19 @@ Rejections are counted and shown, never silently dropped. The two gates are
 distinct and tested separately: shape validation refuses anything **non-finite**,
 and the draft gate refuses anything **non-positive**.
 
+One of those checks is about availability rather than correctness. **A record
+id is also a Firestore document name, and the two sets of legal strings are not
+the same.** `a/b` makes the SDK throw; `a/b/c` builds a path the rules never
+match; `.`, `..` and anything shaped like `__name__` are refused by the
+database. Because the push is a single batch and a local row is always newer
+than the remote, one such row stopped *every* upload, on every sync, from then
+on — and said only "not uploaded yet", which is what being offline says.
+Deleting the fill-up did not help, since its tombstone kept the same id. So
+`recordId.ts` refuses an unstorable id at every door an id can arrive through,
+and sync declines to *send* a row it cannot address rather than handing it to a
+batch it would abort. The row stays on the device and is reported: refusing to
+upload somebody's data is not a licence to delete it.
+
 **On write**, `firestore.rules` now validates shape as well as identity — field
 names, types, string lengths and receipt size. Identity alone stops another
 *user* and does nothing about a bad build or a console edit, and the size bounds

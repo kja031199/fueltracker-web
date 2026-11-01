@@ -37,6 +37,7 @@
 
 import { fuelGradeFromRaw } from '../domain/fuelGrade';
 import { MAX_RECEIPT_BYTES } from '../domain/fuelEntryDraft';
+import { idProblem } from './recordId';
 import type { BackupSnapshot } from '../domain/backupFormat';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records';
 
@@ -50,7 +51,11 @@ import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records
  */
 export const MAX_NAME_LENGTH = 200;
 export const MAX_NOTES_LENGTH = 4000;
-export const MAX_ID_LENGTH = 200;
+
+// Re-exported rather than redefined: the id rule outgrew a length check once
+// it turned out an id is also a Firestore document name (#26), and it lives in
+// `recordId.ts` so the import path can apply exactly the same one.
+export { MAX_ID_LENGTH } from './recordId';
 
 /** Years outside this are not a car. The first automobile was 1886. */
 const MIN_YEAR = 1885;
@@ -112,8 +117,10 @@ function receipt(value: unknown): Uint8Array | null {
 /** The four fields every row must carry, or it cannot be reconciled at all. */
 function syncFields(raw: Raw): { id: string; updatedAt: number; deletedAt: number | null; schemaVersion: number } | string {
   const { id, updatedAt, deletedAt, schemaVersion } = raw;
-  if (typeof id !== 'string' || id === '') return 'missing id';
-  if (id.length > MAX_ID_LENGTH) return 'id is implausibly long';
+  // An id that cannot be stored is not a cosmetic fault to repair: it is the
+  // name of a document, and a row carrying one stops every later push (#26).
+  const badId = idProblem(id);
+  if (badId !== null || typeof id !== 'string') return badId ?? 'no id';
   if (!finite(updatedAt)) return 'updatedAt is not a number';
   if (deletedAt !== null && !finite(deletedAt)) return 'deletedAt is neither null nor a number';
   if (!finite(schemaVersion)) return 'schemaVersion is not a number';

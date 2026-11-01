@@ -218,6 +218,21 @@ describeWithEmulator('firestore.rules', () => {
       await assertFails(setDoc(doc(db, 'users/alice/fillUps/some-other-id'), forWire(fillUp)));
     });
 
+    it('already refuses an id that is not a document name, with no new clause', async () => {
+      // #26 asked whether the rules should check the id's characters too. They
+      // do not need to, and this is the evidence rather than the argument: a
+      // document name is a single path segment and can never contain a slash,
+      // and `data.id == id` makes a field disagreeing with its own name a
+      // refused write. So the one shape that breaks a push is already
+      // unwritable, and the reserved names (`.`, `..`, `__…__`) are refused by
+      // the database itself.
+      const { fillUp } = await realRecords();
+      const db = env.authenticatedContext('alice').firestore();
+      await assertFails(
+        setDoc(doc(db, 'users/alice/fillUps/legal-name'), { ...forWire(fillUp), id: 'a/b' }),
+      );
+    });
+
     it('refuses an unknown extra field', async () => {
       // This is the quota protection: without it, a junk field can be inflated
       // to the 1 MiB document cap.

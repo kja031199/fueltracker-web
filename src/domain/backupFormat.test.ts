@@ -144,6 +144,35 @@ describe('reading a hostile backup file', () => {
     expect(result.skipped.join(' ')).toMatch(/no id/);
   });
 
+  test('skips a row whose id could never be stored, and keeps the rest', () => {
+    // #26. `a/b` is not a document name: the Firestore SDK throws on it, and
+    // one such row stops every push from then on — including the tombstone
+    // you would write trying to delete it. Refusing it at the door is the
+    // whole fix, and refusing only *it* is the rest of the fix.
+    const file = JSON.stringify({
+      format: 'fueltracker-backup',
+      formatVersion: 1,
+      vehicles: [vehicle('v1')],
+      fillUps: [fillUp('f1'), fillUp('a/b'), fillUp('__proto__'), fillUp('f2')],
+      pendingFillUps: [],
+    });
+    const result = parseJsonBackup(file);
+
+    expect(result.error).toBeNull();
+    expect(result.value?.fillUps.map((row) => row.id)).toEqual(['f1', 'f2']);
+    expect(result.skipped).toHaveLength(2);
+    expect(result.skipped.join(' ')).toMatch(/id/i);
+  });
+
+  test('says which id it refused, not just that one was refused', () => {
+    const file = JSON.stringify({
+      format: 'fueltracker-backup',
+      formatVersion: 1,
+      fillUps: [fillUp('a/b')],
+    });
+    expect(parseJsonBackup(file).skipped.join(' ')).toContain('a/b');
+  });
+
   test('missing collections read as empty rather than throwing', () => {
     const result = parseJsonBackup(
       JSON.stringify({ format: 'fueltracker-backup', formatVersion: 1 }),
@@ -222,6 +251,18 @@ describe('CSV reading', () => {
   test('reads CRLF line endings, which is what a spreadsheet writes', () => {
     const csv = toCsv(snapshot.fillUps).split('\n').join('\r\n');
     expect(parseCsv(csv).value).toHaveLength(2);
+  });
+
+  test('skips a CSV row whose id could never be stored', () => {
+    // The same door, the other file format. A spreadsheet is a very easy place
+    // for an id to pick up a slash.
+    const csv =
+      'id,vehicle_id,date_iso,odometer_miles,gallons,price_per_gallon\n' +
+      'f1,v1,2025-01-15T09:30:00.000Z,10000,10,3.5\n' +
+      'a/b,v1,2025-01-16T09:30:00.000Z,10300,9,3.5\n';
+    const result = parseCsv(csv);
+    expect(result.value?.map((row) => row.id)).toEqual(['f1']);
+    expect(result.skipped.join(' ')).toMatch(/id/i);
   });
 
   test('matches columns by name, so reordering and extra columns are fine', () => {

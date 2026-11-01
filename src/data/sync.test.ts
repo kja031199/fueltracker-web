@@ -211,6 +211,85 @@ describe('erasing a tombstone that is already in the account', () => {
   });
 });
 
+describe('a local row the account cannot address', () => {
+  /**
+   * Issue #26, the containment half. Validation now refuses an unstorable id
+   * at every door, but a row stored *before* that fix is already on disk — and
+   * it is strictly newer than anything remote, so it is in every push, and one
+   * `writeBatch` throwing takes the whole upload with it. Every sync, forever,
+   * reported as the ordinary "not uploaded yet". Deleting the fill-up does not
+   * help: the tombstone carries the same id.
+   */
+
+  /** Behaves like Firestore: it will not address a document named `a/b`. */
+  class StrictRemoteStore extends InMemoryRemoteStore {
+    override async push(snapshot: BackupSnapshot): Promise<import('./remote').PushSummary> {
+      for (const row of [
+        ...snapshot.vehicles,
+        ...snapshot.fillUps,
+        ...snapshot.pendingFillUps,
+      ]) {
+        if (row.id.includes('/')) {
+          throw new Error(
+            `Invalid document reference. Document references must have an even number of segments, but users/u1/fillUps/${row.id} has 5.`,
+          );
+        }
+      }
+      return super.push(snapshot);
+    }
+  }
+
+  function storeHolding(rows: readonly FillUpRecord[]) {
+    const clock = fakeClock();
+    const repos = {
+      vehicles: new InMemoryRepository<VehicleRecord>([vehicle()]),
+      fillUps: new InMemoryRepository<FillUpRecord>(rows),
+      pendingFillUps: new InMemoryRepository<import('./records').PendingFillUpRecord>(),
+    };
+    return { store: new FuelTrackerStore(repos, clock), clock };
+  }
+
+  it('does not take the rest of the upload down with it', async () => {
+    const { store, clock } = storeHolding([
+      fillUp({ id: 'good', updatedAt: 900 }),
+      fillUp({ id: 'a/b', updatedAt: 900 }),
+    ]);
+    const remote = new StrictRemoteStore();
+
+    const result = await syncOnce(store, remote, clock);
+
+    expect(result.ok).toBe(true);
+    const after = await remote.pull();
+    expect((after.fillUps as FillUpRecord[]).map((row) => row.id)).toEqual(['good']);
+    expect((after.vehicles as VehicleRecord[])).toHaveLength(1);
+  });
+
+  it('reports the row rather than dropping it quietly', async () => {
+    const { store, clock } = storeHolding([fillUp({ id: 'a/b', updatedAt: 900 })]);
+
+    const result = await syncOnce(store, new StrictRemoteStore(), clock);
+
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.outcome.unsendable).toEqual(['a/b']);
+  });
+
+  it('leaves the row alone locally, because it is not ours to delete', async () => {
+    // Refusing to upload something is not a licence to destroy it. The row
+    // stays readable here; the reader is told, and can export or fix it.
+    const { store, clock } = storeHolding([fillUp({ id: 'a/b', updatedAt: 900 })]);
+    await syncOnce(store, new StrictRemoteStore(), clock);
+    const local = await store.exportSnapshot();
+    expect(local.fillUps.map((row) => row.id)).toEqual(['a/b']);
+  });
+
+  it('says nothing when every id is fine', async () => {
+    const { store, clock } = storeHolding([fillUp({ id: 'good', updatedAt: 900 })]);
+    const result = await syncOnce(store, new StrictRemoteStore(), clock);
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.outcome.unsendable).toEqual([]);
+  });
+});
+
 describe('syncOnce', () => {
   it('pulls a remote row that is missing locally', async () => {
     const { store } = storeWith();

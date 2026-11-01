@@ -24,6 +24,7 @@
 
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
 import { SCHEMA_VERSION } from '../data/records';
+import { idProblem } from '../data/recordId';
 import { FUEL_GRADES } from './fuelGrade';
 import type { FuelGrade } from './fuelGrade';
 import { MAX_RECEIPT_BYTES } from './fuelEntryDraft';
@@ -191,12 +192,18 @@ function receipt(value: unknown, id: string, skipped: string[]): Uint8Array | nu
  * identity and merging is impossible — so a row without one is rejected. The
  * rest are defaulted, because a file hand-edited to drop `updatedAt` should
  * still restore rather than fail wholesale.
+ *
+ * An id that *exists* but could never be stored is rejected for a different
+ * reason: it is also a document name, and importing one would stop this
+ * account syncing — every push, from then on (#26). Returns the problem rather
+ * than `null` so the caller can say which id and why.
  */
 function syncFields(
   row: Record<string, unknown>,
-): { id: string; updatedAt: number; deletedAt: number | null; schemaVersion: number } | null {
+): { id: string; updatedAt: number; deletedAt: number | null; schemaVersion: number } | string {
   const id = str(row['id']);
-  if (id === '') return null;
+  const problem = idProblem(id);
+  if (problem !== null) return problem;
   return {
     id,
     updatedAt: num(row['updatedAt']) ?? 0,
@@ -212,8 +219,8 @@ function parseVehicle(value: unknown, skipped: string[]): VehicleRecord | null {
     return null;
   }
   const sync = syncFields(row);
-  if (sync === null) {
-    skipped.push('a vehicle had no id');
+  if (typeof sync === 'string') {
+    skipped.push(`a vehicle had ${sync}`);
     return null;
   }
   return {
@@ -233,8 +240,8 @@ function parseFillUp(value: unknown, skipped: string[]): FillUpRecord | null {
     return null;
   }
   const sync = syncFields(row);
-  if (sync === null) {
-    skipped.push('a fill-up had no id');
+  if (typeof sync === 'string') {
+    skipped.push(`a fill-up had ${sync}`);
     return null;
   }
   const vehicleId = str(row['vehicleId']);
@@ -267,8 +274,8 @@ function parsePending(value: unknown, skipped: string[]): PendingFillUpRecord | 
   const row = asRecord(value);
   if (row === null) return null;
   const sync = syncFields(row);
-  if (sync === null) {
-    skipped.push('a pending submission had no id');
+  if (typeof sync === 'string') {
+    skipped.push(`a pending submission had ${sync}`);
     return null;
   }
   const vehicleId = str(row['vehicleId']);
@@ -488,8 +495,11 @@ export function parseCsv(text: string): ParseResult<FillUpRecord[]> {
   for (const [position, row] of rows.entries()) {
     const id = cell(row, 'id');
     const vehicleId = cell(row, 'vehicle_id');
-    if (id === '' || vehicleId === '') {
-      skipped.push(`row ${position + 2} has no id or vehicle`);
+    const problem = idProblem(id);
+    if (problem !== null || vehicleId === '') {
+      // A spreadsheet is a very easy place for an id to pick up a slash, and
+      // one unstorable id costs the account its sync (#26).
+      skipped.push(`row ${position + 2} has ${problem ?? 'no vehicle'}`);
       continue;
     }
     const date = new Date(cell(row, 'date_iso'));
