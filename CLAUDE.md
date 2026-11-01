@@ -27,8 +27,14 @@ over IndexedDB, Firebase Auth and Firestore. Deployed to Firebase Hosting at
   anything from the network, `accountStore.ts` the per-account database.
 - `src/data/firebase/` — the **only** place the Firebase SDK is imported.
 - `src/ui/` — React. Screens, hooks, hand-drawn SVG charts (`charts/`).
-- 68 source files, 42 test files, **747 assertions** plus 25 against the
-  Firestore emulator.
+- Roughly seventy source files, with a test file beside nearly every one, plus
+  a separate suite that runs `firestore.rules` against the emulator.
+
+Exact counts are deliberately not written down here. The first version of this
+file carried them and they were wrong one pull request later — a number nobody
+recomputes is wrong more often than it is right, and a doc that is confidently
+wrong about something checkable is worse than one that is vague about it. Run
+`npm test` for the real figure.
 
 ## How to work here
 
@@ -131,10 +137,16 @@ latter is the SDK and ships no binary.
   Variables, not Secrets. Do not commit it: the API key matches gitleaks'
   Google-API-key pattern, and allowlisting a credential pattern is never the
   fix here.
-- **`updatedAt` is never displayed.** It is a merge-ordering value only; the
-  date a reader sees is the separate `date` field. *(PR #14, in flight, makes
-  it a logical clock so a device with a fast clock stops overwriting other
-  devices' edits. Update this line when it merges.)*
+- **`updatedAt` is a logical clock, not a wall clock.** `max(wallClock,
+  highestSeen + 1)`, so a local write is always strictly newer than every row
+  this device has seen — which is what makes last-write-wins mean *last edit*
+  rather than *furthest-ahead clock*. Adoption is bounded at 30 days, because a
+  row claiming `MAX_SAFE_INTEGER` would put the floor at the edge of integer
+  precision where `+ 1` stops producing a larger number and every later write
+  ties. Past the bound the row keeps winning, and sync reports it.
+  This is safe only because **`updatedAt` is never displayed**: it is a
+  merge-ordering value, and the date a reader sees is the separate `date`
+  field. Do not start showing it.
 - **Only a JSON export counts as a backup.** CSV is fill-ups only — no
   vehicles, no tombstones, no receipt bytes.
 - **Receipts over 700 KB do not sync.** Cloud Storage needs a billing account,
@@ -142,8 +154,9 @@ latter is the SDK and ships no binary.
   without the photo and says so, and an incoming row never *removes* a receipt
   the local copy has.
 - **`backupFormat.ts` stamps CSV-imported rows with the fill-up's own date as
-  `updatedAt`**, so imported history loses every merge. Known, unfixed, flagged
-  in PR #14.
+  `updatedAt`**, so imported history loses every merge against anything already
+  in the account. Known and unfixed — orthogonal to clock skew, with its own
+  blast radius. Found while fixing #14.
 - **Tests never touch the network or a real device service.** `StubAuthProvider`
   and `InMemoryRemoteStore` exist for this. The iOS original paid for this
   lesson when an `LAContext` call turned every render test into a round-trip to
