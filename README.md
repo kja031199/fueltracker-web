@@ -270,6 +270,15 @@ usually 200–500 KB, against a 1 MiB document cap.
 
 Usually is not always. A receipt over 700 KB is pushed **without** the image and
 reported, so the fill-up syncs and the photo stays on the device that took it.
+
+A second, larger ceiling — 4 MB — bounds what may be *stored* at all, and it
+applies on every path that admits a receipt: the draft gate, a restored backup,
+and validation of anything pulled from the account. On the import path the bound
+is checked **before** the base64 is decoded, since four characters carry three
+bytes and the decoded size is known from the text length alone; deciding
+afterwards would mean the allocation the guard exists to prevent had already
+happened. Oversized or unreadable drops the photo, never the fill-up — the
+odometer reading is what the statistics are built on.
 Two consequences, both deliberate: a large photo is the one thing a cleared
 browser can still lose, and an incoming row never *removes* a receipt the local
 copy has — otherwise an edit made on a second device would overwrite the only
