@@ -143,6 +143,36 @@ out the simpler-looking alternative of keeping one JSON file in the user's Googl
 Drive: `drive.appdata` is a sensitive scope, which caps an unverified app at 100
 lifetime users and expires its tokens weekly.
 
+### Signing out when the tab goes idle
+
+Off by default, under Settings → Security: sign out after 5, 15, 30 or 60
+minutes without a pointer or a keystroke. It exists because Firebase Auth
+persists a session and never expires it, so a tab left open on a borrowed laptop
+otherwise keeps access indefinitely.
+
+What it does **not** do matters as much, and the setting says so next to the
+switch rather than in a help page:
+
+- **Signing out does not remove the fuel log.** The per-account database stays
+  on the device on purpose, so signing back in finds the history and any edits
+  that had not synced yet. Anyone who opens the browser's developer tools can
+  still read it. This ends a session; it is a small addition to locking the
+  device itself, which is the protection that actually matters.
+- **Signing back in needs a connection.** A device that is offline cannot get
+  back into the app until it reconnects. That is the trade for leaving this on,
+  and it is why the default is off for an app that otherwise works offline.
+
+The rule is a pure function (`domain/idleTimeout.ts`) and the browser part — the
+activity marker, the events, the polling — is separate (`ui/idleTimeout.ts`), so
+the thing that decides to end someone's session is tested directly rather than
+inferred from a render. Two details are deliberate. The last-activity marker
+lives in `localStorage`, so two tabs agree and nobody is signed out of the tab
+they left open while they were working in the other one. And the fallbacks point
+in **opposite directions on purpose**: an unreadable *period* becomes the
+30-minute default, never "no timeout", because that failure would be invisible;
+an unreadable *setting* reads as off, because there is then no evidence anybody
+asked for this and signing them out would be an action they never requested.
+
 ### Local storage is separated by account
 
 The IndexedDB database is named after the signed-in uid
@@ -491,7 +521,7 @@ Stated up front rather than discovered later:
 | **Live camera scanning** | **Gone.** The iOS app reads a pump display in real time via on-device Vision. Browser OCR is orders of magnitude slower and weaker on seven-segment digits, so scanning becomes snap-a-photo. |
 | **Apple Watch app** | **Gone.** No equivalent. |
 | **Encryption at rest** | **Gone.** iOS gives per-file encryption keyed to the device passcode. Browser storage has no equivalent. |
-| **Biometric app lock** | **Degraded.** WebAuthn is a different primitive with no passcode fallback. Google sign-in is now the gate instead, which is a different thing: it protects the account, not the open tab. |
+| **Biometric app lock** | **Degraded.** WebAuthn is a different primitive with no passcode fallback, so there is no Face ID equivalent. What ships instead is an optional [idle timeout](#signing-out-when-the-tab-goes-idle) — off by default — that ends the session after a period of inactivity. It is honestly weaker: it gates the session, not the data, which stays on the device and stays readable in developer tools. |
 | **GPS station detection** | **Dropped.** Receipt brand-name matching still works — that's text, not location. |
 | **Pump display scanning** | **Dropped on evidence.** Seven-segment digits defeat the recogniser even undegraded — confidence 36, no usable output. The pump parser stays, because it costs nothing and reads a receipt's fuel line. |
 | **Bounded image decode** | **Degraded.** iOS decodes an untrusted photo straight to a bounded size and never builds the full bitmap, which is what stops a decompression bomb. The web has no equivalent primitive, so the defence is a byte ceiling checked *before* any decode plus a bounded re-encode after. A large-but-legitimate-looking file that expands hugely remains a gap. |

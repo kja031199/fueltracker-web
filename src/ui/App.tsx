@@ -1,11 +1,14 @@
 import type { ReactElement } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FuelTrackerStore } from '../data/store';
 import type { AuthProvider } from '../data/auth';
 import { StubAuthProvider } from '../data/auth';
 import type { RemoteStore } from '../data/remote';
 import type { UnitPreferences } from '../domain/units';
 import { shouldOnboard } from '../domain/onboardingGate';
+import type { IdleTimeoutSetting } from '../domain/idleTimeout';
+import { IDLE_TIMEOUT_OFF } from '../domain/idleTimeout';
+import { clearActivity, loadIdleTimeoutSetting, saveIdleTimeoutSetting, useIdleTimeout } from './idleTimeout';
 import { applyPalette, preferredColorScheme, watchColorScheme } from './theme';
 import { loadHasOnboarded, loadUnitPreferences, saveHasOnboarded, saveUnitPreferences } from './unitSettings';
 import { useAppData } from './useAppData';
@@ -75,10 +78,27 @@ export function App({
   const [tab, setTab] = useState<Tab>(initialTab);
   const [units, setUnits] = useState<UnitPreferences>(() => loadUnitPreferences());
   const [hasOnboarded, setHasOnboarded] = useState<boolean>(() => loadHasOnboarded());
+  const [idleTimeout, setIdleTimeout] = useState<IdleTimeoutSetting>(() =>
+    loadIdleTimeoutSetting(),
+  );
+  const [idleSignOut, setIdleSignOut] = useState(false);
   const data = useAppData(store);
   const sync = useSync(store, authState.status === 'signedIn' ? remote : null, data.reload);
   const backup = useBackupNudge(data.fillUpCount);
   const serviceWorker = useServiceWorker();
+
+  const signedIn = authState.status === 'signedIn';
+  const endIdleSession = useCallback(() => {
+    // The marker is cleared so the next session starts its own clock rather
+    // than inheriting an already-expired one and bouncing straight back out.
+    clearActivity();
+    setIdleSignOut(true);
+    void authProvider.signOut();
+  }, [authProvider]);
+  // Armed only while signed in: there is nothing to end otherwise, and passing
+  // the real setting on the sign-in screen would have it sign out the person
+  // who is trying to sign in.
+  useIdleTimeout(signedIn ? idleTimeout : IDLE_TIMEOUT_OFF, endIdleSession);
 
   // The palette is applied from the ported values rather than written as CSS,
   // so what the browser paints is what the contrast tests measure.
@@ -91,6 +111,11 @@ export function App({
   function changeUnits(next: UnitPreferences): void {
     setUnits(next);
     saveUnitPreferences(next);
+  }
+
+  function changeIdleTimeout(next: IdleTimeoutSetting): void {
+    setIdleTimeout(next);
+    saveIdleTimeoutSetting(next);
   }
 
   function finishOnboarding(): void {
@@ -120,7 +145,20 @@ export function App({
   }
 
   if (authState.status === 'signedOut') {
-    return <SignInScreen auth={authProvider} error={authState.error} configured={configured} />;
+    return (
+      <SignInScreen
+        auth={authProvider}
+        error={authState.error}
+        configured={configured}
+        notice={
+          idleSignOut
+            ? `You were signed out after ${idleTimeout.minutes} minutes of inactivity, which is ` +
+              'the setting you turned on. Your fuel log is still in this browser — signing in ' +
+              'again picks up where you left off.'
+            : null
+        }
+      />
+    );
   }
 
   if (data.loading) {
@@ -199,6 +237,8 @@ export function App({
             lastBackupAt={backup.state.lastExportAt}
             account={authState.user}
             onSignOut={() => void authProvider.signOut()}
+            idleTimeout={idleTimeout}
+            onIdleTimeoutChange={changeIdleTimeout}
             sync={sync}
             syncEnabled={remote !== null}
           />
