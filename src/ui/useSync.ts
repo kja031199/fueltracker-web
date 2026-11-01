@@ -79,7 +79,7 @@ export function useSync(
         setMessage(result.reason);
         return;
       }
-      const { pulled, pushed, skippedNewerSchema, invalid, at } = result.outcome;
+      const { pulled, pushed, skippedNewerSchema, invalid, unbeatable, at } = result.outcome;
       setLastSyncedAt(at);
       saveLastSynced(at);
 
@@ -98,6 +98,13 @@ export function useSync(
       }
       if (skippedNewerSchema > 0) {
         notes.push(`${skippedNewerSchema} row(s) were written by a newer version and left alone`);
+      }
+      if (unbeatable > 0) {
+        // Said plainly because the consequence is specific and otherwise
+        // invisible: edits made here to those rows will not stick.
+        notes.push(
+          `${unbeatable} row(s) are dated far in the future, probably by a device with a wrong clock — changes you make to those here may not stick until its clock is fixed`,
+        );
       }
       setMessage(notes.length === 0 ? null : `Synced. ${notes.join('; ')}.`);
 

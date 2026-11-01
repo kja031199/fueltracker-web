@@ -91,9 +91,9 @@ export class FuelTrackerStore {
   async removeVehicle(vehicleId: string): Promise<void> {
     const entries = await this.repos.fillUps.list();
     for (const entry of entries) {
-      if (entry.vehicleId === vehicleId) await this.repos.fillUps.remove(entry.id);
+      if (entry.vehicleId === vehicleId) await this.repos.fillUps.remove(entry.id, this.clock.now());
     }
-    await this.repos.vehicles.remove(vehicleId);
+    await this.repos.vehicles.remove(vehicleId, this.clock.now());
   }
 
   // MARK: Fill-ups — the only write path
@@ -124,7 +124,7 @@ export class FuelTrackerStore {
   }
 
   async removeFillUp(id: string): Promise<void> {
-    await this.repos.fillUps.remove(id);
+    await this.repos.fillUps.remove(id, this.clock.now());
   }
 
   /**
@@ -214,12 +214,12 @@ export class FuelTrackerStore {
     if (draft === null) return null;
 
     const record = await this.addFillUp(draft, pending.vehicleId);
-    await this.repos.pendingFillUps.remove(id);
+    await this.repos.pendingFillUps.remove(id, this.clock.now());
     return record;
   }
 
   async rejectPendingFillUp(id: string): Promise<void> {
-    await this.repos.pendingFillUps.remove(id);
+    await this.repos.pendingFillUps.remove(id, this.clock.now());
   }
 
   // MARK: Backup

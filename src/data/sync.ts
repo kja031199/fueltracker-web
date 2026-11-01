@@ -34,8 +34,9 @@ import { SCHEMA_VERSION } from './records';
 import { validateSnapshot } from './recordValidation';
 import type { PushSummary, RawSnapshot, RemoteStore } from './remote';
 import { rowsToPush } from './remote';
-import type { FuelTrackerStore, StoreClock } from './store';
-import { systemClock } from './store';
+import type { FuelTrackerStore } from './store';
+import type { MonotonicClock } from './syncClock';
+import { sharedSyncClock } from './syncClock';
 
 export interface SyncOutcome {
   readonly pulled: ImportSummary;
@@ -47,6 +48,13 @@ export interface SyncOutcome {
    * refused before anything downstream could treat them as records.
    */
   readonly invalid: readonly string[];
+  /**
+   * Rows dated so far in the future that this device will not raise its clock
+   * to match them — so they keep winning every merge, and edits made here to
+   * those rows will not stick. Surfaced because losing to a row we cannot
+   * outbid is bad, and losing to it silently is worse.
+   */
+  readonly unbeatable: number;
   readonly at: number;
 }
 
@@ -117,7 +125,7 @@ export function preserveLocalReceipts(
 export async function syncOnce(
   store: FuelTrackerStore,
   remote: RemoteStore,
-  clock: StoreClock = systemClock,
+  clock: MonotonicClock = sharedSyncClock,
 ): Promise<SyncResult> {
   let raw: RawSnapshot;
   try {
@@ -132,6 +140,21 @@ export async function syncOnce(
   // — only covered numbers. A document with a string `date` or an object
   // `vehicleId` used to flow straight into the statistics layer.
   const { snapshot: remoteSnapshot, rejected: invalid } = validateSnapshot(raw);
+
+  // **Observed before anything is written.** Merges are last-write-wins on
+  // `updatedAt`, so a device whose clock is ahead would otherwise beat every
+  // edit made here — silently, because losing a merge is not an error. Raising
+  // this device's floor above everything it has seen makes the next local write
+  // strictly newer, which is what turns "last write" back into "last edit".
+  clock.clearRefusals();
+  for (const row of [
+    ...remoteSnapshot.vehicles,
+    ...remoteSnapshot.fillUps,
+    ...remoteSnapshot.pendingFillUps,
+  ]) {
+    clock.observe(row.updatedAt);
+  }
+  const unbeatable = clock.refusedCount;
 
   const vehicles = partitionBySchema(remoteSnapshot.vehicles);
   const fillUps = partitionBySchema(remoteSnapshot.fillUps);
@@ -160,7 +183,10 @@ export async function syncOnce(
     return { ok: false, reason: describe(cause, 'Changes are saved here but not uploaded yet.') };
   }
 
-  return { ok: true, outcome: { pulled, pushed, skippedNewerSchema, invalid, at: clock.now() } };
+  return {
+    ok: true,
+    outcome: { pulled, pushed, skippedNewerSchema, invalid, unbeatable, at: clock.now() },
+  };
 }
 
 function describe(cause: unknown, fallback: string): string {
