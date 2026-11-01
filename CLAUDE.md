@@ -48,6 +48,15 @@ behaviour:
    not a typo or a missing import.
 3. Implement until it passes.
 4. Run the whole suite.
+5. **Last, before the pull request: update `CLAUDE.md` and `README.md` if the
+   change made anything in them wrong or incomplete.**
+
+Step 5 is not a formality, and it goes last because that is when you know what
+actually changed rather than what you intended to change. Ask of each file:
+does it now describe only half of this? Receipts were bounded at two different
+sizes for a week while both documents mentioned only one of them, which is
+precisely how the unbounded import path survived as long as it did — the gap in
+the docs was the gap in the code, written down.
 
 Put the failing run in the pull request. "I wrote tests" and "I wrote tests
 that would have caught this" are different claims, and only the second one is
@@ -68,6 +77,20 @@ test that cannot fail is worse, because it reads like proof.
 Recorded results, so a regression is visible: identity-only rules fail 13
 assertions; wide-open rules fail 20; one shared database for all accounts fails
 6; a permanent dismissal instead of a snooze fails 2.
+
+### Do not run `npm audit fix`, and know why
+
+Not superstition, and not "dependency updates are scary". Assessed in #19 and
+recorded in the README: `npm audit` reports a fix as available for the four
+production findings, and there isn't one. `firebase` is already at the latest
+published version, so the suggested resolution is a major change that would most
+plausibly **downgrade** it — leaving the app less current while reporting
+success.
+
+The same assessment found that **none of the findings reaches a browser**, which
+was checked by grepping the built chunks rather than reasoned from package
+names. Re-check that way rather than trusting the severity column; `npm audit
+--omit=dev` separates what ships from what builds.
 
 ### Check exit codes directly
 
@@ -149,10 +172,20 @@ latter is the SDK and ships no binary.
   field. Do not start showing it.
 - **Only a JSON export counts as a backup.** CSV is fill-ups only — no
   vehicles, no tombstones, no receipt bytes.
-- **Receipts over 700 KB do not sync.** Cloud Storage needs a billing account,
-  so images ride inside their document against a 1 MiB cap. The row syncs
-  without the photo and says so, and an incoming row never *removes* a receipt
-  the local copy has.
+- **Receipts have two different ceilings, and both drop the photo rather than
+  the row.** `MAX_RECEIPT_BYTES` (4 MB) is the storage ceiling and applies on
+  *every* path that admits a receipt — the draft gate, a file import, and
+  validation of anything pulled from the account. `MAX_SYNCED_RECEIPT_BYTES`
+  (700 KB) is the narrower sync ceiling, because Cloud Storage needs a billing
+  account and images therefore ride inside their document against a 1 MiB cap.
+  A row over the sync ceiling still syncs, without its photo, and says so; an
+  incoming row never *removes* a receipt the local copy has.
+- **`base64ToBytes` checks its bound before decoding, not after.** Four base64
+  characters carry three bytes, so an oversized payload is refused from the text
+  length alone and never allocated. Deciding after `atob` means the allocation
+  the guard exists to prevent has already happened — a hand-edited backup with a
+  400 MB receipt took the suite eight seconds to refuse that way. If you add
+  another decode path, carry the bound with it.
 - **`backupFormat.ts` stamps CSV-imported rows with the fill-up's own date as
   `updatedAt`**, so imported history loses every merge against anything already
   in the account. Known and unfixed — orthogonal to clock skew, with its own
@@ -191,5 +224,8 @@ workflow runs fire per merge; that is intended — see the README.
       directly, not through a pipe.
 - [ ] Rules touched? Run the emulator suite, and remember `hasOnly`.
 - [ ] No secrets, and no Firebase config, in the diff.
-- [ ] The README updated if a claim in it is now false. A stale promise about
-      where data lives is worse than no promise.
+- [ ] **`README.md` and `CLAUDE.md` re-read against the diff** — the last step,
+      because only now is it clear what changed. A claim that is now false, or
+      true but no longer complete, is worse than no claim: it teaches the next
+      reader to distrust the parts that are load-bearing. If nothing needed
+      changing, say so in the PR rather than leaving it ambiguous.
