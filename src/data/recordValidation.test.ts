@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MAX_RECEIPT_BYTES } from '../domain/fuelEntryDraft';
 import {
   MAX_NAME_LENGTH,
   MAX_NOTES_LENGTH,
@@ -165,6 +166,29 @@ describe('cosmetic problems repair the field', () => {
     const result = validateFillUp({ ...FILL_UP, receiptImageData: 'a picture' });
     if (typeof result === 'string') throw new Error(result);
     expect(result.receiptImageData).toBeNull();
+  });
+
+  it('drops a receipt larger than any write path allows, keeping the row', () => {
+    // Firestore's 1 MiB document cap means this cannot arrive through sync
+    // today, so this is defence in depth — but "every path that admits a
+    // receipt applies the same bound" is a rule worth holding, rather than
+    // "the bound applies except where another system happens to cap it".
+    const result = validateFillUp({
+      ...FILL_UP,
+      receiptImageData: new Uint8Array(MAX_RECEIPT_BYTES + 1),
+    });
+    if (typeof result === 'string') throw new Error(result);
+    expect(result.receiptImageData).toBeNull();
+    expect(result.odometer).toBe(10_000);
+  });
+
+  it('keeps a receipt of exactly the maximum size', () => {
+    const result = validateFillUp({
+      ...FILL_UP,
+      receiptImageData: new Uint8Array(MAX_RECEIPT_BYTES),
+    });
+    if (typeof result === 'string') throw new Error(result);
+    expect(result.receiptImageData).toHaveLength(MAX_RECEIPT_BYTES);
   });
 
   it('keeps real receipt bytes', () => {

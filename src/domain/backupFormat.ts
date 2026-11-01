@@ -26,6 +26,7 @@ import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/r
 import { SCHEMA_VERSION } from '../data/records';
 import { FUEL_GRADES } from './fuelGrade';
 import type { FuelGrade } from './fuelGrade';
+import { MAX_RECEIPT_BYTES } from './fuelEntryDraft';
 
 /** Bumped only when the *file* shape changes, not when a record shape does. */
 export const BACKUP_FORMAT_VERSION = 1;
@@ -66,8 +67,24 @@ export function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-/** Base64 back to bytes, or `null` if it is not valid base64. */
-export function base64ToBytes(text: string): Uint8Array | null {
+/**
+ * Base64 back to bytes, or `null` if it is not valid base64 — or larger than
+ * `maxBytes`.
+ *
+ * **The bound is checked before decoding, not after.** Four base64 characters
+ * carry three bytes, so the decoded size is known from the text length alone,
+ * and refusing there means an oversized payload is never allocated. Deciding
+ * after `atob` would mean the allocation this guard exists to prevent has
+ * already happened — a 400 MB string in a hand-edited backup took the test
+ * suite eight seconds to refuse that way, which is the harm in miniature.
+ *
+ * Unbounded by default, so callers that already know the size stay unchanged.
+ */
+export function base64ToBytes(
+  text: string,
+  maxBytes: number = Number.POSITIVE_INFINITY,
+): Uint8Array | null {
+  if (decodedLengthOf(text) > maxBytes) return null;
   try {
     const binary = atob(text);
     const bytes = new Uint8Array(binary.length);
@@ -76,6 +93,17 @@ export function base64ToBytes(text: string): Uint8Array | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * How many bytes `text` would decode to, from its length alone.
+ *
+ * An over-estimate by at most two bytes when padding is absent, which is the
+ * right direction to be wrong in for a size guard.
+ */
+function decodedLengthOf(text: string): number {
+  const padding = text.endsWith('==') ? 2 : text.endsWith('=') ? 1 : 0;
+  return Math.floor((text.length / 4) * 3) - padding;
 }
 
 // MARK: - JSON
@@ -131,8 +159,29 @@ function grade(value: unknown): FuelGrade {
   return (FUEL_GRADES as readonly string[]).includes(str(value)) ? (value as FuelGrade) : 'Other';
 }
 
-function receipt(value: unknown): Uint8Array | null {
-  return typeof value === 'string' && value !== '' ? base64ToBytes(value) : null;
+/**
+ * A receipt from a file, bounded by the same ceiling every other write path
+ * applies.
+ *
+ * This is the hole that existed: `importBackup` validates a fill-up's numbers
+ * by building a draft, but the draft is never handed the receipt, and the row
+ * that gets stored is the incoming one. So `MAX_RECEIPT_BYTES` — enforced on
+ * every other path — did not apply to an imported photo at all.
+ *
+ * An oversized or unreadable photo drops the **photo**, never the row: the
+ * odometer reading is what the whole MPG chain is built on, and losing a
+ * fill-up because of its picture would be the worse outcome. The same
+ * repair-rather-than-reject split `recordValidation.ts` applies to data from
+ * the network.
+ */
+function receipt(value: unknown, id: string, skipped: string[]): Uint8Array | null {
+  if (typeof value !== 'string' || value === '') return null;
+  const bytes = base64ToBytes(value, MAX_RECEIPT_BYTES);
+  if (bytes === null) {
+    skipped.push(`${id}: the receipt photo was unreadable or too large, so the entry was kept without it`);
+    return null;
+  }
+  return bytes;
 }
 
 /**
@@ -210,7 +259,7 @@ function parseFillUp(value: unknown, skipped: string[]): FillUpRecord | null {
     notes: str(row['notes']),
     latitude: num(row['latitude']),
     longitude: num(row['longitude']),
-    receiptImageData: receipt(row['receiptImageData']),
+    receiptImageData: receipt(row['receiptImageData'], sync.id, skipped),
   };
 }
 
@@ -239,7 +288,7 @@ function parsePending(value: unknown, skipped: string[]): PendingFillUpRecord | 
     notes: str(row['notes']),
     latitude: num(row['latitude']),
     longitude: num(row['longitude']),
-    receiptImageData: receipt(row['receiptImageData']),
+    receiptImageData: receipt(row['receiptImageData'], sync.id, skipped),
   };
 }
 
