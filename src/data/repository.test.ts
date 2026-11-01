@@ -5,6 +5,18 @@ import { InMemoryRepository } from './repository';
 import { DexieRepository, FuelTrackerDatabase } from './db';
 import type { VehicleRecord } from './records';
 import { SCHEMA_VERSION } from './records';
+import { tombstoneVehicle } from './tombstone';
+
+/**
+ * The real builder at a time the test picks.
+ *
+ * Passed in rather than built by the repository: this layer is generic over
+ * the record type and cannot know which fields are content, which is how it
+ * came to write `{ ...row, deletedAt }` and keep everything (#25).
+ */
+function kill(at = 2_000): (row: VehicleRecord) => VehicleRecord {
+  return (row) => tombstoneVehicle(row, at);
+}
 
 function vehicle(id: string, overrides: Partial<VehicleRecord> = {}): VehicleRecord {
   return {
@@ -68,7 +80,7 @@ describe.each(implementations)('%s', (_name, make) => {
     // propagate, so a row deleted on one device reappears from another.
     const repo = await make();
     await repo.put(vehicle('a'));
-    await repo.remove('a');
+    await repo.remove('a', kill());
 
     expect(await repo.get('a')).toBeUndefined();
     expect(await repo.list()).toHaveLength(0);
@@ -79,18 +91,31 @@ describe.each(implementations)('%s', (_name, make) => {
     expect(tombstones[0]?.deletedAt).not.toBeNull();
   });
 
+  test('stores exactly the tombstone it was given', async () => {
+    // The contract that keeps the shape decision with the caller: whatever the
+    // builder returns is what lands, with nothing merged in behind it.
+    const repo = await make();
+    await repo.put(vehicle('a', { name: 'Named', year: 2021 }));
+    await repo.remove('a', kill(4_242));
+
+    const [stored] = await repo.listDeleted();
+    expect(stored?.name).toBe('');
+    expect(stored?.year).toBe(0);
+    expect(stored?.deletedAt).toBe(4_242);
+    expect(stored?.updatedAt).toBe(4_242);
+  });
+
   test('removing twice is a no-op and keeps the first timestamp', async () => {
     const repo = await make();
     await repo.put(vehicle('a'));
-    await repo.remove('a');
-    const first = (await repo.listDeleted())[0]?.deletedAt;
-    await repo.remove('a');
-    expect((await repo.listDeleted())[0]?.deletedAt).toBe(first);
+    await repo.remove('a', kill(2_000));
+    await repo.remove('a', kill(9_000));
+    expect((await repo.listDeleted())[0]?.deletedAt).toBe(2_000);
   });
 
   test('removing something absent is a no-op, not an error', async () => {
     const repo = await make();
-    await expect(repo.remove('nope')).resolves.toBeUndefined();
+    await expect(repo.remove('nope', kill())).resolves.toBeUndefined();
     expect(await repo.listDeleted()).toHaveLength(0);
   });
 
@@ -98,8 +123,8 @@ describe.each(implementations)('%s', (_name, make) => {
     // Which is what a sync reconciliation would do on a later edit.
     const repo = await make();
     await repo.put(vehicle('a'));
-    await repo.remove('a');
-    await repo.put(vehicle('a', { name: 'Back', updatedAt: 2_000 }));
+    await repo.remove('a', kill());
+    await repo.put(vehicle('a', { name: 'Back', updatedAt: 3_000 }));
     expect((await repo.get('a'))?.name).toBe('Back');
     expect(await repo.listDeleted()).toHaveLength(0);
   });
@@ -109,7 +134,7 @@ describe.each(implementations)('%s', (_name, make) => {
     await repo.put(vehicle('a'));
     await repo.put(vehicle('b'));
     await repo.put(vehicle('c'));
-    await repo.remove('b');
+    await repo.remove('b', kill());
 
     const live = (await repo.list()).map((row) => row.id).sort();
     expect(live).toEqual(['a', 'c']);

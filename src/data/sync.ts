@@ -92,9 +92,13 @@ export function partitionBySchema<T extends { readonly schemaVersion: number }>(
  * device's copy with the photoless version, destroying the only remaining copy
  * of the image.
  *
- * The rule: an incoming row never *removes* a receipt, it only adds one. A
- * deliberate deletion of a fill-up travels as a tombstone, so nothing here
- * blocks a real delete.
+ * The rule: an incoming row never *removes* a receipt, it only adds one —
+ * **except for a tombstone**, which is the one case where losing the photo is
+ * the entire intention. A tombstone now carries no receipt by design
+ * (`tombstone.ts`, #25), and the local copy of that row still has one until it
+ * is scrubbed, so without this exception a deletion arriving from another
+ * device would put the photograph straight back onto the row that was deleted
+ * to be rid of it.
  *
  * It lives in sync rather than in `importBackup` because the file-import path
  * has its own tested behaviour, and widening that behaviour to serve this case
@@ -106,6 +110,7 @@ export function preserveLocalReceipts(
 ): FillUpRecord[] {
   const localById = new Map(local.map((row) => [row.id, row]));
   return incoming.map((row) => {
+    if (row.deletedAt !== null) return row;
     if (row.receiptImageData !== null) return row;
     const existing = localById.get(row.id);
     if (existing === undefined || existing.receiptImageData === null) return row;

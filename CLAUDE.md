@@ -84,7 +84,11 @@ unreadable period straight through instead of defaulting it fails 6; clamping a
 future timestamp to "no time has passed" instead of restarting fails 3. Its
 first implementation was written deliberately naive, before the real one, and
 failed 13 of the pure rule's 34 assertions — all of them hostile-input or
-boundary cases.
+boundary cases. For the tombstone scrub — restoring `{ ...row, deletedAt }`
+fails 14; keeping the receipt while emptying everything else fails 7; an
+`isScrubbed` that always answers yes (so the cleanup silently does nothing)
+fails 7; one that compares `updatedAt` too (the write loop) fails 2; dropping
+the tombstone exception in `preserveLocalReceipts` fails 1.
 
 **Assert the mechanism, not a stopwatch.** `receiptBounds.test.ts` checked that
 an oversized payload is refused *before* `atob` by giving the refusal a 1000 ms
@@ -135,8 +139,12 @@ latter is the SDK and ships no binary.
    record. `RemoteStore.pull()` returns `RawSnapshot` (`unknown[]`) on purpose:
    the honest type is what forces the validation. Do not "simplify" it to
    `BackupSnapshot`.
-3. **Deletions are tombstones, never row deletions.** A hard delete leaves
-   nothing to propagate, so the row returns from whichever device still has it.
+3. **Deletions are tombstones, never row deletions — and a tombstone carries
+   only the sync fields.** A hard delete leaves nothing to propagate, so the row
+   returns from whichever device still has it. But `{ ...row, deletedAt }` kept
+   the receipt photograph of a fill-up somebody deleted (#25), so the shape is
+   built by `tombstone.ts` and `Repository.remove` takes the builder as an
+   argument. Nothing may spread a whole row into a tombstone.
 4. **Storage is canonical** — miles, US gallons, US MPG — with conversion only
    at the display boundary. L/100km is the *reciprocal* of MPG, so charts
    **convert the series**, never relabel the axis.
@@ -186,6 +194,16 @@ latter is the SDK and ships no binary.
   This is safe only because **`updatedAt` is never displayed**: it is a
   merge-ordering value, and the date a reader sees is the separate `date`
   field. Do not start showing it.
+- **A tombstone is empty, and three things depend on that together.** The
+  builders are in `tombstone.ts`; `preserveLocalReceipts` has an **exception**
+  for tombstones, or a deletion arriving from another device would put the photo
+  back on the row that was deleted to lose it; and `store.scrubTombstones()`
+  rewrites rows older builds left full, which runs once per store from
+  `useAppData`. It must stay idempotent — `isScrubbed` deliberately ignores
+  `updatedAt`, because comparing it makes every scrubbed row look dirty and
+  turns the cleanup into a write loop with a sync loop behind it. The scrub
+  bumps `updatedAt` (that is what erases the remote copy) and never moves
+  `deletedAt`, which is a fact.
 - **Only a JSON export counts as a backup.** CSV is fill-ups only — no
   vehicles, no tombstones, no receipt bytes.
 - **Receipts have two different ceilings, and both drop the photo rather than

@@ -18,9 +18,11 @@
 import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import type { FuelEntryStats } from '../domain/models';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records';
+import type { FillUpRecord, PendingFillUpRecord, SyncFields, VehicleRecord } from './records';
 import { SCHEMA_VERSION } from './records';
 import type { Repository } from './repository';
+import type { Tombstoner } from './tombstone';
+import { isScrubbed, tombstoneFillUp, tombstonePending, tombstoneVehicle } from './tombstone';
 import type { BackupSnapshot } from '../domain/backupFormat';
 import type { ImportSummary } from './backup';
 import { exportSnapshot, importBackup } from './backup';
@@ -91,9 +93,12 @@ export class FuelTrackerStore {
   async removeVehicle(vehicleId: string): Promise<void> {
     const entries = await this.repos.fillUps.list();
     for (const entry of entries) {
-      if (entry.vehicleId === vehicleId) await this.repos.fillUps.remove(entry.id, this.clock.now());
+      if (entry.vehicleId !== vehicleId) continue;
+      const at = this.clock.now();
+      await this.repos.fillUps.remove(entry.id, (row) => tombstoneFillUp(row, at));
     }
-    await this.repos.vehicles.remove(vehicleId, this.clock.now());
+    const at = this.clock.now();
+    await this.repos.vehicles.remove(vehicleId, (row) => tombstoneVehicle(row, at));
   }
 
   // MARK: Fill-ups — the only write path
@@ -123,8 +128,16 @@ export class FuelTrackerStore {
     return record;
   }
 
+  /**
+   * Tombstones a fill-up, keeping only what sync needs to reconcile it.
+   *
+   * The receipt photograph, the notes, the station and the coordinates are
+   * **gone**, not hidden — see `tombstone.ts` for why that was not always
+   * true. What remains is a record that this id was deleted.
+   */
   async removeFillUp(id: string): Promise<void> {
-    await this.repos.fillUps.remove(id, this.clock.now());
+    const at = this.clock.now();
+    await this.repos.fillUps.remove(id, (row) => tombstoneFillUp(row, at));
   }
 
   /**
@@ -214,12 +227,63 @@ export class FuelTrackerStore {
     if (draft === null) return null;
 
     const record = await this.addFillUp(draft, pending.vehicleId);
-    await this.repos.pendingFillUps.remove(id, this.clock.now());
+    await this.clearSubmission(id);
     return record;
   }
 
   async rejectPendingFillUp(id: string): Promise<void> {
-    await this.repos.pendingFillUps.remove(id, this.clock.now());
+    await this.clearSubmission(id);
+  }
+
+  /**
+   * Tombstones a submission once it has been dealt with.
+   *
+   * A submission is the one record here written by somebody else, so its
+   * tombstone keeps neither their name nor their note — approved or rejected,
+   * the queue entry has done its job and the content belongs to the fill-up it
+   * became, if it became one.
+   */
+  private async clearSubmission(id: string): Promise<void> {
+    const at = this.clock.now();
+    await this.repos.pendingFillUps.remove(id, (row) => tombstonePending(row, at));
+  }
+
+  // MARK: Cleaning up older tombstones
+
+  /**
+   * Empties tombstones that an older build left full, and reports how many.
+   *
+   * Fixing the writer does nothing for the rows already on disk and already in
+   * the account, and those are the ones holding the receipt photographs of
+   * fill-ups somebody deleted (#25). Rewriting a row bumps its `updatedAt`, so
+   * the next sync pushes the thin version over the fat document — which is the
+   * only way the remote copy is ever erased.
+   *
+   * Safe to call on every load: a scrubbed row is recognised as scrubbed and
+   * left alone, so this does nothing after the first time rather than
+   * rewriting and re-pushing the same rows forever.
+   */
+  async scrubTombstones(): Promise<number> {
+    return (
+      (await this.scrub(this.repos.vehicles, tombstoneVehicle)) +
+      (await this.scrub(this.repos.fillUps, tombstoneFillUp)) +
+      (await this.scrub(this.repos.pendingFillUps, tombstonePending))
+    );
+  }
+
+  private async scrub<T extends SyncFields>(
+    repo: Repository<T>,
+    tombstone: Tombstoner<T>,
+  ): Promise<number> {
+    let fixed = 0;
+    for (const row of await repo.listDeleted()) {
+      if (isScrubbed(row, tombstone)) continue;
+      // `updatedAt` moves so the rewrite propagates; `deletedAt` does not,
+      // because when something was deleted is a fact and not ours to restate.
+      await repo.put({ ...tombstone(row, this.clock.now()), deletedAt: row.deletedAt });
+      fixed += 1;
+    }
+    return fixed;
   }
 
   // MARK: Backup

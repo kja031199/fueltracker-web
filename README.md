@@ -222,6 +222,34 @@ Deletions travel as tombstones and are never hard-deleted: a removed row has to
 exist as a fact, or a second device has nothing to learn from and the row simply
 reappears on its next push.
 
+### What deleting actually deletes
+
+A tombstone keeps **only what reconciliation needs** — the four sync fields,
+plus the vehicle id so a cascade can still be matched. The receipt photograph,
+the notes, the station, the coordinates and the measurements are gone, on this
+device and in the account.
+
+That is worth stating because it was not always true. Until #25 a tombstone was
+written as "the whole row, plus a deletion date", so deleting a fill-up hid it
+from the list while keeping its photograph on disk, in the account, and in every
+backup taken afterwards. Deleting is the only control anyone has over those
+photographs — a receipt shows where somebody physically was — so it needs to do
+what it says.
+
+Two consequences worth knowing:
+
+- **A deletion cannot be undone.** There was never an undelete, and now there is
+  nothing left to undelete from.
+- **Tombstones left behind by older builds are cleaned up on load.** The rewrite
+  bumps the row's `updatedAt`, which is what carries the erasure up to the
+  account — rewriting the document that still holds the photograph. It runs
+  once: a tombstone that is already empty is recognised and left alone.
+
+The row itself stays forever, by design and by necessity: `firestore.rules`
+allows no deletes at all, since every write rule is written against the document
+being written. Removing a tombstone entirely would need a rules change and is a
+separate decision — what this closes is the content living inside it.
+
 Sync runs on sign-in, on window focus, and on demand from Settings. There is no
 realtime listener and no sync-per-keystroke — the free tier allows 20,000 writes
 a day, which is enormous for one person's fuel log right up until something
@@ -409,8 +437,12 @@ cost nothing now and cannot be retrofitted later without migrating real data:
 |---|---|
 | `id` | A **client-generated UUID**. A server-assigned id cannot be reconciled with a row created offline. |
 | `updatedAt` | Epoch ms, stamped on every write — the basis for last-write-wins. |
-| `deletedAt` | A **tombstone, not a row deletion**. A hard delete leaves nothing to propagate, so a row deleted on one device reappears from another. |
+| `deletedAt` | A **tombstone, not a row deletion**. A hard delete leaves nothing to propagate, so a row deleted on one device reappears from another. The tombstone keeps only the sync fields — see [what deleting actually deletes](#what-deleting-actually-deletes). |
 | `schemaVersion` | Stamped at write time so a future migration knows what shape it is reading. |
+
+`remove` takes the tombstone *builder* rather than building one itself: the
+layer is generic over the record type and cannot know which of a row's fields
+are content, which is exactly how it came to keep all of them.
 
 The persistence abstraction is four methods — `list`, `get`, `put`, `remove` —
 and there are two implementations: one over Dexie, one over a plain `Map`. The
