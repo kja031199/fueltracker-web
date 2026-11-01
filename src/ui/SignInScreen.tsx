@@ -23,9 +23,21 @@ interface Props {
   readonly error: string | null;
   /** False when no Firebase config is present in this build. */
   readonly configured?: boolean;
+  /**
+   * Why this screen is showing, when it is not simply the front door — an
+   * idle timeout, today. A session that ends on its own and says nothing is
+   * indistinguishable from a bug, and the reader starts doubting the app
+   * rather than reading the setting they switched on.
+   */
+  readonly notice?: string | null;
 }
 
-export function SignInScreen({ auth, error, configured = true }: Props): ReactElement {
+export function SignInScreen({
+  auth,
+  error,
+  configured = true,
+  notice = null,
+}: Props): ReactElement {
   const [busy, setBusy] = useState(false);
 
   async function signIn(): Promise<void> {
@@ -47,6 +59,11 @@ export function SignInScreen({ auth, error, configured = true }: Props): ReactEl
           <h2 className="card__title" id="signin-heading">
             Sign in to continue
           </h2>
+          {notice !== null && (
+            <p className="warning" style={{ margin: '0 0 12px' }} role="status">
+              {notice}
+            </p>
+          )}
           <p style={{ margin: '0 0 8px' }}>
             Log every fill-up and this works out your real fuel economy, what you actually spend,
             and which day of the week you tend to catch the cheapest price.

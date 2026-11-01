@@ -8,6 +8,8 @@ import { backupFilename } from '../data/backup';
 import { parseCsv, parseJsonBackup, toCsv } from '../domain/backupFormat';
 import { downloadText } from './download';
 import { saveJsonBackup } from './exportBackup';
+import type { IdleTimeoutSetting } from '../domain/idleTimeout';
+import { IDLE_MINUTE_CHOICES, IDLE_TIMEOUT_OFF } from '../domain/idleTimeout';
 import {
   DISTANCE_UNITS,
   ECONOMY_UNITS,
@@ -32,6 +34,10 @@ interface Props {
   readonly onBackedUp?: (fillUpCount: number) => void;
   /** Epoch ms of the last JSON backup, or null if there has never been one. */
   readonly lastBackupAt?: number | null;
+  /** The idle-timeout setting for this browser. Off unless somebody asked. */
+  readonly idleTimeout?: IdleTimeoutSetting;
+  /** Omitted by tests that are not about the session timeout. */
+  readonly onIdleTimeoutChange?: (setting: IdleTimeoutSetting) => void;
 }
 
 /** "3 minutes ago", falling back to a date once it stops being recent. */
@@ -64,6 +70,8 @@ export function SettingsScreen({
   syncEnabled = false,
   onBackedUp,
   lastBackupAt = null,
+  idleTimeout = IDLE_TIMEOUT_OFF,
+  onIdleTimeoutChange,
 }: Props): ReactElement {
   const fileInput = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<string | null>(null);
@@ -229,6 +237,55 @@ export function SettingsScreen({
               </button>
             </p>
           )}
+        </section>
+      )}
+
+      {onIdleTimeoutChange !== undefined && (
+        <section className="card" aria-labelledby="security-heading">
+          <h2 className="card__title" id="security-heading">
+            Security
+          </h2>
+          <p style={{ margin: '0 0 8px' }}>
+            <label>
+              <input
+                type="checkbox"
+                checked={idleTimeout.enabled}
+                onChange={(event) =>
+                  onIdleTimeoutChange({ ...idleTimeout, enabled: event.target.checked })
+                }
+              />{' '}
+              Sign out after a period of inactivity
+            </label>
+          </p>
+          <p style={{ margin: '0 0 8px' }}>
+            <label htmlFor="idle-minutes">Sign out when inactive for </label>
+            <select
+              id="idle-minutes"
+              value={idleTimeout.minutes}
+              disabled={!idleTimeout.enabled}
+              onChange={(event) =>
+                onIdleTimeoutChange({ ...idleTimeout, minutes: Number(event.target.value) })
+              }
+            >
+              {IDLE_MINUTE_CHOICES.map((minutes) => (
+                <option key={minutes} value={minutes}>
+                  {minutes} minutes
+                </option>
+              ))}
+            </select>
+          </p>
+          {/* The limits, next to the switch rather than in a help page. This
+              protects less than its name suggests, and a lock that implies
+              more safety than it delivers is worse than none. */}
+          <p style={{ margin: '0 0 8px' }}>
+            Your fuel log stays on this device either way. This ends the session; it does not hide
+            your fill-ups from anyone who opens the browser&rsquo;s developer tools, and it is a
+            small addition to locking the device itself.
+          </p>
+          <p className="warning" style={{ margin: 0 }}>
+            Signing back in needs a connection, so a device that is offline cannot get back into the
+            app until it reconnects. That is the trade for leaving this on.
+          </p>
         </section>
       )}
 

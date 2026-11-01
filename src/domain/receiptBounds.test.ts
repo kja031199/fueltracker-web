@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { MAX_RECEIPT_BYTES } from './fuelEntryDraft';
 import { base64ToBytes, bytesToBase64, parseJsonBackup, toJsonBackup } from './backupFormat';
 
@@ -45,12 +45,39 @@ describe('base64ToBytes', () => {
     // already happened, which is the thing being defended against — so the
     // refusal has to be derivable from the text length alone.
     //
-    // 400 MB of base64 is ~300 MB of bytes. If this decodes before refusing,
-    // the test machine feels it; if the bound is checked first, it is instant.
-    const huge = base64OfLength(300 * 1024 * 1024);
-    const started = Date.now();
-    expect(base64ToBytes(huge, MAX_RECEIPT_BYTES)).toBeNull();
-    expect(Date.now() - started).toBeLessThan(1000);
+    // Asserted on the mechanism, not on a stopwatch. This used to give the
+    // refusal a 1000 ms budget, and it failed at 2673 ms in a full run while
+    // passing in isolation: nothing had decoded, the worker was starved by
+    // other suites. A test that fails for reasons unrelated to its subject
+    // teaches people to re-run rather than to read, and this one is load-bearing
+    // — it is the only assertion standing between a hand-edited backup and a
+    // 300 MB allocation.
+    const decode = vi.spyOn(globalThis, 'atob');
+    try {
+      // 400 MB of base64 is ~300 MB of bytes.
+      const huge = base64OfLength(300 * 1024 * 1024);
+      const started = Date.now();
+      expect(base64ToBytes(huge, MAX_RECEIPT_BYTES)).toBeNull();
+      expect(decode).not.toHaveBeenCalled();
+      // Kept as a backstop, generously: a decode of this payload would not
+      // finish inside ten seconds, and the spy above is the real assertion.
+      expect(Date.now() - started).toBeLessThan(10_000);
+    } finally {
+      decode.mockRestore();
+    }
+  });
+
+  it('does decode when the payload is within the bound, so the spy above means something', () => {
+    // Guards the assertion rather than the code: a spy on a name the
+    // implementation no longer calls would report "never decoded" forever, and
+    // read exactly like a passing bound check.
+    const decode = vi.spyOn(globalThis, 'atob');
+    try {
+      expect(base64ToBytes(bytesToBase64(new Uint8Array([7, 8, 9])), 1000)).not.toBeNull();
+      expect(decode).toHaveBeenCalled();
+    } finally {
+      decode.mockRestore();
+    }
   });
 
   it('is unbounded when no bound is given, so existing callers are unchanged', () => {

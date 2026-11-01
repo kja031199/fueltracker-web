@@ -20,7 +20,8 @@ over IndexedDB, Firebase Auth and Firestore. Deployed to Firebase Hosting at
 
 - `src/domain/` — pure logic. No storage, no React, no platform. Statistics,
   units, the draft gate, the accessible palette, the backup-reminder decision,
-  the three scan parsers (`scanning/`), backup serialisation.
+  the idle-timeout rule, the three scan parsers (`scanning/`), backup
+  serialisation.
 - `src/data/` — records and persistence. `store.ts` is the write surface,
   `repository.ts` the four-method abstraction, `db.ts` the Dexie binding,
   `sync.ts` the reconciliation, `recordValidation.ts` the shape check on
@@ -76,7 +77,22 @@ test that cannot fail is worse, because it reads like proof.
 
 Recorded results, so a regression is visible: identity-only rules fail 13
 assertions; wide-open rules fail 20; one shared database for all accounts fails
-6; a permanent dismissal instead of a snooze fails 2.
+6; a permanent dismissal instead of a snooze fails 2. For the idle timeout —
+resetting the activity marker on mount instead of reading it (i.e. a reload gets
+you back in) fails 3; `>` instead of `>=` at the boundary fails 1; passing an
+unreadable period straight through instead of defaulting it fails 6; clamping a
+future timestamp to "no time has passed" instead of restarting fails 3. Its
+first implementation was written deliberately naive, before the real one, and
+failed 13 of the pure rule's 34 assertions — all of them hostile-input or
+boundary cases.
+
+**Assert the mechanism, not a stopwatch.** `receiptBounds.test.ts` checked that
+an oversized payload is refused *before* `atob` by giving the refusal a 1000 ms
+budget. It failed at 2673 ms in a full run and passed in isolation: nothing had
+decoded, the worker was starved by two new jsdom suites. It now spies on `atob`
+and requires it was never called, with a second test confirming the spy *does*
+see a legitimate decode — a spy on a name the code no longer calls would report
+"never decoded" forever and read exactly like a passing bound check.
 
 ### Do not run `npm audit fix`, and know why
 
@@ -190,6 +206,22 @@ latter is the SDK and ships no binary.
   `updatedAt`**, so imported history loses every merge against anything already
   in the account. Known and unfixed — orthogonal to clock skew, with its own
   blast radius. Found while fixing #14.
+- **Testing Library does not see vitest's fake timers.** Its
+  `jestFakeTimersAreEnabled()` looks for *Jest*, so under a blanket
+  `vi.useFakeTimers()` every `findBy*`/`waitFor` polls with a faked `setTimeout`
+  that never fires — the test **hangs to its time limit** rather than failing,
+  which reads like an infinite loop in the code under test. Fake only what the
+  code needs: `vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval',
+  'Date'] })`. Fake timers must also go in **before** the render, or the interval
+  the component armed is the real one and advancing does nothing.
+- **The idle timeout is off by default, and it signs out without deleting
+  anything.** The per-account database is left in place on purpose (see
+  invariant 5), so the timeout gates the *session*, not the data — which stays
+  readable in DevTools. Say that in any copy about it. Its fallbacks point in
+  opposite directions deliberately: an unreadable **period** becomes the default
+  (never "no timeout" — an invisible failure), an unreadable **setting** reads as
+  off (no evidence of consent). Both are documented at the top of
+  `domain/idleTimeout.ts`; keep them that way if you touch either.
 - **Tests never touch the network or a real device service.** `StubAuthProvider`
   and `InMemoryRemoteStore` exist for this. The iOS original paid for this
   lesson when an `LAContext` call turned every render test into a round-trip to
