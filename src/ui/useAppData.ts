@@ -14,6 +14,14 @@ import type { FuelTrackerStore } from '../data/store';
 export interface AppData {
   readonly vehicles: readonly VehicleRecord[];
   readonly fillUps: readonly FillUpRecord[];
+  /**
+   * Live fill-ups across **every** vehicle, not just the selected one.
+   *
+   * The backup reminder needs the whole log: someone with three cars and four
+   * fill-ups each has twelve worth losing, and counting only the selected
+   * vehicle would quietly keep them under the prompt threshold.
+   */
+  readonly fillUpCount: number;
   readonly loading: boolean;
   /** Set when loading failed — storage can be unavailable, not just empty. */
   readonly error: string | null;
@@ -25,6 +33,7 @@ export interface AppData {
 export function useAppData(store: FuelTrackerStore): AppData {
   const [vehicles, setVehicles] = useState<readonly VehicleRecord[]>([]);
   const [fillUps, setFillUps] = useState<readonly FillUpRecord[]>([]);
+  const [fillUpCount, setFillUpCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
@@ -33,6 +42,7 @@ export function useAppData(store: FuelTrackerStore): AppData {
     try {
       const loaded = await store.vehicles();
       setVehicles(loaded);
+      setFillUpCount(await store.fillUpCount());
       setSelectedVehicleId((current) => {
         // Keep the current selection if it still exists; otherwise fall back to
         // the first vehicle, so deleting the selected one cannot strand the UI
@@ -77,5 +87,5 @@ export function useAppData(store: FuelTrackerStore): AppData {
 
   const selectVehicle = useCallback((id: string) => setSelectedVehicleId(id), []);
 
-  return { vehicles, fillUps, loading, error, selectedVehicleId, selectVehicle, reload };
+  return { vehicles, fillUps, fillUpCount, loading, error, selectedVehicleId, selectVehicle, reload };
 }

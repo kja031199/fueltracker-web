@@ -110,9 +110,21 @@ can be cleared by the reader, by the browser under pressure, or by a privacy
 setting — before there was an account, that was total data loss, and the whole
 reason export shipped before the charts did.
 
-**Export is still worth doing.** A backup file is the only copy that does not
-depend on somebody else's service staying up, or on you keeping access to that
-Google account.
+**Export is still worth doing, and the app now says so.** A backup file is the
+only copy that does not depend on somebody else's service staying up, or on you
+keeping access to that Google account.
+
+The account is not a backup — it is a second *live* copy, and it replicates a
+mistake faithfully. A deletion travels as a tombstone, last-write-wins carries
+it to every device, and the free tier has no point-in-time recovery to fall
+back on. So a banner asks for a backup when there has never been one, when the
+last is over a month old, or after 25 new fill-ups, and **dismissing it snoozes
+for a week rather than silencing it** — a permanent dismissal would quietly
+re-open the risk it exists to close.
+
+Only the JSON export counts. The CSV is fill-ups only, so treating it as a
+backup would tell someone they are protected when a restore would lose their
+deletions and their second car.
 
 ### Signing in
 

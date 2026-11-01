@@ -13,6 +13,9 @@ import { useAuth } from './useAuth';
 import { useSync } from './useSync';
 import { useServiceWorker } from './useServiceWorker';
 import { UpdateBanner } from './UpdateBanner';
+import { BackupBanner } from './BackupBanner';
+import { useBackupNudge } from './backupNudge';
+import { saveJsonBackup } from './exportBackup';
 import { SignInScreen } from './SignInScreen';
 import { VehiclesScreen } from './VehiclesScreen';
 import { SettingsScreen } from './SettingsScreen';
@@ -74,6 +77,7 @@ export function App({
   const [hasOnboarded, setHasOnboarded] = useState<boolean>(() => loadHasOnboarded());
   const data = useAppData(store);
   const sync = useSync(store, authState.status === 'signedIn' ? remote : null, data.reload);
+  const backup = useBackupNudge(data.fillUpCount);
   const serviceWorker = useServiceWorker();
 
   // The palette is applied from the ported values rather than written as CSS,
@@ -167,6 +171,13 @@ export function App({
   return (
     <div className="app">
       <UpdateBanner state={serviceWorker} />
+      <BackupBanner
+        reason={backup.reason}
+        onBackUp={() => {
+          void saveJsonBackup(store).then((saved) => backup.recordBackup(saved.fillUps));
+        }}
+        onDismiss={backup.snooze}
+      />
       <h1 className="app__title">FuelTracker</h1>
       <main className="app__main">
         {tab === 'vehicles' && (
@@ -184,6 +195,8 @@ export function App({
             onChange={changeUnits}
             store={store}
             onImported={data.reload}
+            onBackedUp={backup.recordBackup}
+            lastBackupAt={backup.state.lastExportAt}
             account={authState.user}
             onSignOut={() => void authProvider.signOut()}
             sync={sync}
