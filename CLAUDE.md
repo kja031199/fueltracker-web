@@ -25,7 +25,9 @@ over IndexedDB, Firebase Auth and Firestore. Deployed to Firebase Hosting at
 - `src/data/` — records and persistence. `store.ts` is the write surface,
   `repository.ts` the four-method abstraction, `db.ts` the Dexie binding,
   `sync.ts` the reconciliation, `recordValidation.ts` the shape check on
-  anything from the network, `accountStore.ts` the per-account database.
+  anything from the network, `recordId.ts` which ids can be stored at all,
+  `tombstone.ts` what a deletion leaves, `accountStore.ts` the per-account
+  database.
 - `src/data/firebase/` — the **only** place the Firebase SDK is imported.
 - `src/ui/` — React. Screens, hooks, hand-drawn SVG charts (`charts/`).
 - Roughly seventy source files, with a test file beside nearly every one, plus
@@ -194,6 +196,20 @@ latter is the SDK and ships no binary.
   This is safe only because **`updatedAt` is never displayed**: it is a
   merge-ordering value, and the date a reader sees is the separate `date`
   field. Do not start showing it.
+- **A record id is also a Firestore document name, and the legal sets differ.**
+  `a/b` makes the SDK throw, `a/b/c` builds a path the rules never match, and
+  `.`, `..` and `__anything__` are refused by the server. One such row used to
+  stop **every** push, on every sync, forever — reported as the ordinary "not
+  uploaded yet" — and deleting the fill-up did not help, because the tombstone
+  carried the same id. `recordId.ts` is the single rule, applied in
+  `recordValidation` (the account) and `backupFormat` (JSON and CSV imports);
+  `sendableRows` in `remote.ts` keeps an already-stored bad row from aborting
+  the batch. It declines to **send**, never to keep: the row stays local and is
+  reported in `SyncOutcome.unsendable`.
+  The rules deliberately gained **no** new clause for this — a document name is
+  one path segment so it cannot contain a slash, and `data.id == id` already
+  refuses a field that disagrees with its own name. There is an emulator test
+  asserting that rather than a comment claiming it.
 - **A tombstone is empty, and three things depend on that together.** The
   builders are in `tombstone.ts`; `preserveLocalReceipts` has an **exception**
   for tombstones, or a deletion arriving from another device would put the photo

@@ -14,6 +14,7 @@
 
 import type { BackupSnapshot } from '../domain/backupFormat';
 import type { SyncFields } from './records';
+import { isStorableId } from './recordId';
 
 export interface PushSummary {
   /** Documents written. */
@@ -115,6 +116,32 @@ export class InMemoryRemoteStore implements RemoteStore {
 }
 
 /** Rows the remote side is missing or holds an older version of. */
+/**
+ * Keeps the rows the account can actually address, and names the ones it cannot.
+ *
+ * A row whose id is not a storable document name cannot be uploaded, and
+ * attempting it does not fail politely: the SDK throws, or the server refuses,
+ * and the whole `writeBatch` goes with it — so one such row stops *everything*
+ * uploading, on every sync, forever (#26). Validation now refuses an id like
+ * that at every door, but a row stored before that cannot be allowed to hold
+ * an account hostage.
+ *
+ * Declining to send a row is as far as this goes. The row stays in local
+ * storage: refusing to upload somebody's data is not a licence to delete it,
+ * and `SyncOutcome.unsendable` is how they get told instead.
+ */
+export function sendableRows<T extends SyncFields>(
+  rows: readonly T[],
+  unsendable: string[],
+): T[] {
+  const sendable: T[] = [];
+  for (const row of rows) {
+    if (isStorableId(row.id)) sendable.push(row);
+    else unsendable.push(row.id);
+  }
+  return sendable;
+}
+
 export function rowsToPush<T extends SyncFields>(
   local: readonly T[],
   remote: readonly T[],

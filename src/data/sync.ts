@@ -33,7 +33,7 @@ import type { FillUpRecord } from './records';
 import { SCHEMA_VERSION } from './records';
 import { validateSnapshot } from './recordValidation';
 import type { PushSummary, RawSnapshot, RemoteStore } from './remote';
-import { rowsToPush } from './remote';
+import { rowsToPush, sendableRows } from './remote';
 import type { FuelTrackerStore } from './store';
 import type { MonotonicClock } from './syncClock';
 import { sharedSyncClock } from './syncClock';
@@ -55,6 +55,16 @@ export interface SyncOutcome {
    * outbid is bad, and losing to it silently is worse.
    */
   readonly unbeatable: number;
+  /**
+   * Ids of local rows the account cannot address, so they were left out of the
+   * push rather than taking it down with them (#26).
+   *
+   * Reported because the consequence is specific and was otherwise invisible:
+   * those rows stay on this device only, and the failure used to present as
+   * the ordinary "not uploaded yet" — forever, for every row, not just the
+   * broken one.
+   */
+  readonly unsendable: readonly string[];
   readonly at: number;
 }
 
@@ -175,10 +185,16 @@ export async function syncOnce(
   });
 
   const localAfter = await store.exportSnapshot();
+  // Anything with an id the account cannot address is held back here, by name,
+  // rather than being handed to a batch it would abort.
+  const unsendable: string[] = [];
   const outgoing: BackupSnapshot = {
-    vehicles: rowsToPush(localAfter.vehicles, remoteSnapshot.vehicles),
-    fillUps: rowsToPush(localAfter.fillUps, remoteSnapshot.fillUps),
-    pendingFillUps: rowsToPush(localAfter.pendingFillUps, remoteSnapshot.pendingFillUps),
+    vehicles: sendableRows(rowsToPush(localAfter.vehicles, remoteSnapshot.vehicles), unsendable),
+    fillUps: sendableRows(rowsToPush(localAfter.fillUps, remoteSnapshot.fillUps), unsendable),
+    pendingFillUps: sendableRows(
+      rowsToPush(localAfter.pendingFillUps, remoteSnapshot.pendingFillUps),
+      unsendable,
+    ),
   };
 
   let pushed: PushSummary;
@@ -190,7 +206,15 @@ export async function syncOnce(
 
   return {
     ok: true,
-    outcome: { pulled, pushed, skippedNewerSchema, invalid, unbeatable, at: clock.now() },
+    outcome: {
+      pulled,
+      pushed,
+      skippedNewerSchema,
+      invalid,
+      unbeatable,
+      unsendable,
+      at: clock.now(),
+    },
   };
 }
 

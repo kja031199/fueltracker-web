@@ -173,6 +173,51 @@ describe('the account section', () => {
     expect(screen.getByRole('navigation', { name: /sections/i })).toBeInTheDocument();
   });
 
+  test('a row the account cannot address is reported, not left as a silent failure', async () => {
+    // #26. This used to present as the ordinary "not uploaded yet", forever,
+    // while every later fill-up quietly stopped reaching the account too.
+    const fillUps = new InMemoryRepository<FillUpRecord>([
+      {
+        id: 'a/b',
+        updatedAt: 900,
+        deletedAt: null,
+        schemaVersion: 1,
+        vehicleId: 'v1',
+        date: 1_700_000_000_000,
+        odometer: 10_000,
+        gallons: 10,
+        pricePerGallon: 3.5,
+        isFullTank: true,
+        missedPreviousFillUp: false,
+        fuelGrade: 'Regular',
+        station: '',
+        notes: '',
+        latitude: null,
+        longitude: null,
+        receiptImageData: null,
+      },
+    ]);
+    const store = new FuelTrackerStore({
+      vehicles: new InMemoryRepository<VehicleRecord>(),
+      fillUps,
+      pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
+    });
+    await store.addVehicle({ name: 'Civic' });
+
+    render(
+      <App
+        store={store}
+        auth={new StubAuthProvider({ status: 'signedIn', user: USER }, USER)}
+        remote={new InMemoryRemoteStore()}
+        initialTab="settings"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(/could not be uploaded/i),
+    );
+  });
+
   test('a large receipt is reported as staying on the device', async () => {
     const store = makeStore();
     const added = await store.addVehicle({ name: 'Civic' });

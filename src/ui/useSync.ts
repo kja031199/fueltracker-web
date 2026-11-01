@@ -79,7 +79,8 @@ export function useSync(
         setMessage(result.reason);
         return;
       }
-      const { pulled, pushed, skippedNewerSchema, invalid, unbeatable, at } = result.outcome;
+      const { pulled, pushed, skippedNewerSchema, invalid, unbeatable, unsendable, at } =
+        result.outcome;
       setLastSyncedAt(at);
       saveLastSynced(at);
 
@@ -94,6 +95,14 @@ export function useSync(
       if (pushed.receiptsOmitted > 0) {
         notes.push(
           `${pushed.receiptsOmitted} receipt photo(s) were too large to sync and stayed on this device`,
+        );
+      }
+      if (unsendable.length > 0) {
+        // Named plainly: this one is not a transient network condition, it will
+        // not fix itself, and the rows are only on this device until it is
+        // dealt with.
+        notes.push(
+          `${unsendable.length} row(s) could not be uploaded because of their id and stay on this device only`,
         );
       }
       if (skippedNewerSchema > 0) {
