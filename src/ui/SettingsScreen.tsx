@@ -5,8 +5,9 @@ import type { FuelTrackerStore } from '../data/store';
 import type { AuthUser } from '../data/auth';
 import type { SyncStatus } from './useSync';
 import { backupFilename } from '../data/backup';
-import { parseCsv, parseJsonBackup, toCsv, toJsonBackup } from '../domain/backupFormat';
+import { parseCsv, parseJsonBackup, toCsv } from '../domain/backupFormat';
 import { downloadText } from './download';
+import { saveJsonBackup } from './exportBackup';
 import {
   DISTANCE_UNITS,
   ECONOMY_UNITS,
@@ -27,6 +28,10 @@ interface Props {
   readonly sync?: SyncStatus;
   /** False when this build has no backend configured, so nothing syncs. */
   readonly syncEnabled?: boolean;
+  /** Records that a JSON backup was taken, for the reminder. */
+  readonly onBackedUp?: (fillUpCount: number) => void;
+  /** Epoch ms of the last JSON backup, or null if there has never been one. */
+  readonly lastBackupAt?: number | null;
 }
 
 /** "3 minutes ago", falling back to a date once it stops being recent. */
@@ -57,17 +62,21 @@ export function SettingsScreen({
   onSignOut,
   sync,
   syncEnabled = false,
+  onBackedUp,
+  lastBackupAt = null,
 }: Props): ReactElement {
   const fileInput = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [problems, setProblems] = useState<readonly string[]>([]);
 
   async function exportJson(): Promise<void> {
-    const snapshot = await store.exportSnapshot();
-    downloadText(toJsonBackup(snapshot), backupFilename(), 'application/json');
+    const saved = await saveJsonBackup(store);
+    // Recorded so the reminder knows this happened. Only a JSON export counts
+    // — see the CSV handler below.
+    onBackedUp?.(saved.fillUps);
     setProblems([]);
     setStatus(
-      `Saved a backup of ${snapshot.vehicles.length} vehicle(s) and ${snapshot.fillUps.length} fill-up(s).`,
+      `Saved a backup of ${saved.vehicles} vehicle(s) and ${saved.fillUps} fill-up(s).`,
     );
   }
 
@@ -78,6 +87,9 @@ export function SettingsScreen({
     const live = snapshot.fillUps.filter((record) => record.deletedAt === null);
     downloadText(toCsv(live), backupFilename(new Date(), 'csv'), 'text/csv');
     setProblems([]);
+    // Deliberately does NOT count as a backup. CSV is fill-ups only — no
+    // vehicles, no tombstones, no receipt bytes — so marking someone protected
+    // by it would be telling them a restore will return something it will not.
     setStatus(`Saved ${live.length} fill-up(s) as CSV.`);
   }
 
@@ -243,6 +255,14 @@ export function SettingsScreen({
         <h2 className="card__title" id="backup-heading">
           Backup and restore
         </h2>
+
+        <p style={{ margin: '0 0 8px' }}>
+          Last backup: <strong>{describeSyncTime(lastBackupAt)}</strong>.
+        </p>
+        <p style={{ margin: '0 0 12px', opacity: 0.8 }}>
+          Only the JSON export counts as a backup. The CSV is fill-ups only — no vehicles, no
+          deletions, no receipt photos — so it is for spreadsheets, not for restoring.
+        </p>
 
         <div className="row-actions">
           <button className="button" type="button" onClick={() => void exportJson()}>

@@ -127,6 +127,19 @@ export class FuelTrackerStore {
     await this.repos.fillUps.remove(id);
   }
 
+  /**
+   * How many live fill-ups exist, across every vehicle.
+   *
+   * Deliberately counts the same rows `fillUps()` would return — live only,
+   * tombstones excluded — because the backup reminder compares this against a
+   * count recorded at export time. If the two counted differently, the
+   * difference alone would drift people into being prompted.
+   */
+  async fillUpCount(): Promise<number> {
+    const rows = await this.repos.fillUps.list();
+    return rows.length;
+  }
+
   /** One vehicle's live fill-ups, newest first. */
   async fillUps(vehicleId: string): Promise<FillUpRecord[]> {
     const rows = await this.repos.fillUps.list();
