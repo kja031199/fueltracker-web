@@ -1,20 +1,43 @@
+# Keeps the dependency tree and the CI supply chain from quietly ageing.
+#
+# Dependabot runs on GitHub's own infrastructure and costs no Actions minutes;
+# only the pull requests it opens trigger CI. That is the point — a bump is
+# validated by the real build and the real suite before anyone merges it.
+#
+# Version updates are NOT the same feature as security alerts. This file turns
+# on the first; the second is a repository setting under Code security, and has
+# to be enabled by hand. Issue #19 covers both.
+
 version: 2
+
 updates:
-  # The pinned actions above go stale and occasionally get deprecated.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      # Monthly, not weekly. This is a small tree on a personal project, and a
+      # weekly cadence mostly produces noise to close — which is how a feed
+      # stops being read, which is how the one that mattered gets missed.
+      interval: monthly
+    # Minor and patch arrive as one pull request so a routine refresh is a
+    # single review. Majors stay ungrouped on purpose: vite-plugin-pwa 1 -> 2
+    # was assessed in #19 and brought no security benefit at all, which is
+    # exactly the kind of thing that deserves reading rather than batching.
+    groups:
+      npm-minor-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "deps"
+
   - package-ecosystem: github-actions
-    directory: /
+    directory: "/"
     schedule:
       interval: monthly
     groups:
       actions-minor-patch:
+        patterns: ["*"]
         update-types: [minor, patch]
-
-  # npm. Minor and patch grouped into one PR; majors stay separate because a
-  # major is a breaking change that deserves its own review.
-  - package-ecosystem: npm
-    directory: /
-    schedule:
-      interval: monthly
-    groups:
-      npm-minor-patch:
-        update-types: [minor, patch]
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "ci"

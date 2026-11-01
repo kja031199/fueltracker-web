@@ -558,6 +558,45 @@ docblock. The domain and storage suites stay on the node environment, which
 starts faster and needs nothing a browser provides — the cost of a DOM is paid
 only where it buys something.
 
+## What the dependency audit says, and what was accepted
+
+`npm ci` reports vulnerabilities. They have been assessed rather than ignored or
+blanket-fixed, and the conclusion is recorded here so the number means something
+to the next person who sees it.
+
+**None of them reaches a browser.** That was checked, not assumed: grepping the
+built chunks for `grpc-js`, `undici`, `source-map-js`, `serialize-javascript`,
+`fast-uri` and `ejs` finds zero references in any of them.
+
+Most are build tooling and test infrastructure — vite, vitest, workbox-build and
+its rollup plugins — which run on a developer's machine and on CI runners, never
+in anyone's browser.
+
+**Four are in the production tree and all are one root cause**:
+`@grpc/grpc-js`, reached through `@firebase/firestore`. They are **accepted**,
+for three reasons together:
+
+1. `grpc-js` is Firestore's **Node** transport. `@firebase/firestore`'s
+   `exports` map sends the `browser` condition to a different entry that uses
+   WebChannel over HTTPS, so it is not in the bundle at all.
+2. Both advisories concern a gRPC **server** mishandling certificates and
+   leaking handler errors to clients. This project runs no server. The only
+   place grpc-js executes here is the rules test suite, in Node, against a local
+   emulator.
+3. **There is no fix to apply.** `npm audit` reports one as available, but
+   `firebase` is already at the latest published version, so the "fix" resolves
+   to a major change that would most plausibly *downgrade* it — making the app
+   less current while reporting success. This is the concrete reason
+   `npm audit fix --force` is not run here.
+
+Revisit when `firebase` publishes a release that moves off the affected
+`@grpc/grpc-js`.
+
+**Tried and rejected:** `vite-plugin-pwa` 1 → 2, on the theory that it would
+pull a newer workbox and clear eight findings at once. It does not — 2.0.0
+depends on the same `workbox-build` 7.4.1. A major version bump with no security
+benefit is risk paid for nothing, so it was reverted.
+
 ## Automated checks
 
 Three checks run on every pull request and every push to `main`. None of them
