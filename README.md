@@ -143,6 +143,65 @@ out the simpler-looking alternative of keeping one JSON file in the user's Googl
 Drive: `drive.appdata` is a sensitive scope, which caps an unverified app at 100
 lifetime users and expires its tokens weekly.
 
+### Who can sign in
+
+Signing in with Google is not the same as being allowed in, and until #27 this
+project treated it as if it were. Any Google account on earth could sign in and
+write data under its own uid: `firestore.rules` confined a stranger to their own
+tree, and then let them fill it — on this project's daily write quota, inside
+its 1 GiB, and invisible to the owner, because nobody can read anybody else's
+tree. Being bounded to your own corner is not the same as being admitted.
+
+So `firestore.rules` now carries an **allowlist of uids**, and every read and
+write is gated on it as well as on owning the path. An account that is not on
+the list is refused everywhere, including in its own tree.
+
+Uids rather than email addresses, for three reasons:
+
+- A uid is opaque, so a public repository stays free of anybody's personal
+  data. An allowlist of email addresses would publish other people's.
+- A list literal costs nothing to evaluate. Looking an allowlist up with
+  `exists()` would add a billed read to *every* request, which is a strange
+  thing to spend on a rule about quota.
+- A list a reader can see is a list a reviewer can check.
+
+The cost is real and worth stating: **a uid does not exist until its owner has
+signed in once.** To add somebody:
+
+1. They sign in. The app loads and then cannot read anything — expected, and
+   worth warning them about first.
+2. Firebase console → Authentication → Users. Their row is now there; copy the
+   **User UID** column.
+3. Add it to the `allowed()` list in `firestore.rules`, in a pull request.
+4. Merging deploys the rules (rules first, then hosting — see *Deploying*), and
+   they can use the app on their next reload.
+
+The rules suite reads that list **out of the rules file** rather than keeping
+its own copy, so adding a person needs no test change, and emptying the list
+fails the suite rather than silently locking everybody out. A separate check
+fails while the list still holds a placeholder, which is what keeps a
+switched-on-but-admitting-nobody allowlist off `main`.
+
+Two things belong with this that no pull request can do, because they are
+console settings:
+
+- **Turn off new sign-ups** (Authentication → Settings → User actions). The
+  allowlist refuses a stranger; this stops the account being created at all, so
+  there is nothing to refuse and nothing accumulating in your user list.
+- **Set a budget alert.** The free tier stops serving rather than charging, so
+  the failure mode is the app going quiet, not a bill — but finding that out
+  from a notification beats finding it out from a sync that stopped working.
+
+Still not done, deliberately: **App Check**. The web config in the bundle is a
+working client credential, and App Check is the mechanism that binds requests
+to *this app* rather than to anyone who copied four strings out of the
+JavaScript. The allowlist already stops an unknown account storing data, which
+is the part that mattered; App Check would additionally stop a script hammering
+the project's read quota using a known-good account's credentials. It needs a
+reCAPTCHA integration plus a debug provider so the emulator suite and
+`npm run dev` keep working, which is its own piece of work rather than a line
+in this one.
+
 ### Signing out when the tab goes idle
 
 Off by default, under Settings → Security: sign out after 5, 15, 30 or 60
@@ -359,7 +418,12 @@ remaining copy of the image with null.
 
 The Firebase web config is public by design and still is not committed: the API
 key matches gitleaks' Google-API-key pattern, and this project's policy is that
-allowlisting a credential pattern is never the fix. Copy `.env.example` to
+allowlisting a credential pattern is never the fix. Public does not mean
+harmless, though: those four strings are a working client credential, and what
+bounds their use is `firestore.rules` — the per-account scoping, the shape and
+size limits, and the [sign-in allowlist](#who-can-sign-in). Not the obscurity
+of the values, and not the app's own code, which anybody can bypass by talking
+to Firestore directly. Copy `.env.example` to
 `.env.local` and fill in the four values from the Firebase console. A checkout
 with no config still builds, starts and passes its tests — the sign-in screen
 says what is missing instead of offering a dead button.

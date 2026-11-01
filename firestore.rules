@@ -39,12 +39,41 @@ service cloud.firestore {
 
     match /users/{uid} {
 
-      // Signed in, and signed in as the owner of this path. The null check is
-      // not redundant: an unauthenticated request has request.auth == null, and
-      // reading .uid off null makes the whole condition an error rather than a
-      // denial.
+      // The accounts allowed to use this deployment at all.
+      //
+      // Google sign-in is open to every Google account on earth, and until #27
+      // that was enough to get in: the rules confined a stranger to their own
+      // tree and then let them write in it freely — on this project's quota,
+      // inside its 1 GiB, invisible to the owner, because nobody can see
+      // anybody else's tree. Being bounded to your own corner is not the same
+      // as being allowed through the door.
+      //
+      // A list of uids rather than emails or a document to look up, for three
+      // reasons. A uid is opaque, so this file stays free of anybody's
+      // personal data even though the repository is public. A list literal
+      // costs nothing to evaluate, where an `exists()` against an allowlist
+      // document would add a billed read to **every** request — a strange
+      // thing to spend on a rule about quota. And a list a reader can see is a
+      // list a reviewer can check.
+      //
+      // The cost, stated: adding somebody is a deploy of this file, and their
+      // uid only exists once they have signed in and been refused once.
+      // `README.md` has the steps.
+      function allowed() {
+        return request.auth != null && request.auth.uid in [
+          'REPLACE_WITH_OWNER_UID'
+        ];
+      }
+
+      // Allowed through the door, and signed in as the owner of this path.
+      // Both halves are tested on their own in rules.test.ts, because a single
+      // test that fails for either reason proves neither.
+      //
+      // The null check inside allowed() is not redundant: an unauthenticated
+      // request has request.auth == null, and reading .uid off null makes the
+      // whole condition an error rather than a denial.
       function owner() {
-        return request.auth != null && request.auth.uid == uid;
+        return allowed() && request.auth.uid == uid;
       }
 
       // The four fields every row carries, plus the document id matching the
