@@ -158,6 +158,57 @@ describe('preserveLocalReceipts', () => {
     const merged = preserveLocalReceipts([fillUp({ id: 'other' })], [fillUp({ receiptImageData: bytes })]);
     expect(merged[0]?.receiptImageData).toBeNull();
   });
+
+  it('does not re-attach a photo to a tombstone', () => {
+    // Issue #25. A tombstone now carries no receipt deliberately, and the
+    // local copy of that same row still has one until it is scrubbed — so the
+    // "an incoming row never *removes* a receipt" rule, applied to a deletion,
+    // would put the photo straight back onto the row that was deleted to be
+    // rid of it. The exception is narrow and only for tombstones: a live row
+    // arriving without a photo still keeps the local one.
+    const merged = preserveLocalReceipts(
+      [fillUp({ receiptImageData: null, deletedAt: 900, updatedAt: 900 })],
+      [fillUp({ receiptImageData: bytes })],
+    );
+    expect(merged[0]?.receiptImageData).toBeNull();
+  });
+});
+
+describe('erasing a tombstone that is already in the account', () => {
+  it('pushes the scrubbed row over the fat one', async () => {
+    // The only way the remote copy is ever erased: rewriting the row locally
+    // bumps `updatedAt`, so the next sync pushes the thin version over the
+    // document that still holds the photograph.
+    const fat = fillUp({
+      deletedAt: 500,
+      updatedAt: 500,
+      station: 'Shell, Market St',
+      notes: 'before the airport run',
+      receiptImageData: new Uint8Array([1, 2, 3]),
+    });
+    const clock = fakeClock();
+    const repos = {
+      vehicles: new InMemoryRepository<VehicleRecord>(),
+      fillUps: new InMemoryRepository<FillUpRecord>([fat]),
+      pendingFillUps: new InMemoryRepository<import('./records').PendingFillUpRecord>(),
+    };
+    const store = new FuelTrackerStore(repos, clock);
+    const remote = new InMemoryRemoteStore({
+      ...emptySnapshot(),
+      fillUps: [fat],
+    });
+
+    expect(await store.scrubTombstones()).toBe(1);
+    const result = await syncOnce(store, remote, clock);
+    expect(result.ok).toBe(true);
+
+    const after = await remote.pull();
+    const row = after.fillUps[0] as FillUpRecord;
+    expect(row.deletedAt).not.toBeNull();
+    expect(row.receiptImageData).toBeNull();
+    expect(row.station).toBe('');
+    expect(row.notes).toBe('');
+  });
 });
 
 describe('syncOnce', () => {

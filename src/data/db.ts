@@ -65,10 +65,10 @@ export class DexieRepository<T extends SyncFields> implements Repository<T> {
     await this.table.put(record);
   }
 
-  async remove(id: string, now: number = Date.now()): Promise<void> {
+  async remove(id: string, toTombstone: (row: T) => T): Promise<void> {
     const row = await this.table.get(id);
     if (row === undefined || row.deletedAt !== null) return;
-    await this.table.put({ ...row, deletedAt: now, updatedAt: now });
+    await this.table.put(toTombstone(row));
   }
 
   async listDeleted(): Promise<T[]> {

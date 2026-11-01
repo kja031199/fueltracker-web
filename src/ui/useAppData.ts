@@ -62,6 +62,18 @@ export function useAppData(store: FuelTrackerStore): AppData {
     void reload();
   }, [reload]);
 
+  // Tombstones written by older builds still carry the receipt photograph,
+  // notes and coordinates of fill-ups that were deleted (#25). Fixing the
+  // writer does nothing for those, so the cleanup runs once per store: it is
+  // idempotent, it only touches rows that are already deleted, and bumping
+  // their `updatedAt` is what carries the erasure up to the account.
+  useEffect(() => {
+    void store.scrubTombstones().catch(() => {
+      // Nothing a reader can act on, and `reload` already reports storage
+      // being unavailable. Retried on the next load.
+    });
+  }, [store]);
+
   // Fill-ups follow the selected vehicle rather than being loaded wholesale,
   // since every statistic is computed per vehicle.
   useEffect(() => {

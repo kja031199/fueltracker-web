@@ -279,3 +279,165 @@ describe('toStats bridges storage to the statistics layer', () => {
     expect(stats.averageMPG).toBeNull();
   });
 });
+
+describe('deleting leaves a tombstone, not a copy of the row', () => {
+  /**
+   * Issue #25. `remove()` used to write `{...row, deletedAt: now}`, so a
+   * deleted fill-up kept its receipt photograph, its notes and its
+   * coordinates — on this device, on every device it synced to, in the
+   * account, and in every backup taken afterwards. Delete is the only control
+   * anyone has over those photos.
+   */
+
+  const RECEIPT = new Uint8Array([1, 2, 3, 4, 5]);
+
+  async function deletedFillUp(): Promise<FillUpRecord> {
+    const vehicle = await store.addVehicle({ name: 'Civic' });
+    const entry = await store.addFillUp(
+      draft({
+        station: 'Shell, Market St',
+        notes: 'before the airport run',
+        latitude: 37.79,
+        longitude: -122.4,
+        receiptImageData: RECEIPT,
+      }),
+      vehicle.id,
+    );
+    await store.removeFillUp(entry.id);
+    const snapshot = await store.exportSnapshot();
+    const row = snapshot.fillUps.find((candidate) => candidate.id === entry.id);
+    if (row === undefined) throw new Error('the tombstone is missing entirely');
+    return row;
+  }
+
+  test('keeps no receipt photograph', async () => {
+    expect((await deletedFillUp()).receiptImageData).toBeNull();
+  });
+
+  test('keeps no free text and no coordinates', async () => {
+    const row = await deletedFillUp();
+    expect(row.station).toBe('');
+    expect(row.notes).toBe('');
+    expect(row.latitude).toBeNull();
+    expect(row.longitude).toBeNull();
+  });
+
+  test('is still a deletion — it stays out of the live list and still exports', async () => {
+    // The scrub must not become a hard delete by accident. A tombstone nobody
+    // can enumerate is a row that comes back from whichever device still has
+    // it, which is the whole reason deletions are tombstones.
+    const row = await deletedFillUp();
+    expect(row.deletedAt).not.toBeNull();
+    expect(await store.fillUps(row.vehicleId)).toHaveLength(0);
+  });
+
+  test('deleting a vehicle scrubs its fill-ups too, not just the vehicle', async () => {
+    const vehicle = await store.addVehicle({ name: 'Civic', make: 'Honda' });
+    await store.addFillUp(draft({ notes: 'secret', receiptImageData: RECEIPT }), vehicle.id);
+
+    await store.removeVehicle(vehicle.id);
+
+    const snapshot = await store.exportSnapshot();
+    expect(snapshot.fillUps[0]?.receiptImageData).toBeNull();
+    expect(snapshot.fillUps[0]?.notes).toBe('');
+    expect(snapshot.vehicles[0]?.name).toBe('');
+    expect(snapshot.vehicles[0]?.deletedAt).not.toBeNull();
+  });
+
+  test('rejecting a submission does not keep the submitter', async () => {
+    // The one record here written by somebody else. Keeping their name and
+    // their note after a rejection is the worst version of this bug.
+    const vehicle = await store.addVehicle({ name: 'Civic' });
+    const pending = await store.submitFillUp(
+      draft({ station: 'Costco', notes: 'filled it for you', receiptImageData: RECEIPT }),
+      vehicle.id,
+      'Sam',
+    );
+
+    await store.rejectPendingFillUp(pending.id);
+
+    const row = (await store.exportSnapshot()).pendingFillUps[0];
+    expect(row?.deletedAt).not.toBeNull();
+    expect(row?.submitterName).toBe('');
+    expect(row?.notes).toBe('');
+    expect(row?.receiptImageData).toBeNull();
+  });
+});
+
+describe('scrubTombstones cleans up what older builds left behind', () => {
+  /**
+   * The data is already on disk and already in the account, so fixing the
+   * writer is only half of it. This is the other half, and it is the only
+   * thing that can erase the remote copy: rewriting the row bumps
+   * `updatedAt`, so the next sync pushes the thin version over the fat one.
+   */
+
+  const FAT: FillUpRecord = {
+    id: 'legacy',
+    updatedAt: 500,
+    deletedAt: 500,
+    schemaVersion: SCHEMA_VERSION,
+    vehicleId: 'v1',
+    date: 1_700_000_000_000,
+    odometer: 10_000,
+    gallons: 10,
+    pricePerGallon: 3.5,
+    isFullTank: true,
+    missedPreviousFillUp: false,
+    fuelGrade: 'Premium',
+    station: 'Shell, Market St',
+    notes: 'before the airport run',
+    latitude: 37.79,
+    longitude: -122.4,
+    receiptImageData: new Uint8Array([1, 2, 3]),
+  };
+
+  function storeHolding(rows: readonly FillUpRecord[]): FuelTrackerStore {
+    return new FuelTrackerStore(
+      {
+        vehicles: new InMemoryRepository<VehicleRecord>(),
+        fillUps: new InMemoryRepository<FillUpRecord>(rows),
+        pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
+      },
+      testClock(10_000),
+    );
+  }
+
+  test('rewrites a fat tombstone and says how many it fixed', async () => {
+    const legacy = storeHolding([FAT]);
+
+    expect(await legacy.scrubTombstones()).toBe(1);
+
+    const row = (await legacy.exportSnapshot()).fillUps[0];
+    expect(row?.receiptImageData).toBeNull();
+    expect(row?.station).toBe('');
+    expect(row?.deletedAt).toBe(500);
+  });
+
+  test('bumps updatedAt, so the scrubbed row beats the fat copy in the account', async () => {
+    const legacy = storeHolding([FAT]);
+    await legacy.scrubTombstones();
+    const row = (await legacy.exportSnapshot()).fillUps[0];
+    expect(row?.updatedAt ?? 0).toBeGreaterThan(FAT.updatedAt);
+  });
+
+  test('is a no-op the second time, so it is not a write loop', async () => {
+    // Called on every app start. If a scrubbed row still looked dirty it
+    // would be rewritten and re-pushed forever, spending quota to change
+    // nothing.
+    const legacy = storeHolding([FAT]);
+    await legacy.scrubTombstones();
+    expect(await legacy.scrubTombstones()).toBe(0);
+  });
+
+  test('leaves live rows alone', async () => {
+    const vehicle = await store.addVehicle({ name: 'Civic' });
+    const entry = await store.addFillUp(draft({ notes: 'still here' }), vehicle.id);
+
+    expect(await store.scrubTombstones()).toBe(0);
+
+    const rows = await store.fillUps(vehicle.id);
+    expect(rows[0]?.notes).toBe('still here');
+    expect(rows[0]?.updatedAt).toBe(entry.updatedAt);
+  });
+});

@@ -169,3 +169,60 @@ describe('navigation', () => {
     );
   });
 });
+
+describe('cleaning up old tombstones', () => {
+  test('a fat tombstone from an older build is scrubbed when the app opens', async () => {
+    // Issue #25 left receipt photographs inside deleted rows on disk. Fixing
+    // the writer does nothing about the ones already there, so the app runs
+    // the cleanup on load — and this is the test that the wiring exists at
+    // all, which is the part a pure-function suite cannot prove.
+    localStorage.setItem('fueltracker.hasOnboarded', 'true');
+    const fillUps = new InMemoryRepository<FillUpRecord>([
+      {
+        id: 'legacy',
+        updatedAt: 500,
+        deletedAt: 500,
+        schemaVersion: 1,
+        vehicleId: 'v1',
+        date: 1_700_000_000_000,
+        odometer: 10_000,
+        gallons: 10,
+        pricePerGallon: 3.5,
+        isFullTank: true,
+        missedPreviousFillUp: false,
+        fuelGrade: 'Premium',
+        station: 'Shell, Market St',
+        notes: 'before the airport run',
+        latitude: 37.79,
+        longitude: -122.4,
+        receiptImageData: new Uint8Array([1, 2, 3]),
+      },
+    ]);
+    const store = new FuelTrackerStore({
+      vehicles: new InMemoryRepository<VehicleRecord>([
+        {
+          id: 'v1',
+          updatedAt: 100,
+          deletedAt: null,
+          schemaVersion: 1,
+          name: 'Civic',
+          make: 'Honda',
+          model: 'Civic',
+          year: 2019,
+          createdAt: 100,
+        },
+      ]),
+      fillUps,
+      pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
+    });
+
+    render(<App store={store} />);
+    await screen.findByRole('navigation', { name: /sections/i });
+
+    await waitFor(async () => {
+      const [row] = await fillUps.listDeleted();
+      expect(row?.receiptImageData).toBeNull();
+      expect(row?.notes).toBe('');
+    });
+  });
+});
