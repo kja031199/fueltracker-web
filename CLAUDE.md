@@ -78,7 +78,9 @@ caught real holes here — a test that cannot fail is decoration, and a rules
 test that cannot fail is worse, because it reads like proof.
 
 Recorded results, so a regression is visible: identity-only rules fail 13
-assertions; wide-open rules fail 20; one shared database for all accounts fails
+assertions; wide-open rules fail 20; dropping the sign-in allowlist from
+`owner()` fails 2 (the two that put a stranger in its *own* tree, so scoping
+cannot be what refused it); one shared database for all accounts fails
 6; a permanent dismissal instead of a snooze fails 2. For the idle timeout —
 resetting the activity marker on mount instead of reading it (i.e. a reload gets
 you back in) fails 3; `>` instead of `>=` at the boundary fails 1; passing an
@@ -162,6 +164,17 @@ latter is the SDK and ships no binary.
 
 ## Gotchas worth remembering
 
+- **`firestore.rules` has a sign-in allowlist, so adding a *person* is also a
+  deploy.** Signing in with Google was never the same as being allowed in: a
+  stranger used to get their own tree and fill it on this project's quota (#27).
+  The list is uids, not emails — opaque, free to evaluate (an `exists()` lookup
+  would bill a read on every request), and reviewable. A uid does not exist
+  until its owner signs in and is refused once; the steps are in `README.md`.
+  `rules.test.ts` parses the list **out of the rules file** instead of keeping a
+  copy, so adding somebody needs no test change, and two checks guard the edges:
+  the list must not be empty, and it must not still hold a placeholder — the
+  second is what stops a switched-on-but-admitting-nobody allowlist reaching
+  `main` and locking the owner out of their own data.
 - **`hasOnly` in `firestore.rules` means adding a field is a two-part change.**
   An unknown field is refused, so the rules must be deployed *before* a build
   that writes it. Change both in the same pull request. This is the cost of the
