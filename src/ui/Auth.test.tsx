@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { InMemoryRepository } from '../data/repository';
@@ -150,6 +150,87 @@ describe('the account section', () => {
     // Arrives through the sync on mount, not from local storage — the store
     // started empty.
     expect(await screen.findByText(/Account Car/)).toBeInTheDocument();
+  });
+
+  describe('the account id', () => {
+    /**
+     * The uid is the identifier `firestore.rules` allowlists (#27), and it was
+     * nowhere in the app — so adding somebody meant the owner digging through
+     * the Firebase console's Users table after the person had already been
+     * refused. It is on their own Settings screen instead.
+     *
+     * It keeps working in exactly the case it is needed: the uid comes from
+     * Auth, not Firestore, so a person who is signed in but allowlisted out
+     * can still read their own id while every data read is being denied.
+     */
+
+    /**
+     * Stubs `navigator.clipboard`.
+     *
+     * **Call this after `userEvent.setup()`, never before.** user-event
+     * installs its own clipboard stub on setup, so a stub written first is
+     * silently replaced and the spy records nothing — which reads exactly like
+     * a button that does not work.
+     */
+    function clipboard(): ReturnType<typeof vi.fn> {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+      return writeText;
+    }
+
+    async function openSettings(): Promise<void> {
+      const store = makeStore();
+      await store.addVehicle({ name: 'Civic' });
+      render(
+        <App
+          store={store}
+          auth={new StubAuthProvider({ status: 'signedIn', user: USER }, USER)}
+          initialTab="settings"
+        />,
+      );
+      await screen.findByRole('navigation', { name: /sections/i });
+    }
+
+    test('is shown, so it can be read off the screen', async () => {
+      await openSettings();
+      expect(screen.getByText(USER.uid)).toBeInTheDocument();
+    });
+
+    test('copies to the clipboard on request', async () => {
+      const user = userEvent.setup();
+      const writeText = clipboard();
+      await openSettings();
+
+      await user.click(screen.getByRole('button', { name: /copy account id/i }));
+
+      expect(writeText).toHaveBeenCalledWith(USER.uid);
+      expect(await screen.findByText(/copied/i)).toBeInTheDocument();
+    });
+
+    test('says to copy it by hand when the browser refuses the clipboard', async () => {
+      // No clipboard at all: plain http, an old browser, a blocked permission.
+      // The id is on screen either way, so the honest failure is to say so
+      // rather than to leave a dead button.
+      const user = userEvent.setup();
+      Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+      await openSettings();
+
+      await user.click(screen.getByRole('button', { name: /copy account id/i }));
+
+      expect(await screen.findByText(/by hand/i)).toBeInTheDocument();
+      expect(screen.getByText(USER.uid)).toBeInTheDocument();
+    });
+
+    test('survives a clipboard that rejects', async () => {
+      const user = userEvent.setup();
+      const writeText = vi.fn().mockRejectedValue(new Error('denied'));
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+      await openSettings();
+
+      await user.click(screen.getByRole('button', { name: /copy account id/i }));
+
+      expect(await screen.findByText(/by hand/i)).toBeInTheDocument();
+    });
   });
 
   test('a sync failure is reported without taking the app down', async () => {
