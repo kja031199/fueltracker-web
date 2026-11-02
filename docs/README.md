@@ -13,7 +13,7 @@ how to run it; everything here is the detail behind it.
   what a deletion actually deletes, the logical clock, and why nothing arriving
   from the account is believed without being checked.
 - **[deploying.md](deploying.md)** — pointing a checkout at your own Firebase
-  project, the deploy that runs on merge, the pinned deploy toolchain, and the
+  project, the separate project local development has to use, the deploy that runs on merge, the pinned deploy toolchain, and the
   Workload Identity decision.
 - **[security.md](security.md)** — the security headers, the one third-party
   request the app makes, and what the dependency audit says, including what was

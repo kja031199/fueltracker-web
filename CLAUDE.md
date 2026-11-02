@@ -124,7 +124,15 @@ npm ci --prefix .github/firebase-cli
   which was checked by grepping the built chunks, not inferred from names.
 - **CI has no `.env.local`.** Vite inlines `VITE_*` at build time, so a build
   without them *succeeds* and ships a bundle with no backend. `deploy.yml`
-  refuses to deploy if one is missing and greps the served JS for the project id.
+  refuses to deploy if one is missing and greps the served JS for the **app id**
+  — not the project id, which is a source constant since #45 and so in every
+  bundle, configured or not (`workflows.test.ts` pins this).
+- **A development build refuses the production project** (#45):
+  `developmentUsesProduction` in `settings.ts` checks `import.meta.env.DEV` *or*
+  a local hostname, before Firebase is imported, and renders
+  `WrongProjectScreen`. No override, deliberately. Local dev needs its own
+  Firebase project, and **uids are per project**, so the dev uid has to be in
+  the allowlist too — see [docs/deploying.md](docs/deploying.md).
 - **The Firebase web config is public by design** and lives in repository
   Variables. Still never commit it: the API key matches gitleaks'
   Google-API-key rule, and allowlisting a credential pattern is never the fix.

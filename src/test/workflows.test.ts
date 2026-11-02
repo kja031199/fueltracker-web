@@ -132,3 +132,30 @@ describe('dependabot watches what it needs to', () => {
     expect(config).toMatch(/\.github\/firebase-cli/);
   });
 });
+
+describe('the deploy smoke test proves configuration was baked in', () => {
+  const deploy = readFileSync(`${WORKFLOW_DIR}/deploy.yml`, 'utf8');
+  const bundleCheck = deploy
+    .split('\n')
+    .find((line) => line.includes('$url$bundle') && line.includes('grep'));
+
+  test('there is a bundle check to inspect', () => {
+    expect(bundleCheck).toBeDefined();
+  });
+
+  test('it looks for the app id, not the project id', () => {
+    // Issue #45 put the production project id into the source as a constant
+    // (`PRODUCTION_PROJECT_ID`, for the development guard), so it is now in
+    // every main bundle — configured or not. A smoke test grepping for it would
+    // pass for a site built with no configuration at all. The app id reaches
+    // the bundle only from `VITE_FIREBASE_APP_ID` at build time.
+    expect(bundleCheck).toContain('$VITE_FIREBASE_APP_ID');
+    expect(bundleCheck).not.toContain('$VITE_FIREBASE_PROJECT_ID');
+  });
+
+  test('it matches the app id as a fixed string', () => {
+    // An app id is `1:<number>:web:<hex>`; read as a regex it happens to be
+    // harmless, but the check should not depend on that.
+    expect(bundleCheck).toMatch(/grep -qF /);
+  });
+});

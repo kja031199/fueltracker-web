@@ -19,6 +19,13 @@
  * just cannot sign in, and says so on screen instead of throwing during module
  * evaluation. A config read that throws on import gives a blank page and a
  * console message, which is the least diagnosable failure there is.
+ *
+ * ## A development build refuses the production project
+ *
+ * Issue #45. Checked before Firebase is even imported, so a dev server whose
+ * `.env.local` names production opens no auth session, no database and no
+ * connection — it renders `WrongProjectScreen` and stops. See
+ * `developmentUsesProduction` for the two signals and why there is no override.
  */
 
 import { StrictMode } from 'react';
@@ -32,8 +39,9 @@ import { adoptLegacyDatabase, openAccountStore } from './data/accountStore';
 import type { AuthProvider, AuthState } from './data/auth';
 import { StubAuthProvider } from './data/auth';
 import type { RemoteStore } from './data/remote';
-import { readSettings } from './data/firebase/settings';
+import { developmentUsesProduction, readSettings } from './data/firebase/settings';
 import { installCspWatch } from './ui/cspWatch';
+import { WrongProjectScreen } from './ui/WrongProjectScreen';
 import './ui/styles.css';
 
 // Before anything renders, so a violation during load is caught. Records
@@ -89,6 +97,16 @@ async function start(): Promise<void> {
     // No backend in this build. Render the sign-in screen in its unconfigured
     // state, which explains what to do, rather than a dead button.
     render(new StubAuthProvider({ status: 'signedOut', error: null }), emptyStore(), null, false);
+    return;
+  }
+
+  if (
+    developmentUsesProduction(settings, {
+      dev: import.meta.env.DEV,
+      hostname: window.location.hostname,
+    })
+  ) {
+    root.render(<WrongProjectScreen projectId={settings.projectId.trim()} />);
     return;
   }
 

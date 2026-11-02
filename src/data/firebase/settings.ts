@@ -57,3 +57,60 @@ export function readSettings(
   if (REQUIRED.some((key) => settings[key].trim() === '')) return null;
   return settings;
 }
+
+/**
+ * The project the live site is deployed from.
+ *
+ * Named here rather than read from the environment because the guard below
+ * exists to stop the environment being wrong: a value that came from
+ * `.env.local` could not protect against `.env.local`.
+ */
+export const PRODUCTION_PROJECT_ID = 'fueltracker-899eb';
+
+/**
+ * Whether a page served from `hostname` is running on the developer's own
+ * machine: `localhost` and its subdomains, the IPv4 loopback block, IPv6
+ * loopback (bracketed, as `location.hostname` gives it, or bare), and the
+ * all-interfaces address some dev servers print.
+ *
+ * Every pattern is anchored at both ends: `localhost.example.com` and
+ * `127.0.0.1.nip.io` are somebody else's servers.
+ */
+export function isLocalHostname(hostname: string): boolean {
+  const host = hostname.trim().toLowerCase();
+  return (
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    /^127(\.\d{1,3}){3}$/.test(host) ||
+    host === '::1' ||
+    host === '[::1]' ||
+    host === '0.0.0.0'
+  );
+}
+
+/**
+ * True when a development build is about to use the production project.
+ *
+ * Issue #45. Local development used to sign in to and sync with the real fuel
+ * log, so a bug in an unreviewed change — a tombstone scrub, an id rule, a sync
+ * edit — ran against production data before a PR existed. This refuses that
+ * pairing, and deliberately has no override: an escape hatch is the first
+ * thing a hurried evening reaches for.
+ *
+ * Two signals, because either alone misses a case:
+ * - `dev` (Vite's `import.meta.env.DEV`) catches the dev server even when it is
+ *   reached on a LAN address with `vite --host`.
+ * - the hostname catches `vite preview`, which serves the *production* bundle
+ *   — `dev` false — on the developer's machine.
+ *
+ * The deployed site has neither, so it is unaffected. The project id is
+ * compared trimmed and lower-cased so a stray space in `.env.local` cannot
+ * slip past it.
+ */
+export function developmentUsesProduction(
+  settings: FirebaseSettings,
+  where: { readonly dev: boolean; readonly hostname: string },
+): boolean {
+  if (settings.projectId.trim().toLowerCase() !== PRODUCTION_PROJECT_ID) return false;
+  return where.dev || isLocalHostname(where.hostname);
+}
