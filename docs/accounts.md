@@ -59,7 +59,10 @@ The cost is real and worth stating: **a uid does not exist until its owner has
 signed in once.** To add somebody:
 
 1. They sign in. The app loads and then cannot read anything — expected, and
-   worth warning them about first.
+   worth warning them about first. Settings says *"This account does not have
+   access to this FuelTracker"* rather than blaming the network, which is the
+   point of #40; what it does **not** yet do is say so before they have been
+   walked through a first-run flow over data that will never sync (#41).
 2. They open Settings → Account, tap **Copy account id**, and send it to you.
    It is the same value the rules compare against, and it stays readable even
    though all their data reads are being refused, because it comes from Auth

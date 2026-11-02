@@ -83,6 +83,28 @@ allows no deletes at all, since every write rule is written against the document
 being written. Removing a tombstone entirely would need a rules change and is a
 separate decision — what this closes is the content living inside it.
 
+### Two ways a sync fails, and they need different sentences
+
+`syncOnce` never throws — being unable to reach the account is the ordinary
+condition of an offline-first app, not an error — but there are two failures
+behind that, and they ask different things of the reader:
+
+- **Unreachable.** Offline, a flaky connection, the service down. It fixes
+  itself and there is nothing to do, so the message says so and the local copy
+  carries on working.
+- **Refused.** The security rules said no, which arrives as
+  `permission-denied`. It will **never** fix itself, and since the allowlist it
+  is routine rather than a bug: it is exactly what a signed-in account that is
+  not on the list sees. The remedy is specific — send your account id to
+  whoever runs this copy — so the message names it.
+
+Both used to read *"Could not reach your account"*, with the real cause in
+brackets, which sent the one person who could act on it to check their wifi
+(#40). The failure now carries a `kind`, and a refusal is detected
+**structurally** — `cause.code === 'permission-denied'` — rather than with
+`instanceof FirestoreError`, because importing that would pull the Firebase SDK
+into `sync.ts` and the suite would stop running without it.
+
 Sync runs on sign-in, on window focus, and on demand from Settings. There is no
 realtime listener and no sync-per-keystroke — the free tier allows 20,000 writes
 a day, which is enormous for one person's fuel log right up until something

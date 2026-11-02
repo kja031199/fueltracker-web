@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { InMemoryRepository } from './repository';
 import { InMemoryRemoteStore, emptySnapshot, rowsToPush } from './remote';
+import type { RawSnapshot, RemoteStore } from './remote';
 import { FuelTrackerStore } from './store';
 import { MonotonicClock } from './syncClock';
 import { SCHEMA_VERSION, type FillUpRecord, type VehicleRecord } from './records';
 import { validateSnapshot } from './recordValidation';
-import { partitionBySchema, preserveLocalReceipts, syncOnce } from './sync';
+import { isRefusal, partitionBySchema, preserveLocalReceipts, syncOnce } from './sync';
 import type { BackupSnapshot } from '../domain/backupFormat';
 
 /**
@@ -208,6 +209,130 @@ describe('erasing a tombstone that is already in the account', () => {
     expect(row.receiptImageData).toBeNull();
     expect(row.station).toBe('');
     expect(row.notes).toBe('');
+  });
+});
+
+describe('a refusal is not the same as being unreachable', () => {
+  /**
+   * Issue #40. Every sync failure used to be reported as "Could not reach your
+   * account", with the real cause in brackets — so a `permission-denied` from
+   * the security rules read as a network problem. Two different situations,
+   * two different remedies, and the headline named the wrong one.
+   *
+   * Since the allowlist in #27 this is routine rather than a bug: it is
+   * exactly what a signed-in account that is not on the list sees, and nothing
+   * it does about its wifi will change anything.
+   */
+
+  /** A remote that refuses, the way Firestore does: a coded error object. */
+  class RefusingRemote implements RemoteStore {
+    constructor(private readonly where: 'pull' | 'push') {}
+
+    async pull(): Promise<RawSnapshot> {
+      if (this.where === 'pull') throw refusal();
+      return { vehicles: [], fillUps: [], pendingFillUps: [] };
+    }
+
+    async push(): Promise<import('./remote').PushSummary> {
+      if (this.where === 'push') throw refusal();
+      return { written: 0, receiptsOmitted: 0 };
+    }
+  }
+
+  /** Shaped like a FirebaseError, built by hand: no SDK in this suite. */
+  function refusal(): unknown {
+    const error = new Error('Missing or insufficient permissions.');
+    (error as unknown as Record<string, unknown>)['code'] = 'permission-denied';
+    return error;
+  }
+
+  it('reports a refused pull as refused, not as unreachable', async () => {
+    const { store, clock } = storeWith();
+    const result = await syncOnce(store, new RefusingRemote('pull'), clock);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.kind).toBe('refused');
+    expect(result.reason).not.toMatch(/could not reach/i);
+    expect(result.reason).toMatch(/access/i);
+  });
+
+  it('reports a refused push the same way', async () => {
+    // A rules refusal on the way up is the same fact as one on the way down,
+    // and "saved here but not uploaded yet" is just as misleading about it.
+    const { store, clock } = storeWith();
+    await store.addVehicle({ name: 'Civic' });
+
+    const result = await syncOnce(store, new RefusingRemote('push'), clock);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.kind).toBe('refused');
+    expect(result.reason).toMatch(/access/i);
+  });
+
+  it('tells a refused reader where to find the id that fixes it', async () => {
+    // The remedy is specific: send your account id to whoever runs this copy.
+    // A message that does not say that leaves the one actionable fact out.
+    const { store, clock } = storeWith();
+    const result = await syncOnce(store, new RefusingRemote('pull'), clock);
+    if (result.ok) throw new Error('expected a refusal');
+    expect(result.reason).toMatch(/account id/i);
+  });
+
+  it('still reports an ordinary network failure as unreachable', async () => {
+    // The distinction has to cut both ways, or it is just a reworded message.
+    const { store, clock } = storeWith();
+    const remote = new InMemoryRemoteStore();
+    remote.failPull = true;
+
+    const result = await syncOnce(store, remote, clock);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.kind).toBe('unreachable');
+    expect(result.reason).toMatch(/could not reach your account/i);
+  });
+
+  it('still reports an ordinary failed upload as unreachable', async () => {
+    const { store, clock } = storeWith();
+    await store.addVehicle({ name: 'Civic' });
+    const remote = new InMemoryRemoteStore();
+    remote.failPush = true;
+
+    const result = await syncOnce(store, remote, clock);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.kind).toBe('unreachable');
+    expect(result.reason).toMatch(/not uploaded yet/i);
+  });
+});
+
+describe('isRefusal', () => {
+  it('recognises the code Firestore uses', () => {
+    const error = new Error('nope');
+    (error as unknown as Record<string, unknown>)['code'] = 'permission-denied';
+    expect(isRefusal(error)).toBe(true);
+  });
+
+  it('recognises it on a plain object, since the shape is what is checked', () => {
+    // Read structurally on purpose: importing `FirestoreError` would pull the
+    // Firebase SDK into `sync.ts` and break invariant 6, which is what keeps
+    // this suite runnable with no SDK and no emulator.
+    expect(isRefusal({ code: 'permission-denied' })).toBe(true);
+  });
+
+  it.each([
+    ['nothing', undefined],
+    ['null', null],
+    ['a bare error', new Error('offline')],
+    ['another code', { code: 'unavailable' }],
+    ['a string', 'permission-denied'],
+    ['a number', 7],
+    ['a nested code', { error: { code: 'permission-denied' } }],
+  ])('does not mistake %s for a refusal', (_label, value) => {
+    expect(isRefusal(value)).toBe(false);
   });
 });
 
