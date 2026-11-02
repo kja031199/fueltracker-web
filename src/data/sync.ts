@@ -68,9 +68,24 @@ export interface SyncOutcome {
   readonly at: number;
 }
 
+/**
+ * Why a sync failed, which decides what the reader should do about it.
+ *
+ * - `unreachable` — offline, a flaky network, the service down. The ordinary
+ *   condition of an offline-first app; it fixes itself and there is nothing to
+ *   do.
+ * - `refused` — the security rules said no. It will **never** fix itself, and
+ *   since the allowlist in #27 it is routine rather than a bug: it is what a
+ *   signed-in account that is not on the list sees.
+ *
+ * Reporting both as "could not reach your account" named the wrong one and
+ * sent the one person who could act on it to check their wifi (#40).
+ */
+export type SyncFailureKind = 'unreachable' | 'refused';
+
 export type SyncResult =
   | { readonly ok: true; readonly outcome: SyncOutcome }
-  | { readonly ok: false; readonly reason: string };
+  | { readonly ok: false; readonly kind: SyncFailureKind; readonly reason: string };
 
 /**
  * Drops rows this build cannot read.
@@ -137,6 +152,41 @@ export function preserveLocalReceipts(
  * storage untouched; a failed **push** leaves the pulled merge in place, which
  * is correct — the data arrived, only the upload did not.
  */
+/**
+ * Whether the account refused us, as opposed to being out of reach.
+ *
+ * Checked **structurally** rather than with `instanceof FirestoreError`:
+ * importing that would pull the Firebase SDK into this file and break
+ * invariant 6, which is what keeps the suite runnable with no SDK and no
+ * emulator. The cost is that a future remote has to use the same code; the
+ * benefit is that every test of this behaviour runs offline.
+ *
+ * `unauthenticated` is deliberately *not* treated as a refusal. The SDK
+ * refreshes tokens on its own, and a session that is genuinely gone arrives
+ * through `onAuthStateChanged`, which puts the app on the sign-in screen — so
+ * it is not a thing a sync message has to explain.
+ */
+export function isRefusal(cause: unknown): boolean {
+  if (typeof cause !== 'object' || cause === null) return false;
+  return (cause as { code?: unknown }).code === 'permission-denied';
+}
+
+/**
+ * The message a refused reader needs, which is not "check your connection".
+ *
+ * Names the one actionable fact: the account id, and who to send it to. It
+ * serves the owner too — a rules deploy that refuses its own author reads as
+ * this rather than as a network fault.
+ */
+const REFUSED =
+  'This account does not have access to this FuelTracker, so nothing is syncing. ' +
+  'Send your account id — Settings → Account — to whoever runs this copy.';
+
+function failure(cause: unknown, fallback: string): SyncResult {
+  if (isRefusal(cause)) return { ok: false, kind: 'refused', reason: REFUSED };
+  return { ok: false, kind: 'unreachable', reason: describe(cause, fallback) };
+}
+
 export async function syncOnce(
   store: FuelTrackerStore,
   remote: RemoteStore,
@@ -146,7 +196,7 @@ export async function syncOnce(
   try {
     raw = await remote.pull();
   } catch (cause) {
-    return { ok: false, reason: describe(cause, 'Could not reach your account.') };
+    return failure(cause, 'Could not reach your account.');
   }
 
   // **Shape first, before anything else looks at it.** The account's contents
@@ -201,7 +251,7 @@ export async function syncOnce(
   try {
     pushed = await remote.push(outgoing);
   } catch (cause) {
-    return { ok: false, reason: describe(cause, 'Changes are saved here but not uploaded yet.') };
+    return failure(cause, 'Changes are saved here but not uploaded yet.');
   }
 
   return {

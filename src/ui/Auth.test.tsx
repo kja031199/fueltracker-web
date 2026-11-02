@@ -299,6 +299,40 @@ describe('the account section', () => {
     );
   });
 
+  test('a refusal says so, instead of blaming the network', async () => {
+    // #40. Every sync failure used to read "could not reach your account",
+    // which is the wrong diagnosis for a `permission-denied` and sends the one
+    // person who can act on it — a guest who is not on the allowlist — to
+    // check their wifi.
+    const store = makeStore();
+    await store.addVehicle({ name: 'Civic' });
+
+    const refusing = {
+      async pull(): Promise<never> {
+        const error = new Error('Missing or insufficient permissions.');
+        (error as unknown as Record<string, unknown>)['code'] = 'permission-denied';
+        throw error;
+      },
+      async push() {
+        return { written: 0, receiptsOmitted: 0 };
+      },
+    };
+
+    render(
+      <App
+        store={store}
+        auth={new StubAuthProvider({ status: 'signedIn', user: USER }, USER)}
+        remote={refusing}
+        initialTab="settings"
+      />,
+    );
+
+    const status = await screen.findByRole('status');
+    expect(status).toHaveTextContent(/does not have access/i);
+    expect(status).toHaveTextContent(/account id/i);
+    expect(status).not.toHaveTextContent(/could not reach/i);
+  });
+
   test('a large receipt is reported as staying on the device', async () => {
     const store = makeStore();
     const added = await store.addVehicle({ name: 'Civic' });

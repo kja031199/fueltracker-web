@@ -152,6 +152,11 @@ npm ci --prefix .github/firebase-cli
   clock*. Adoption is bounded at 30 days, or a row claiming `MAX_SAFE_INTEGER`
   would put the floor where `+ 1` stops producing a larger number. Safe only
   because `updatedAt` is **never displayed** — the date a reader sees is `date`.
+- **A refused sync is not an unreachable one.** `SyncResult`'s failure arm
+  carries a `kind`: `refused` means the rules said no and it will never fix
+  itself, `unreachable` means try again later. Detected structurally
+  (`cause.code === 'permission-denied'`) because `instanceof FirestoreError`
+  would pull the SDK into `sync.ts` and break invariant 6 (#40).
 - **A record id is also a Firestore document name, and the legal sets differ.**
   `recordId.ts` is the single rule, applied to the account and to both import
   paths; `sendableRows` keeps an already-stored bad row from aborting the push
