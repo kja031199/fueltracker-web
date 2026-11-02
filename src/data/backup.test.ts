@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { computeFuelStatistics } from '../domain/fuelStatistics';
-import { parseJsonBackup, toJsonBackup } from '../domain/backupFormat';
+import { parseJsonBackup, toJsonBackup } from './backupFormat';
 import { backupFilename, exportSnapshot, importBackup } from './backup';
 import { InMemoryRepository } from './repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records';

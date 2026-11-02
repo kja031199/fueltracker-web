@@ -9,7 +9,7 @@
 
 import type { FuelTrackerStore } from '../data/store';
 import { backupFilename } from '../data/backup';
-import { toJsonBackup } from '../domain/backupFormat';
+import { toJsonBackup } from '../data/backupFormat';
 import { downloadText } from './download';
 
 export interface BackupSummary {

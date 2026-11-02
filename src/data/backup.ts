@@ -7,8 +7,7 @@
  */
 
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
-import type { BackupSnapshot } from '../domain/backupFormat';
-import type { FillUpRecord, PendingFillUpRecord, SyncFields, VehicleRecord } from './records';
+import type { FillUpRecord, PendingFillUpRecord, SyncFields, VehicleRecord, Snapshot } from './records';
 import type { Repositories } from './store';
 import { isStorableId } from './recordId';
 import { boundFillUpText, boundPendingText, boundVehicleText } from './recordText';
@@ -22,7 +21,7 @@ import { boundFillUpText, boundPendingText, boundVehicleText } from './recordTex
  * with no record that it was ever deleted. `listDeleted` has had no reader
  * until now; this is the one it was written for.
  */
-export async function exportSnapshot(repos: Repositories): Promise<BackupSnapshot> {
+export async function exportSnapshot(repos: Repositories): Promise<Snapshot> {
   const [vehicles, deletedVehicles] = await Promise.all([
     repos.vehicles.list(),
     repos.vehicles.listDeleted(),
@@ -84,7 +83,7 @@ function shouldReplace(incoming: SyncFields, existing: SyncFields | undefined): 
  */
 export async function importBackup(
   repos: Repositories,
-  snapshot: BackupSnapshot,
+  snapshot: Snapshot,
 ): Promise<ImportSummary> {
   const rejected: string[] = [];
   let skippedOlder = 0;

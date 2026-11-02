@@ -22,23 +22,16 @@
  * tested against hostile input without any of that in the way.
  */
 
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
-import { SCHEMA_VERSION } from '../data/records';
-import { idProblem } from '../data/recordId';
-import { FUEL_GRADES } from './fuelGrade';
-import type { FuelGrade } from './fuelGrade';
-import { MAX_RECEIPT_BYTES } from './fuelEntryDraft';
+import type { FillUpRecord, Snapshot } from './records';
+import { SCHEMA_VERSION } from './records';
+import { MAX_RECEIPT_BYTES } from '../domain/fuelEntryDraft';
+import { validateFillUp, validatePending, validateVehicle } from './recordValidation';
 
 /** Bumped only when the *file* shape changes, not when a record shape does. */
 export const BACKUP_FORMAT_VERSION = 1;
 
-export interface BackupSnapshot {
-  readonly vehicles: readonly VehicleRecord[];
-  readonly fillUps: readonly FillUpRecord[];
-  readonly pendingFillUps: readonly PendingFillUpRecord[];
-}
 
-export interface BackupFile extends BackupSnapshot {
+export interface BackupFile extends Snapshot {
   readonly format: 'fueltracker-backup';
   readonly formatVersion: number;
   readonly schemaVersion: number;
@@ -109,7 +102,7 @@ function decodedLengthOf(text: string): number {
 
 // MARK: - JSON
 
-export function toJsonBackup(snapshot: BackupSnapshot, exportedAt: Date = new Date()): string {
+export function toJsonBackup(snapshot: Snapshot, exportedAt: Date = new Date()): string {
   const file = {
     format: 'fueltracker-backup',
     formatVersion: BACKUP_FORMAT_VERSION,
@@ -144,159 +137,40 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-function str(value: unknown, fallback = ''): string {
-  return typeof value === 'string' ? value : fallback;
-}
-
-function num(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
-function bool(value: unknown, fallback: boolean): boolean {
-  return typeof value === 'boolean' ? value : fallback;
-}
-
-function grade(value: unknown): FuelGrade {
-  return (FUEL_GRADES as readonly string[]).includes(str(value)) ? (value as FuelGrade) : 'Other';
-}
-
 /**
- * A receipt from a file, bounded by the same ceiling every other write path
- * applies.
+ * A row from a file, with its receipt turned from base64 into bytes — the one
+ * thing about a row that differs between a file and the account. Everything
+ * else is decoded by the same functions that read the account
+ * (`recordValidation.ts`), so the two cannot drift apart again (#54).
  *
- * This is the hole that existed: `importBackup` validates a fill-up's numbers
- * by building a draft, but the draft is never handed the receipt, and the row
- * that gets stored is the incoming one. So `MAX_RECEIPT_BYTES` — enforced on
- * every other path — did not apply to an imported photo at all.
- *
- * An oversized or unreadable photo drops the **photo**, never the row: the
- * odometer reading is what the whole MPG chain is built on, and losing a
- * fill-up because of its picture would be the worse outcome. The same
- * repair-rather-than-reject split `recordValidation.ts` applies to data from
- * the network.
+ * The receipt is bounded **before** it is decoded: four characters carry three
+ * bytes, so the size is known from the text alone, and deciding afterwards
+ * would mean the allocation the bound exists to prevent had already happened.
+ * An unreadable or oversized photo is dropped and reported; the row is kept.
  */
-function receipt(value: unknown, id: string, skipped: string[]): Uint8Array | null {
-  if (typeof value !== 'string' || value === '') return null;
-  const bytes = base64ToBytes(value, MAX_RECEIPT_BYTES);
+function withReceiptBytes(value: unknown, skipped: string[]): unknown {
+  const row = asRecord(value);
+  if (row === null) return value;
+  const encoded = row['receiptImageData'];
+  if (typeof encoded !== 'string' || encoded === '') return { ...row, receiptImageData: null };
+  const bytes = base64ToBytes(encoded, MAX_RECEIPT_BYTES);
   if (bytes === null) {
+    const id = typeof row['id'] === 'string' ? row['id'] : 'a row';
     skipped.push(`${id}: the receipt photo was unreadable or too large, so the entry was kept without it`);
-    return null;
+    return { ...row, receiptImageData: null };
   }
-  return bytes;
+  return { ...row, receiptImageData: bytes };
 }
 
-/**
- * Sync fields, repaired rather than trusted.
- *
- * An id is the one thing that cannot be invented — without it a row has no
- * identity and merging is impossible — so a row without one is rejected. The
- * rest are defaulted, because a file hand-edited to drop `updatedAt` should
- * still restore rather than fail wholesale.
- *
- * An id that *exists* but could never be stored is rejected for a different
- * reason: it is also a document name, and importing one would stop this
- * account syncing — every push, from then on (#26). Returns the problem rather
- * than `null` so the caller can say which id and why.
- */
-function syncFields(
-  row: Record<string, unknown>,
-): { id: string; updatedAt: number; deletedAt: number | null; schemaVersion: number } | string {
-  const id = str(row['id']);
-  const problem = idProblem(id);
-  if (problem !== null) return problem;
-  return {
-    id,
-    updatedAt: num(row['updatedAt']) ?? 0,
-    deletedAt: num(row['deletedAt']),
-    schemaVersion: num(row['schemaVersion']) ?? SCHEMA_VERSION,
-  };
-}
-
-function parseVehicle(value: unknown, skipped: string[]): VehicleRecord | null {
-  const row = asRecord(value);
-  if (row === null) {
-    skipped.push('a vehicle entry was not an object');
-    return null;
+/** Runs one decoder over a list, keeping what decodes and reporting the rest. */
+function decodeAll<T>(rows: unknown, decode: (value: unknown) => T | string, skipped: string[]): T[] {
+  const out: T[] = [];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const result = decode(row);
+    if (typeof result === 'string') skipped.push(result);
+    else out.push(result);
   }
-  const sync = syncFields(row);
-  if (typeof sync === 'string') {
-    skipped.push(`a vehicle had ${sync}`);
-    return null;
-  }
-  return {
-    ...sync,
-    name: str(row['name']),
-    make: str(row['make']),
-    model: str(row['model']),
-    year: num(row['year']) ?? 0,
-    createdAt: num(row['createdAt']) ?? sync.updatedAt,
-  };
-}
-
-function parseFillUp(value: unknown, skipped: string[]): FillUpRecord | null {
-  const row = asRecord(value);
-  if (row === null) {
-    skipped.push('a fill-up entry was not an object');
-    return null;
-  }
-  const sync = syncFields(row);
-  if (typeof sync === 'string') {
-    skipped.push(`a fill-up had ${sync}`);
-    return null;
-  }
-  const vehicleId = str(row['vehicleId']);
-  if (vehicleId === '') {
-    skipped.push(`fill-up ${sync.id} had no vehicle`);
-    return null;
-  }
-  // The measurements are left as they are found, including nonsense: the draft
-  // gate at import time is what decides whether they are writable, and doing it
-  // here as well would put the rule in two places.
-  return {
-    ...sync,
-    vehicleId,
-    date: num(row['date']) ?? 0,
-    odometer: num(row['odometer']) ?? 0,
-    gallons: num(row['gallons']) ?? 0,
-    pricePerGallon: num(row['pricePerGallon']) ?? 0,
-    isFullTank: bool(row['isFullTank'], true),
-    missedPreviousFillUp: bool(row['missedPreviousFillUp'], false),
-    fuelGrade: grade(row['fuelGrade']),
-    station: str(row['station']),
-    notes: str(row['notes']),
-    latitude: num(row['latitude']),
-    longitude: num(row['longitude']),
-    receiptImageData: receipt(row['receiptImageData'], sync.id, skipped),
-  };
-}
-
-function parsePending(value: unknown, skipped: string[]): PendingFillUpRecord | null {
-  const row = asRecord(value);
-  if (row === null) return null;
-  const sync = syncFields(row);
-  if (typeof sync === 'string') {
-    skipped.push(`a pending submission had ${sync}`);
-    return null;
-  }
-  const vehicleId = str(row['vehicleId']);
-  if (vehicleId === '') return null;
-  return {
-    ...sync,
-    vehicleId,
-    submittedAt: num(row['submittedAt']) ?? sync.updatedAt,
-    submitterName: str(row['submitterName']),
-    date: num(row['date']) ?? 0,
-    odometer: num(row['odometer']) ?? 0,
-    gallons: num(row['gallons']) ?? 0,
-    pricePerGallon: num(row['pricePerGallon']) ?? 0,
-    isFullTank: bool(row['isFullTank'], true),
-    fuelGrade: grade(row['fuelGrade']),
-    station: str(row['station']),
-    notes: str(row['notes']),
-    latitude: num(row['latitude']),
-    longitude: num(row['longitude']),
-    receiptImageData: receipt(row['receiptImageData'], sync.id, skipped),
-  };
+  return out;
 }
 
 /**
@@ -307,7 +181,7 @@ function parsePending(value: unknown, skipped: string[]): PendingFillUpRecord | 
  * A row that cannot be read is skipped **and reported**, so an import never
  * half-succeeds in silence.
  */
-export function parseJsonBackup(text: string): ParseResult<BackupSnapshot> {
+export function parseJsonBackup(text: string): ParseResult<Snapshot> {
   const skipped: string[] = [];
   let parsed: unknown;
   try {
@@ -327,7 +201,8 @@ export function parseJsonBackup(text: string): ParseResult<BackupSnapshot> {
       skipped,
     };
   }
-  const version = num(file['formatVersion']);
+  const rawVersion = file['formatVersion'];
+  const version = typeof rawVersion === 'number' && Number.isFinite(rawVersion) ? rawVersion : null;
   if (version !== null && version > BACKUP_FORMAT_VERSION) {
     return {
       value: null,
@@ -336,16 +211,20 @@ export function parseJsonBackup(text: string): ParseResult<BackupSnapshot> {
     };
   }
 
-  const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
-  const vehicles = list(file['vehicles'])
-    .map((row) => parseVehicle(row, skipped))
-    .filter((row): row is VehicleRecord => row !== null);
-  const fillUps = list(file['fillUps'])
-    .map((row) => parseFillUp(row, skipped))
-    .filter((row): row is FillUpRecord => row !== null);
-  const pendingFillUps = list(file['pendingFillUps'])
-    .map((row) => parsePending(row, skipped))
-    .filter((row): row is PendingFillUpRecord => row !== null);
+  // The same decoders the account is read with: one policy for both doors.
+  const vehicles = decodeAll(file['vehicles'], validateVehicle, skipped);
+  const fillUps = decodeAll(
+    Array.isArray(file['fillUps']) ? file['fillUps'].map((row) => withReceiptBytes(row, skipped)) : [],
+    validateFillUp,
+    skipped,
+  );
+  const pendingFillUps = decodeAll(
+    Array.isArray(file['pendingFillUps'])
+      ? file['pendingFillUps'].map((row) => withReceiptBytes(row, skipped))
+      : [],
+    validatePending,
+    skipped,
+  );
 
   return { value: { vehicles, fillUps, pendingFillUps }, error: null, skipped };
 }
@@ -551,39 +430,41 @@ export function parseCsv(text: string): ParseResult<FillUpRecord[]> {
 
   const records: FillUpRecord[] = [];
   for (const [position, row] of rows.entries()) {
-    const id = cell(row, 'id');
-    const vehicleId = cell(row, 'vehicle_id');
-    const problem = idProblem(id);
-    if (problem !== null || vehicleId === '') {
-      // A spreadsheet is a very easy place for an id to pick up a slash, and
-      // one unstorable id costs the account its sync (#26).
-      skipped.push(`row ${position + 2} has ${problem ?? 'no vehicle'}`);
-      continue;
-    }
+    const line = position + 2;
     const date = new Date(cell(row, 'date_iso'));
     if (Number.isNaN(date.getTime())) {
-      skipped.push(`row ${position + 2} has an unreadable date`);
+      skipped.push(`row ${line} has an unreadable date`);
       continue;
     }
-    records.push({
-      id,
+    // A spreadsheet row becomes the same shape the account and a JSON backup
+    // hold, and is decoded by the same function (#54) — so its id, vehicle,
+    // numbers and text meet exactly the rules every other door applies. A
+    // spreadsheet is a very easy place for an id to pick up a slash, and one
+    // unstorable id costs the account its sync (#26).
+    const decoded = validateFillUp({
+      id: cell(row, 'id'),
       updatedAt: date.getTime(),
       deletedAt: null,
       schemaVersion: SCHEMA_VERSION,
-      vehicleId,
+      vehicleId: cell(row, 'vehicle_id'),
       date: date.getTime(),
       odometer: Number(cell(row, 'odometer_miles')),
       gallons: Number(cell(row, 'gallons')),
       pricePerGallon: Number(cell(row, 'price_per_gallon')),
       isFullTank: cell(row, 'full_tank').toLowerCase() !== 'no',
       missedPreviousFillUp: cell(row, 'missed_previous').toLowerCase() === 'yes',
-      fuelGrade: grade(cell(row, 'fuel_grade')),
+      fuelGrade: cell(row, 'fuel_grade'),
       station: cell(row, 'station'),
       notes: cell(row, 'notes'),
       latitude: null,
       longitude: null,
       receiptImageData: null,
     });
+    if (typeof decoded === 'string') {
+      skipped.push(`row ${line}: ${decoded}`);
+      continue;
+    }
+    records.push(decoded);
   }
   return { value: records, error: null, skipped };
 }

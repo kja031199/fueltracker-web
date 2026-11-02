@@ -21,11 +21,14 @@ Hosting at `fueltracker-899eb.web.app`.
 
 - `src/domain/` — pure logic, no storage and no React: statistics, units, the
   draft gate, the palette, the backup reminder, the idle-timeout rule, the scan
-  parsers (`scanning/`), backup serialisation.
+  parsers (`scanning/`). **It imports nothing from `data/` or `ui/`**, and
+  `src/test/layering.test.ts` enforces that (#54).
 - `src/data/` — records and persistence. `store.ts` is the write surface,
   `repository.ts` the four-method abstraction, `db.ts` the Dexie binding,
-  `sync.ts` the reconciliation, `recordValidation.ts` the shape check on
-  anything from the network, `recordId.ts` which ids can be stored at all,
+  `sync.ts` the reconciliation, `records.ts` the record types and `Snapshot`,
+  `recordValidation.ts` **the one decoder** for a row from anywhere (account,
+  JSON backup or CSV), `backupFormat.ts` the file envelopes around it,
+  `recordId.ts` which ids can be stored at all,
   `tombstone.ts` what a deletion leaves, `accountStore.ts` the per-account
   database.
 - `src/data/firebase/` — the **only** place the Firebase SDK is imported.
@@ -85,7 +88,10 @@ npm ci --prefix .github/firebase-cli
 2. **Nothing from the account is trusted.** `syncOnce` puts every pulled
    document through `recordValidation.ts` first. `RemoteStore.pull()` returns
    `RawSnapshot` (`unknown[]`) on purpose — the honest type is what forces the
-   validation. Do not "simplify" it to `BackupSnapshot`.
+   validation. Do not "simplify" it to `Snapshot`.
+   **The same decoder reads files** (#54): `backupFormat.ts` only unwraps the
+   envelope and turns base64 receipts into bytes. Do not add a second row
+   parser; there were two, and they drifted into a lockout (#50).
 3. **Deletions are tombstones, and a tombstone carries only the sync fields.**
    A hard delete leaves nothing to propagate. `tombstone.ts` owns the shape and
    `Repository.remove` takes the builder as an argument; nothing may spread a

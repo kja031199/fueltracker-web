@@ -27,9 +27,8 @@
  * one that happened to sync second, not the one edited later.
  */
 
-import type { BackupSnapshot } from '../domain/backupFormat';
 import type { ImportSummary } from './backup';
-import type { FillUpRecord } from './records';
+import type { FillUpRecord, Snapshot } from './records';
 import { SCHEMA_VERSION } from './records';
 import { validateSnapshot } from './recordValidation';
 import type { Collection, PullCursor, PushSummary, RawSnapshot, RemoteStore } from './remote';
@@ -313,7 +312,7 @@ export async function syncOnce(
   // Anything with an id the account cannot address is held back here, by name,
   // rather than being handed to a batch it would abort.
   const unsendable: string[] = [];
-  const outgoing: BackupSnapshot = {
+  const outgoing: Snapshot = {
     vehicles: sendableRows(newerThanKnown('vehicles', localAfter.vehicles, known), unsendable),
     fillUps: sendableRows(newerThanKnown('fillUps', localAfter.fillUps, known), unsendable),
     pendingFillUps: sendableRows(

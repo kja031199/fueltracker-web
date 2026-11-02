@@ -39,8 +39,7 @@ import { fuelGradeFromRaw } from '../domain/fuelGrade';
 import { TEXT_LIMITS, boundText } from '../domain/textLimits';
 import { MAX_RECEIPT_BYTES } from '../domain/fuelEntryDraft';
 import { idProblem } from './recordId';
-import type { BackupSnapshot } from '../domain/backupFormat';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records';
+import type { FillUpRecord, PendingFillUpRecord, VehicleRecord, Snapshot } from './records';
 
 /**
  * Text bounds, set well beyond plausible human input rather than tightly.
@@ -259,7 +258,7 @@ function partition<T>(
 }
 
 export interface ValidatedSnapshot {
-  readonly snapshot: BackupSnapshot;
+  readonly snapshot: Snapshot;
   readonly rejected: readonly string[];
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MAX_RECEIPT_BYTES } from './fuelEntryDraft';
+import { MAX_RECEIPT_BYTES } from '../domain/fuelEntryDraft';
 import { base64ToBytes, bytesToBase64, parseJsonBackup, toJsonBackup } from './backupFormat';
 
 /**
