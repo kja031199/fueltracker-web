@@ -78,6 +78,9 @@ Recorded so a regression in the tests themselves is visible:
 | Text: a push refusal reported as `refused` again / sync skipping the repair / repair keeping the old `updatedAt` | 2 / 1 / 1 |
 | Text: push backstop ignoring text / unstorable `vehicleId` accepted on import / sent on push | 1 / 1 / 1 |
 | Text: `boundText` splitting an emoji / a client limit drifting from the rules / `maxLength` removed | 1 / 2 / 1 |
+| Date window: chain over windowed rows / dashboard filtering first (both the #51 bug) | 5 / 1 |
+| Date window: segments not windowed / boundary exclusive / invalid date as a window | 4 / 6 / 1 |
+| Date window: no anchor / anchor without odometer guard / cost per mile ignoring it / intervals ignoring it / suspect norm from the window | 1 / 1 / 1 / 1 / 1 |
 | Sign-in adopting the legacy database (the #44 behaviour) | 3 |
 | Sign-in copying legacy rows but keeping the original / deleting it uncopied | 2 / 2 |
 | Sign-in merely opening the legacy database / opening the wrong account's | 1 / 1 |

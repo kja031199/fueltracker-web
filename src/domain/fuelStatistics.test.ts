@@ -511,3 +511,119 @@ describe('hostile magnitudes and volume', () => {
     expect(Number.isFinite(s.averageMPG!)).toBe(true);
   });
 });
+
+describe('a date window (#51)', () => {
+  /**
+   * The dashboard used to filter rows by its range and *then* compute, so the
+   * first fill-up in the range had no predecessor and the segment ending there
+   * was lost — though both of its ends were known. With a fill-up every two
+   * weeks, a range admitting two reported half its segments, and a range
+   * admitting one reported no economy at all.
+   *
+   * The window is applied to the *outputs*: the chain runs over the whole
+   * history, and a segment counts when it ends inside the window.
+   */
+  const day = (n: number): Date => new Date(2026, 0, 1 + n);
+  const fortnightly: FuelEntryStats[] = [0, 14, 28, 42].map((n, i) => ({
+    id: `f${i}`,
+    date: day(n),
+    odometer: 10_000 + i * 300,
+    gallons: 10,
+    pricePerGallon: 3,
+    isFullTank: true,
+    missedPreviousFillUp: false,
+  }));
+
+  test('no window is the whole history, exactly as before', () => {
+    const plain = computeFuelStatistics(fortnightly);
+    const unwindowed = computeFuelStatistics(fortnightly, { from: null });
+    expect(unwindowed.mpgPoints).toEqual(plain.mpgPoints);
+    expect(unwindowed.milesTracked).toBe(plain.milesTracked);
+    expect(unwindowed.totalSpent).toBe(plain.totalSpent);
+  });
+
+  test('a window admitting two fill-ups reports both of their segments', () => {
+    const s = computeFuelStatistics(fortnightly, { from: day(28) });
+    expect(s.mpgPoints.map((p) => p.id)).toEqual(['f2', 'f3']);
+    expect(s.averageMPG).toBe(30);
+  });
+
+  test('a window admitting one fill-up still reports its economy', () => {
+    const s = computeFuelStatistics(fortnightly, { from: day(42) });
+    expect(s.mpgPoints.map((p) => p.id)).toEqual(['f3']);
+    expect(s.averageMPG).toBe(30);
+    expect(s.lastMPG).toBe(30);
+    expect(s.mpgSeries).toHaveLength(1);
+  });
+
+  test('spending and counts come only from fill-ups dated in the window', () => {
+    const s = computeFuelStatistics(fortnightly, { from: day(28) });
+    expect(s.fillUpCount).toBe(2);
+    expect(s.totalSpent).toBe(60);
+    expect(s.totalGallons).toBe(20);
+    expect(s.priceSeries.map((p) => p.id)).toEqual(['f2', 'f3']);
+    expect(s.monthlyTotals.reduce((sum, m) => sum + m.fillUpCount, 0)).toBe(2);
+  });
+
+  test('distance includes the drive into the window, and cost per mile follows', () => {
+    // f1 → f3 is 600 miles, all fuelled by the two in-window fill-ups. Measuring
+    // only f2 → f3 said 300, and charged 60 dollars to it: twice the real rate.
+    const s = computeFuelStatistics(fortnightly, { from: day(28) });
+    expect(s.milesTracked).toBe(600);
+    expect(s.costPerMile).toBeCloseTo(0.1, 10);
+    expect(s.averageMilesBetweenFillUps).toBe(300);
+  });
+
+  test('a partial fill before the window still counts toward the segment it belongs to', () => {
+    // Full at day 0, partial at day 14 (outside), full at day 28 (inside): the
+    // segment ending at day 28 burned both fills' fuel.
+    const rows = fortnightly.slice(0, 3).map((row, i) => (i === 1 ? { ...row, isFullTank: false } : row));
+    const s = computeFuelStatistics(rows, { from: day(28) });
+    expect(s.mpgPoints).toHaveLength(1);
+    expect(s.mpgPoints[0]?.gallons).toBe(20);
+    expect(s.mpgPoints[0]?.miles).toBe(600);
+  });
+
+  test('a missed fill-up at the window edge still breaks the chain', () => {
+    // The existing rule, unchanged: an unlogged fill sits before this entry,
+    // so no segment can end here — window or not.
+    const rows = fortnightly.map((row) => (row.id === 'f2' ? { ...row, missedPreviousFillUp: true } : row));
+    const s = computeFuelStatistics(rows, { from: day(28) });
+    expect(s.mpgPoints.map((p) => p.id)).toEqual(['f3']);
+  });
+
+  test('suspect segments are judged against the whole history, then windowed', () => {
+    // The norm for "this looks like an unlogged fill-up" is the vehicle's, not
+    // the window's — a short window has too few segments to know it.
+    const rows = [...fortnightly, { ...fortnightly[3]!, id: 'f4', date: day(56), odometer: 11_800 }];
+    const s = computeFuelStatistics(rows, { from: day(56) });
+    // f4: 900 miles on 10 gallons = 90 MPG, three times the 30 MPG norm.
+    expect([...s.suspectSegmentIds]).toEqual(['f4']);
+  });
+
+  test('a window after every fill-up is empty, not an error', () => {
+    const s = computeFuelStatistics(fortnightly, { from: day(400) });
+    expect(s.fillUpCount).toBe(0);
+    expect(s.mpgPoints).toEqual([]);
+    expect(s.averageMPG).toBeNull();
+    expect(s.milesTracked).toBe(0);
+    expect(s.costPerMile).toBeNull();
+    expect(s.averageMilesBetweenFillUps).toBeNull();
+  });
+
+  test('an invalid window date is no window, rather than an empty dashboard', () => {
+    const s = computeFuelStatistics(fortnightly, { from: new Date(Number.NaN) });
+    expect(s.fillUpCount).toBe(4);
+    expect(s.mpgPoints).toHaveLength(3);
+  });
+
+  test('an earlier row with a higher odometer cannot make distance negative', () => {
+    // Hostile or mistyped data: a pre-window fill-up claiming more miles than
+    // the window's first. It is not a usable anchor, so distance is measured
+    // inside the window as before.
+    const rows = [...fortnightly.slice(2), { ...fortnightly[0]!, id: 'odd', odometer: 99_999 }];
+    const s = computeFuelStatistics(rows, { from: day(28) });
+    expect(s.milesTracked).toBe(300);
+    expect(s.milesTracked).toBeGreaterThanOrEqual(0);
+  });
+});

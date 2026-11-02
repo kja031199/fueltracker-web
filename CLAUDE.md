@@ -222,6 +222,11 @@ npm ci --prefix .github/firebase-cli
   about it. Its fallbacks point in opposite directions on purpose: an unreadable
   *period* becomes the default, an unreadable *setting* reads as off.
 
+- **Never filter fill-ups before computing statistics for a date range.** Pass
+  the whole history and `{ from }` to `computeFuelStatistics` (#51). An MPG
+  segment spans two rows, so filtering first drops the one that crosses into
+  the range, and understates distance with it.
+
 ### Tests
 
 - **Tests never touch the network or a real device service.**
