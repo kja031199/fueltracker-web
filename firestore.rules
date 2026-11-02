@@ -58,7 +58,7 @@ service cloud.firestore {
       //
       // The cost, stated: adding somebody is a deploy of this file, and their
       // uid only exists once they have signed in and been refused once.
-      // `README.md` has the steps.
+      // `docs/accounts.md` has the steps.
       function allowed() {
         return request.auth != null && request.auth.uid in [
           'Vz0Y9I7XU0TX6L1yvfzw8BJnIfG2',
