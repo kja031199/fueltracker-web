@@ -33,7 +33,13 @@ import type { AuthProvider, AuthState } from './data/auth';
 import { StubAuthProvider } from './data/auth';
 import type { RemoteStore } from './data/remote';
 import { readSettings } from './data/firebase/settings';
+import { installCspWatch } from './ui/cspWatch';
 import './ui/styles.css';
+
+// Before anything renders, so a violation during load is caught. Records
+// nothing unless somebody armed it from the console — see cspWatch.ts and
+// docs/csp-check.md.
+installCspWatch();
 
 const container = document.getElementById('root');
 if (container === null) throw new Error('missing #root');

@@ -24,6 +24,13 @@ anything, so the real flows can be exercised before it is enforced. A policy
 written without being able to load the deployed site is a guess, and the
 failure mode of a wrong guess is being locked out of your own app.
 
+It is **still report-only**, which means none of it is enforced yet (#28). The
+check that unblocks the flip is a five-minute job in a desktop browser, and
+[csp-check.md](csp-check.md) is the recipe: three console lines and five flows,
+producing a list of exactly what would have been blocked. The collector that
+makes it exact lives in `src/ui/cspWatch.ts` and records nothing until somebody
+arms it.
+
 `script-src` is `'self'` with no nonce or hash machinery, which is possible only
 because the built page carries no inline script. Nothing in the build enforces
 that — Vite happens to emit a single `<script src>` — so a test does, since the

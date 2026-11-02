@@ -18,6 +18,9 @@ how to run it; everything here is the detail behind it.
 - **[security.md](security.md)** — the security headers, the one third-party
   request the app makes, and what the dependency audit says, including what was
   accepted rather than fixed.
+- **[csp-check.md](csp-check.md)** — the five-minute browser check that has to
+  happen before the Content-Security-Policy can be enforced, and the console
+  helpers that make its answer exact.
 - **[interface.md](interface.md)** — contrast that is measured rather than
   asserted, charts drawn by hand, and installing it for offline use.
 - **[development.md](development.md)** — local commands, and the four checks
