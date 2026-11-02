@@ -39,11 +39,22 @@ function headers(): Map<string, string> {
   return found;
 }
 
-/** The policy as a directive → value map, from whichever CSP header is set. */
+/**
+ * The **enforced** policy, as a directive → value map.
+ *
+ * Deliberately not falling back to `Content-Security-Policy-Report-Only`. It
+ * used to, which meant every assertion below passed just as happily against a
+ * policy the browser was only reporting on — so the flip to enforcing would
+ * have been invisible to CI, and a revert to report-only equally so. Reading
+ * only the enforcing header makes this whole file fail if the policy stops
+ * being enforced.
+ */
 function policy(): Map<string, string> {
-  const all = headers();
-  const raw = all.get('Content-Security-Policy') ?? all.get('Content-Security-Policy-Report-Only');
-  expect(raw, 'no CSP header is configured at all').toBeDefined();
+  const raw = headers().get('Content-Security-Policy');
+  expect(
+    raw,
+    'the CSP must be served as Content-Security-Policy, not Report-Only: report-only blocks nothing',
+  ).toBeDefined();
   const directives = new Map<string, string>();
   for (const part of (raw ?? '').split(';')) {
     const trimmed = part.trim();
@@ -83,6 +94,41 @@ describe('the built page stays compatible with a strict policy', () => {
 });
 
 describe('the policy', () => {
+  it('is enforced rather than reported', () => {
+    // #28. The policy was served report-only for its whole life: the browser
+    // evaluated it, logged what it would have refused, and refused nothing.
+    // A policy that blocks nothing is documentation, and its value arrives the
+    // moment something else has already gone wrong — which is precisely when
+    // nobody is reading a console.
+    const all = headers();
+    expect(all.has('Content-Security-Policy')).toBe(true);
+    // A report-only header *alongside* the enforced one is legitimate — it is
+    // how a stricter candidate gets trialled — but it must never be the only
+    // one. Hence the assertion above rather than a ban on this one.
+  });
+
+  it('allows the script Firebase Auth injects, and nothing else off-origin', () => {
+    // Found by running the live check from docs/csp-check.md rather than by
+    // reasoning: signing in was refused twice under `script-src 'self'`.
+    // Firebase Auth injects `https://apis.google.com/js/api.js` to host its
+    // auth iframe, and that file then loads a second gapi chunk from a
+    // generated path on the same origin — so the origin is allowed, not a
+    // path. Enforcing the policy without this would have broken sign-in for
+    // every account on the next deploy.
+    //
+    // It does mean Google can serve arbitrary script to this page, which is
+    // already true of anyone using Firebase Auth's popup flow: there is no
+    // supported way to run it without that script.
+    const scriptSrc = policy().get('script-src') ?? '';
+    expect(scriptSrc).toContain('https://apis.google.com');
+    const offOrigin = scriptSrc
+      .split(/\s+/)
+      .filter((source) => source.startsWith('http') || source.includes('*'));
+    expect(offOrigin, 'script-src should name exactly one off-origin source').toEqual([
+      'https://apis.google.com',
+    ]);
+  });
+
   it('does not weaken script-src', () => {
     // Asserted directly, so loosening it later has to be a visible, deliberate
     // edit to this file rather than a quiet addition to a long header string.

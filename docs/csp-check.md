@@ -1,25 +1,50 @@
-# Checking the CSP before enforcing it
+# Checking the CSP against the live site
 
-The Content-Security-Policy is served as **`Content-Security-Policy-Report-Only`**
-(issue #28). The policy is written and tested, but report-only means the browser
-reports violations instead of blocking them — so nothing it describes is
-actually enforced, and with no reporting endpoint nothing is collected either.
+The Content-Security-Policy **is enforced** (issue #28). This page is how it
+got there, and how to re-run the check the next time the policy changes —
+which is not optional, for the reason the first run demonstrated.
 
-Flipping it to enforcing is a one-line change. Doing that *safely* needs
-somebody to run the real flows against the deployed site first, because a
-policy that blocks sign-in breaks the app for everybody until a revert
-deploys — and sign-in is the flow most likely to trip over `frame-src`,
-`connect-src` or `Cross-Origin-Opener-Policy`.
+## What the first run found
 
-That check cannot be automated from the authoring environment: the deployed
-origin, the Firebase auth domain and `cdn.jsdelivr.net` are all unreachable
-from it, and signing in needs a real Google account. So it is a person's five
-minutes. This page is how to make those five minutes produce an exact answer.
+Two refusals, both on sign-in:
+
+```
+script-src-elem  https://apis.google.com/js/api.js?onload=__iframefcb285418
+                   from assets/authProvider-*.js
+script-src-elem  https://apis.google.com/_/scs/abc-static/_/js/k=gapi.lb…
+                   from api.js:21
+```
+
+Firebase Auth injects `apis.google.com/js/api.js` to host its auth iframe, and
+that file loads a second gapi chunk. Under `script-src 'self'` both were
+refused — so **enforcing the policy without running this check would have
+broken sign-in for every account on the next deploy**. `script-src` now names
+`https://apis.google.com`, and nothing else off-origin.
+
+Nothing else was refused: Firestore sync and the receipt scan were already
+covered by `connect-src`.
+
+## Why reasoning is not a substitute
+
+A policy written without being able to load the deployed site is a guess. The
+authoring environment cannot reach the deployed origin, the Firebase auth
+domain or `cdn.jsdelivr.net`, and signing in needs a real Google account — so
+the only honest evidence is a run in a real browser against the real site.
+
+Report-only is what makes that safe: the browser evaluates the policy and
+reports what it *would* have refused while refusing nothing, so a cascade stays
+visible — the second refusal above was reported by a script that only ran
+because the first one was not actually blocked.
+
+## Re-running it
+
+Do this whenever the policy changes, or when a change adds a request to a new
+origin. It takes about five minutes.
 
 **You need a desktop browser.** There is no console on a phone, and one of the
 flows uses a file picker.
 
-## 1. Arm the watcher
+### 1. Arm the watcher
 
 Open <https://fueltracker-899eb.web.app>, open DevTools (⌥⌘I on a Mac,
 F12 elsewhere) and in the Console run:
@@ -35,7 +60,7 @@ including ones that happen during load, which a pasted snippet would miss.
 It records nothing until armed, and it keeps what it records in `localStorage`,
 so the findings survive the reloads that two of the flows involve.
 
-## 2. Run the five flows
+### 2. Run the five flows
 
 Nothing here needs to be done carefully — the point is to make the app do each
 kind of work once.
@@ -55,7 +80,7 @@ kind of work once.
    The service worker serves the app; this is where `manifest-src` and the
    precache show up.
 
-## 3. Report
+### 3. Report
 
 ```js
 __fuelTrackerCsp.report()
@@ -81,23 +106,26 @@ CSP violations: 2 distinct, 7 event(s).
 Repeats of the same directive-and-target are counted rather than listed, so a
 request that fires in a loop does not bury the one that matters.
 
-## 4. Disarm
+### 4. Disarm
 
 ```js
 __fuelTrackerCsp.off()     // stops recording; the log is kept
 __fuelTrackerCsp.clear()   // empties the log
 ```
 
-## What happens with the answer
+## What to do with the answer
 
-- **Nothing blocked** → the header flips from
-  `Content-Security-Policy-Report-Only` to `Content-Security-Policy` in
-  `firebase.json`, and `src/ui/csp.test.ts` is changed to assert the
-  *enforcing* header so a revert to report-only fails CI.
-- **Something blocked** → it gets fixed first, which is usually one origin
-  added to one directive. A violation on a flow that still *worked* is exactly
-  what report-only is for: it would have broken once enforced.
+- **Nothing blocked** → nothing to do; the policy already covers what the app
+  does.
+- **Something blocked** → it needs fixing before it bites, which is usually one
+  origin added to one directive in `firebase.json`. Now that the policy is
+  enforced, a violation is not hypothetical: that request *is* being refused on
+  the live site.
 
-The same three lines re-run this check the next time the policy gains an
-origin, which is why the watcher stays in the app rather than being deleted
-once #28 closes.
+If a change is risky enough to want a report-only trial first, a report-only
+header may be served **alongside** the enforced one — that is how a stricter
+candidate gets tested. `src/ui/csp.test.ts` requires the enforcing header to be
+present, so it cannot be quietly replaced by a report-only one again.
+
+The obvious next tightening is dropping `'unsafe-inline'` from `style-src`,
+which the app's inline `style` attributes currently require.

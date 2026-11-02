@@ -131,12 +131,16 @@ npm ci --prefix .github/firebase-cli
 - **`Cross-Origin-Opener-Policy: same-origin` breaks `signInWithPopup`** by
   severing `window.opener`. The value is `same-origin-allow-popups`, and a test
   asserts it is not the dangerous one.
-- **The CSP is report-only** until the live flows have been checked with a
-  console open (#28) — which cannot be done from here: the deployed origin, the
-  auth domain and the OCR CDN are all unreachable, and two flows need a Google
-  account. `cspWatch.ts` collects the evidence when armed from the console;
-  `docs/csp-check.md` is the recipe. `script-src 'self'` holds only because the
-  built page has no inline script, which `csp.test.ts` enforces.
+- **The CSP is enforced** (#28), and `csp.test.ts` reads only the enforcing
+  header — so reverting to report-only fails the whole file rather than passing
+  quietly. `script-src` is `'self'` plus `https://apis.google.com`, which
+  Firebase Auth injects to host its auth iframe: the live check refused sign-in
+  twice without it. `script-src 'self'` holds for everything else only because
+  the built page has no inline script, which the same file enforces.
+- **Changing the policy needs the live check**, not reasoning: the deployed
+  origin, the auth domain and the OCR CDN are all unreachable from here, and
+  signing in needs a real Google account. `cspWatch.ts` collects the evidence
+  when armed from the console, and `docs/csp-check.md` is the recipe.
 - **OCR fetches from `cdn.jsdelivr.net` at scan time.** `createWorker('eng')`
   takes no paths, so the domain appears nowhere in this source. It must stay in
   `connect-src` (#17).

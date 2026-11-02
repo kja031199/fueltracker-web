@@ -76,15 +76,20 @@ fails the suite rather than silently locking everybody out. A separate check
 fails while the list still holds a placeholder, which is what keeps a
 switched-on-but-admitting-nobody allowlist off `main`.
 
-Two things belong with this that no pull request can do, because they are
-console settings:
+One related console setting, and one correction to earlier advice:
 
-- **Turn off new sign-ups** (Authentication → Settings → User actions). The
-  allowlist refuses a stranger; this stops the account being created at all, so
-  there is nothing to refuse and nothing accumulating in your user list.
-- **Set a budget alert.** The free tier stops serving rather than charging, so
-  the failure mode is the app going quiet, not a bill — but finding that out
-  from a notification beats finding it out from a sync that stopped working.
+- **Leave new sign-ups enabled** (Authentication → Settings → User actions).
+  Turning them off sounds like defence in depth and is not: a person's uid does
+  not exist until their first sign-in, so disabling sign-ups also blocks
+  everybody you *want* to add. The allowlist is the gate — a stranger who signs
+  in gets an auth record and nothing else, no reads, no writes, no quota. The
+  only cost is rows accumulating in the user list.
+- **There is no budget to alert on while the project is on the free Spark
+  plan.** An earlier version of this page said to set a budget alert; that was
+  wrong, because Spark has no billing account and stops serving rather than
+  charging. The failure mode is the app going quiet. A budget alert becomes
+  worth setting if the project is ever upgraded to Blaze, which is also the
+  point at which the quota stops being a safety net.
 
 Still not done, deliberately: **App Check**. The web config in the bundle is a
 working client credential, and App Check is the mechanism that binds requests
