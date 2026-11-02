@@ -192,3 +192,32 @@ describe('an ordinary sync failure is not an access problem', () => {
     expect(await screen.findByRole('heading', { name: /welcome/i })).toBeInTheDocument();
   });
 });
+
+describe('a refused change is not a refused account (#50)', () => {
+  test('keeps the app open when the account reads fine but refuses a write', async () => {
+    // The pull succeeding is what proves the account is allowed. Before #50 a
+    // single over-long field made the push fail with the same code as the
+    // allowlist, and this screen replaced the app — leaving no way to reach
+    // the fill-up that caused it.
+    const refusesWrites: RemoteStore = {
+      async pull(): Promise<RawSnapshot> {
+        return { vehicles: [], fillUps: [], pendingFillUps: [] };
+      },
+      async push(): Promise<PushSummary> {
+        const error = new Error('Missing or insufficient permissions.');
+        (error as unknown as Record<string, unknown>)['code'] = 'permission-denied';
+        throw error;
+      },
+    };
+    localStorage.setItem('fueltracker.hasOnboarded', 'true');
+    const store = makeStore();
+    await store.addVehicle({ name: 'Civic' });
+
+    render(<App store={store} auth={signedIn()} remote={refusesWrites} />);
+
+    expect(await screen.findByRole('navigation', { name: /sections/i })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole('heading', { name: /does not have access/i })).not.toBeInTheDocument(),
+    );
+  });
+});

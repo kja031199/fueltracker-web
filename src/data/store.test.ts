@@ -7,6 +7,7 @@ import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records
 import { SCHEMA_VERSION } from './records';
 import type { StoreClock } from './store';
 import { FuelTrackerStore, toStats } from './store';
+import { TEXT_LIMITS } from '../domain/textLimits';
 
 /** A clock that advances by a millisecond per read, so ids and times differ. */
 function testClock(start = 1_000): StoreClock {
@@ -439,5 +440,82 @@ describe('scrubTombstones cleans up what older builds left behind', () => {
     const rows = await store.fillUps(vehicle.id);
     expect(rows[0]?.notes).toBe('still here');
     expect(rows[0]?.updatedAt).toBe(entry.updatedAt);
+  });
+});
+
+describe('text is bounded on every write (#50)', () => {
+  const long = (n: number) => 'x'.repeat(n + 1);
+
+  test('a vehicle\'s name, make and model are shortened to their limits', async () => {
+    const store = makeStore();
+    const vehicle = await store.addVehicle({
+      name: long(TEXT_LIMITS.name),
+      make: long(TEXT_LIMITS.make),
+      model: long(TEXT_LIMITS.model),
+    });
+    expect(vehicle.name).toHaveLength(TEXT_LIMITS.name);
+    expect(vehicle.make).toHaveLength(TEXT_LIMITS.make);
+    expect(vehicle.model).toHaveLength(TEXT_LIMITS.model);
+  });
+
+  test('a submitter name is shortened to its limit', async () => {
+    const store = makeStore();
+    const pending = await store.submitFillUp(draft(), 'v1', long(TEXT_LIMITS.submitterName));
+    expect(pending.submitterName).toHaveLength(TEXT_LIMITS.submitterName);
+  });
+});
+
+describe('repairing text an older build stored unbounded (#50)', () => {
+  /** A store holding a row written before the bound existed. */
+  function holding(row: Partial<FillUpRecord>) {
+    const fillUps = new InMemoryRepository<FillUpRecord>([
+      {
+        id: 'old',
+        updatedAt: 500,
+        deletedAt: null,
+        schemaVersion: SCHEMA_VERSION,
+        vehicleId: 'v1',
+        date: 1_700_000_000_000,
+        odometer: 10_000,
+        gallons: 10,
+        pricePerGallon: 3,
+        isFullTank: true,
+        missedPreviousFillUp: false,
+        fuelGrade: 'Regular',
+        station: 'Shell',
+        notes: '',
+        latitude: null,
+        longitude: null,
+        receiptImageData: null,
+        ...row,
+      },
+    ]);
+    const store = new FuelTrackerStore(
+      { vehicles: new InMemoryRepository<VehicleRecord>(), fillUps, pendingFillUps: new InMemoryRepository<PendingFillUpRecord>() },
+      testClock(),
+    );
+    return { store, fillUps };
+  }
+
+  test('shortens an over-long row and moves its updatedAt so the repair syncs', async () => {
+    const { store, fillUps } = holding({ station: 's'.repeat(TEXT_LIMITS.station + 1) });
+
+    expect(await store.repairOversizedText()).toBe(1);
+
+    const row = await fillUps.get('old');
+    expect(row?.station).toHaveLength(TEXT_LIMITS.station);
+    expect(row?.updatedAt).toBeGreaterThan(500);
+  });
+
+  test('does nothing the second time', async () => {
+    const { store } = holding({ notes: 'n'.repeat(TEXT_LIMITS.notes + 10) });
+    await store.repairOversizedText();
+    expect(await store.repairOversizedText()).toBe(0);
+  });
+
+  test('leaves a row within the limits exactly as it was', async () => {
+    const { store, fillUps } = holding({});
+    expect(await store.repairOversizedText()).toBe(0);
+    expect((await fillUps.get('old'))?.updatedAt).toBe(500);
   });
 });

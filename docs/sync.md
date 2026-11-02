@@ -83,10 +83,10 @@ allows no deletes at all, since every write rule is written against the document
 being written. Removing a tombstone entirely would need a rules change and is a
 separate decision — what this closes is the content living inside it.
 
-### Two ways a sync fails, and they need different sentences
+### Three ways a sync fails, and they need different sentences
 
 `syncOnce` never throws — being unable to reach the account is the ordinary
-condition of an offline-first app, not an error — but there are two failures
+condition of an offline-first app, not an error — but there are three failures
 behind that, and they ask different things of the reader:
 
 - **Unreachable.** Offline, a flaky connection, the service down. It fixes
@@ -96,7 +96,12 @@ behind that, and they ask different things of the reader:
   `permission-denied`. It will **never** fix itself, and since the allowlist it
   is routine rather than a bug: it is exactly what a signed-in account that is
   not on the list sees. The remedy is specific — send your account id to
-  whoever runs this copy — so the message names it.
+  whoever runs this copy — so the message names it. **Only a refused pull
+  counts.** An allowed account can always read its own tree.
+- **Rejected.** The rules refused an *upload*, after the pull worked (#50). It
+  arrives as the same `permission-denied`, but the pull succeeding has already
+  proved the account is allowed, so what was refused is the data. The app stays
+  open, and the message says the changes are safe on this device.
 
 Both used to read *"Could not reach your account"*, with the real cause in
 brackets, which sent the one person who could act on it to check their wifi
@@ -104,6 +109,13 @@ brackets, which sent the one person who could act on it to check their wifi
 **structurally** — `cause.code === 'permission-denied'` — rather than with
 `instanceof FirestoreError`, because importing that would pull the Firebase SDK
 into `sync.ts` and the suite would stop running without it.
+
+Telling the last two apart is not cosmetic. Until #50 a refused upload counted
+as `refused`, and one station name a character past the rules' limit put an
+*allowed* owner on the no-access screen. The batch failed with 0 of 3 documents
+uploaded, every retry failed the same way, and the screen hid the fill-up that
+would have had to be edited. Reproduced against the emulator before the fix,
+and covered there now.
 
 A refusal does more than change the wording: it **closes the app** and shows
 the screen described in [accounts.md](accounts.md), because the alternative is
@@ -176,6 +188,32 @@ and sync declines to *send* a row it cannot address rather than handing it to a
 batch it would abort. The row stays on the device and is reported: refusing to
 upload somebody's data is not a licence to delete it.
 
+**Text had the same failure, and the same shape of fix (#50).** The rules bound
+every text field, and nothing on the client did. So the app saved a
+201-character station name, and the account refused the whole batch. Now:
+
+- **One table of limits**, `TEXT_LIMITS` in `src/domain/textLimits.ts`, keyed by
+  the rules' own field names. `src/data/rulesLimits.test.ts` reads
+  `firestore.rules` and fails if the two ever differ. **Change both together,
+  rules deployed first.**
+- **Bounded at every door:** the draft gate (station, notes), `addVehicle`,
+  `submitFillUp`, and `importBackup`, which is the door both a restored file and
+  a sync pull come through. The form inputs carry the same numbers as
+  `maxLength`, so nobody can type past them.
+- **Shortened, never rejected.** This is the policy pulled text already
+  followed. Losing an odometer reading over a long note would be worse.
+- **Measured in UTF-16 units**, which is JavaScript's `.length`. Measured
+  against the emulator, it is also what the rules' `string.size()` counts:
+  200 `é` are accepted, and 150 emoji (300 units) are refused. `boundText`
+  never leaves half an emoji at the cut.
+- **Rows already stored too long are repaired before each push**
+  (`repairOversizedText`). Their `updatedAt` moves, so the repair is what
+  syncs, and the reader is told how many were shortened.
+- **`sendableRows` is the backstop.** It also holds back a row with an
+  over-long field or an unstorable `vehicleId` (a CSV only requires that column
+  to be non-empty), so if something new slips through, it costs that row and
+  not the batch.
+
 **On write**, `firestore.rules` now validates shape as well as identity — field
 names, types, string lengths and receipt size. Identity alone stops another
 *user* and does nothing about a bad build or a console edit, and the size bounds
@@ -186,7 +224,7 @@ One consequence worth knowing before adding a field: the rules use `hasOnly`, so
 an unknown field is refused. **New fields must be deployed to the rules before a
 build that writes them** — change both in the same pull request.
 
-The rules suite is 25 assertions against the emulator, including the positive
+The rules suite is 34 assertions against the emulator, including the positive
 cases built from records the app itself produces rather than hand-written
 literals, which is what stops the rules and the schema drifting apart. It has
 been mutation-tested twice: with the shape checks removed 13 assertions fail,

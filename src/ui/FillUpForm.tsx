@@ -17,6 +17,7 @@ import { distance, volume } from '../domain/units';
 import type { FillUpRecord } from '../data/records';
 import type { FuelTrackerStore } from '../data/store';
 import { importReceiptPhoto } from './importReceipt';
+import { TEXT_LIMITS } from '../domain/textLimits';
 
 interface Props {
   readonly store: FuelTrackerStore;
@@ -415,6 +416,7 @@ export function FillUpForm({
         </label>
         <input
           id="fillup-station"
+          maxLength={TEXT_LIMITS.station}
           value={form.station}
           onChange={(event) => update('station', event.target.value)}
         />
@@ -426,6 +428,7 @@ export function FillUpForm({
         </label>
         <textarea
           id="fillup-notes"
+          maxLength={TEXT_LIMITS.notes}
           rows={2}
           value={form.notes}
           onChange={(event) => update('notes', event.target.value)}

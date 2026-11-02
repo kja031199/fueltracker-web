@@ -36,6 +36,7 @@
  */
 
 import { fuelGradeFromRaw } from '../domain/fuelGrade';
+import { TEXT_LIMITS, boundText } from '../domain/textLimits';
 import { MAX_RECEIPT_BYTES } from '../domain/fuelEntryDraft';
 import { idProblem } from './recordId';
 import type { BackupSnapshot } from '../domain/backupFormat';
@@ -49,8 +50,10 @@ import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records
  * These are here to stop a document being inflated to the 1 MiB cap, not to
  * enforce a style guide.
  */
-export const MAX_NAME_LENGTH = 200;
-export const MAX_NOTES_LENGTH = 4000;
+// Derived from the shared table rather than restated, so the rules, the forms,
+// the draft gate and this cannot disagree again (#50).
+export const MAX_NAME_LENGTH = TEXT_LIMITS.station;
+export const MAX_NOTES_LENGTH = TEXT_LIMITS.notes;
 
 // Re-exported rather than redefined: the id rule outgrew a length check once
 // it turned out an id is also a Firestore document name (#26), and it lives in
@@ -83,7 +86,7 @@ function text(value: unknown, max: number): string {
   // labels, and `String(value)` on an object would store "[object Object]",
   // which looks like real data and is worse than nothing.
   if (typeof value !== 'string') return '';
-  return value.length > max ? value.slice(0, max) : value;
+  return boundText(value, max);
 }
 
 function flag(value: unknown): boolean {
@@ -136,9 +139,9 @@ export function validateVehicle(value: unknown): VehicleRecord | string {
   const year = finite(value.year) ? Math.trunc(value.year) : 0;
   return {
     ...common,
-    name: text(value.name, MAX_NAME_LENGTH),
-    make: text(value.make, MAX_NAME_LENGTH),
-    model: text(value.model, MAX_NAME_LENGTH),
+    name: text(value.name, TEXT_LIMITS.name),
+    make: text(value.make, TEXT_LIMITS.make),
+    model: text(value.model, TEXT_LIMITS.model),
     // Out-of-range becomes 0, which the UI already renders as "no year given"
     // rather than a date nobody drove in.
     year: year >= MIN_YEAR && year <= MAX_YEAR ? year : 0,
@@ -205,8 +208,8 @@ export function validateFillUp(value: unknown): FillUpRecord | string {
     // Reuses the ported fallback rather than deciding again here: an
     // unrecognised grade has always become `Other`, on iOS and on the web.
     fuelGrade: fuelGradeFromRaw(typeof value.fuelGrade === 'string' ? value.fuelGrade : ''),
-    station: text(value.station, MAX_NAME_LENGTH),
-    notes: text(value.notes, MAX_NOTES_LENGTH),
+    station: text(value.station, TEXT_LIMITS.station),
+    notes: text(value.notes, TEXT_LIMITS.notes),
     latitude: coordinate(value.latitude),
     longitude: coordinate(value.longitude),
     receiptImageData: receipt(value.receiptImageData),
@@ -229,12 +232,12 @@ export function validatePending(value: unknown): PendingFillUpRecord | string {
     ...common,
     vehicleId: value.vehicleId,
     submittedAt: value.submittedAt,
-    submitterName: text(value.submitterName, MAX_NAME_LENGTH),
+    submitterName: text(value.submitterName, TEXT_LIMITS.submitterName),
     ...numbers,
     isFullTank: flag(value.isFullTank),
     fuelGrade: fuelGradeFromRaw(typeof value.fuelGrade === 'string' ? value.fuelGrade : ''),
-    station: text(value.station, MAX_NAME_LENGTH),
-    notes: text(value.notes, MAX_NOTES_LENGTH),
+    station: text(value.station, TEXT_LIMITS.station),
+    notes: text(value.notes, TEXT_LIMITS.notes),
     latitude: coordinate(value.latitude),
     longitude: coordinate(value.longitude),
     receiptImageData: receipt(value.receiptImageData),

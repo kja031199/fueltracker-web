@@ -74,6 +74,10 @@ Recorded so a regression in the tests themselves is visible:
 | An action unpinned / its version comment dropped | 2 / 1 |
 | A binary's checksum check deleted / moved after `tar` / its pinned hash removed | 2 / 1 / 1 |
 | One `persist-credentials: false` deleted / set to `true` | 1 / 1 |
+| Text: draft gate / `addVehicle` / import left unbounded | 1 / 1 / 1 |
+| Text: a push refusal reported as `refused` again / sync skipping the repair / repair keeping the old `updatedAt` | 2 / 1 / 1 |
+| Text: push backstop ignoring text / unstorable `vehicleId` accepted on import / sent on push | 1 / 1 / 1 |
+| Text: `boundText` splitting an emoji / a client limit drifting from the rules / `maxLength` removed | 1 / 2 / 1 |
 | Sign-in adopting the legacy database (the #44 behaviour) | 3 |
 | Sign-in copying legacy rows but keeping the original / deleting it uncopied | 2 / 2 |
 | Sign-in merely opening the legacy database / opening the wrong account's | 1 / 1 |

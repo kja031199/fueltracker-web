@@ -171,14 +171,23 @@ npm ci --prefix .github/firebase-cli
   would put the floor where `+ 1` stops producing a larger number. Safe only
   because `updatedAt` is **never displayed** — the date a reader sees is `date`.
 - **A refused sync is not an unreachable one.** `SyncResult`'s failure arm
-  carries a `kind`: `refused` means the rules said no and it will never fix
-  itself, `unreachable` means try again later. Detected structurally
+  carries a `kind`: `refused` means the rules refused the *pull* and it will
+  never fix itself, `rejected` means they refused an *upload* after the pull
+  worked, so the data was refused and not the person (#50), and `unreachable`
+  means try again later. Only `refused` closes the app. Detected structurally
   (`cause.code === 'permission-denied'`) because `instanceof FirestoreError`
   would pull the SDK into `sync.ts` and break invariant 6 (#40). A refusal
   **closes the app** (`NoAccessScreen`, #41) rather than being a status line —
   so do not widen `refused` to cover ordinary failures, or the app shuts itself
   every time a phone goes through a tunnel. The refusal `reason` is diagnostic
   now rather than displayed; the screen carries its own copy.
+- **Text limits live in `TEXT_LIMITS` and must equal the rules'** (#50).
+  `rulesLimits.test.ts` reads `firestore.rules` to enforce it. Text is bounded
+  at the draft gate, in `addVehicle`/`submitFillUp`, and in `importBackup`
+  (file *and* pull). A new text field needs a `label()` in the rules, an entry in
+  `TEXT_LIMITS`, a place in `recordText.ts`, and a `maxLength` on its input.
+  Length is in UTF-16 units, which is what both `.length` and the rules count;
+  this was measured, not assumed.
 - **A record id is also a Firestore document name, and the legal sets differ.**
   `recordId.ts` is the single rule, applied to the account and to both import
   paths; `sendableRows` keeps an already-stored bad row from aborting the push

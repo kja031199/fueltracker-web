@@ -36,11 +36,13 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { Bytes, doc, getDoc, setDoc } from 'firebase/firestore';
+import { Bytes, collection, doc, getDoc, getDocs, setDoc, writeBatch } from 'firebase/firestore';
 import { InMemoryRepository } from '../repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../records';
 import { FuelTrackerStore } from '../store';
 import { makeFuelEntryDraft } from '../../domain/fuelEntryDraft';
+import type { RemoteStore } from '../remote';
+import { syncOnce } from '../sync';
 
 const HOST = process.env.FIRESTORE_EMULATOR_HOST;
 // `describe.skipIf` rather than a thrown error: a checkout without the
@@ -424,6 +426,91 @@ describeWithEmulator('firestore.rules', () => {
       const { fillUp } = await realRecords();
       const db = env.authenticatedContext(STRANGER).firestore();
       await assertFails(setDoc(doc(db, `users/${OWNER}/fillUps/${fillUp.id}`), forWire(fillUp)));
+    });
+  });
+
+  describe('an allowed owner with an over-long field (#50)', () => {
+    /**
+     * The exact failure, against the real rules: a 201-character station name
+     * failed the whole batch with `permission-denied`, sync called that an
+     * access refusal, and the owner was locked out with 0 of 3 documents
+     * uploaded. Driven through the real `syncOnce` and the real store.
+     *
+     * The remote here is an adapter, not `FirestoreRemoteStore`: that class
+     * builds its own Firestore instance from a web config, and the emulator
+     * hands out an authenticated one instead. The adapter writes exactly what
+     * the real push does — one `writeBatch`, `users/<uid>/<collection>/<id>`.
+     */
+    function emulatorRemote(): RemoteStore {
+      const db = env.authenticatedContext(OWNER).firestore();
+      return {
+        async pull() {
+          const read = async (name: string) =>
+            (await getDocs(collection(db, 'users', OWNER, name))).docs.map((d) => d.data());
+          return { vehicles: await read('vehicles'), fillUps: await read('fillUps'), pendingFillUps: [] };
+        },
+        async push(snapshot) {
+          const batch = writeBatch(db);
+          for (const row of snapshot.vehicles) batch.set(doc(db, 'users', OWNER, 'vehicles', row.id), { ...row });
+          for (const row of snapshot.fillUps) {
+            batch.set(doc(db, 'users', OWNER, 'fillUps', row.id), { ...row, receiptImageData: null });
+          }
+          await batch.commit();
+          return { written: snapshot.vehicles.length + snapshot.fillUps.length, receiptsOmitted: 0 };
+        },
+      };
+    }
+
+    it('uploads every row, shortened to what the rules accept', async () => {
+      await env.clearFirestore();
+      const store = new FuelTrackerStore({
+        vehicles: new InMemoryRepository<VehicleRecord>(),
+        fillUps: new InMemoryRepository<FillUpRecord>(),
+        pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
+      });
+      const vehicle = await store.addVehicle({ name: 'Car' });
+      const base = { odometer: 1000, gallons: 10, pricePerGallon: 3 };
+      await store.addFillUp(makeFuelEntryDraft({ ...base, date: new Date(2026, 0, 1) })!, vehicle.id);
+      await store.addFillUp(
+        makeFuelEntryDraft({ ...base, odometer: 1300, date: new Date(2026, 0, 8), station: 'x'.repeat(201) })!,
+        vehicle.id,
+      );
+
+      const result = await syncOnce(store, emulatorRemote());
+
+      expect(result.ok).toBe(true);
+      const db = env.authenticatedContext(OWNER).firestore();
+      const fillUps = (await getDocs(collection(db, 'users', OWNER, 'fillUps'))).docs.map((d) => d.data());
+      expect(fillUps).toHaveLength(2);
+      expect(fillUps.map((row) => (row['station'] as string).length).sort()).toEqual([0, 200]);
+    });
+
+    it('repairs a row stored too long by an older build, then uploads it', async () => {
+      await env.clearFirestore();
+      const vehicle: VehicleRecord = {
+        id: 'v1', updatedAt: 500, deletedAt: null, schemaVersion: 1,
+        name: 'Car', make: '', model: '', year: 2020, createdAt: 500,
+      };
+      const legacy: FillUpRecord = {
+        id: 'f1', updatedAt: 500, deletedAt: null, schemaVersion: 1, vehicleId: 'v1',
+        date: 1_700_000_000_000, odometer: 1000, gallons: 10, pricePerGallon: 3, isFullTank: true,
+        missedPreviousFillUp: false, fuelGrade: 'Regular', station: 'x'.repeat(201),
+        notes: 'n'.repeat(4001), latitude: null, longitude: null, receiptImageData: null,
+      };
+      // Written straight into the repositories, as an older build would have.
+      const store = new FuelTrackerStore({
+        vehicles: new InMemoryRepository<VehicleRecord>([vehicle]),
+        fillUps: new InMemoryRepository<FillUpRecord>([legacy]),
+        pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
+      });
+
+      const result = await syncOnce(store, emulatorRemote());
+
+      expect(result.ok).toBe(true);
+      const db = env.authenticatedContext(OWNER).firestore();
+      const stored = (await getDoc(doc(db, 'users', OWNER, 'fillUps', 'f1'))).data();
+      expect((stored?.['station'] as string).length).toBe(200);
+      expect((stored?.['notes'] as string).length).toBe(4000);
     });
   });
 });
