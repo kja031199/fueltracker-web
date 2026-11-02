@@ -171,6 +171,13 @@ npm ci --prefix .github/firebase-cli
 
 ### Data and sync
 
+- **Screens get `FillUpSummary`, not `FillUpRecord`** (#53). `store.fillUps()`
+  carries no photo bytes. To edit, load the whole row with `store.fillUp(id)`:
+  a form started from a summary saves the fill-up back without its photo. Read
+  one vehicle with `listForVehicle` and count with `countLive`; **never
+  `list()` + filter** where an index answers it. `list()` is for export and
+  sync, which need every row and every photo.
+
 - **`updatedAt` is a logical clock**, `max(wallClock, highestSeen + 1)`, which
   is what makes last-write-wins mean *last edit* rather than *furthest-ahead
   clock*. Adoption is bounded at 30 days, or a row claiming `MAX_SAFE_INTEGER`

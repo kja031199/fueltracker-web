@@ -8,12 +8,17 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import type { FillUpRecord, VehicleRecord } from '../data/records';
+import type { FillUpSummary, VehicleRecord } from '../data/records';
 import type { FuelTrackerStore } from '../data/store';
 
 export interface AppData {
   readonly vehicles: readonly VehicleRecord[];
-  readonly fillUps: readonly FillUpRecord[];
+  /**
+   * The selected vehicle's fill-ups, **without photo bytes** (#53): held for
+   * the whole session, and nothing here shows a photo. To edit one, load it
+   * whole with `store.fillUp(id)`.
+   */
+  readonly fillUps: readonly FillUpSummary[];
   /**
    * Live fill-ups across **every** vehicle, not just the selected one.
    *
@@ -32,7 +37,12 @@ export interface AppData {
 
 export function useAppData(store: FuelTrackerStore): AppData {
   const [vehicles, setVehicles] = useState<readonly VehicleRecord[]>([]);
-  const [fillUps, setFillUps] = useState<readonly FillUpRecord[]>([]);
+  const [fillUps, setFillUps] = useState<readonly FillUpSummary[]>([]);
+  // Bumped by every reload, so the selected vehicle's fill-ups are re-read
+  // exactly once per change (#53). They used to follow the `vehicles` array's
+  // identity, which is new on every reload — the same effect, but tied to a
+  // value that changes for unrelated reasons.
+  const [revision, setRevision] = useState(0);
   const [fillUpCount, setFillUpCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +61,7 @@ export function useAppData(store: FuelTrackerStore): AppData {
         return loaded[0]?.id ?? null;
       });
       setError(null);
+      setRevision((value) => value + 1);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not open local storage.');
     } finally {
@@ -95,7 +106,7 @@ export function useAppData(store: FuelTrackerStore): AppData {
     return () => {
       cancelled = true;
     };
-  }, [store, selectedVehicleId, vehicles]);
+  }, [store, selectedVehicleId, revision]);
 
   const selectVehicle = useCallback((id: string) => setSelectedVehicleId(id), []);
 

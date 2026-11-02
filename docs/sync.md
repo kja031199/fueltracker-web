@@ -29,6 +29,35 @@ Only the JSON export counts. The CSV is fill-ups only, so treating it as a
 backup would tell someone they are protected when a restore would lose their
 deletions and their second car.
 
+### Reading only what the screen needs
+
+Every local query used to list a whole table and filter in memory (#53). One
+vehicle's fill-ups cost every vehicle's, the fill-up count read every row to
+return a number, and both ran after every save, deserialising every receipt
+photo each time. Now:
+
+- **One vehicle's rows come from the `vehicleId` index**
+  (`listForVehicle`). That index had been declared since the first schema and
+  never queried. The fill-up list, the dashboard and removing a vehicle all use
+  it.
+- **The count reads no rows** (`countLive`). It takes the table's count minus
+  the count of a `deletedAt` index (Dexie schema version 3). IndexedDB leaves
+  a `null` key out of an index, so that index holds only tombstones.
+- **List rows carry no photo bytes.** `store.fillUps()` returns
+  `FillUpSummary`: everything but `receiptImageData`, plus `hasReceipt`. The
+  screens hold these for the whole session and none of them shows a photo.
+  **Editing loads the whole row** (`store.fillUp(id)`), because the form saves
+  whatever it starts from, and a summary would save the fill-up back without
+  its photo. A distinct type makes that impossible to write by accident.
+- **One save means one read** of the selected vehicle's rows. They are re-read
+  on a reload counter, not on the identity of the vehicles array.
+
+Export and sync still read whole tables, because they need every row and every
+photo. One cost was knowingly left: IndexedDB still deserialises the selected
+vehicle's photos once per refresh before they are dropped, because a row
+cannot be read without its fields. Moving photos into their own table would
+remove that; it would also migrate everyone's local data, so it was deferred.
+
 ### How sync works, and why it is so little code
 
 Pull, merge, push — reusing the backup machinery rather than inventing a second

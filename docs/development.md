@@ -85,6 +85,10 @@ Recorded so a regression in the tests themselves is visible:
 | Sync timing: focus not throttled / saves not coalesced / a save mid-sync dropped / App not syncing after a save | 2 / 1 / 2 / 1 |
 | One decoder: file vehicles / fill-ups / submissions bypassing it / CSV refusals unreported | 5 / 12 / 2 / 3 |
 | One decoder: file receipts unbounded / dropped / a string flag read as true / garbled `deletedAt` accepted / domain importing data | 1 / 4 / 1 / 1 / 1 |
+| Local reads: fill-ups / count / vehicle removal back to a whole-table read | 3 / 2 / 1 |
+| Local reads: summaries keeping photo bytes / `hasReceipt` always false / edit form started from a list row | 1 / 1 / 1 |
+| Local reads: no re-read after a reload / `deletedAt` index missing / Dexie count including tombstones | 2 / 3 / 3 |
+| Local reads: per-vehicle read including tombstones (Dexie / in memory) | 1 / 5 |
 | Sync (emulator): rules accepting any `syncedAt` / push unstamped / records carrying it / remote ignoring the cursor | 1 / 4 / 1 / 2 |
 | Date window: segments not windowed / boundary exclusive / invalid date as a window | 4 / 6 / 1 |
 | Date window: no anchor / anchor without odometer guard / cost per mile ignoring it / intervals ignoring it / suspect norm from the window | 1 / 1 / 1 / 1 / 1 |

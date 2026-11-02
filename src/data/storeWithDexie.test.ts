@@ -57,9 +57,10 @@ describe('the store over IndexedDB', () => {
     const { store, db } = await openStore();
     const vehicle = await store.addVehicle({ name: 'Car' });
     const bytes = new Uint8Array([0, 1, 127, 128, 255, 42]);
-    await store.addFillUp(draft({ receiptImageData: bytes }), vehicle.id);
+    const added = await store.addFillUp(draft({ receiptImageData: bytes }), vehicle.id);
 
-    const stored = (await store.fillUps(vehicle.id))[0]?.receiptImageData;
+    // The whole row: list rows carry no photo bytes since #53.
+    const stored = (await store.fillUp(added.id))?.receiptImageData;
     expect(stored).not.toBeNull();
     expect(Array.from(stored!)).toEqual([0, 1, 127, 128, 255, 42]);
     db.close();

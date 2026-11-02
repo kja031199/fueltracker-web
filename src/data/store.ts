@@ -20,7 +20,9 @@ import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import type { FuelEntryStats } from '../domain/models';
 import type { FillUpRecord, PendingFillUpRecord, SyncFields, VehicleRecord, Snapshot } from './records';
 import { SCHEMA_VERSION } from './records';
-import type { Repository } from './repository';
+import type { Repository, VehicleScopedRepository } from './repository';
+import type { FillUpSummary } from './records';
+import { toSummary } from './records';
 import type { Tombstoner } from './tombstone';
 import { isScrubbed, tombstoneFillUp, tombstonePending, tombstoneVehicle } from './tombstone';
 import type { ImportSummary } from './backup';
@@ -44,8 +46,8 @@ export const systemClock: StoreClock = {
 
 export interface Repositories {
   readonly vehicles: Repository<VehicleRecord>;
-  readonly fillUps: Repository<FillUpRecord>;
-  readonly pendingFillUps: Repository<PendingFillUpRecord>;
+  readonly fillUps: VehicleScopedRepository<FillUpRecord>;
+  readonly pendingFillUps: VehicleScopedRepository<PendingFillUpRecord>;
 }
 
 export interface NewVehicle {
@@ -93,9 +95,9 @@ export class FuelTrackerStore {
    * storage and ready to sync back as a vehicle with no owner.
    */
   async removeVehicle(vehicleId: string): Promise<void> {
-    const entries = await this.repos.fillUps.list();
+    // That vehicle's rows only, from the index (#53) — not every fill-up.
+    const entries = await this.repos.fillUps.listForVehicle(vehicleId);
     for (const entry of entries) {
-      if (entry.vehicleId !== vehicleId) continue;
       const at = this.clock.now();
       await this.repos.fillUps.remove(entry.id, (row) => tombstoneFillUp(row, at));
     }
@@ -151,14 +153,29 @@ export class FuelTrackerStore {
    * difference alone would drift people into being prompted.
    */
   async fillUpCount(): Promise<number> {
-    const rows = await this.repos.fillUps.list();
-    return rows.length;
+    // From the indexes, reading no rows (#53). It used to read every fill-up of
+    // every vehicle — every receipt photo — after every save, to return a number.
+    return this.repos.fillUps.countLive();
   }
 
-  /** One vehicle's live fill-ups, newest first. */
-  async fillUps(vehicleId: string): Promise<FillUpRecord[]> {
-    const rows = await this.repos.fillUps.list();
-    return rows.filter((row) => row.vehicleId === vehicleId).sort((a, b) => b.date - a.date);
+  /**
+   * One vehicle's live fill-ups, newest first, **without their photo bytes**
+   * (#53). Read through the `vehicleId` index rather than the whole table. The
+   * screens hold these for the session and none of them shows a photo; to edit
+   * one, load it whole with `fillUp(id)`.
+   */
+  async fillUps(vehicleId: string): Promise<FillUpSummary[]> {
+    const rows = await this.repos.fillUps.listForVehicle(vehicleId);
+    return rows.sort((a, b) => b.date - a.date).map(toSummary);
+  }
+
+  /**
+   * One whole live fill-up, photo included — what the edit form starts from,
+   * so that saving an edit keeps the photo. `undefined` if it is deleted or
+   * unknown.
+   */
+  async fillUp(id: string): Promise<FillUpRecord | undefined> {
+    return this.repos.fillUps.get(id);
   }
 
   // MARK: Pending submissions
@@ -375,7 +392,12 @@ export class FuelTrackerStore {
  * both. Statistics never sees a record and storage never sees a `Date`-shaped
  * entry.
  */
-export function toStats(records: readonly FillUpRecord[]): FuelEntryStats[] {
+export function toStats(
+  records: readonly Pick<
+    FillUpRecord,
+    'id' | 'date' | 'odometer' | 'gallons' | 'pricePerGallon' | 'isFullTank' | 'missedPreviousFillUp'
+  >[],
+): FuelEntryStats[] {
   return records.map((record) => ({
     id: record.id,
     date: new Date(record.date),

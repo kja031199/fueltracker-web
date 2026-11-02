@@ -5,18 +5,26 @@
  * because the raw API is event-based and unpleasant to get right, and over a
  * heavier sync-capable database because nothing here needs one yet.
  *
- * ## What is indexed, and why so little
+ * ## What is indexed, and what each index is for
  *
- * `id` is the primary key; `vehicleId` and `date` are indexed because the
- * fill-up list and every chart query by vehicle and order by date. Nothing else
- * is indexed: an index that no query uses costs a write on every insert and
- * buys nothing, and the filtering the app actually does — search text, fuel
- * grade, station — is a pure in-memory pass over one vehicle's history by
- * design (see `fillUpFilter.ts`), not a database query.
+ * - `id` — the primary key.
+ * - `vehicleId` — **`listForVehicle`**: the fill-up list, the dashboard and
+ *   removing a vehicle read one vehicle's rows, not the table (#53). It was
+ *   declared from the first schema and, until #53, never queried: every read
+ *   was `toArray()` and a filter, so one vehicle cost every vehicle's rows and
+ *   every receipt photo in them.
+ * - `deletedAt` — **`countLive`**, without reading a row. IndexedDB leaves a
+ *   `null` key out of an index, so this index holds only tombstones, and live
+ *   rows are the table's count minus the index's. An earlier note here called
+ *   indexing a mostly-null field "the index that earns nothing"; it earns
+ *   exactly this, because the nulls cost nothing to leave out.
+ * - `date` — declared, not yet queried; rows are sorted in memory after the
+ *   per-vehicle read, which is small. Kept rather than dropped, because
+ *   dropping an index is a schema change of its own.
  *
- * `deletedAt` is **not** indexed either. Tombstones are rare and the live-row
- * filter runs in memory; indexing a field that is null on almost every row is
- * the classic index that earns nothing.
+ * The filtering the app does — search text, fuel grade, station — is a pure
+ * in-memory pass over one vehicle's history by design (see `fillUpFilter.ts`),
+ * not a database query.
  */
 
 import Dexie from 'dexie';
@@ -50,6 +58,15 @@ export class FuelTrackerDatabase extends Dexie {
       pendingFillUps: 'id, vehicleId',
       syncState: 'key',
     });
+    // Version 3 indexes `deletedAt` (#53), so live rows can be counted without
+    // reading any. Adding an index moves no data; `dexieIndexes.test.ts` opens
+    // a version-2 database, rows and sync cursor included, to prove it.
+    this.version(3).stores({
+      vehicles: 'id, deletedAt',
+      fillUps: 'id, vehicleId, date, deletedAt',
+      pendingFillUps: 'id, vehicleId, deletedAt',
+      syncState: 'key',
+    });
   }
 }
 
@@ -73,12 +90,31 @@ export class DexieSyncState implements SyncStateStore {
 /**
  * A `Repository` over one Dexie table.
  *
- * The live/tombstoned split is applied **in memory** rather than through an
- * index, for the reason given above. One vehicle's history is hundreds of rows,
- * not millions.
+ * `list()` and `listDeleted()` still read the whole table — export and sync
+ * need every row, receipts included. Everything the screens ask for goes
+ * through the indexed reads below instead.
  */
 export class DexieRepository<T extends SyncFields> implements Repository<T> {
   constructor(private readonly table: Table<T, string>) {}
+
+  /**
+   * One vehicle's live rows, from the `vehicleId` index. Only meaningful on a
+   * table that has the index (fill-ups, submissions); Dexie refuses the query
+   * on one that does not, which is the right failure for a programming error.
+   */
+  async listForVehicle(vehicleId: string): Promise<T[]> {
+    const rows = await this.table.where('vehicleId').equals(vehicleId).toArray();
+    return rows.filter((row) => row.deletedAt === null);
+  }
+
+  /** Live rows counted from two indexes, reading none of them. See above. */
+  async countLive(): Promise<number> {
+    const [all, tombstones] = await Promise.all([
+      this.table.count(),
+      this.table.where('deletedAt').aboveOrEqual(Number.NEGATIVE_INFINITY).count(),
+    ]);
+    return all - tombstones;
+  }
 
   async list(): Promise<T[]> {
     const rows = await this.table.toArray();

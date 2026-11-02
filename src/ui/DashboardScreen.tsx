@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { useMemo, useState } from 'react';
-import type { FillUpRecord, VehicleRecord } from '../data/records';
+import type { FillUpSummary, VehicleRecord } from '../data/records';
 import { toStats } from '../data/store';
 import { computeFuelStatistics } from '../domain/fuelStatistics';
 import { dashboardKPIs, kpiAccessibilityLabel } from '../domain/kpi';
@@ -24,7 +24,7 @@ interface Props {
   readonly vehicles: readonly VehicleRecord[];
   readonly selectedVehicleId: string | null;
   readonly onSelect: (id: string) => void;
-  readonly fillUps: readonly FillUpRecord[];
+  readonly fillUps: readonly FillUpSummary[];
   readonly units: UnitPreferences;
 }
 
