@@ -99,16 +99,59 @@ function monthKey(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
-export function computeFuelStatistics(input: readonly FuelEntryStats[]): FuelStatistics {
-  const entries = [...input].sort((a, b) => a.odometer - b.odometer);
+/**
+ * Which part of the history the figures describe (#51).
+ *
+ * `from` is inclusive; `null`, absent or an invalid date means the whole
+ * history. An invalid date is read as "no window" rather than "nothing", so a
+ * bad cutoff degrades to the all-time view instead of an empty dashboard.
+ */
+export interface StatisticsWindow {
+  readonly from?: Date | null;
+}
+
+/**
+ * Every figure the dashboard shows, for the whole history or a window of it.
+ *
+ * ## A window narrows the outputs, not the inputs
+ *
+ * Issue #51. The dashboard used to filter rows by its range and then compute,
+ * so the first fill-up inside the range had no predecessor and the MPG segment
+ * ending there was lost — though both its ends were known. A range admitting
+ * two fill-ups reported half its segments; a range admitting one reported no
+ * economy at all.
+ *
+ * So the MPG chain always runs over the **whole** history, and then:
+ *
+ * - **Segments** (MPG points, the MPG series, best/worst/average) count when
+ *   they *end* inside the window, wherever they began.
+ * - **Suspect segments** are judged against the whole history's norm, then
+ *   windowed. A short window has too few segments to know what normal is.
+ * - **Distance** runs from the last fill-up before the window, when there is
+ *   one, to the last inside it: the drive into the window was fuelled by the
+ *   window's first fill-up, so leaving it out understated distance and
+ *   overstated cost per mile.
+ * - **Everything else** — spending, gallons, counts, prices, the monthly
+ *   rollup — comes from fill-ups dated inside the window, as before.
+ *
+ * With no window every figure is exactly what it always was.
+ */
+export function computeFuelStatistics(
+  input: readonly FuelEntryStats[],
+  window: StatisticsWindow = {},
+): FuelStatistics {
+  const history = [...input].sort((a, b) => a.odometer - b.odometer);
+  const from = window.from?.getTime();
+  const windowed = from !== undefined && Number.isFinite(from);
+  const inWindow = (date: Date): boolean => !windowed || date.getTime() >= (from as number);
+  const entries = windowed ? history.filter((e) => inWindow(e.date)) : history;
 
   // --- MPG segments between full-tank fills -------------------------------
-  const mpgPoints: MPGPoint[] = [];
-  const mpgById = new Map<string, number>();
+  const allPoints: MPGPoint[] = [];
   let baseline: FuelEntryStats | null = null;
   let gallonsSinceBaseline = 0;
 
-  for (const entry of entries) {
+  for (const entry of history) {
     if (entry.missedPreviousFillUp) {
       // An unlogged fill sits before this entry, so no segment can end here —
       // restart the chain instead. Its fuel still counts toward spending; it
@@ -123,14 +166,13 @@ export function computeFuelStatistics(input: readonly FuelEntryStats[]): FuelSta
         const miles = entry.odometer - baseline.odometer;
         if (miles > 0 && gallonsSinceBaseline > 0) {
           const mpg = miles / gallonsSinceBaseline;
-          mpgPoints.push({
+          allPoints.push({
             id: entry.id,
             date: entry.date,
             mpg,
             miles,
             gallons: gallonsSinceBaseline,
           });
-          mpgById.set(entry.id, mpg);
         }
         // Deliberately OUTSIDE the guard: when a segment is skipped (zero
         // distance, zero gallons) the baseline still advances and the counter
@@ -147,19 +189,26 @@ export function computeFuelStatistics(input: readonly FuelEntryStats[]): FuelSta
   }
 
   // --- Suspect segments ---------------------------------------------------
-  // Two independent rules, union'd. Every comparison is strictly `>`.
-  const suspectSegmentIds = new Set<string>();
-  if (mpgPoints.length >= MIN_POINTS_FOR_RELATIVE_SUSPECT) {
-    const median = upperMedian(mpgPoints.map((p) => p.mpg));
+  // Two independent rules, union'd. Every comparison is strictly `>`. Judged
+  // over the whole history, then windowed below with everything else.
+  const allSuspects = new Set<string>();
+  if (allPoints.length >= MIN_POINTS_FOR_RELATIVE_SUSPECT) {
+    const median = upperMedian(allPoints.map((p) => p.mpg));
     if (median !== null) {
-      for (const p of mpgPoints) {
-        if (p.mpg > median * SUSPECT_MEDIAN_MULTIPLE) suspectSegmentIds.add(p.id);
+      for (const p of allPoints) {
+        if (p.mpg > median * SUSPECT_MEDIAN_MULTIPLE) allSuspects.add(p.id);
       }
     }
   }
-  for (const p of mpgPoints) {
-    if (p.mpg > ABSURD_MPG) suspectSegmentIds.add(p.id);
+  for (const p of allPoints) {
+    if (p.mpg > ABSURD_MPG) allSuspects.add(p.id);
   }
+
+  // --- The window ---------------------------------------------------------
+  // A segment belongs to the window it *ends* in.
+  const mpgPoints = allPoints.filter((p) => inWindow(p.date));
+  const mpgById = new Map(mpgPoints.map((p) => [p.id, p.mpg] as const));
+  const suspectSegmentIds = new Set(mpgPoints.filter((p) => allSuspects.has(p.id)).map((p) => p.id));
 
   // --- Series -------------------------------------------------------------
   // Price keeps odometer order; the odometer series is re-sorted by DATE.
@@ -208,15 +257,33 @@ export function computeFuelStatistics(input: readonly FuelEntryStats[]): FuelSta
 
   const first = entries[0];
   const last = entries[entries.length - 1];
-  const milesTracked = first !== undefined && last !== undefined ? last.odometer - first.odometer : 0;
+  // The last fill-up before the window, when it is a usable starting point:
+  // the drive from it into the window was fuelled by the window's first
+  // fill-up, so it belongs to the window. Not usable if its odometer is not
+  // below the window's first — mistyped or hostile data must not make
+  // distance negative or invent miles.
+  let anchor: FuelEntryStats | null = null;
+  if (windowed && first !== undefined) {
+    for (const e of history) {
+      if (!inWindow(e.date) && e.odometer < first.odometer) {
+        if (anchor === null || e.odometer > anchor.odometer) anchor = e;
+      }
+    }
+  }
+  const start = anchor ?? first;
+  const milesTracked = start !== undefined && last !== undefined ? last.odometer - start.odometer : 0;
 
   let costPerMile: number | null = null;
   if (milesTracked > 0) {
     // Fuel that moved the car across the tracked span is everything after the
-    // first (baseline) fill.
-    const spent = entries.slice(1).reduce((sum, e) => sum + totalCost(e), 0);
+    // baseline fill — which is the anchor, outside the window, when there is
+    // one, and otherwise the window's own first fill-up.
+    const fuelled = anchor !== null ? entries : entries.slice(1);
+    const spent = fuelled.reduce((sum, e) => sum + totalCost(e), 0);
     if (spent > 0) costPerMile = spent / milesTracked;
   }
+  // One interval per fill-up after the starting point.
+  const intervals = anchor !== null ? entries.length : entries.length - 1;
 
   // Swift's `max(by:)` keeps the FIRST of equal maxima; mirror that by only
   // replacing on a strictly later date.
@@ -271,6 +338,6 @@ export function computeFuelStatistics(input: readonly FuelEntryStats[]): FuelSta
     averageFillUpCost: fillUpCount > 0 ? totalSpent / fillUpCount : null,
     averageGallonsPerFillUp: fillUpCount > 0 ? totalGallons / fillUpCount : null,
     averageMonthlySpend,
-    averageMilesBetweenFillUps: entries.length > 1 ? milesTracked / (entries.length - 1) : null,
+    averageMilesBetweenFillUps: intervals > 0 ? milesTracked / intervals : null,
   };
 }

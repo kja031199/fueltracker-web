@@ -33,14 +33,13 @@ interface Props {
  *
  * ## The range picker narrows the view, not the maths it reports
  *
- * Statistics are recomputed over whatever the range admits, so "3M" genuinely
- * reports the last three months rather than a slice of an all-time figure. That
+ * Statistics are recomputed for whatever the range admits, so "3M" genuinely
+ * reports the last three months rather than a slice of an all-time figure —
+ * with the window applied to the figures rather than the rows, so a drive that
+ * ended inside the range still counts (#51). That
  * is different from the fill-up list's filter, which narrows only what is shown
  * while the dashboard keeps reading the full history — the two look similar and
  * mean different things.
- *
- * Charts are not here yet. The KPI cards and the weekday insight are the parts
- * that need no charting library, and the series work is a phase of its own.
  */
 export function DashboardScreen({
   vehicles,
@@ -51,13 +50,20 @@ export function DashboardScreen({
 }: Props): ReactElement {
   const [range, setRange] = useState<DashboardTimeRange>('All');
 
+  const cutoff = useMemo(() => cutoffFrom(range), [range]);
   const inRange = useMemo(() => {
-    const cutoff = cutoffFrom(range);
     if (cutoff === null) return fillUps;
     return fillUps.filter((record) => record.date >= cutoff.getTime());
-  }, [fillUps, range]);
+  }, [fillUps, cutoff]);
 
-  const stats = useMemo(() => computeFuelStatistics(toStats(inRange)), [inRange]);
+  // The whole history goes in and the window is applied to what comes out
+  // (#51): an MPG segment that *ends* in the range began before it, and
+  // filtering first threw that segment away. The weekday figures below are
+  // per fill-up, so they still read the filtered rows.
+  const stats = useMemo(
+    () => computeFuelStatistics(toStats(fillUps), { from: cutoff }),
+    [fillUps, cutoff],
+  );
   const kpis = useMemo(() => dashboardKPIs(stats, units), [stats, units]);
   const insight = useMemo(
     () => weekdayPriceInsight(toStats(inRange), { units }),
