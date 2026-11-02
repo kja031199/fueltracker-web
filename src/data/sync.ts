@@ -65,6 +65,12 @@ export interface SyncOutcome {
    * broken one.
    */
   readonly unsendable: readonly string[];
+  /**
+   * Local rows whose text was longer than the account accepts, shortened
+   * before this push (#50). Saved before text was bounded at every door; each
+   * one used to fail the whole upload batch on every sync.
+   */
+  readonly repaired: number;
   readonly at: number;
 }
 
@@ -78,10 +84,16 @@ export interface SyncOutcome {
  *   since the allowlist in #27 it is routine rather than a bug: it is what a
  *   signed-in account that is not on the list sees.
  *
+ * - `rejected` — the rules refused an *upload*, after the pull worked (#50).
+ *   A pull succeeding proves the account is allowed, so this is about the
+ *   data, not the person, and the app stays open. Before this it was reported
+ *   as `refused`: one over-long field put an allowed owner on the no-access
+ *   screen, which hides the very row they would need to fix.
+ *
  * Reporting both as "could not reach your account" named the wrong one and
  * sent the one person who could act on it to check their wifi (#40).
  */
-export type SyncFailureKind = 'unreachable' | 'refused';
+export type SyncFailureKind = 'unreachable' | 'refused' | 'rejected';
 
 export type SyncResult =
   | { readonly ok: true; readonly outcome: SyncOutcome }
@@ -182,6 +194,14 @@ const REFUSED =
   'This account does not have access to this FuelTracker, so nothing is syncing. ' +
   'Send your account id — Settings → Account — to whoever runs this copy.';
 
+/**
+ * A refused upload from an account that is allowed (#50). Says that nothing
+ * is lost, because nothing is: every change is still in this browser.
+ */
+const REJECTED =
+  'Your account would not accept some changes, so they are saved on this device but not ' +
+  'uploaded. Everything else keeps working; exporting a backup keeps a copy safe meanwhile.';
+
 function failure(cause: unknown, fallback: string): SyncResult {
   if (isRefusal(cause)) return { ok: false, kind: 'refused', reason: REFUSED };
   return { ok: false, kind: 'unreachable', reason: describe(cause, fallback) };
@@ -234,6 +254,12 @@ export async function syncOnce(
     pendingFillUps: pending.readable,
   });
 
+  // Rows an older build stored with text longer than the account accepts are
+  // shortened before the push is built, or each one fails the whole batch on
+  // every sync (#50). After the clock has observed the account, so the repair
+  // is stamped newer than anything there.
+  const repaired = await store.repairOversizedText();
+
   const localAfter = await store.exportSnapshot();
   // Anything with an id the account cannot address is held back here, by name,
   // rather than being handed to a batch it would abort.
@@ -251,6 +277,8 @@ export async function syncOnce(
   try {
     pushed = await remote.push(outgoing);
   } catch (cause) {
+    // The pull worked, so a refusal here is about the data, not the account.
+    if (isRefusal(cause)) return { ok: false, kind: 'rejected', reason: REJECTED };
     return failure(cause, 'Changes are saved here but not uploaded yet.');
   }
 
@@ -263,6 +291,7 @@ export async function syncOnce(
       invalid,
       unbeatable,
       unsendable,
+      repaired,
       at: clock.now(),
     },
   };

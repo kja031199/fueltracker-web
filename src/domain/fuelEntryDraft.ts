@@ -1,4 +1,5 @@
 import type { FuelGrade } from './fuelGrade';
+import { TEXT_LIMITS, boundText } from './textLimits';
 
 /**
  * A validated fill-up ready to be written to the store. Ported from
@@ -84,8 +85,10 @@ export function makeFuelEntryDraft(input: FuelEntryDraftInput): FuelEntryDraft |
     isFullTank: input.isFullTank ?? true,
     missedPreviousFillUp: input.missedPreviousFillUp ?? false,
     fuelGrade: input.fuelGrade ?? 'Regular',
-    station: input.station ?? '',
-    notes: input.notes ?? '',
+    // Bounded here, at the one gate every fill-up passes, so no write path can
+    // store text the account would refuse (#50).
+    station: boundText(input.station ?? '', TEXT_LIMITS.station),
+    notes: boundText(input.notes ?? '', TEXT_LIMITS.notes),
     latitude: input.latitude ?? null,
     longitude: input.longitude ?? null,
     receiptImageData: keptReceipt,

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import type { VehicleRecord } from '../data/records';
 import type { FuelTrackerStore } from '../data/store';
+import { TEXT_LIMITS } from '../domain/textLimits';
 
 interface Props {
   readonly store: FuelTrackerStore;
@@ -70,6 +71,7 @@ export function VehiclesScreen({
             </label>
             <input
               id="vehicle-name"
+              maxLength={TEXT_LIMITS.name}
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="Daily Driver"
@@ -80,13 +82,13 @@ export function VehiclesScreen({
             <label className="field__label" htmlFor="vehicle-make">
               Make
             </label>
-            <input id="vehicle-make" value={make} onChange={(e) => setMake(e.target.value)} />
+            <input id="vehicle-make" maxLength={TEXT_LIMITS.make} value={make} onChange={(e) => setMake(e.target.value)} />
           </div>
           <div className="field">
             <label className="field__label" htmlFor="vehicle-model">
               Model
             </label>
-            <input id="vehicle-model" value={model} onChange={(e) => setModel(e.target.value)} />
+            <input id="vehicle-model" maxLength={TEXT_LIMITS.model} value={model} onChange={(e) => setModel(e.target.value)} />
           </div>
           <div className="field">
             <label className="field__label" htmlFor="vehicle-year">

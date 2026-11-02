@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { InMemoryRepository } from './repository';
-import { InMemoryRemoteStore, emptySnapshot, rowsToPush } from './remote';
+import { InMemoryRemoteStore, emptySnapshot, rowsToPush, sendableRows } from './remote';
 import type { RawSnapshot, RemoteStore } from './remote';
 import { FuelTrackerStore } from './store';
 import { MonotonicClock } from './syncClock';
@@ -257,9 +257,12 @@ describe('a refusal is not the same as being unreachable', () => {
     expect(result.reason).toMatch(/access/i);
   });
 
-  it('reports a refused push the same way', async () => {
-    // A rules refusal on the way up is the same fact as one on the way down,
-    // and "saved here but not uploaded yet" is just as misleading about it.
+  it('reports a refused push as rejected changes, not as a refused account', async () => {
+    // Changed in #50; this test used to assert the opposite. A push is refused
+    // only *after* a pull succeeded — and a pull succeeding proves the account
+    // is allowed. What was refused is the data, not the person: one over-long
+    // station name used to put an allowed owner on the no-access screen, with
+    // no way to reach the row that caused it.
     const { store, clock } = storeWith();
     await store.addVehicle({ name: 'Civic' });
 
@@ -267,8 +270,9 @@ describe('a refusal is not the same as being unreachable', () => {
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.kind).toBe('refused');
-    expect(result.reason).toMatch(/access/i);
+    expect(result.kind).toBe('rejected');
+    expect(result.reason).not.toMatch(/does not have access/i);
+    expect(result.reason).toMatch(/saved on this device/i);
   });
 
   it('tells a refused reader where to find the id that fixes it', async () => {
@@ -760,5 +764,125 @@ describe('syncOnce', () => {
       const result = await syncOnce(store, new InMemoryRemoteStore(), fakeClock());
       expect(result.ok).toBe(true);
     });
+  });
+});
+
+describe('one over-long field does not stop the upload (#50)', () => {
+  /**
+   * Refuses the whole batch the way Firestore does when any document breaks
+   * `firestore.rules`: a coded `permission-denied`, all or nothing.
+   *
+   * The limits are written out as literals rather than imported from
+   * `TEXT_LIMITS` on purpose — this stands in for the server, and a fake server
+   * that reads the client's own numbers would agree with the client however
+   * wrong it was. `rulesLimits.test.ts` ties those numbers to the real rules.
+   */
+  class RulesLikeRemote extends InMemoryRemoteStore {
+    override async push(snapshot: BackupSnapshot): Promise<import('./remote').PushSummary> {
+      const tooLong = (value: string, max: number): boolean => value.length > max;
+      const bad =
+        snapshot.vehicles.some((row) => tooLong(row.name, 200) || tooLong(row.make, 200) || tooLong(row.model, 200)) ||
+        snapshot.fillUps.some(
+          (row) => tooLong(row.station, 200) || tooLong(row.notes, 4000) || tooLong(row.vehicleId, 200),
+        );
+      if (bad) {
+        const error = new Error('Missing or insufficient permissions.');
+        (error as unknown as Record<string, unknown>)['code'] = 'permission-denied';
+        throw error;
+      }
+      return super.push(snapshot);
+    }
+  }
+
+  /** A store holding rows written before text was bounded. */
+  function legacyStore(rows: readonly FillUpRecord[]) {
+    const clock = fakeClock();
+    const repos = {
+      vehicles: new InMemoryRepository<VehicleRecord>([vehicle()]),
+      fillUps: new InMemoryRepository<FillUpRecord>(rows),
+      pendingFillUps: new InMemoryRepository<import('./records').PendingFillUpRecord>(),
+    };
+    return { store: new FuelTrackerStore(repos, clock), repos, clock };
+  }
+
+  it('repairs a row an older build stored too long, and uploads everything', async () => {
+    const { store, clock } = legacyStore([
+      fillUp({ id: 'good', updatedAt: 900 }),
+      fillUp({ id: 'long', updatedAt: 900, station: 's'.repeat(201) }),
+    ]);
+    const remote = new RulesLikeRemote();
+
+    const result = await syncOnce(store, remote, clock);
+
+    if (!result.ok) throw new Error(`expected success, got ${result.kind}: ${result.reason}`);
+    expect(result.outcome.repaired).toBe(1);
+    const uploaded = (await remote.pull()).fillUps as FillUpRecord[];
+    expect(uploaded.map((row) => row.id).sort()).toEqual(['good', 'long']);
+    expect(uploaded.find((row) => row.id === 'long')?.station).toHaveLength(200);
+  });
+
+  it('repairs once, not on every sync', async () => {
+    const { store, clock } = legacyStore([fillUp({ id: 'long', updatedAt: 900, notes: 'n'.repeat(5000) })]);
+    const remote = new RulesLikeRemote();
+    await syncOnce(store, remote, clock);
+
+    const second = await syncOnce(store, remote, clock);
+
+    if (!second.ok) throw new Error(second.reason);
+    expect(second.outcome.repaired).toBe(0);
+  });
+
+  it('holds back a row whose vehicle id cannot be stored, and uploads the rest', async () => {
+    // Not repairable — shortening an id would point the fill-up at a vehicle
+    // that does not exist. So it stays on the device and is reported, the way
+    // an unstorable row id already is.
+    const badVehicle = 'v'.repeat(300);
+    const { store, clock } = legacyStore([
+      fillUp({ id: 'good', updatedAt: 900 }),
+      fillUp({ id: 'orphan', updatedAt: 900, vehicleId: badVehicle }),
+    ]);
+    const remote = new RulesLikeRemote();
+
+    const result = await syncOnce(store, remote, clock);
+
+    if (!result.ok) throw new Error(`expected success, got ${result.kind}: ${result.reason}`);
+    expect(result.outcome.unsendable).toEqual(['orphan']);
+    const uploaded = (await remote.pull()).fillUps as FillUpRecord[];
+    expect(uploaded.map((row) => row.id)).toEqual(['good']);
+  });
+
+  it('bounds text arriving from the account, too', async () => {
+    // A console edit or another build can put a long field in the account.
+    const { store, clock } = legacyStore([]);
+    const remote = new InMemoryRemoteStore(
+      snapshot({ fillUps: [fillUp({ id: 'remote', updatedAt: 900, notes: 'n'.repeat(4001) })] }),
+    );
+
+    await syncOnce(store, remote, clock);
+
+    const local = await store.exportSnapshot();
+    expect(local.fillUps.find((row) => row.id === 'remote')?.notes).toHaveLength(4000);
+  });
+});
+
+describe('the last check before a push (#50)', () => {
+  it('holds back a row whose text is still too long, by id', () => {
+    // Every door bounds text and sync repairs stored rows first, so in the app
+    // this never fires. It is the backstop: if something new slips past, it
+    // costs that row, not the whole batch.
+    const unsendable: string[] = [];
+    const sent = sendableRows(
+      [fillUp({ id: 'fine' }), fillUp({ id: 'long', notes: 'n'.repeat(4001) })],
+      unsendable,
+    );
+    expect(sent.map((row) => row.id)).toEqual(['fine']);
+    expect(unsendable).toEqual(['long']);
+  });
+
+  it('lets text exactly at the limit through', () => {
+    const unsendable: string[] = [];
+    const sent = sendableRows([fillUp({ id: 'edge', station: 's'.repeat(200) })], unsendable);
+    expect(sent).toHaveLength(1);
+    expect(unsendable).toEqual([]);
   });
 });

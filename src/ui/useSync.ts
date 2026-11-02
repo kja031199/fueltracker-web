@@ -92,7 +92,7 @@ export function useSync(
       // A sync that worked is the only thing that can clear a refusal, and it
       // is what makes "ask the owner, then press Try again" recover in place.
       setRefused(false);
-      const { pulled, pushed, skippedNewerSchema, invalid, unbeatable, unsendable, at } =
+      const { pulled, pushed, skippedNewerSchema, invalid, unbeatable, unsendable, repaired, at } =
         result.outcome;
       setLastSyncedAt(at);
       saveLastSynced(at);
@@ -115,7 +115,12 @@ export function useSync(
         // not fix itself, and the rows are only on this device until it is
         // dealt with.
         notes.push(
-          `${unsendable.length} row(s) could not be uploaded because of their id and stay on this device only`,
+          `${unsendable.length} row(s) could not be uploaded and stay on this device only`,
+        );
+      }
+      if (repaired > 0) {
+        notes.push(
+          `${repaired} row(s) had text longer than your account accepts and were shortened so they could sync`,
         );
       }
       if (skippedNewerSchema > 0) {
@@ -132,7 +137,7 @@ export function useSync(
 
       const changed =
         pulled.vehiclesWritten + pulled.fillUpsWritten + pulled.pendingWritten > 0;
-      if (changed) await onChanged();
+      if (changed || repaired > 0) await onChanged();
     } finally {
       running.current = false;
       setSyncing(false);

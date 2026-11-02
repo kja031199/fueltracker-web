@@ -8,6 +8,8 @@ import { FuelTrackerStore, toStats } from './store';
 import type { Repositories } from './store';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { seedDemoData } from './demoData';
+import { TEXT_LIMITS } from '../domain/textLimits';
+import { SCHEMA_VERSION } from './records';
 
 function makeRepos(): Repositories {
   return {
@@ -213,5 +215,54 @@ describe('backupFilename', () => {
   test('sorts by date and says what it is', () => {
     expect(backupFilename(new Date(2025, 5, 1))).toBe('fueltracker-2025-06-01.json');
     expect(backupFilename(new Date(2025, 11, 25), 'csv')).toBe('fueltracker-2025-12-25.csv');
+  });
+});
+
+describe('imports are bounded like every other write (#50)', () => {
+  /**
+   * `importBackup` is the door both a restored file and a sync pull come in
+   * through, and it stored rows exactly as found. A backup with a long station
+   * name then failed every upload from that device.
+   */
+  const sync = { updatedAt: 500, deletedAt: null, schemaVersion: SCHEMA_VERSION };
+  const vehicle: VehicleRecord = {
+    id: 'v1', ...sync, name: 'n'.repeat(TEXT_LIMITS.name + 1), make: '', model: '', year: 2020, createdAt: 500,
+  };
+  const fillUp: FillUpRecord = {
+    id: 'f1', ...sync, vehicleId: 'v1', date: 1_700_000_000_000, odometer: 10_000, gallons: 10,
+    pricePerGallon: 3, isFullTank: true, missedPreviousFillUp: false, fuelGrade: 'Regular',
+    station: 's'.repeat(TEXT_LIMITS.station + 1), notes: 'n'.repeat(TEXT_LIMITS.notes + 1),
+    latitude: null, longitude: null, receiptImageData: null,
+  };
+  const pending: PendingFillUpRecord = {
+    id: 'p1', ...sync, vehicleId: 'v1', submittedAt: 500, submitterName: 'x'.repeat(TEXT_LIMITS.submitterName + 1),
+    date: 1_700_000_000_000, odometer: 10_000, gallons: 10, pricePerGallon: 3, isFullTank: true,
+    fuelGrade: 'Regular', station: '', notes: '', latitude: null, longitude: null, receiptImageData: null,
+  };
+
+  test('stores every text field within its limit', async () => {
+    const repos = makeRepos();
+    await importBackup(repos, { vehicles: [vehicle], fillUps: [fillUp], pendingFillUps: [pending] });
+
+    expect((await repos.vehicles.get('v1'))?.name).toHaveLength(TEXT_LIMITS.name);
+    const stored = await repos.fillUps.get('f1');
+    expect(stored?.station).toHaveLength(TEXT_LIMITS.station);
+    expect(stored?.notes).toHaveLength(TEXT_LIMITS.notes);
+    expect((await repos.pendingFillUps.get('p1'))?.submitterName).toHaveLength(TEXT_LIMITS.submitterName);
+  });
+
+  test('refuses a fill-up whose vehicle id could never be stored, and says so', async () => {
+    // A CSV only requires the vehicle_id column to be non-empty. A 300-character
+    // one passes that and is refused by the account on every push.
+    const repos = makeRepos();
+    const summary = await importBackup(repos, {
+      vehicles: [],
+      fillUps: [{ ...fillUp, vehicleId: 'v'.repeat(300) }],
+      pendingFillUps: [],
+    });
+
+    expect(await repos.fillUps.get('f1')).toBeUndefined();
+    expect(summary.rejected).toHaveLength(1);
+    expect(summary.rejected[0]).toMatch(/vehicle/i);
   });
 });

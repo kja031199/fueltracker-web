@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { FUEL_GRADES, fuelGradeFromRaw } from './fuelGrade';
 import { MAX_RECEIPT_BYTES, draftTotalCost, makeFuelEntryDraft } from './fuelEntryDraft';
+import { TEXT_LIMITS } from './textLimits';
 
 const valid = () => ({
   date: new Date('2026-07-19T12:00:00Z'),
@@ -100,5 +101,28 @@ describe('fuel grade', () => {
 
   test('Regular is first, so it is the natural default in a picker', () => {
     expect(FUEL_GRADES[0]).toBe('Regular');
+  });
+});
+
+describe('text is bounded at the gate (#50)', () => {
+  const base = { date: new Date(2026, 0, 1), odometer: 10_000, gallons: 10, pricePerGallon: 3 };
+
+  test('a station one past the limit is shortened, and the fill-up still saves', () => {
+    // Shortened rather than rejected: losing an odometer reading over a long
+    // station name would be the worse outcome — the rule `recordValidation`
+    // already applies to text arriving from the account.
+    const draft = makeFuelEntryDraft({ ...base, station: 's'.repeat(TEXT_LIMITS.station + 1) });
+    expect(draft?.station).toHaveLength(TEXT_LIMITS.station);
+  });
+
+  test('notes one past the limit are shortened', () => {
+    const draft = makeFuelEntryDraft({ ...base, notes: 'n'.repeat(TEXT_LIMITS.notes + 1) });
+    expect(draft?.notes).toHaveLength(TEXT_LIMITS.notes);
+  });
+
+  test('text within the limit is kept exactly', () => {
+    const draft = makeFuelEntryDraft({ ...base, station: 'Shell', notes: 'n'.repeat(TEXT_LIMITS.notes) });
+    expect(draft?.station).toBe('Shell');
+    expect(draft?.notes).toHaveLength(TEXT_LIMITS.notes);
   });
 });

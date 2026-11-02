@@ -10,6 +10,8 @@ import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import type { BackupSnapshot } from '../domain/backupFormat';
 import type { FillUpRecord, PendingFillUpRecord, SyncFields, VehicleRecord } from './records';
 import type { Repositories } from './store';
+import { isStorableId } from './recordId';
+import { boundFillUpText, boundPendingText, boundVehicleText } from './recordText';
 
 /**
  * Everything in storage, **including tombstones**.
@@ -94,7 +96,10 @@ export async function importBackup(
   for (const row of [...(await repos.vehicles.list()), ...(await repos.vehicles.listDeleted())]) {
     existingVehicles.set(row.id, row);
   }
-  for (const incoming of snapshot.vehicles) {
+  // Text is bounded on the way in (#50). This is the door both a restored file
+  // and a sync pull come through, and it used to store rows exactly as found:
+  // one long station name in a backup then failed every upload afterwards.
+  for (const incoming of snapshot.vehicles.map(boundVehicleText)) {
     if (!shouldReplace(incoming, existingVehicles.get(incoming.id))) {
       skippedOlder += 1;
       continue;
@@ -107,7 +112,14 @@ export async function importBackup(
   for (const row of [...(await repos.fillUps.list()), ...(await repos.fillUps.listDeleted())]) {
     existingFillUps.set(row.id, row);
   }
-  for (const incoming of snapshot.fillUps) {
+  for (const incoming of snapshot.fillUps.map(boundFillUpText)) {
+    // A vehicle id is not text to shorten — a shortened one points at a vehicle
+    // that does not exist — and one the account cannot store fails every push.
+    // A CSV only requires it to be non-empty, so this is where it is checked.
+    if (!isStorableId(incoming.vehicleId)) {
+      rejected.push(`fill-up ${incoming.id}: its vehicle id cannot be stored`);
+      continue;
+    }
     if (!shouldReplace(incoming, existingFillUps.get(incoming.id))) {
       skippedOlder += 1;
       continue;
@@ -139,7 +151,11 @@ export async function importBackup(
   ]) {
     existingPending.set(row.id, row);
   }
-  for (const incoming of snapshot.pendingFillUps) {
+  for (const incoming of snapshot.pendingFillUps.map(boundPendingText)) {
+    if (!isStorableId(incoming.vehicleId)) {
+      rejected.push(`submission ${incoming.id}: its vehicle id cannot be stored`);
+      continue;
+    }
     if (!shouldReplace(incoming, existingPending.get(incoming.id))) {
       skippedOlder += 1;
       continue;

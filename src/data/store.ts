@@ -26,6 +26,8 @@ import { isScrubbed, tombstoneFillUp, tombstonePending, tombstoneVehicle } from 
 import type { BackupSnapshot } from '../domain/backupFormat';
 import type { ImportSummary } from './backup';
 import { exportSnapshot, importBackup } from './backup';
+import { TEXT_LIMITS, boundText } from '../domain/textLimits';
+import { boundFillUpText, boundPendingText, boundVehicleText } from './recordText';
 
 /**
  * Injected rather than read from globals, so tests are deterministic and a
@@ -69,9 +71,10 @@ export class FuelTrackerStore {
       updatedAt: now,
       deletedAt: null,
       schemaVersion: SCHEMA_VERSION,
-      name: vehicle.name,
-      make: vehicle.make ?? '',
-      model: vehicle.model ?? '',
+      // Bounded like a fill-up's text is at the draft gate (#50).
+      name: boundText(vehicle.name, TEXT_LIMITS.name),
+      make: boundText(vehicle.make ?? '', TEXT_LIMITS.make),
+      model: boundText(vehicle.model ?? '', TEXT_LIMITS.model),
       year: vehicle.year ?? new Date(now).getFullYear(),
       createdAt: now,
     };
@@ -175,7 +178,7 @@ export class FuelTrackerStore {
       schemaVersion: SCHEMA_VERSION,
       vehicleId,
       submittedAt: now,
-      submitterName,
+      submitterName: boundText(submitterName, TEXT_LIMITS.submitterName),
       date: draft.date.getTime(),
       odometer: draft.odometer,
       gallons: draft.gallons,
@@ -284,6 +287,41 @@ export class FuelTrackerStore {
       fixed += 1;
     }
     return fixed;
+  }
+
+  // MARK: Repairing text stored before it was bounded
+
+  /**
+   * Shortens live rows whose text is longer than the account accepts, and
+   * reports how many it changed (#50).
+   *
+   * Every door bounds text now, but rows saved before that are on disk, and
+   * each one fails the whole upload batch on every sync. Rewriting a row
+   * moves its `updatedAt`, so the repaired version is what gets pushed.
+   *
+   * Called by sync before it builds a push. Idempotent: a row that fits is
+   * left alone, so after the first repair this rewrites nothing.
+   */
+  async repairOversizedText(): Promise<number> {
+    return (
+      (await this.repair(this.repos.vehicles, boundVehicleText)) +
+      (await this.repair(this.repos.fillUps, boundFillUpText)) +
+      (await this.repair(this.repos.pendingFillUps, boundPendingText))
+    );
+  }
+
+  private async repair<T extends SyncFields>(
+    repo: Repository<T>,
+    bound: (row: T) => T,
+  ): Promise<number> {
+    let repaired = 0;
+    for (const row of await repo.list()) {
+      const bounded = bound(row);
+      if (bounded === row) continue;
+      await repo.put({ ...bounded, updatedAt: this.clock.now() });
+      repaired += 1;
+    }
+    return repaired;
   }
 
   // MARK: Backup

@@ -7,6 +7,7 @@ import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/r
 import { FuelTrackerStore } from '../data/store';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { App } from './App';
+import { TEXT_LIMITS } from '../domain/textLimits';
 
 function makeStore(): FuelTrackerStore {
   return new FuelTrackerStore({
@@ -254,5 +255,25 @@ describe('the dashboard', () => {
     }, 'dashboard');
 
     expect(await screen.findByText(/looks like a fill-up went unlogged/i)).toBeInTheDocument();
+  });
+});
+
+describe('text fields stop at what the account accepts (#50)', () => {
+  test('station and notes carry the shared limits, so nobody can type past them', async () => {
+    const user = userEvent.setup();
+    await setUp();
+    await user.click(await screen.findByRole('button', { name: /log a fill-up/i }));
+
+    expect(screen.getByLabelText(/gas station/i)).toHaveAttribute('maxLength', String(TEXT_LIMITS.station));
+    expect(screen.getByLabelText(/notes/i)).toHaveAttribute('maxLength', String(TEXT_LIMITS.notes));
+  });
+
+  test('the vehicle form carries them too', async () => {
+    localStorage.setItem('fueltracker.hasOnboarded', 'true');
+    render(<App store={makeStore()} initialTab="vehicles" />);
+
+    expect(await screen.findByLabelText('Name')).toHaveAttribute('maxLength', String(TEXT_LIMITS.name));
+    expect(screen.getByLabelText('Make')).toHaveAttribute('maxLength', String(TEXT_LIMITS.make));
+    expect(screen.getByLabelText('Model')).toHaveAttribute('maxLength', String(TEXT_LIMITS.model));
   });
 });

@@ -15,6 +15,7 @@
 import type { BackupSnapshot } from '../domain/backupFormat';
 import type { SyncFields } from './records';
 import { isStorableId } from './recordId';
+import { textProblem } from './recordText';
 
 export interface PushSummary {
   /** Documents written. */
@@ -126,6 +127,12 @@ export class InMemoryRemoteStore implements RemoteStore {
  * that at every door, but a row stored before that cannot be allowed to hold
  * an account hostage.
  *
+ * The same holds for anything else the rules would refuse a row for (#50): a
+ * vehicle id the account cannot store, or text over its limit. Text is bounded
+ * at every door and repaired before a push, so this should find nothing —
+ * it is the backstop that keeps one row from costing the whole upload if
+ * something ever slips past.
+ *
  * Declining to send a row is as far as this goes. The row stays in local
  * storage: refusing to upload somebody's data is not a licence to delete it,
  * and `SyncOutcome.unsendable` is how they get told instead.
@@ -136,7 +143,10 @@ export function sendableRows<T extends SyncFields>(
 ): T[] {
   const sendable: T[] = [];
   for (const row of rows) {
-    if (isStorableId(row.id)) sendable.push(row);
+    const vehicleId = (row as { readonly vehicleId?: unknown }).vehicleId;
+    const addressable =
+      isStorableId(row.id) && (vehicleId === undefined || isStorableId(vehicleId));
+    if (addressable && textProblem(row) === null) sendable.push(row);
     else unsendable.push(row.id);
   }
   return sendable;
