@@ -83,6 +83,8 @@ Recorded so a regression in the tests themselves is visible:
 | Sync: unstamped read leaving the mark null / full read not rebuilding `known` / clock observing only pulled rows | 1 / 1 / 1 |
 | Sync: cursor version ignored / no weekly reconcile / full reads timed by the merge clock / junk cursor accepted | 1 / 1 / 1 / 1 |
 | Sync timing: focus not throttled / saves not coalesced / a save mid-sync dropped / App not syncing after a save | 2 / 1 / 2 / 1 |
+| One decoder: file vehicles / fill-ups / submissions bypassing it / CSV refusals unreported | 5 / 12 / 2 / 3 |
+| One decoder: file receipts unbounded / dropped / a string flag read as true / garbled `deletedAt` accepted / domain importing data | 1 / 4 / 1 / 1 / 1 |
 | Sync (emulator): rules accepting any `syncedAt` / push unstamped / records carrying it / remote ignoring the cursor | 1 / 4 / 1 / 2 |
 | Date window: segments not windowed / boundary exclusive / invalid date as a window | 4 / 6 / 1 |
 | Date window: no anchor / anchor without odometer guard / cost per mile ignoring it / intervals ignoring it / suspect norm from the window | 1 / 1 / 1 / 1 / 1 |

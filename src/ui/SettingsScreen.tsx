@@ -5,7 +5,7 @@ import type { FuelTrackerStore } from '../data/store';
 import type { AuthUser } from '../data/auth';
 import type { SyncStatus } from './useSync';
 import { backupFilename } from '../data/backup';
-import { parseCsv, parseJsonBackup, toCsv } from '../domain/backupFormat';
+import { parseCsv, parseJsonBackup, toCsv } from '../data/backupFormat';
 import { downloadText } from './download';
 import { AccountId } from './AccountId';
 import { saveJsonBackup } from './exportBackup';

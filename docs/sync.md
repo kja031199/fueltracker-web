@@ -235,6 +235,23 @@ Rejections are counted and shown, never silently dropped. The two gates are
 distinct and tested separately: shape validation refuses anything **non-finite**,
 and the draft gate refuses anything **non-positive**.
 
+**One decoder for every door (#54).** A restored JSON backup and a CSV row go
+through exactly these functions too. Only the envelope differs: `backupFormat.ts`
+unwraps the file and turns a base64 receipt into bytes, bounded before
+decoding. Before this there were two decoders, and they disagreed. The file
+path took any length of text, read `isFullTank: "no"` as true, treated a garbled
+`deletedAt` as a live row (resurrecting a deletion), kept a 99999 model year,
+defaulted a missing `updatedAt` to zero, and silently dropped a submission with
+no vehicle. One of those differences was a way into the lockout fixed in #50.
+`recordParity.test.ts` sends each of those cases through both doors and requires
+the same result.
+
+Two consequences for a hand-edited file: a measurement that is not a number is
+refused with its reason, instead of being read as 0, and a row missing
+`updatedAt`, `createdAt` or `submittedAt` is refused instead of being defaulted.
+Every backup the app has ever written carries all of those fields, so only a
+hand edit is affected.
+
 One of those checks is about availability rather than correctness. **A record
 id is also a Firestore document name, and the two sets of legal strings are not
 the same.** `a/b` makes the SDK throw; `a/b/c` builds a path the rules never

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import type { FillUpRecord, VehicleRecord } from '../data/records';
-import { SCHEMA_VERSION } from '../data/records';
+import type { FillUpRecord, VehicleRecord } from './records';
+import { SCHEMA_VERSION } from './records';
 import {
   BACKUP_FORMAT_VERSION,
   CSV_COLUMNS,
@@ -191,15 +191,28 @@ describe('reading a hostile backup file', () => {
     expect(parseJsonBackup(file).value?.fillUps[0]?.fuelGrade).toBe('Other');
   });
 
-  test('nonsense measurements survive parsing and are left for the write gate', () => {
-    // Deliberate: the draft decides what is writable, and putting that rule
-    // here too would mean maintaining it in two places.
+  test('a measurement that is not a number is refused, and the reason says which', () => {
+    // Changed in #54. It used to read as 0 and be left for the write gate, while
+    // the same row from the account was refused here — two policies for one row.
+    // Now both doors use one decoder. The *range* rule (positive, finite) still
+    // belongs to the draft gate alone; this only refuses what is not a number.
     const file = JSON.stringify({
       format: 'fueltracker-backup',
       formatVersion: 1,
-      fillUps: [{ ...fillUp('f1'), gallons: 'lots' }],
+      fillUps: [{ ...fillUp('f1'), gallons: 'lots' }, fillUp('f2')],
     });
-    expect(parseJsonBackup(file).value?.fillUps[0]?.gallons).toBe(0);
+    const result = parseJsonBackup(file);
+    expect(result.value?.fillUps.map((row) => row.id)).toEqual(['f2']);
+    expect(result.skipped.join(' ')).toMatch(/f1: gallons is not a number/);
+  });
+
+  test('a negative measurement still reaches the write gate, which owns that rule', () => {
+    const file = JSON.stringify({
+      format: 'fueltracker-backup',
+      formatVersion: 1,
+      fillUps: [{ ...fillUp('f1'), gallons: -5 }],
+    });
+    expect(parseJsonBackup(file).value?.fillUps[0]?.gallons).toBe(-5);
   });
 });
 

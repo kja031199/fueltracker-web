@@ -18,12 +18,11 @@
 import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import type { FuelEntryStats } from '../domain/models';
-import type { FillUpRecord, PendingFillUpRecord, SyncFields, VehicleRecord } from './records';
+import type { FillUpRecord, PendingFillUpRecord, SyncFields, VehicleRecord, Snapshot } from './records';
 import { SCHEMA_VERSION } from './records';
 import type { Repository } from './repository';
 import type { Tombstoner } from './tombstone';
 import { isScrubbed, tombstoneFillUp, tombstonePending, tombstoneVehicle } from './tombstone';
-import type { BackupSnapshot } from '../domain/backupFormat';
 import type { ImportSummary } from './backup';
 import { exportSnapshot, importBackup } from './backup';
 import { TEXT_LIMITS, boundText } from '../domain/textLimits';
@@ -333,12 +332,12 @@ export class FuelTrackerStore {
    * out would give a caller a way to `put` a fill-up straight into storage,
    * which is precisely the door `addFillUp` exists to be the only one of.
    */
-  async exportSnapshot(): Promise<BackupSnapshot> {
+  async exportSnapshot(): Promise<Snapshot> {
     return exportSnapshot(this.repos);
   }
 
   /** Merges a parsed backup in. See `data/backup.ts` for the rules. */
-  async importBackup(snapshot: BackupSnapshot): Promise<ImportSummary> {
+  async importBackup(snapshot: Snapshot): Promise<ImportSummary> {
     return importBackup(this.repos, snapshot);
   }
 

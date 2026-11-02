@@ -12,8 +12,7 @@
  * and is the only file that imports `firebase/firestore`.
  */
 
-import type { BackupSnapshot } from '../domain/backupFormat';
-import type { SyncFields } from './records';
+import type { SyncFields, Snapshot } from './records';
 import { isStorableId } from './recordId';
 import { textProblem } from './recordText';
 
@@ -34,7 +33,7 @@ export interface PushSummary {
  * Typed as `unknown[]` on purpose. The account's contents may have been written
  * by a different build of this app, half-written, or edited by hand in the
  * Firebase console — so a remote implementation is not in a position to promise
- * that what it read is a `VehicleRecord`. Saying `BackupSnapshot` here would be
+ * that what it read is a `VehicleRecord`. Saying `Snapshot` here would be
  * the lie that lets an unchecked document reach the statistics layer, and
  * putting the honest type in the interface is what forces `syncOnce` to
  * validate it. Every implementation gets that for free, including future ones.
@@ -65,11 +64,11 @@ export interface RemoteStore {
    */
   pull(since?: PullCursor | null): Promise<RawSnapshot>;
   /** Writes these rows, replacing by id. */
-  push(snapshot: BackupSnapshot): Promise<PushSummary>;
+  push(snapshot: Snapshot): Promise<PushSummary>;
 }
 
 /** An empty snapshot, for a fresh account or a failed pull. */
-export function emptySnapshot(): BackupSnapshot {
+export function emptySnapshot(): Snapshot {
   return { vehicles: [], fillUps: [], pendingFillUps: [] };
 }
 
@@ -86,9 +85,9 @@ export function emptySnapshot(): BackupSnapshot {
  * exactly the real migration case.
  */
 export class InMemoryRemoteStore implements RemoteStore {
-  private readonly vehicles = new Map<string, BackupSnapshot['vehicles'][number]>();
-  private readonly fillUps = new Map<string, BackupSnapshot['fillUps'][number]>();
-  private readonly pendingFillUps = new Map<string, BackupSnapshot['pendingFillUps'][number]>();
+  private readonly vehicles = new Map<string, Snapshot['vehicles'][number]>();
+  private readonly fillUps = new Map<string, Snapshot['fillUps'][number]>();
+  private readonly pendingFillUps = new Map<string, Snapshot['pendingFillUps'][number]>();
   /** `collection/id` → the server time of the last push that wrote it. */
   private readonly stamps = new Map<string, number>();
   private serverTime = 0;
@@ -102,7 +101,7 @@ export class InMemoryRemoteStore implements RemoteStore {
   /** Every pull: the cursor it was given and how many rows it returned. */
   readonly pullLog: { readonly since: PullCursor | null; readonly rows: number }[] = [];
 
-  constructor(seed: BackupSnapshot = emptySnapshot()) {
+  constructor(seed: Snapshot = emptySnapshot()) {
     for (const row of seed.vehicles) this.vehicles.set(row.id, row);
     for (const row of seed.fillUps) this.fillUps.set(row.id, row);
     for (const row of seed.pendingFillUps) this.pendingFillUps.set(row.id, row);
@@ -129,7 +128,7 @@ export class InMemoryRemoteStore implements RemoteStore {
     };
   }
 
-  async push(snapshot: BackupSnapshot): Promise<PushSummary> {
+  async push(snapshot: Snapshot): Promise<PushSummary> {
     if (this.failPush) throw new Error('write refused');
     // One batch, one commit time — as a Firestore `writeBatch` stamps it.
     const at = ++this.serverTime;

@@ -54,8 +54,7 @@ import {
   writeBatch,
   type Firestore,
 } from 'firebase/firestore';
-import type { BackupSnapshot } from '../../domain/backupFormat';
-import type { FillUpRecord, PendingFillUpRecord } from '../records';
+import type { FillUpRecord, PendingFillUpRecord, Snapshot } from '../records';
 import type { Collection, PullCursor, PushSummary, RawSnapshot, RemoteStore } from '../remote';
 import { firebaseApp, type FirebaseSettings } from './config';
 
@@ -110,7 +109,7 @@ export class FirestoreRemoteStore implements RemoteStore {
   /**
    * Everything the account holds, **as documents rather than as records**.
    *
-   * The return type is deliberately `RawSnapshot` and not `BackupSnapshot`:
+   * The return type is deliberately `RawSnapshot` and not `Snapshot`:
    * what comes back is whatever is in the account, which may have been written
    * by a different build, half-written, or hand-edited in the console. Calling
    * it a typed record here would be the lie that lets it reach the statistics
@@ -134,7 +133,7 @@ export class FirestoreRemoteStore implements RemoteStore {
     };
   }
 
-  async push(snapshot: BackupSnapshot): Promise<PushSummary> {
+  async push(snapshot: Snapshot): Promise<PushSummary> {
     let receiptsOmitted = 0;
     const writes: { readonly path: Collection; readonly id: string; readonly data: object }[] = [];
 

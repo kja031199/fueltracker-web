@@ -88,6 +88,21 @@ export interface PendingFillUpRecord extends SyncFields {
 }
 
 /**
+ * Everything the store holds: every row of every collection, tombstones
+ * included. What `exportSnapshot` returns, what `importBackup` merges, what a
+ * sync pulls and pushes, and what a backup file wraps.
+ *
+ * Defined here, with the records, since #54. It was `BackupSnapshot` in
+ * `domain/backupFormat.ts`, which made the store's central type a property of
+ * a file format, and the domain layer and the data layer depend on each other.
+ */
+export interface Snapshot {
+  readonly vehicles: readonly VehicleRecord[];
+  readonly fillUps: readonly FillUpRecord[];
+  readonly pendingFillUps: readonly PendingFillUpRecord[];
+}
+
+/**
  * Total cost is always derived from gallons × price, never stored — the same
  * rule the domain layer follows. A stored total is a second source of truth
  * that can disagree with its own inputs.

@@ -9,7 +9,7 @@ import { validateSnapshot } from './recordValidation';
 import { isRefusal, partitionBySchema, preserveLocalReceipts, syncOnce } from './sync';
 import { InMemorySyncState } from './syncState';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
-import type { BackupSnapshot } from '../domain/backupFormat';
+import type { Snapshot } from './records';
 
 /**
  * A monotonic clock over a wall clock the test controls.
@@ -78,7 +78,7 @@ function fillUp(overrides: Partial<FillUpRecord> = {}): FillUpRecord {
   };
 }
 
-function snapshot(overrides: Partial<BackupSnapshot> = {}): BackupSnapshot {
+function snapshot(overrides: Partial<Snapshot> = {}): Snapshot {
   return { ...emptySnapshot(), ...overrides };
 }
 
@@ -90,7 +90,7 @@ function snapshot(overrides: Partial<BackupSnapshot> = {}): BackupSnapshot {
  * field have to validate first, same as the app does, which means these
  * assertions exercise the validator rather than bypassing it.
  */
-async function pulled(remote: InMemoryRemoteStore): Promise<BackupSnapshot> {
+async function pulled(remote: InMemoryRemoteStore): Promise<Snapshot> {
   return validateSnapshot(await remote.pull()).snapshot;
 }
 
@@ -354,7 +354,7 @@ describe('a local row the account cannot address', () => {
 
   /** Behaves like Firestore: it will not address a document named `a/b`. */
   class StrictRemoteStore extends InMemoryRemoteStore {
-    override async push(snapshot: BackupSnapshot): Promise<import('./remote').PushSummary> {
+    override async push(snapshot: Snapshot): Promise<import('./remote').PushSummary> {
       for (const row of [
         ...snapshot.vehicles,
         ...snapshot.fillUps,
@@ -780,7 +780,7 @@ describe('one over-long field does not stop the upload (#50)', () => {
    * wrong it was. `rulesLimits.test.ts` ties those numbers to the real rules.
    */
   class RulesLikeRemote extends InMemoryRemoteStore {
-    override async push(snapshot: BackupSnapshot): Promise<import('./remote').PushSummary> {
+    override async push(snapshot: Snapshot): Promise<import('./remote').PushSummary> {
       const tooLong = (value: string, max: number): boolean => value.length > max;
       const bad =
         snapshot.vehicles.some((row) => tooLong(row.name, 200) || tooLong(row.make, 200) || tooLong(row.model, 200)) ||
