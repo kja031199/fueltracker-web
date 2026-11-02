@@ -123,6 +123,11 @@ npm ci --prefix .github/firebase-cli
   actions. In *that* directory npm offers `firebase-tools@13.11.2` as the "fix"
   for ten of sixteen advisories — two majors backwards. See
   [docs/deploying.md](docs/deploying.md).
+- **gitleaks and lychee are verified against pinned SHA-256s** in `checks.yml`
+  (#46): bumping a `*_VERSION` means bumping its `*_SHA256`, taken from the
+  release's published checksums and confirmed against your own download, never
+  computed in CI. **Every checkout sets `persist-credentials: false`**; both are
+  enforced by `workflows.test.ts`.
 - **Do not run `npm audit fix`.** Assessed in #19: npm claims a fix for the
   production findings and there isn't one — `firebase` is already current, so
   the suggestion would downgrade it. None of the findings reaches a browser,

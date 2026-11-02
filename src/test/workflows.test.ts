@@ -159,3 +159,95 @@ describe('the deploy smoke test proves configuration was baked in', () => {
     expect(bundleCheck).toMatch(/grep -qF /);
   });
 });
+
+/**
+ * One workflow step per entry, split on the `- name:` / `- uses:` / `- run:`
+ * line that starts it.
+ *
+ * Deliberately crude: it reads YAML as lines, as the rest of this file does,
+ * rather than adding a YAML parser to the dev dependencies for one test. The
+ * guard-the-guard counts below are what catch it if the crudeness ever stops
+ * finding what it is looking for.
+ */
+function steps(): { workflow: string; text: string }[] {
+  return workflows().flatMap(({ name, text }) => {
+    const chunks: string[] = [];
+    let current: string[] | null = null;
+    for (const line of text.split('\n')) {
+      if (/^\s+- (name|uses|run):/.test(line)) {
+        if (current !== null) chunks.push(current.join('\n'));
+        current = [line];
+      } else if (/^\S/.test(line) || /^ {2}\S/.test(line) || /^ {4}[a-z-]+:/.test(line)) {
+        // A top-level key, a job id, or a job-level key such as `env:` ends the
+        // current step — otherwise the next job's env would be read as part of
+        // the previous job's last step.
+        if (current !== null) chunks.push(current.join('\n'));
+        current = null;
+      } else if (current !== null) {
+        current.push(line);
+      }
+    }
+    if (current !== null) chunks.push(current.join('\n'));
+    return chunks.map((chunk) => ({ workflow: name, text: chunk }));
+  });
+}
+
+/** Lines that run, not lines that explain. */
+function commands(text: string): string {
+  return text
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('#'))
+    .join('\n');
+}
+
+describe('downloaded binaries are verified before they run', () => {
+  // Issue #46. gitleaks and lychee were fetched by version and trusted as-is.
+  // A replaced release asset would turn a required check into a green tick
+  // that checks nothing — and the secret scan exists for exactly the day it
+  // is needed, on a public repository that has had a token pasted into it.
+  const downloads = steps().filter(({ text }) => /releases\/download/.test(commands(text)));
+
+  test('there are downloads to check, so a passing suite means something', () => {
+    expect(downloads.map(({ workflow }) => workflow)).toEqual(['checks.yml', 'checks.yml']);
+  });
+
+  test.each(downloads)('$workflow verifies a SHA-256 before extracting', ({ workflow, text }) => {
+    const run = commands(text);
+    const verify = run.search(/sha256sum (-c|--check)/);
+    // `tar` as a command — at the start of a line or after a pipe — not the
+    // `.tar.gz` in the file name, which appears first.
+    const extract = run.search(/(^|\|)\s*tar\s+-/m);
+    expect(verify, `${workflow}: no checksum verification`).toBeGreaterThan(-1);
+    expect(extract, `${workflow}: nothing extracted?`).toBeGreaterThan(-1);
+    // Order matters: verifying after extraction has already run the archive
+    // through tar, and a pipe straight into tar never sees the file at all.
+    expect(verify).toBeLessThan(extract);
+    expect(run).not.toMatch(/\|\s*tar\b/);
+  });
+
+  test.each(downloads)('$workflow checks against a pinned hash, not one it fetched', ({ workflow, text }) => {
+    // A checksum downloaded from the same place as the tarball proves only
+    // that the two were replaced together. The expected value has to live in
+    // this repository, where changing it is a reviewed diff.
+    const name = /\$\{?([A-Z0-9_]+_SHA256)\}?/.exec(commands(text))?.[1];
+    expect(name, `${workflow}: the check names no *_SHA256 variable`).toBeDefined();
+    const source = readFileSync(`${WORKFLOW_DIR}/${workflow}`, 'utf8');
+    expect(source).toMatch(new RegExp(`\\b${name}:\\s*[0-9a-f]{64}\\b`));
+  });
+});
+
+describe('checkout does not leave the token behind', () => {
+  // Issue #46. `persist-credentials` defaults to true: the GITHUB_TOKEN stays
+  // in `.git/config` for every later step, including `npm ci` runs that execute
+  // several hundred packages' lifecycle scripts. Nothing after checkout needs
+  // git authentication.
+  const checkouts = steps().filter(({ text }) => /uses:\s*actions\/checkout@/.test(text));
+
+  test('there are checkouts to check', () => {
+    expect(checkouts.length).toBeGreaterThanOrEqual(5);
+  });
+
+  test.each(checkouts)('$workflow sets persist-credentials: false', ({ text }) => {
+    expect(commands(text)).toMatch(/^\s+persist-credentials:\s*false\s*$/m);
+  });
+});

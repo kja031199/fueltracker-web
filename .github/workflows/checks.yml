@@ -22,6 +22,11 @@ jobs:
     timeout-minutes: 10
     env:
       GITLEAKS_VERSION: 8.24.3
+      # SHA-256 of gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz (#46). Bump it
+      # with the version: a different file should be a reviewed diff, never a
+      # silent one. Source: the release's gitleaks_<v>_checksums.txt, confirmed
+      # against a download.
+      GITLEAKS_SHA256: 9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c
     steps:
       # Full history, not the diff: a secret committed and then deleted in a
       # later commit is still leaked.
@@ -29,13 +34,19 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          # Nothing after checkout needs git auth; don't leave the token in
+          # .git/config for later steps (#46).
+          persist-credentials: false
 
       - name: Install gitleaks
         run: |
           set -euo pipefail
-          curl -sSfL \
-            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
-            | tar -xz gitleaks
+          tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL -o "$tarball" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/$tarball"
+          # Verified before extraction, so a mismatch fails the job here.
+          echo "${GITLEAKS_SHA256}  $tarball" | sha256sum --check --strict -
+          tar -xzf "$tarball" gitleaks
           chmod +x gitleaks
           ./gitleaks version
 
@@ -53,16 +64,28 @@ jobs:
     timeout-minutes: 10
     env:
       LYCHEE_VERSION: v0.15.1
+      # SHA-256 of lychee-${LYCHEE_VERSION}-x86_64-unknown-linux-gnu.tar.gz
+      # (#46). This release publishes no checksum, so the pin is the hash of two
+      # downloads made hours apart that agreed: it cannot prove the first file
+      # was genuine, but it does make any later change to it fail this job.
+      LYCHEE_SHA256: 9afdf0f48064fdcd8a8815ca6d2d9fcd43a0ef4c2edf9da23d6f7bf46a764eb8
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing after checkout needs git auth; keep the token out of
+          # .git/config, where `npm ci` lifecycle scripts could read it (#46).
+          persist-credentials: false
 
       - name: Install lychee
         run: |
           set -euo pipefail
-          curl -sSfL \
-            "https://github.com/lycheeverse/lychee/releases/download/${LYCHEE_VERSION}/lychee-${LYCHEE_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
-            | tar -xz lychee
+          tarball="lychee-${LYCHEE_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+          curl -sSfL -o "$tarball" \
+            "https://github.com/lycheeverse/lychee/releases/download/${LYCHEE_VERSION}/$tarball"
+          # Verified before extraction, so a mismatch fails the job here.
+          echo "${LYCHEE_SHA256}  $tarball" | sha256sum --check --strict -
+          tar -xzf "$tarball" lychee
           chmod +x lychee
           ./lychee --version
 
