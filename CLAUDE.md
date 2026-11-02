@@ -102,6 +102,34 @@ and requires it was never called, with a second test confirming the spy *does*
 see a legitimate decode — a spy on a name the code no longer calls would report
 "never decoded" forever and read exactly like a passing bound check.
 
+### The deploy toolchain is pinned — keep it that way
+
+`npx --yes firebase-tools` is gone from the workflows (#30). It resolved
+whatever was newest when the job ran and executed it next to the
+service-account key, in a tree no lockfile covered and Dependabot could not
+see. The CLI now lives in `.github/firebase-cli/` with an exact version and its
+own lockfile, and both the deploy job **and the rules job** install it with
+`npm ci` — so the version that holds the credential on merge is exercised by a
+required check first.
+
+`src/test/workflows.test.ts` enforces this inside the ordinary test run: every
+`uses:` must be a 40-character SHA with a readable version comment, no workflow
+may resolve `firebase-tools` at run time, the manifest must pin an exact
+version, every lockfile entry must carry an integrity hash, and the
+`dependabot.yml` entry must exist. A pin nothing checks comes undone the next
+time somebody adds a step in a hurry.
+
+Its own manifest rather than a devDependency: 622 packages that two jobs need
+should not be installed by every job, nor change what `npm audit` says about
+the tree that ships. And note the trap — in **that** directory npm offers
+`firebase-tools@13.11.2` as the fix for ten of its sixteen moderate advisories,
+which is two majors backwards from the pinned 15.34.2. Same shape as the
+finding in #19, different tree.
+
+Local ad-hoc use of `npx --yes firebase-tools` is still fine: no credential of
+this repository is involved and a human is watching. The pin is about the job
+that holds the key.
+
 ### Do not run `npm audit fix`, and know why
 
 Not superstition, and not "dependency updates are scary". Assessed in #19 and
@@ -127,10 +155,18 @@ Node 22, and the full suite executes in this environment — the Swift original
 could never run its tests here and everything deferred to CI. There is no
 excuse for an unverified assertion in this repo.
 
-The Firestore emulator also runs here: `npx --yes firebase-tools emulators:exec
---only firestore --project fueltracker-rules-test "npx vitest run
-src/data/firebase/rules.test.ts"`. Note `firebase-tools`, not `firebase` — the
-latter is the SDK and ships no binary.
+The Firestore emulator also runs here. Use the pinned CLI, which is what CI
+runs, so a rules result here and a rules result there mean the same thing:
+
+```bash
+npm ci --prefix .github/firebase-cli
+.github/firebase-cli/node_modules/.bin/firebase emulators:exec \
+  --only firestore --project fueltracker-rules-test \
+  "npx vitest run src/data/firebase/rules.test.ts"
+```
+
+`npx --yes firebase-tools emulators:exec …` still works for an ad-hoc run. Note
+`firebase-tools`, not `firebase` — the latter is the SDK and ships no binary.
 
 ## Hard invariants
 

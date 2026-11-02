@@ -460,6 +460,10 @@ npx --yes firebase-tools login
 npx --yes firebase-tools deploy --project <your-project-id>
 ```
 
+Those are the by-hand commands, and `npx` is fine for them: no credential of
+this repository's is involved, and a human is watching. CI uses a pinned copy
+instead — see *The deploy toolchain is pinned* below.
+
 Global installs land in a root-owned directory under a stock Node `.pkg`, which
 fails with `EACCES`. Don't reach for `sudo` — it runs package install scripts as
 root. Either use `npx` as above, or point npm somewhere you own:
@@ -505,6 +509,60 @@ hosting target, so `--only firestore:rules` stays fast and skips the build.
 The rules deploy is not optional. A database created in production mode denies
 everything until they are uploaded, so sign-in succeeds and then every read
 fails with permission-denied. `firebase deploy` with no `--only` covers both.
+
+#### The deploy toolchain is pinned
+
+CI does **not** use `npx --yes firebase-tools`. That resolved whatever version
+was newest at the moment the job ran, downloaded it with several hundred
+transitive dependencies, and executed it in a process holding the
+service-account key — and because it was not in any `package.json`, it was not
+in a lockfile either, so nothing verified it and Dependabot could not see it.
+The one dependency trusted with a credential was the only one with no version
+floor and no update review (#30).
+
+It now lives in `.github/firebase-cli/`, with its own `package.json` pinning an
+exact version and its own lockfile covering all 622 packages with integrity
+hashes. Both the deploy job and the **rules** job install it with `npm ci`, so
+the version that holds the credential on merge is exercised by a required check
+on every pull request first.
+
+Its own manifest rather than a devDependency of the app, deliberately: it is
+needed in two jobs, it would add 622 packages to an install that every other
+job performs, and it would change what `npm audit` reports about the tree that
+actually ships — which the assessment in #19 went to some trouble to pin down.
+
+What pinning does **not** do is make the tool's own tree clean. It has 16
+moderate advisories, and they were always there: `npx` installed the same tree
+and simply hid it. Worth knowing before reaching for `npm audit fix` in that
+directory, because the same trap #19 found in the app's tree is there too —
+npm offers **firebase-tools 13.11.2** as the "fix" for ten of the sixteen,
+which is two majors *backwards* from the pinned 15.34.2. It would report
+success while making the deploy tool older.
+
+The real mitigation for a credential sitting next to that much code is not to
+have a long-lived credential at all — see below.
+
+#### Workload Identity Federation, considered and deferred
+
+GitHub can mint a short-lived OIDC token per run and exchange it for Google
+credentials, which would remove the stored service-account key from this
+repository entirely. It is the right end state and it is **not** done here, for
+one reason: it needs setup on the Google side that no pull request can perform —
+a Workload Identity Pool and provider, plus bindings on the `github-deploy`
+service account restricted to this repository and branch. A half-configured
+auth change does not degrade, it takes the deploy down.
+
+One wrinkle worth planning for: the usual recipe uses
+`google-github-actions/auth`, which would put a third-party action in the
+credential path — the exact thing `deploy.yml` avoids today by writing the key
+itself with `printf`. The exchange is three HTTPS calls and can be hand-rolled
+with `curl` to keep that property.
+
+Until then the key is mitigated rather than removed: the `github-deploy`
+account holds only Hosting Admin, Rules Admin and Service Usage Consumer; it is
+written with `printf` so nothing in the JSON is interpreted; `rm -f` runs under
+`if: always()`; and the tests run **before** the key is written, so a compromised
+test dependency never sees it.
 
 Two formats, two jobs. The **JSON backup** is the complete one — every vehicle,
 every fill-up, receipt bytes, and the deletions too — and importing it **merges

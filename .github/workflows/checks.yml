@@ -26,7 +26,7 @@ jobs:
       # Full history, not the diff: a secret committed and then deleted in a
       # later commit is still leaked.
       - name: Check out
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -55,7 +55,7 @@ jobs:
       LYCHEE_VERSION: v0.15.1
     steps:
       - name: Check out
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install lychee
         run: |

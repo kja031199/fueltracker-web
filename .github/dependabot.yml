@@ -30,6 +30,18 @@ updates:
     commit-message:
       prefix: "deps"
 
+  # The Firebase CLI has its own manifest, so it needs its own entry — a pin
+  # with nothing proposing updates is the difference between pinned and frozen.
+  # Ungrouped and not batched: this is the dependency that holds the deploy
+  # credential, so its bump deserves to be read on its own.
+  - package-ecosystem: npm
+    directory: "/.github/firebase-cli"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "ci"
+
   - package-ecosystem: github-actions
     directory: "/"
     schedule:

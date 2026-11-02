@@ -30,10 +30,10 @@ jobs:
 
     steps:
       - name: Check out
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
@@ -77,10 +77,10 @@ jobs:
 
     steps:
       - name: Check out
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
@@ -88,11 +88,18 @@ jobs:
       - name: Install
         run: npm ci
 
+      # The same pinned CLI the deploy uses. Deliberately: this job runs on
+      # every pull request, so the version that holds the credential on merge
+      # is exercised here first — a broken pin fails a required check instead
+      # of a deploy.
+      - name: Install the pinned Firebase CLI
+        run: npm ci --prefix .github/firebase-cli
+
       # Java is preinstalled on ubuntu-latest. The emulator JAR is fetched on
       # first run, which takes a few seconds.
       - name: Test rules against the emulator
         run: >
-          npx --yes firebase-tools emulators:exec
+          .github/firebase-cli/node_modules/.bin/firebase emulators:exec
           --only firestore
           --project fueltracker-rules-test
           "npx vitest run src/data/firebase/rules.test.ts"

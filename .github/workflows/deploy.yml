@@ -45,16 +45,26 @@ jobs:
 
     steps:
       - name: Check out
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
 
       - name: Install
         run: npm ci
+
+      # The one dependency in this project that is trusted with a credential,
+      # and until #30 the only one with no version floor, no integrity hash and
+      # no update review: `npx --yes firebase-tools` resolved whatever was
+      # newest at the moment the job ran, then executed it in a process that
+      # can read the key written below. It has its own manifest and lockfile so
+      # `npm ci` verifies all 600-odd packages against recorded hashes, without
+      # putting any of them in the app's own tree.
+      - name: Install the pinned Firebase CLI
+        run: npm ci --prefix .github/firebase-cli
 
       # The trap this workflow exists to not fall into. Vite inlines VITE_* at
       # build time, so with these unset the build succeeds and produces a bundle
@@ -105,7 +115,7 @@ jobs:
       # A single `firebase deploy` does not promise this order.
       - name: Deploy security rules
         run: >
-          npx --yes firebase-tools deploy
+          .github/firebase-cli/node_modules/.bin/firebase deploy
           --only firestore:rules
           --project "$VITE_FIREBASE_PROJECT_ID"
           --non-interactive
@@ -115,7 +125,7 @@ jobs:
       # hook is what stops a *manual* deploy shipping a stale dist/.
       - name: Deploy hosting
         run: >
-          npx --yes firebase-tools deploy
+          .github/firebase-cli/node_modules/.bin/firebase deploy
           --only hosting
           --project "$VITE_FIREBASE_PROJECT_ID"
           --non-interactive
