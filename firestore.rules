@@ -61,7 +61,8 @@ service cloud.firestore {
       // `README.md` has the steps.
       function allowed() {
         return request.auth != null && request.auth.uid in [
-          'Vz0Y9I7XU0TX6L1yvfzw8BJnIfG2'
+          'Vz0Y9I7XU0TX6L1yvfzw8BJnIfG2',
+          'h2VnTaHnwnWWF4gtPvXTQcJcGAC2'
         ];
       }
 

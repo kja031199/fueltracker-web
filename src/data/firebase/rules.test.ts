@@ -79,6 +79,9 @@ const OWNER = ALLOWED[0] ?? 'nobody-is-allowed';
  */
 const STRANGER = 'uid-that-is-not-on-the-allowlist';
 
+/** A second allowed account, when the deployment has one. */
+const SECOND = ALLOWED[1];
+
 describeWithEmulator('firestore.rules', () => {
   let env: RulesTestEnvironment;
 
@@ -175,6 +178,38 @@ describeWithEmulator('firestore.rules', () => {
           createdAt: 1,
         }),
       );
+    });
+
+    // Runs only when the deployment allows more than one account. With a single
+    // entry there is no second allowed identity to test against, and the
+    // uid-shaped-path test above covers the scoping question in that case.
+    it.runIf(SECOND !== undefined)(
+      'keeps two allowed accounts out of each other\'s data',
+      async () => {
+        // The strongest form of the scoping assertion, and only possible with
+        // two entries: both parties are through the door, so the allowlist
+        // cannot be what refuses this — only `request.auth.uid == uid` can.
+        const db = env.authenticatedContext(SECOND!).firestore();
+        await assertFails(getDoc(doc(db, `users/${OWNER}/fillUps/f1`)));
+        await assertFails(
+          setDoc(doc(db, `users/${OWNER}/vehicles/v1`), {
+            id: 'v1',
+            updatedAt: 1,
+            deletedAt: null,
+            schemaVersion: 1,
+            name: 'Not yours',
+            make: '',
+            model: '',
+            year: 2020,
+            createdAt: 1,
+          }),
+        );
+      },
+    );
+
+    it.runIf(SECOND !== undefined)('lets the second allowed account use its own tree', async () => {
+      const db = env.authenticatedContext(SECOND!).firestore();
+      await assertSucceeds(getDoc(doc(db, `users/${SECOND}/fillUps/f1`)));
     });
 
     it('is not empty, or nobody can use the deployment at all', async () => {

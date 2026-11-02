@@ -163,6 +163,11 @@ So `firestore.rules` now carries an **allowlist of uids**, and every read and
 write is gated on it as well as on owning the path. An account that is not on
 the list is refused everywhere, including in its own tree.
 
+Being on the list grants **a tree of your own, not a look at anybody else's**.
+Two allowed accounts are as separate as an allowed account and a stranger: the
+same `request.auth.uid == uid` check scopes both. The rules suite asserts that
+directly whenever the list holds more than one entry.
+
 Uids rather than email addresses, for three reasons:
 
 - A uid is opaque, so a public repository stays free of anybody's personal
