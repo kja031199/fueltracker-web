@@ -516,6 +516,19 @@ whatever units you have selected, with the unit named in every column heading �
 because a file whose meaning depends on a setting that is not in the file is a
 file you will misread a year from now.
 
+A CSV cell is escaped for **two different readers**, and they want different
+things. RFC 4180 quoting is what makes the file parse; it does nothing about
+what a spreadsheet *executes*. Excel, LibreOffice and Google Sheets all treat a
+cell starting with `=`, `+`, `-`, `@`, a tab or a carriage return as a formula,
+and quoting does not help — `"=1+1"` is still evaluated. So a cell like that is
+written with a leading apostrophe, which spreadsheets read as "this is text"
+and do not show. It matters because not all of this text is self-authored: a
+station name can come from OCR'd receipt text, from an imported file, or (once
+the shareable link lands) from somebody else entirely. The guard escapes itself
+and the importer removes exactly one apostrophe again, so an export and a
+re-import still agree — an escape that is not reversible would corrupt data,
+which is a worse bug than the one it prevents.
+
 Imported fill-ups go through the same validated draft as anything typed in. An
 import file is a new input source and an untrusted one — hand-edited, written by
 another app, or truncated — so a row with impossible numbers is rejected and
