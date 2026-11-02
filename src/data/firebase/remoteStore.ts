@@ -43,16 +43,20 @@
 
 import {
   Bytes,
+  Timestamp,
   collection,
   doc,
-  getDocs,
+  getDocsFromServer,
   getFirestore,
+  query,
+  serverTimestamp,
+  where,
   writeBatch,
   type Firestore,
 } from 'firebase/firestore';
 import type { BackupSnapshot } from '../../domain/backupFormat';
 import type { FillUpRecord, PendingFillUpRecord } from '../records';
-import type { PushSummary, RawSnapshot, RemoteStore } from '../remote';
+import type { Collection, PullCursor, PushSummary, RawSnapshot, RemoteStore } from '../remote';
 import { firebaseApp, type FirebaseSettings } from './config';
 
 /**
@@ -64,7 +68,25 @@ export const MAX_SYNCED_RECEIPT_BYTES = 700 * 1024;
 /** Firestore's batch limit. Larger histories are written in several batches. */
 const BATCH_LIMIT = 500;
 
-type Collection = 'vehicles' | 'fillUps' | 'pendingFillUps';
+/**
+ * A stamp as an exact integer count of microseconds, and back.
+ *
+ * Firestore keeps timestamps to the microsecond, so this is lossless — and it
+ * has to be. The first version stored milliseconds as a float and read from a
+ * millisecond below the cursor to be safe about rounding; against the emulator
+ * that re-downloaded the newest document of every collection on every sync,
+ * receipt and all, for ever. Exact integers compare exactly, so `>` the
+ * cursor returns precisely what is new. About 1.8 × 10^15 today: well inside
+ * `Number.MAX_SAFE_INTEGER`.
+ */
+function toMicros(stamp: Timestamp): number {
+  return stamp.seconds * 1_000_000 + Math.floor(stamp.nanoseconds / 1_000);
+}
+
+function fromMicros(micros: number): Timestamp {
+  const seconds = Math.floor(micros / 1_000_000);
+  return new Timestamp(seconds, (micros - seconds * 1_000_000) * 1_000);
+}
 
 export class FirestoreRemoteStore implements RemoteStore {
   private readonly db: Firestore;
@@ -72,8 +94,17 @@ export class FirestoreRemoteStore implements RemoteStore {
   constructor(
     settings: FirebaseSettings,
     private readonly uid: string,
+    db?: Firestore,
   ) {
-    this.db = getFirestore(firebaseApp(settings));
+    this.db = db ?? getFirestore(firebaseApp(settings));
+  }
+
+  /**
+   * Over a Firestore instance that already exists — the emulator's, in
+   * `rules.test.ts`, so the real push and pull run against the real rules.
+   */
+  static over(db: Firestore, uid: string): FirestoreRemoteStore {
+    return new FirestoreRemoteStore({ apiKey: '', authDomain: '', projectId: '', appId: '' }, uid, db);
   }
 
   /**
@@ -85,13 +116,22 @@ export class FirestoreRemoteStore implements RemoteStore {
    * it a typed record here would be the lie that lets it reach the statistics
    * layer unchecked. `syncOnce` validates it — see `recordValidation.ts`.
    */
-  async pull(): Promise<RawSnapshot> {
+  async pull(since: PullCursor | null = null): Promise<RawSnapshot> {
     const [vehicles, fillUps, pendingFillUps] = await Promise.all([
-      this.read('vehicles'),
-      this.read('fillUps'),
-      this.read('pendingFillUps'),
+      this.read('vehicles', since?.vehicles ?? null),
+      this.read('fillUps', since?.fillUps ?? null),
+      this.read('pendingFillUps', since?.pendingFillUps ?? null),
     ]);
-    return { vehicles, fillUps, pendingFillUps };
+    return {
+      vehicles: vehicles.rows,
+      fillUps: fillUps.rows,
+      pendingFillUps: pendingFillUps.rows,
+      highWater: {
+        vehicles: vehicles.highWater,
+        fillUps: fillUps.highWater,
+        pendingFillUps: pendingFillUps.highWater,
+      },
+    };
   }
 
   async push(snapshot: BackupSnapshot): Promise<PushSummary> {
@@ -101,6 +141,10 @@ export class FirestoreRemoteStore implements RemoteStore {
     for (const row of snapshot.vehicles) {
       writes.push({ path: 'vehicles', id: row.id, data: { ...row } });
     }
+    // Every document is stamped with the server's commit time (#52), and the
+    // rules refuse one that is not — that stamp is what an incremental read
+    // asks for. A client-chosen time could sit below another device's cursor
+    // and never be read, so it is the server's or nothing.
     for (const row of snapshot.fillUps) {
       const { data, omitted } = this.encodeReceipt(row);
       if (omitted) receiptsOmitted += 1;
@@ -115,7 +159,10 @@ export class FirestoreRemoteStore implements RemoteStore {
     for (let start = 0; start < writes.length; start += BATCH_LIMIT) {
       const batch = writeBatch(this.db);
       for (const write of writes.slice(start, start + BATCH_LIMIT)) {
-        batch.set(doc(this.db, 'users', this.uid, write.path, write.id), write.data);
+        batch.set(doc(this.db, 'users', this.uid, write.path, write.id), {
+          ...write.data,
+          syncedAt: serverTimestamp(),
+        });
       }
       await batch.commit();
     }
@@ -123,10 +170,36 @@ export class FirestoreRemoteStore implements RemoteStore {
     return { written: writes.length, receiptsOmitted };
   }
 
-  /** Raw documents, with only the receipt bytes converted. */
-  private async read(path: Collection): Promise<Record<string, unknown>[]> {
-    const snapshot = await getDocs(collection(this.db, 'users', this.uid, path));
-    return snapshot.docs.map((document) => decode(document.data()));
+  /**
+   * Raw documents, with only the receipt bytes converted, and the newest stamp
+   * among them.
+   *
+   * Every document when `since` is `null`; otherwise only those stamped after
+   * it. A document with no stamp predates #52 and is only ever returned by a
+   * full read — which every device does first, so none is missed.
+   *
+   * **From the server, never the cache.** The cursor claims "everything up to
+   * here has been seen", and a cached result cannot back that claim; offline,
+   * this fails, which sync reports as unreachable.
+   */
+  private async read(
+    path: Collection,
+    since: number | null,
+  ): Promise<{ rows: Record<string, unknown>[]; highWater: number | null }> {
+    const all = collection(this.db, 'users', this.uid, path);
+    const target =
+      since === null
+        ? all
+        : query(all, where('syncedAt', '>', fromMicros(since)));
+    const snapshot = await getDocsFromServer(target);
+    let highWater: number | null = null;
+    const rows = snapshot.docs.map((document) => {
+      const data = document.data();
+      const stamp = data['syncedAt'];
+      if (stamp instanceof Timestamp) highWater = Math.max(highWater ?? 0, toMicros(stamp));
+      return decode(data);
+    });
+    return { rows, highWater };
   }
 
   private encodeReceipt(
@@ -153,9 +226,12 @@ export class FirestoreRemoteStore implements RemoteStore {
  * the place where validation is assumed to have happened.
  */
 function decode(data: Record<string, unknown>): Record<string, unknown> {
-  const receipt = data.receiptImageData;
+  // The stamp is the remote's bookkeeping, not part of a record: it is read
+  // above for the cursor and dropped here, so no record ever carries it.
+  const { syncedAt: _stamp, ...rest } = data;
+  const receipt = rest.receiptImageData;
   return {
-    ...data,
+    ...rest,
     receiptImageData: receipt instanceof Bytes ? receipt.toUint8Array() : null,
   };
 }

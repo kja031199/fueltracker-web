@@ -43,11 +43,27 @@ export interface RawSnapshot {
   readonly vehicles: readonly unknown[];
   readonly fillUps: readonly unknown[];
   readonly pendingFillUps: readonly unknown[];
+  /**
+   * Per collection, the newest server stamp among the documents just read —
+   * the cursor for the next incremental read (#52). `null` for a collection
+   * whose documents carried no stamp. Absent from a remote that does not stamp
+   * at all, which sync then reads in full every time, as before.
+   */
+  readonly highWater?: PullCursor;
 }
 
+export type Collection = 'vehicles' | 'fillUps' | 'pendingFillUps';
+
+/** Per collection: read only documents stamped after this, or all of them when `null`. */
+export type PullCursor = Readonly<Record<Collection, number | null>>;
+
 export interface RemoteStore {
-  /** Everything the account holds, tombstones included and unvalidated. */
-  pull(): Promise<RawSnapshot>;
+  /**
+   * What the account holds, tombstones included and unvalidated: everything
+   * when `since` is absent or `null`, otherwise only the documents each
+   * collection has had stamped since its mark (#52).
+   */
+  pull(since?: PullCursor | null): Promise<RawSnapshot>;
   /** Writes these rows, replacing by id. */
   push(snapshot: BackupSnapshot): Promise<PushSummary>;
 }
@@ -62,11 +78,20 @@ export function emptySnapshot(): BackupSnapshot {
  *
  * Replaces by id and keeps tombstones, exactly as Firestore does, so a test
  * that pushes then pulls sees what the real thing would return.
+ *
+ * It also stamps like Firestore (#52): every pushed row gets a server time,
+ * strictly increasing per push, and a pull with a cursor returns only rows
+ * stamped after it. A **seeded** row has no stamp — it stands for a document
+ * written before stamps existed — so only a full read returns it, which is
+ * exactly the real migration case.
  */
 export class InMemoryRemoteStore implements RemoteStore {
   private readonly vehicles = new Map<string, BackupSnapshot['vehicles'][number]>();
   private readonly fillUps = new Map<string, BackupSnapshot['fillUps'][number]>();
   private readonly pendingFillUps = new Map<string, BackupSnapshot['pendingFillUps'][number]>();
+  /** `collection/id` → the server time of the last push that wrote it. */
+  private readonly stamps = new Map<string, number>();
+  private serverTime = 0;
 
   /** Set to make `pull()` reject, standing in for being offline. */
   failPull = false;
@@ -74,6 +99,8 @@ export class InMemoryRemoteStore implements RemoteStore {
   failPush = false;
   /** Bound above which a receipt is dropped, mirroring the document cap. */
   receiptByteLimit = Number.POSITIVE_INFINITY;
+  /** Every pull: the cursor it was given and how many rows it returned. */
+  readonly pullLog: { readonly since: PullCursor | null; readonly rows: number }[] = [];
 
   constructor(seed: BackupSnapshot = emptySnapshot()) {
     for (const row of seed.vehicles) this.vehicles.set(row.id, row);
@@ -81,21 +108,36 @@ export class InMemoryRemoteStore implements RemoteStore {
     for (const row of seed.pendingFillUps) this.pendingFillUps.set(row.id, row);
   }
 
-  async pull(): Promise<RawSnapshot> {
+  async pull(since: PullCursor | null = null): Promise<RawSnapshot> {
     if (this.failPull) throw new Error('offline');
+    const vehicles = this.read('vehicles', this.vehicles, since);
+    const fillUps = this.read('fillUps', this.fillUps, since);
+    const pendingFillUps = this.read('pendingFillUps', this.pendingFillUps, since);
+    this.pullLog.push({
+      since,
+      rows: vehicles.rows.length + fillUps.rows.length + pendingFillUps.rows.length,
+    });
     return {
-      vehicles: [...this.vehicles.values()],
-      fillUps: [...this.fillUps.values()],
-      pendingFillUps: [...this.pendingFillUps.values()],
+      vehicles: vehicles.rows,
+      fillUps: fillUps.rows,
+      pendingFillUps: pendingFillUps.rows,
+      highWater: {
+        vehicles: vehicles.highWater,
+        fillUps: fillUps.highWater,
+        pendingFillUps: pendingFillUps.highWater,
+      },
     };
   }
 
   async push(snapshot: BackupSnapshot): Promise<PushSummary> {
     if (this.failPush) throw new Error('write refused');
+    // One batch, one commit time — as a Firestore `writeBatch` stamps it.
+    const at = ++this.serverTime;
     let written = 0;
     let receiptsOmitted = 0;
     for (const row of snapshot.vehicles) {
       this.vehicles.set(row.id, row);
+      this.stamps.set(`vehicles/${row.id}`, at);
       written += 1;
     }
     for (const row of snapshot.fillUps) {
@@ -106,13 +148,38 @@ export class InMemoryRemoteStore implements RemoteStore {
       } else {
         this.fillUps.set(row.id, row);
       }
+      this.stamps.set(`fillUps/${row.id}`, at);
       written += 1;
     }
     for (const row of snapshot.pendingFillUps) {
       this.pendingFillUps.set(row.id, row);
+      this.stamps.set(`pendingFillUps/${row.id}`, at);
       written += 1;
     }
     return { written, receiptsOmitted };
+  }
+
+  /** Deletes a document outright, as a hand edit in the console would. */
+  forget(collection: Collection, id: string): void {
+    this[collection].delete(id);
+    this.stamps.delete(`${collection}/${id}`);
+  }
+
+  private read<T extends SyncFields>(
+    name: Collection,
+    rows: Map<string, T>,
+    since: PullCursor | null,
+  ): { rows: T[]; highWater: number | null } {
+    const mark = since === null ? null : since[name];
+    let highWater: number | null = null;
+    const out: T[] = [];
+    for (const row of rows.values()) {
+      const stamp = this.stamps.get(`${name}/${row.id}`);
+      if (mark !== null && (stamp === undefined || stamp <= mark)) continue;
+      out.push(row);
+      if (stamp !== undefined) highWater = Math.max(highWater ?? stamp, stamp);
+    }
+    return { rows: out, highWater };
   }
 }
 

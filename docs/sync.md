@@ -36,9 +36,9 @@ reconciliation:
 
 | Step | What runs |
 |---|---|
-| Pull | `importBackup`, the same function a restored file goes through |
+| Pull | Only what changed since the last sync (see below), then `importBackup`, the same function a restored file goes through |
 | Merge | `shouldReplace` — last-write-wins on `updatedAt` |
-| Push | `exportSnapshot`, then only the rows the account holds an older copy of |
+| Push | `exportSnapshot`, then only the rows newer than the version the account is known to hold |
 
 That reuse was planned from the first commit: every stored row has carried
 `id`, `updatedAt`, `deletedAt` and `schemaVersion` since before anything read
@@ -123,11 +123,71 @@ somebody typing into a log that can never sync. An unreachable account changes
 nothing — that is the ordinary condition of an offline-first app, and the local
 copy keeps working.
 
-Sync runs on sign-in, on window focus, and on demand from Settings. There is no
-realtime listener and no sync-per-keystroke — the free tier allows 20,000 writes
-a day, which is enormous for one person's fuel log right up until something
-syncs in a loop, and an app that stops working at 4pm because it burned its
-quota is a worse failure than one that is a few seconds stale.
+### When sync runs, and what one costs
+
+Sync runs on sign-in, **shortly after every save or import**, on window focus
+**at most once a minute**, and on demand from Settings (#52;
+`src/ui/syncScheduler.ts`). Saves in quick succession share one sync, and a
+save made while a sync is running gets another one straight afterwards.
+
+Before #52 a save waited for the next focus. If the browser's storage was
+cleared first, the change never reached the account at all, which is the one
+loss the account exists to prevent. And every focus was a full read.
+
+There is still no realtime listener. The free tier allows 20,000 writes a day,
+which is enormous for one person's fuel log right up until something syncs in a
+loop. An app that stops working at 4pm because it burned its quota is a worse
+failure than one that is a few seconds stale.
+
+**A sync reads only what changed.** Every sync used to `getDocs` all three
+collections, and receipts ride inside fill-up documents (see below). So 100
+receipts were 20–50 MB per focus, against a free allowance of 10 GiB of egress
+a month. Now:
+
+- **Every upload carries a server stamp**, `syncedAt: serverTimestamp()`, and
+  `firestore.rules` refuses a write without one, or with one the client chose
+  (`syncedAt == request.time`). Strict on purpose: a write without it would be
+  invisible to every incremental read, on every other device, for good.
+- **Each collection keeps its own cursor**, the newest stamp it has read, and a
+  sync asks for `syncedAt > cursor`. Per collection, because the three
+  collections are three reads at three moments. One shared cursor could skip a
+  write that landed in one collection between two of the reads.
+- **The cursor is exact.** It is stored as integer microseconds, Firestore's
+  own precision. The first version kept float milliseconds and re-read a
+  millisecond below the cursor to be safe about rounding. Against the emulator,
+  that re-downloaded the newest document of every collection on every sync,
+  receipt and all.
+- **Reads come from the server, never the cache** (`getDocsFromServer`). The
+  cursor claims "everything up to here has been seen", and a cached result
+  cannot back that claim.
+- **What to upload** comes from the versions this device knows the account
+  holds (`known`, kept with the cursor), since the whole remote snapshot is no
+  longer in hand. Nothing is recorded about a push itself. The next pull
+  returns the server's echo of it, and that is when its version becomes known,
+  so a half-failed push is never mistaken for one that landed.
+- **The merge clock's floor is rebuilt from everything known**, not only from
+  what was just pulled (see the next section). Otherwise a reloaded device
+  would forget a fast device's timestamps.
+- **A full read still happens**: the first time on each device, after a build
+  whose `SYNC_CURSOR_VERSION` or `SCHEMA_VERSION` differs, and **weekly** as a
+  safety net for anything an incremental read cannot see, such as a document
+  deleted in the console. That week is measured on the wall clock, not the merge
+  clock. The merge clock jumps ahead after seeing a fast device's rows, so a
+  reloaded device thought its last full read was in the future and read in full
+  every time. Mutation testing caught that.
+
+**The cursor lives in the account's own IndexedDB database**
+(`DexieSyncState`, Dexie schema version 2). It claims "this device holds
+everything up to here", which is only true while those rows are on disk.
+Anywhere that could outlive them, `localStorage` included, a cleared database
+would be followed by a read that never fetches them again.
+
+**Deploying it:** the rules change is in the same pull request and deploys
+before hosting, as every rules change does. A copy of the app still running old
+code (an installed PWA that hasn't taken its update) has its uploads refused
+until it updates. Its changes stay on its device and go up afterwards. Copies
+from before #58 report that refusal as no access, so after this deploy, reload
+or reopen any installed copy.
 
 ### A wrong clock cannot eat your edits
 
@@ -224,7 +284,7 @@ One consequence worth knowing before adding a field: the rules use `hasOnly`, so
 an unknown field is refused. **New fields must be deployed to the rules before a
 build that writes them** — change both in the same pull request.
 
-The rules suite is 34 assertions against the emulator, including the positive
+The rules suite is 40 assertions against the emulator, including the positive
 cases built from records the app itself produces rather than hand-written
 literals, which is what stops the rules and the schema drifting apart. It has
 been mutation-tested twice: with the shape checks removed 13 assertions fail,

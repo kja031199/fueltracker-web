@@ -7,6 +7,8 @@ import { MonotonicClock } from './syncClock';
 import { SCHEMA_VERSION, type FillUpRecord, type VehicleRecord } from './records';
 import { validateSnapshot } from './recordValidation';
 import { isRefusal, partitionBySchema, preserveLocalReceipts, syncOnce } from './sync';
+import { InMemorySyncState } from './syncState';
+import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import type { BackupSnapshot } from '../domain/backupFormat';
 
 /**
@@ -884,5 +886,274 @@ describe('the last check before a push (#50)', () => {
     const sent = sendableRows([fillUp({ id: 'edge', station: 's'.repeat(200) })], unsendable);
     expect(sent).toHaveLength(1);
     expect(unsendable).toEqual([]);
+  });
+});
+
+describe('incremental pull (#52)', () => {
+  /**
+   * Every sync used to read the entire account — every document, every receipt
+   * photo — on every window focus. Now each upload is stamped by the server
+   * (`syncedAt`), and a sync asks only for what changed since the newest stamp
+   * it has seen, per collection. `InMemoryRemoteStore` simulates the stamps:
+   * a seeded row has none (it predates the change), a pushed row gets one.
+   */
+  it('the first sync reads everything, including rows written before stamps existed', async () => {
+    const remote = new InMemoryRemoteStore(snapshot({ vehicles: [vehicle()], fillUps: [fillUp()] }));
+    const { store, clock } = storeWith();
+    const state = new InMemorySyncState();
+
+    const result = await syncOnce(store, remote, clock, state);
+
+    if (!result.ok) throw new Error(result.reason);
+    expect(remote.pullLog[0]?.since).toBeNull();
+    expect((await store.exportSnapshot()).fillUps.map((row) => row.id)).toEqual(['f1']);
+  });
+
+  it('a steady-state sync downloads nothing at all', async () => {
+    // The acceptance criterion: with nothing changed anywhere, no rows — and so
+    // no receipt bytes — cross the wire. The second sync sees only this
+    // device's own uploads echoed back once; the third sees nothing.
+    const remote = new InMemoryRemoteStore(snapshot({ vehicles: [vehicle()], fillUps: [fillUp()] }));
+    const { store, clock } = storeWith();
+    const state = new InMemorySyncState();
+    await store.addVehicle({ name: 'Second car' });
+
+    await syncOnce(store, remote, clock, state);
+    await syncOnce(store, remote, clock, state);
+    await syncOnce(store, remote, clock, state);
+
+    expect(remote.pullLog[2]?.rows).toBe(0);
+    expect(remote.pullLog[2]?.since).not.toBeNull();
+  });
+
+  it('a steady-state sync uploads nothing either', async () => {
+    // Re-sending an unchanged row would restamp it, and every other device
+    // would download it again — the cost this whole change exists to remove.
+    const remote = new InMemoryRemoteStore();
+    const { store, clock } = storeWith();
+    const state = new InMemorySyncState();
+    await store.addVehicle({ name: 'Car' });
+    await syncOnce(store, remote, clock, state);
+    await syncOnce(store, remote, clock, state);
+
+    const third = await syncOnce(store, remote, clock, state);
+
+    if (!third.ok) throw new Error(third.reason);
+    expect(third.outcome.pushed.written).toBe(0);
+  });
+
+  it('asks each collection for its own changes, with its own cursor', async () => {
+    // Three collections are three reads at three moments. One shared cursor
+    // could skip a write landing in one collection between two of the reads.
+    const remote = new InMemoryRemoteStore(snapshot({ vehicles: [vehicle()] }));
+    const { store, clock } = storeWith();
+    const state = new InMemorySyncState();
+
+    await syncOnce(store, remote, clock, state);
+    await syncOnce(store, remote, clock, state);
+
+    const since = remote.pullLog[1]?.since;
+    expect(since).not.toBeNull();
+    expect(Object.keys(since ?? {}).sort()).toEqual(['fillUps', 'pendingFillUps', 'vehicles']);
+  });
+
+  it('keeps each collection at its own mark, not the newest of all three', async () => {
+    const remote = new InMemoryRemoteStore();
+    const { store, clock } = storeWith();
+    const state = new InMemorySyncState();
+    const car = await store.addVehicle({ name: 'Car' });
+    await syncOnce(store, remote, clock, state); // vehicle stamped first
+    await store.addFillUp(
+      makeFuelEntryDraft({ date: new Date(2026, 0, 1), odometer: 1000, gallons: 10, pricePerGallon: 3 })!,
+      car.id,
+    );
+    await syncOnce(store, remote, clock, state); // fill-up stamped later
+    await syncOnce(store, remote, clock, state); // both echoes read
+
+    const marks = (await state.load())?.highWater;
+    expect(marks?.vehicles).not.toBeNull();
+    expect(marks?.fillUps).not.toBeNull();
+    expect(marks?.vehicles).toBeLessThan(marks!.fillUps!);
+  });
+
+  it('never moves a collection\'s mark backwards', async () => {
+    // An incremental read only returns newer stamps, so this cannot happen
+    // with a correct remote — and if a remote ever got it wrong, a mark moving
+    // back would just re-read; a mark moving forward wrongly would lose rows.
+    const inner = new InMemoryRemoteStore();
+    let lie = false;
+    const remote: RemoteStore = {
+      pull: async (since) => {
+        const result = await inner.pull(since);
+        return lie ? { ...result, highWater: { vehicles: 0, fillUps: 0, pendingFillUps: 0 } } : result;
+      },
+      push: (snapshot) => inner.push(snapshot),
+    };
+    const { store, clock } = storeWith();
+    const state = new InMemorySyncState();
+    await store.addVehicle({ name: 'Car' });
+    await syncOnce(store, remote, clock, state);
+    await syncOnce(store, remote, clock, state);
+    const before = (await state.load())?.highWater.vehicles;
+
+    lie = true;
+    await syncOnce(store, remote, clock, state);
+
+    expect((await state.load())?.highWater.vehicles).toBe(before);
+  });
+
+  it('with a remote that does not stamp, every read is full and rebuilds what is known', async () => {
+    // A row that disappears from such a remote is sent again, exactly as when
+    // every sync compared against the whole account.
+    const inner = new InMemoryRemoteStore();
+    const unstamped: RemoteStore = {
+      pull: async () => {
+        const { vehicles, fillUps, pendingFillUps } = await inner.pull();
+        return { vehicles, fillUps, pendingFillUps };
+      },
+      push: (snapshot) => inner.push(snapshot),
+    };
+    const { store, clock } = storeWith();
+    const state = new InMemorySyncState();
+    const car = await store.addVehicle({ name: 'Car' });
+    await syncOnce(store, unstamped, clock, state);
+    await syncOnce(store, unstamped, clock, state);
+    inner.forget('vehicles', car.id);
+
+    await syncOnce(store, unstamped, clock, state);
+
+    expect((await inner.pull()).vehicles).toHaveLength(1);
+  });
+
+  it('picks up exactly what another device changed since', async () => {
+    const remote = new InMemoryRemoteStore();
+    const a = storeWith(fakeClock(1_000_000));
+    const aState = new InMemorySyncState();
+    const b = storeWith(fakeClock(2_000_000));
+    const bState = new InMemorySyncState();
+    await syncOnce(a.store, remote, a.clock, aState);
+    await syncOnce(a.store, remote, a.clock, aState);
+
+    await b.store.addVehicle({ name: 'From B' });
+    await syncOnce(b.store, remote, b.clock, bState);
+    await syncOnce(a.store, remote, a.clock, aState);
+
+    const last = remote.pullLog[remote.pullLog.length - 1];
+    expect(last?.rows).toBe(1);
+    expect((await a.store.vehicles()).map((v) => v.name)).toEqual(['From B']);
+  });
+
+  it('uploads a local change even when nothing remote changed', async () => {
+    const remote = new InMemoryRemoteStore();
+    const { store, clock } = storeWith();
+    const state = new InMemorySyncState();
+    await syncOnce(store, remote, clock, state);
+
+    await store.addVehicle({ name: 'New' });
+    const result = await syncOnce(store, remote, clock, state);
+
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.outcome.pushed.written).toBe(1);
+  });
+
+  it('does not upload a row the account already has at the same version', async () => {
+    // Without the full remote snapshot to compare against, "what to push" comes
+    // from the versions this device knows the account holds. Pushing a row back
+    // unchanged would restamp it and every other device would re-download it.
+    const remote = new InMemoryRemoteStore(snapshot({ vehicles: [vehicle()] }));
+    const { store, clock } = storeWith();
+    const state = new InMemorySyncState();
+    await syncOnce(store, remote, clock, state);
+
+    const second = await syncOnce(store, remote, clock, state);
+
+    if (!second.ok) throw new Error(second.reason);
+    expect(second.outcome.pushed.written).toBe(0);
+  });
+
+  it('rebuilds the clock floor from what it knows, not only from what it pulled', async () => {
+    // Every full pull used to re-observe every remote row, which is what keeps
+    // a slow device's edits newer than a fast device's. An incremental pull
+    // sees only changes, so after a reload — a fresh clock — the floor would be
+    // gone and this device's next edit would silently lose to the old row.
+    const ahead = 1_000_000 + 86_400_000; // a day ahead: inside the adoption bound
+    const remote = new InMemoryRemoteStore(snapshot({ vehicles: [vehicle({ updatedAt: ahead })] }));
+    const state = new InMemorySyncState();
+    const first = storeWith(fakeClock(1_000_000));
+    await syncOnce(first.store, remote, first.clock, state);
+
+    // A new session a little later: the clock's floor is gone. Still behind
+    // the fast device, which is the whole point.
+    const reloadedClock = fakeClock(1_000_000 + 60_000);
+    await syncOnce(first.store, remote, reloadedClock, state);
+
+    // It must have been an incremental read — a full one would rebuild the
+    // floor from the pulled rows and prove nothing. (It once silently was:
+    // the last full read was timed by the merge clock, which had jumped ahead,
+    // so the reloaded device thought it was in the future and read in full.)
+    expect(remote.pullLog[1]?.since).not.toBeNull();
+    expect(reloadedClock.now()).toBeGreaterThan(ahead);
+  });
+
+  it('starts over with a full read when the saved cursor is from another version', async () => {
+    const remote = new InMemoryRemoteStore(snapshot({ vehicles: [vehicle()] }));
+    const { store, clock } = storeWith();
+    const state = new InMemorySyncState();
+    await syncOnce(store, remote, clock, state);
+    const saved = await state.load();
+    await state.save({ ...saved!, version: saved!.version + 1 });
+
+    await syncOnce(store, remote, clock, state);
+
+    expect(remote.pullLog[1]?.since).toBeNull();
+  });
+
+  it('reconciles with a full read once the last one is a week old', async () => {
+    // The safety net for anything an incremental read cannot see — a document
+    // deleted outright in the console, say. A full read rebuilds what the
+    // device believes the account holds, so a row missing there is re-sent.
+    const remote = new InMemoryRemoteStore();
+    const { store, clock } = storeWith();
+    const state = new InMemorySyncState();
+    await store.addVehicle({ name: 'Kept' });
+    await syncOnce(store, remote, clock, state);
+    const saved = await state.load();
+    await state.save({ ...saved!, fullPulledAt: saved!.fullPulledAt - 8 * 86_400_000 });
+    remote.forget('vehicles', (await store.vehicles())[0]!.id);
+
+    await syncOnce(store, remote, clock, state);
+
+    expect(remote.pullLog[1]?.since).toBeNull();
+    expect((await remote.pull()).vehicles).toHaveLength(1);
+  });
+
+  it('does not move the cursor when the pull fails', async () => {
+    const remote = new InMemoryRemoteStore(snapshot({ vehicles: [vehicle()] }));
+    const { store, clock } = storeWith();
+    const state = new InMemorySyncState();
+    await syncOnce(store, remote, clock, state);
+    const before = await state.load();
+    remote.failPull = true;
+
+    await syncOnce(store, remote, clock, state);
+
+    expect(await state.load()).toEqual(before);
+  });
+
+  it('keeps a change that failed to upload, and sends it next time', async () => {
+    const remote = new InMemoryRemoteStore();
+    const { store, clock } = storeWith();
+    const state = new InMemorySyncState();
+    await syncOnce(store, remote, clock, state);
+    await store.addVehicle({ name: 'Pending' });
+    remote.failPush = true;
+    await syncOnce(store, remote, clock, state);
+
+    remote.failPush = false;
+    const retry = await syncOnce(store, remote, clock, state);
+
+    if (!retry.ok) throw new Error(retry.reason);
+    expect(retry.outcome.pushed.written).toBe(1);
+    expect((await remote.pull()).vehicles).toHaveLength(1);
   });
 });

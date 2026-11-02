@@ -58,6 +58,16 @@ export class MonotonicClock implements StoreClock {
    * because `shouldReplace` compares with `>` — equal timestamps mean the
    * second write silently loses.
    */
+  /**
+   * The device's wall clock, unadjusted. For *elapsed time* — how long since
+   * the last full read (#52) — where the merge clock is the wrong tool: it
+   * jumps ahead after observing a fast device's rows, and a fresh one after a
+   * reload starts behind it again.
+   */
+  wall(): number {
+    return this.wallClock();
+  }
+
   now(): number {
     const next = Math.max(this.wallClock(), this.lastIssued + 1);
     this.lastIssued = next;

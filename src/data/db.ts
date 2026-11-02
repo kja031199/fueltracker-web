@@ -23,6 +23,8 @@ import Dexie from 'dexie';
 import type { Table } from 'dexie';
 import type { FillUpRecord, PendingFillUpRecord, SyncFields, VehicleRecord } from './records';
 import type { Repository } from './repository';
+import type { SyncCursor, SyncStateStore } from './syncState';
+import { parseCursor } from './syncState';
 
 export const DATABASE_NAME = 'fueltracker';
 
@@ -30,6 +32,7 @@ export class FuelTrackerDatabase extends Dexie {
   declare vehicles: Table<VehicleRecord, string>;
   declare fillUps: Table<FillUpRecord, string>;
   declare pendingFillUps: Table<PendingFillUpRecord, string>;
+  declare syncState: Table<{ readonly key: string } & Record<string, unknown>, string>;
 
   constructor(name: string = DATABASE_NAME) {
     super(name);
@@ -38,6 +41,32 @@ export class FuelTrackerDatabase extends Dexie {
       fillUps: 'id, vehicleId, date',
       pendingFillUps: 'id, vehicleId',
     });
+    // Version 2 adds where incremental sync keeps its place (#52). Adding a
+    // table touches no existing row; `syncState.test.ts` opens a version-1
+    // database with this code to prove it.
+    this.version(2).stores({
+      vehicles: 'id',
+      fillUps: 'id, vehicleId, date',
+      pendingFillUps: 'id, vehicleId',
+      syncState: 'key',
+    });
+  }
+}
+
+/**
+ * The sync cursor, in the same database as the rows it describes (#52), so
+ * the two can only ever be cleared together. See `syncState.ts`.
+ */
+export class DexieSyncState implements SyncStateStore {
+  constructor(private readonly db: FuelTrackerDatabase) {}
+
+  async load(): Promise<SyncCursor | null> {
+    const row = await this.db.syncState.get('cursor');
+    return parseCursor(row?.['cursor']);
+  }
+
+  async save(cursor: SyncCursor): Promise<void> {
+    await this.db.syncState.put({ key: 'cursor', cursor });
   }
 }
 

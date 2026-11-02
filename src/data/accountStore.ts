@@ -26,7 +26,8 @@
  * the machine.
  */
 
-import { DexieRepository, FuelTrackerDatabase } from './db';
+import { DexieRepository, DexieSyncState, FuelTrackerDatabase } from './db';
+import type { SyncStateStore } from './syncState';
 import { FuelTrackerStore } from './store';
 import { sharedSyncClock } from './syncClock';
 
@@ -60,6 +61,8 @@ export function databaseNameFor(uid: string, prefix = ''): string {
 
 export interface AccountStore {
   readonly store: FuelTrackerStore;
+  /** Where incremental sync keeps its place, in this account's database (#52). */
+  readonly syncState: SyncStateStore;
   readonly databaseName: string;
   /** Releases the connection. Called when the signed-in account changes. */
   close(): void;
@@ -89,7 +92,12 @@ export async function openAccountStore(uid: string, prefix = ''): Promise<Accoun
   const databaseName = databaseNameFor(uid, prefix);
   const db = new FuelTrackerDatabase(databaseName);
   await db.open();
-  return { store: storeOver(db), databaseName, close: () => db.close() };
+  return {
+    store: storeOver(db),
+    syncState: new DexieSyncState(db),
+    databaseName,
+    close: () => db.close(),
+  };
 }
 
 /**

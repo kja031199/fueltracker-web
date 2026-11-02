@@ -181,6 +181,17 @@ npm ci --prefix .github/firebase-cli
   so do not widen `refused` to cover ordinary failures, or the app shuts itself
   every time a phone goes through a tunnel. The refusal `reason` is diagnostic
   now rather than displayed; the screen carries its own copy.
+- **Every write carries `syncedAt: serverTimestamp()`, and the rules demand
+  it** (`== request.time`, #52). It is what incremental sync reads by, so a
+  write without it would never reach other devices. Every *positive* rules test
+  must include it (`forWire` does), or the test passes for the wrong reason.
+  Records never carry it: `remoteStore.decode` drops it.
+- **The sync cursor is exact integer microseconds, per collection, kept in the
+  account's IndexedDB** (`syncState.ts`, `DexieSyncState`). Not float ms with a
+  margin, which re-downloaded a document on every sync. Not one cursor for all
+  three collections, which can skip a write. Not `localStorage`, which can
+  outlive the rows. **Elapsed time uses `clock.wall()`**, never the merge
+  clock, which jumps ahead.
 - **Text limits live in `TEXT_LIMITS` and must equal the rules'** (#50).
   `rulesLimits.test.ts` reads `firestore.rules` to enforce it. Text is bounded
   at the draft gate, in `addVehicle`/`submitFillUp`, and in `importBackup`

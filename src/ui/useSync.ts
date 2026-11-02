@@ -3,15 +3,17 @@
  *
  * ## When it runs, and why not more often
  *
- * On mount (so signing in pulls the account down), on window focus (so coming
- * back to a tab that was open on another device catches up), and on demand from
- * Settings. That is all.
+ * On mount (so signing in pulls the account down), shortly after every save
+ * (so a change reaches the account without waiting for anything), on window
+ * focus at most once a minute (so coming back to a tab catches up), and on
+ * demand from Settings. `syncScheduler.ts` owns the timing (#52).
  *
- * No realtime listener, and no sync on every keystroke or write. The free tier
- * allows 20,000 writes and 50,000 reads a day, which is enormous for one
- * person's fuel log right up until something syncs in a loop — and an app that
- * silently stops working at 4pm because it burned its quota is a worse failure
- * than one that is a few seconds stale. A fuel log changes a few times a month.
+ * No realtime listener. The free tier allows 20,000 writes and 50,000 reads a
+ * day, which is enormous for one person's fuel log right up until something
+ * syncs in a loop — and an app that silently stops working at 4pm because it
+ * burned its quota is a worse failure than one that is a few seconds stale.
+ * Each sync is also cheap now: it reads only what changed since the last one
+ * (`syncState.ts`), not the whole account.
  *
  * ## Failure is a status, not an error
  *
@@ -24,6 +26,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RemoteStore } from '../data/remote';
 import type { FuelTrackerStore } from '../data/store';
 import { syncOnce } from '../data/sync';
+import { InMemorySyncState, type SyncStateStore } from '../data/syncState';
+import { createSyncScheduler } from './syncScheduler';
 
 const LAST_SYNCED_KEY = 'fueltracker.lastSyncedAt';
 
@@ -62,6 +66,8 @@ export interface SyncStatus {
    */
   readonly refused: boolean;
   readonly syncNow: () => Promise<void>;
+  /** Call after a local save: syncs shortly, sharing one sync with saves that follow. */
+  readonly afterWrite: () => void;
 }
 
 export function useSync(
@@ -69,21 +75,23 @@ export function useSync(
   remote: RemoteStore | null,
   /** Called after a sync that changed anything, so the screens reload. */
   onChanged: () => Promise<void>,
+  /**
+   * Where incremental sync keeps its place — the account's own database in the
+   * app (#52). Omitted in tests, where an in-memory one per mount is used.
+   */
+  syncState?: SyncStateStore,
 ): SyncStatus {
+  const [fallbackState] = useState<SyncStateStore>(() => new InMemorySyncState());
+  const state = syncState ?? fallbackState;
   const [syncing, setSyncing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(() => loadLastSynced());
   const [message, setMessage] = useState<string | null>(null);
   const [refused, setRefused] = useState(false);
-  // Guards against two syncs overlapping — a focus event landing while the
-  // mount sync is still in flight would otherwise push the same rows twice.
-  const running = useRef(false);
-
-  const syncNow = useCallback(async () => {
-    if (remote === null || running.current) return;
-    running.current = true;
+  const run = useCallback(async () => {
+    if (remote === null) return;
     setSyncing(true);
     try {
-      const result = await syncOnce(store, remote);
+      const result = await syncOnce(store, remote, undefined, state);
       if (!result.ok) {
         setMessage(result.reason);
         setRefused(result.kind === 'refused');
@@ -139,22 +147,33 @@ export function useSync(
         pulled.vehiclesWritten + pulled.fillUpsWritten + pulled.pendingWritten > 0;
       if (changed || repaired > 0) await onChanged();
     } finally {
-      running.current = false;
       setSyncing(false);
     }
-  }, [store, remote, onChanged]);
+  }, [store, remote, onChanged, state]);
 
+  // One scheduler per mount, always calling the latest `run`. It owns the
+  // timing and makes sure two syncs never overlap — a focus landing while the
+  // mount sync is in flight would otherwise push the same rows twice.
+  const latest = useRef(run);
+  latest.current = run;
+  const [scheduler] = useState(() => createSyncScheduler(() => latest.current()));
+  useEffect(() => () => scheduler.dispose(), [scheduler]);
+
+  // On mount, and whenever the account or store changes.
   useEffect(() => {
-    void syncNow();
-  }, [syncNow]);
+    void scheduler.runNow();
+  }, [run, scheduler]);
 
   useEffect(() => {
     function onFocus(): void {
-      void syncNow();
+      scheduler.onFocus();
     }
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, [syncNow]);
+  }, [scheduler]);
 
-  return { syncing, lastSyncedAt, message, refused, syncNow };
+  const syncNow = useCallback(() => scheduler.runNow(), [scheduler]);
+  const afterWrite = useCallback(() => scheduler.afterWrite(), [scheduler]);
+
+  return { syncing, lastSyncedAt, message, refused, syncNow, afterWrite };
 }
