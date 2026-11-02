@@ -177,8 +177,12 @@ signed in once.** To add somebody:
 
 1. They sign in. The app loads and then cannot read anything — expected, and
    worth warning them about first.
-2. Firebase console → Authentication → Users. Their row is now there; copy the
-   **User UID** column.
+2. They open Settings → Account, tap **Copy account id**, and send it to you.
+   It is the same value the rules compare against, and it stays readable even
+   though all their data reads are being refused, because it comes from Auth
+   rather than Firestore. (Firebase console → Authentication → Users shows the
+   same string in the **User UID** column, for an owner who would rather look
+   than ask.)
 3. Add it to the `allowed()` list in `firestore.rules`, in a pull request.
 4. Merging deploys the rules (rules first, then hosting — see *Deploying*), and
    they can use the app on their next reload.
