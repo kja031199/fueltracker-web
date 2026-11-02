@@ -2,7 +2,7 @@
   "name": "fueltracker-firebase-cli",
   "version": "0.0.0",
   "private": true,
-  "description": "The pinned Firebase CLI that CI deploys with. Deliberately its own manifest rather than a devDependency of the app: it is needed in exactly two jobs, it drags in several hundred packages, and putting it in the app's tree would both slow every other job and change what `npm audit` reports about what ships. See README.md, 'Deploying'.",
+  "description": "The pinned Firebase CLI that CI deploys with. Deliberately its own manifest rather than a devDependency of the app: it is needed in exactly two jobs, it drags in several hundred packages, and putting it in the app's tree would both slow every other job and change what `npm audit` reports about what ships. See docs/deploying.md.",
   "dependencies": {
     "firebase-tools": "15.34.2"
   }

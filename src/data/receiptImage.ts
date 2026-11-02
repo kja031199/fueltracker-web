@@ -21,7 +21,7 @@
  * 2. a bounded re-encode after, so whatever is *stored* is small regardless.
  *
  * The residual gap — a large-but-legitimate-looking file that decodes huge — is
- * real, is recorded in the README, and is the price of the platform.
+ * real, is recorded in docs/port.md, and is the price of the platform.
  */
 
 /**

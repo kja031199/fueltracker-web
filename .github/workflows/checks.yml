@@ -74,8 +74,18 @@ jobs:
           # down should never stand between a correct change and main.
           #
           # node_modules is excluded explicitly rather than relying on this job
-          # happening not to install dependencies: `**/*.md` otherwise globs 42
-          # vendored READMEs whose broken links are not ours to fix, and the
-          # check would start failing the day anyone adds an install step here.
+          # happening not to install dependencies: `**/*.md` otherwise globs
+          # hundreds of vendored READMEs whose broken links are not ours to fix,
+          # and the check would start failing the day anyone adds an install
+          # step here.
+          #
+          # Both trees are named, because `--exclude-path` takes a path and not
+          # a glob: a nested node_modules is not covered by excluding the
+          # top-level one. Installing the pinned CLI locally and running this
+          # command found 777 errors in its dependencies' own documentation.
+          # Kept as an allowlist of exclusions rather than narrowing the input
+          # glob to our own files, so a new document is checked by default —
+          # a loud failure beats a silent skip.
           ./lychee --offline --no-progress --include-fragments \
-            --exclude-path node_modules '**/*.md'
+            --exclude-path node_modules \
+            --exclude-path .github/firebase-cli/node_modules '**/*.md'
