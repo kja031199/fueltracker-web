@@ -137,6 +137,13 @@ round-trip — which is also why the Firebase chunks are precached by the servic
 worker rather than excluded for their size. Without them an offline reload could
 not restore the session, and the app would not open at all.
 
+Settings → Account shows **your account id** — the uid Firebase knows you by —
+with a button to copy it. It is there because it is the identifier that grants
+access to a deployment, and the only other place to find it is the Firebase
+console, which the person who needs to read it usually cannot open. It comes
+from Auth rather than Firestore, so it stays readable even for somebody whose
+data reads are all being refused.
+
 Only non-sensitive profile scopes are requested (email and display name), so
 there is no OAuth verification screen and no seven-day token expiry. That ruled
 out the simpler-looking alternative of keeping one JSON file in the user's Google

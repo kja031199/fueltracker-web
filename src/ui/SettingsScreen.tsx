@@ -76,6 +76,29 @@ export function SettingsScreen({
   const fileInput = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [problems, setProblems] = useState<readonly string[]>([]);
+  const [copied, setCopied] = useState<'yes' | 'failed' | null>(null);
+
+  /**
+   * Puts the account id on the clipboard, and says so either way.
+   *
+   * The id is on screen regardless, so the button is a convenience and its
+   * failure is not important — but a dead button that silently does nothing is
+   * worse than one that admits it. No clipboard at all is the ordinary case on
+   * plain http or with the permission blocked.
+   */
+  async function copyAccountId(uid: string): Promise<void> {
+    try {
+      const clipboard: Clipboard | undefined = navigator.clipboard;
+      if (clipboard === undefined) {
+        setCopied('failed');
+        return;
+      }
+      await clipboard.writeText(uid);
+      setCopied('yes');
+    } catch {
+      setCopied('failed');
+    }
+  }
 
   async function exportJson(): Promise<void> {
     const saved = await saveJsonBackup(store);
@@ -202,6 +225,40 @@ export function SettingsScreen({
           </h2>
           <p style={{ margin: '0 0 8px' }}>
             Signed in as <strong>{account.email === '' ? account.displayName : account.email}</strong>.
+          </p>
+
+          {/* The identifier the sign-in allowlist in firestore.rules matches on.
+              Shown here because it was otherwise only findable in the Firebase
+              console, by the owner, after the person had already been refused —
+              and because it comes from Auth rather than Firestore, so somebody
+              who is signed in but not allowed through can still read their own
+              id while every data read is being denied. */}
+          <p style={{ margin: '0 0 4px' }}>
+            Your account id: <code>{account.uid}</code>
+          </p>
+          <p style={{ margin: '0 0 8px', opacity: 0.8 }}>
+            Send this to whoever runs this copy of FuelTracker if they need to give your
+            account access.
+          </p>
+          <p style={{ margin: '0 0 8px' }}>
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={() => void copyAccountId(account.uid)}
+            >
+              Copy account id
+            </button>
+            {copied !== null && (
+              // Deliberately not role="status": this screen already has two,
+              // and a third would make `getByRole('status')` ambiguous for
+              // every test that reads the sync or import message. aria-live
+              // still announces it.
+              <span aria-live="polite" style={{ marginLeft: 8, opacity: 0.8 }}>
+                {copied === 'yes'
+                  ? 'Copied.'
+                  : 'Your browser would not let the app use the clipboard — copy it by hand.'}
+              </span>
+            )}
           </p>
 
           {syncEnabled && sync !== undefined ? (

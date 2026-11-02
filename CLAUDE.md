@@ -260,6 +260,11 @@ latter is the SDK and ships no binary.
   and `InMemoryRemoteStore` exist for this. The iOS original paid for this
   lesson when an `LAContext` call turned every render test into a round-trip to
   a system daemon.
+- **`userEvent.setup()` replaces `navigator.clipboard`.** Stub the clipboard
+  **after** calling it, never before: user-event installs its own stub on
+  setup, so an earlier one is silently replaced and the spy records nothing —
+  which reads exactly like a button that does not work. Cost me a confusing red
+  in `Auth.test.tsx`; the helper there carries the warning.
 - **Component tests opt into a DOM** with a `@vitest-environment jsdom`
   docblock. Domain and storage suites stay on node, which is faster and needs
   nothing a browser provides.
