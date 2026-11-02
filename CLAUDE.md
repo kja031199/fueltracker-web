@@ -156,7 +156,11 @@ npm ci --prefix .github/firebase-cli
   carries a `kind`: `refused` means the rules said no and it will never fix
   itself, `unreachable` means try again later. Detected structurally
   (`cause.code === 'permission-denied'`) because `instanceof FirestoreError`
-  would pull the SDK into `sync.ts` and break invariant 6 (#40).
+  would pull the SDK into `sync.ts` and break invariant 6 (#40). A refusal
+  **closes the app** (`NoAccessScreen`, #41) rather than being a status line —
+  so do not widen `refused` to cover ordinary failures, or the app shuts itself
+  every time a phone goes through a tunnel. The refusal `reason` is diagnostic
+  now rather than displayed; the screen carries its own copy.
 - **A record id is also a Firestore document name, and the legal sets differ.**
   `recordId.ts` is the single rule, applied to the account and to both import
   paths; `sendableRows` keeps an already-stored bad row from aborting the push

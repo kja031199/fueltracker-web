@@ -299,11 +299,15 @@ describe('the account section', () => {
     );
   });
 
-  test('a refusal says so, instead of blaming the network', async () => {
-    // #40. Every sync failure used to read "could not reach your account",
-    // which is the wrong diagnosis for a `permission-denied` and sends the one
-    // person who can act on it — a guest who is not on the allowlist — to
-    // check their wifi.
+  test('a refusal closes the app rather than showing a status line', async () => {
+    // Supersedes the assertion added in #40, which checked that the refusal
+    // *message* reached the Settings status line. Since #41 a refusal replaces
+    // the app with a screen that explains it and shows the account id, so
+    // Settings is never reached — the message is diagnostic now rather than
+    // displayed, and its wording is still asserted in `sync.test.ts`.
+    //
+    // Kept here rather than only in `NoAccess.test.tsx` because this file owns
+    // the question "what does a signed-in reader see", and the answer changed.
     const store = makeStore();
     await store.addVehicle({ name: 'Civic' });
 
@@ -327,10 +331,11 @@ describe('the account section', () => {
       />,
     );
 
-    const status = await screen.findByRole('status');
-    expect(status).toHaveTextContent(/does not have access/i);
-    expect(status).toHaveTextContent(/account id/i);
-    expect(status).not.toHaveTextContent(/could not reach/i);
+    expect(
+      await screen.findByRole('heading', { name: /does not have access/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(USER.uid)).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: /sections/i })).not.toBeInTheDocument();
   });
 
   test('a large receipt is reported as staying on the device', async () => {

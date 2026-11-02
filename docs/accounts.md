@@ -58,20 +58,28 @@ Uids rather than email addresses, for three reasons:
 The cost is real and worth stating: **a uid does not exist until its owner has
 signed in once.** To add somebody:
 
-1. They sign in. The app loads and then cannot read anything — expected, and
-   worth warning them about first. Settings says *"This account does not have
-   access to this FuelTracker"* rather than blaming the network, which is the
-   point of #40; what it does **not** yet do is say so before they have been
-   walked through a first-run flow over data that will never sync (#41).
-2. They open Settings → Account, tap **Copy account id**, and send it to you.
-   It is the same value the rules compare against, and it stays readable even
-   though all their data reads are being refused, because it comes from Auth
-   rather than Firestore. (Firebase console → Authentication → Users shows the
-   same string in the **User UID** column, for an owner who would rather look
-   than ask.)
+1. They sign in. Instead of the app they get a screen saying **this account
+   does not have access**, with their account id and a button to copy it. The
+   app deliberately stays closed: the first-run flow it used to show promises
+   that a fuel log is kept in your Google account, which for them would be
+   false, and they would be logging fill-ups that could never leave the device
+   (#41).
+2. They send you the id. It is the same value the rules compare against, and it
+   is readable even though every data read is being refused, because it comes
+   from Auth rather than Firestore. (Firebase console → Authentication → Users
+   shows the same string in the **User UID** column, for an owner who would
+   rather look than ask.)
 3. Add it to the `allowed()` list in `firestore.rules`, in a pull request.
-4. Merging deploys the rules (rules first, then hosting — see *Deploying*), and
-   they can use the app on their next reload.
+4. Merging deploys the rules (rules first, then hosting — see *Deploying*).
+   Tell them when it is done and they press **Try again** on that same screen —
+   no reload, and no guessing whether it has taken effect yet.
+
+Two things the screen keeps reachable, because a block with no way out is just
+a wall: **Sign out**, since it may be the wrong Google account, and **an
+export** when the device holds anything. That second one is for the case that
+makes a hard block unfair — somebody who had access, logged fill-ups and then
+lost it would otherwise have their own data stranded behind a Settings screen
+they can no longer open.
 
 The rules suite reads that list **out of the rules file** rather than keeping
 its own copy, so adding a person needs no test change, and emptying the list
