@@ -741,7 +741,8 @@ describe('syncOnce', () => {
 
       await syncOnce(store, remote, fakeClock());
 
-      const [stored] = await store.fillUps(added.id);
+      // The whole row: list rows carry no photo bytes since #53.
+      const stored = await store.fillUp(entry.id);
       expect(stored?.station).toBe('Edited');
       expect(stored?.id).toBe(entry.id);
       expect(stored?.receiptImageData?.byteLength).toBe(900 * 1024);

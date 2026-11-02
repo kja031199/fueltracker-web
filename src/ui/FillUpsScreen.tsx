@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { useMemo, useState } from 'react';
-import type { FillUpRecord } from '../data/records';
+import type { FillUpRecord, FillUpSummary } from '../data/records';
 import type { FuelTrackerStore } from '../data/store';
 import type { FillUpFilter } from '../domain/fillUpFilter';
 import { EMPTY_FILTER, applyFilter, isFilterActive } from '../domain/fillUpFilter';
@@ -16,7 +16,7 @@ import { FillUpForm } from './FillUpForm';
 interface Props {
   readonly store: FuelTrackerStore;
   readonly vehicleId: string | null;
-  readonly fillUps: readonly FillUpRecord[];
+  readonly fillUps: readonly FillUpSummary[];
   readonly units: UnitPreferences;
   readonly onChanged: () => Promise<void>;
 }
@@ -37,6 +37,9 @@ export function FillUpsScreen({
   onChanged,
 }: Props): ReactElement {
   const [filter, setFilter] = useState<FillUpFilter>(EMPTY_FILTER);
+  // The **whole** row, photo included — never a list row (#53). The form saves
+  // whatever it was given, so starting it from a summary would save the
+  // fill-up back without its photo. The type makes that impossible to write.
   const [editing, setEditing] = useState<FillUpRecord | null>(null);
   const [adding, setAdding] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
@@ -81,6 +84,14 @@ export function FillUpsScreen({
         }}
       />
     );
+  }
+
+  async function edit(id: string): Promise<void> {
+    const whole = await store.fillUp(id);
+    // Gone since the list was drawn (deleted on another device and synced):
+    // refresh rather than open a form for something that no longer exists.
+    if (whole === undefined) await onChanged();
+    else setEditing(whole);
   }
 
   async function remove(id: string): Promise<void> {
@@ -231,7 +242,7 @@ export function FillUpsScreen({
                   <button
                     className="button button--secondary"
                     type="button"
-                    onClick={() => setEditing(record)}
+                    onClick={() => void edit(record.id)}
                   >
                     Edit
                   </button>

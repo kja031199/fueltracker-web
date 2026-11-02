@@ -122,3 +122,25 @@ export function hasReceipt(
 ): boolean {
   return record.receiptImageData !== null && record.receiptImageData.byteLength > 0;
 }
+
+/**
+ * A fill-up as the screens hold it: everything except the photo bytes (#53).
+ *
+ * The list keeps one vehicle's fill-ups in React state for the whole session,
+ * and nothing on it shows a photo — so carrying them there was memory spent on
+ * nothing. Only *whether* there is one survives.
+ *
+ * **A distinct type, on purpose.** A list row with `receiptImageData: null`
+ * would look exactly like a fill-up without a photo, and building the edit
+ * form from one would save it back with the photo gone — silently. Without
+ * the field, the compiler forces the edit path to load the whole row
+ * (`store.fillUp(id)`).
+ */
+export type FillUpSummary = Omit<FillUpRecord, 'receiptImageData'> & {
+  readonly hasReceipt: boolean;
+};
+
+export function toSummary(record: FillUpRecord): FillUpSummary {
+  const { receiptImageData: _bytes, ...rest } = record;
+  return { ...rest, hasReceipt: hasReceipt(record) };
+}

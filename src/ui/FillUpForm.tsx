@@ -14,7 +14,7 @@ import type { FuelGrade } from '../domain/fuelGrade';
 import { currency, distance as formatDistance } from '../domain/format';
 import type { UnitPreferences } from '../domain/units';
 import { distance, volume } from '../domain/units';
-import type { FillUpRecord } from '../data/records';
+import type { FillUpRecord, FillUpSummary } from '../data/records';
 import type { FuelTrackerStore } from '../data/store';
 import { importReceiptPhoto } from './importReceipt';
 import { TEXT_LIMITS } from '../domain/textLimits';
@@ -24,7 +24,8 @@ interface Props {
   readonly vehicleId: string;
   readonly units: UnitPreferences;
   /** Existing fill-ups on this vehicle, for the odometer sanity check. */
-  readonly existing: readonly FillUpRecord[];
+  /** Only odometers are read from these, so summaries are enough. */
+  readonly existing: readonly FillUpSummary[];
   /** The record being edited, or null when creating. */
   readonly editing: FillUpRecord | null;
   readonly onSaved: () => Promise<void>;

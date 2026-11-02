@@ -277,3 +277,64 @@ describe('text fields stop at what the account accepts (#50)', () => {
     expect(screen.getByLabelText('Model')).toHaveAttribute('maxLength', String(TEXT_LIMITS.model));
   });
 });
+
+describe('the list holds summaries, and editing loads the whole row (#53)', () => {
+  const PHOTO = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 9, 9, 9]);
+
+  test('editing a fill-up that has a receipt keeps the receipt', async () => {
+    // The list no longer carries photo bytes. Building the edit form from a
+    // list row would therefore save the fill-up back without its photo —
+    // silently. The form has to start from the whole row.
+    const user = userEvent.setup();
+    let id = '';
+    const store = await setUp(async (s, vehicleId) => {
+      id = (await s.addFillUp(draft({ receiptImageData: PHOTO }), vehicleId)).id;
+    });
+
+    await user.click(await screen.findByRole('button', { name: /^edit$/i }));
+    const station = await screen.findByLabelText(/gas station/i);
+    await user.clear(station);
+    await user.type(station, 'Costco');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(async () => expect((await store.fillUp(id))?.station).toBe('Costco'));
+    expect((await store.fillUp(id))?.receiptImageData).toEqual(PHOTO);
+  });
+
+  test("one save reads the selected vehicle's rows once, and never the whole table", async () => {
+    class CountingRepository<T extends FillUpRecord> extends InMemoryRepository<T> {
+      wholeTableReads = 0;
+      vehicleReads = 0;
+      override async list(): Promise<T[]> {
+        this.wholeTableReads += 1;
+        return super.list();
+      }
+      override async listForVehicle(vehicleId: string): Promise<T[]> {
+        this.vehicleReads += 1;
+        return super.listForVehicle(vehicleId);
+      }
+    }
+    localStorage.setItem('fueltracker.hasOnboarded', 'true');
+    const fillUps = new CountingRepository<FillUpRecord>();
+    const store = new FuelTrackerStore({
+      vehicles: new InMemoryRepository<VehicleRecord>(),
+      fillUps,
+      pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
+    });
+    await store.addVehicle({ name: 'Daily Driver' });
+    const user = userEvent.setup();
+    render(<App store={store} initialTab="fillups" />);
+    await user.click(await screen.findByRole('button', { name: /log a fill-up/i }));
+    const before = fillUps.vehicleReads;
+    fillUps.wholeTableReads = 0;
+
+    await user.type(screen.getByLabelText(/odometer/i), '10000');
+    await user.type(screen.getByLabelText('Gallons'), '10');
+    await user.type(screen.getByLabelText(/price per gallon/i), '3.5');
+    await user.click(screen.getByRole('button', { name: /save fill-up/i }));
+    await screen.findByRole('list');
+
+    expect(fillUps.vehicleReads - before).toBe(1);
+    expect(fillUps.wholeTableReads).toBe(0);
+  });
+});

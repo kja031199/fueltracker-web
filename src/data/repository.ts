@@ -41,10 +41,32 @@ export interface Repository<T extends SyncFields> {
    */
   remove(id: string, toTombstone: (row: T) => T): Promise<void>;
   /**
-   * Tombstoned records, for a future sync push. Nothing reads this yet; it
-   * exists because a tombstone nobody can enumerate is just a leak.
+   * Tombstoned records: exported, merged on import, and re-thinned by
+   * `scrubTombstones`. A tombstone nobody can enumerate is just a leak.
    */
   listDeleted(): Promise<T[]>;
+  /**
+   * How many live records there are, without reading them (#53). The backup
+   * reminder asks after every save, and reading every row — every receipt
+   * photo — to return one number was the most wasteful query in the app.
+   */
+  countLive(): Promise<number>;
+}
+
+/**
+ * A repository whose rows belong to a vehicle, and can be read one vehicle at
+ * a time (#53).
+ *
+ * Every per-vehicle question — the fill-up list, the dashboard, removing a
+ * vehicle — used to `list()` the whole table and filter, so one vehicle's
+ * history cost every vehicle's, receipts included. Dexie answers this from the
+ * `vehicleId` index, which had been declared since the first schema and never
+ * queried.
+ */
+export interface VehicleScopedRepository<T extends SyncFields & { readonly vehicleId: string }>
+  extends Repository<T> {
+  /** One vehicle's live records. */
+  listForVehicle(vehicleId: string): Promise<T[]>;
 }
 
 /**
@@ -83,5 +105,23 @@ export class InMemoryRepository<T extends SyncFields> implements Repository<T> {
 
   async listDeleted(): Promise<T[]> {
     return [...this.rows.values()].filter((row) => row.deletedAt !== null);
+  }
+
+  async countLive(): Promise<number> {
+    let live = 0;
+    for (const row of this.rows.values()) if (row.deletedAt === null) live += 1;
+    return live;
+  }
+
+  /**
+   * One vehicle's live records. Implemented for every record type so one class
+   * serves all three tables in tests; on a row with no `vehicleId` it simply
+   * matches nothing.
+   */
+  async listForVehicle(vehicleId: string): Promise<T[]> {
+    return [...this.rows.values()].filter(
+      (row) =>
+        row.deletedAt === null && (row as { readonly vehicleId?: unknown }).vehicleId === vehicleId,
+    );
   }
 }
