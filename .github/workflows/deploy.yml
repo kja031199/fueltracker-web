@@ -132,8 +132,10 @@ jobs:
 
       # End-to-end proof, and the only one available: the authoring environment
       # cannot reach *.web.app. Checks the site answers, and that the served
-      # JavaScript actually carries the project id — which is what proves the
+      # JavaScript actually carries the app id — which is what proves the
       # configuration was baked in rather than merely present on the runner.
+      # Not the project id: since #45 that is a constant in the source (the
+      # development guard), so it is in every bundle, configured or not.
       - name: Smoke-test the deployed site
         run: |
           url="https://$VITE_FIREBASE_PROJECT_ID.web.app"
@@ -151,7 +153,7 @@ jobs:
             echo "::error::could not find the main bundle in the served page"
             exit 1
           fi
-          if ! curl -sS "$url$bundle" | grep -q "$VITE_FIREBASE_PROJECT_ID"; then
+          if ! curl -sS "$url$bundle" | grep -qF "$VITE_FIREBASE_APP_ID"; then
             echo "::error::the deployed bundle carries no Firebase configuration"
             exit 1
           fi

@@ -37,7 +37,9 @@ npm run build      # typecheck, then a production build
 
 It runs with no configuration: without a Firebase config the sign-in screen
 says what is missing rather than offering a dead button. To point a checkout at
-your own project, see [docs/deploying.md](docs/deploying.md).
+your own project, see [docs/deploying.md](docs/deploying.md). A development
+build refuses the production project, so local work needs a
+[development project of its own](docs/deploying.md#local-development-uses-its-own-project).
 
 ## Documentation
 

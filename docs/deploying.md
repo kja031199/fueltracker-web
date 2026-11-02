@@ -22,6 +22,64 @@ bundle, so the deployed site carries whatever environment was present when
 `vite build` ran — not whatever is in `.env.local` now. Building without it
 produces a site that loads and then says it has no backend.
 
+## Local development uses its own project
+
+A development build **refuses the production project** (#45). If `.env.local`
+names `fueltracker-899eb` and the page is either served by the Vite dev server
+(`import.meta.env.DEV`, which also covers `vite --host` on a LAN address) or
+loaded from this machine (`localhost`, `*.localhost`, `127.x.x.x`, `[::1]`,
+`0.0.0.0` — which covers `vite preview`), the app starts nothing — no sign-in,
+no sync, no local database — and says so. There is no override, on purpose.
+
+Why: before this, `npm run dev` signed in to and synced with the real fuel log,
+so a bug in an unreviewed change — a tombstone scrub, an id rule, a sync edit —
+ran against production data before any pull request existed. And `localhost`
+had to be an authorized sign-in domain on production, so any page served on the
+owner's machine could open a genuine Google popup for it.
+
+### Setting up a development project (about five minutes, free)
+
+1. In the [Firebase console](https://console.firebase.google.com/), **Add
+   project** — e.g. `fueltracker-dev`. Analytics is not needed. The free Spark
+   plan has no billing, so there is nothing to cap.
+2. **Build → Authentication → Get started → Google**, enable it. `localhost`
+   is an authorized domain on a new project by default.
+3. **Build → Firestore Database → Create database**, production mode, any
+   region.
+4. **Project settings → Your apps → Web (`</>`)**, register an app, and copy
+   its four config values into `.env.local` (from `.env.example`).
+5. Run `npm run dev` and sign in. You will land on the **no-access screen**:
+   that is correct. **Uids are per project**, so your development uid is not
+   your production one, and the allowlist in `firestore.rules` does not know it
+   yet. Copy the id the screen shows.
+6. Add that uid to the `allowed()` list in `firestore.rules` with a comment
+   saying it is the development project's, and deploy the rules there with the
+   pinned CLI:
+
+   ```bash
+   npm ci --prefix .github/firebase-cli
+   .github/firebase-cli/node_modules/.bin/firebase login
+   .github/firebase-cli/node_modules/.bin/firebase deploy \
+     --only firestore:rules --project <your-dev-project-id>
+   ```
+
+   Committing that uid is harmless — like the others it is opaque, and it is
+   meaningless to the production project — and committing it means the same
+   rules file deploys to both. Then **Try again** on the no-access screen.
+
+The [Firestore emulator](development.md) is the alternative when you only need
+the rules, not a real sign-in: `src/data/firebase/rules.test.ts` already runs
+against it with a throwaway project id.
+
+### And on production: remove `localhost`
+
+The guard stops *this app* reaching production from a development build; it
+cannot stop a hand-written page on your machine that copies the public config.
+That needs the second layer, in the production project's console:
+**Authentication → Settings → Authorized domains → remove `localhost`**. After
+that, a sign-in attempt for production from any local page fails with
+`auth/unauthorized-domain`, whatever code is running.
+
 ## Deploying
 
 Two package names matter here. The CLI is **`firebase-tools`**; `firebase` is
@@ -60,8 +118,10 @@ in it are load-bearing:
   `VITE_*` at build time, so without them the build *succeeds* and produces a
   bundle with no backend — a live site that loads and then says it has no
   configuration. A red deploy is the better outcome, and a post-deploy smoke
-  test greps the served JavaScript for the project id to confirm the
+  test greps the served JavaScript for the **app id** to confirm the
   configuration really was baked in rather than merely present on the runner.
+  Not the project id: since #45 that is a constant in the source, so every
+  bundle carries it, configured or not.
 
 Rules are deployed in a step of their own, **before** hosting, for the `hasOnly`
 reason below. It is not a required check: it runs after merge, and a failed
