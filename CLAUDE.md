@@ -235,6 +235,17 @@ latter is the SDK and ships no binary.
   `deletedAt`, which is a fact.
 - **Only a JSON export counts as a backup.** CSV is fill-ups only — no
   vehicles, no tombstones, no receipt bytes.
+- **A CSV cell is escaped for two readers: the parser and the spreadsheet.**
+  RFC 4180 quoting is for the first and does nothing for the second — `"=1+1"`
+  is still evaluated by Excel, LibreOffice and Sheets (#29). `guardCsvCell`
+  prefixes an apostrophe to a cell starting with `= + - @`, tab or CR; the
+  pattern includes any number of leading apostrophes so the guard **escapes
+  itself**, and `unguardCsvCell` removes exactly one on the way back in. Keep
+  that pair reversible: an escape that is not would corrupt data on an
+  export/import cycle, which is worse than the injection it prevents. It runs
+  on every cell, not just the text ones, so a guarded number parses — and it
+  unguards **after** trimming, or a cell guarded for a leading tab loses the
+  tab. There is one test defending each of those three choices.
 - **Receipts have two different ceilings, and both drop the photo rather than
   the row.** `MAX_RECEIPT_BYTES` (4 MB) is the storage ceiling and applies on
   *every* path that admits a receipt — the draft gate, a file import, and

@@ -377,9 +377,63 @@ export const CSV_COLUMNS = [
   'notes',
 ] as const;
 
-/** RFC 4180 quoting: wrap when needed, and double an embedded quote. */
+/**
+ * Characters a spreadsheet reads as the beginning of a formula.
+ *
+ * Any number of leading apostrophes is part of the pattern so that the guard
+ * escapes **itself**: text that already starts with `'=` gets another
+ * apostrophe, and the reader takes exactly one off again. Without that, the
+ * escape would not be reversible and an export/import cycle would quietly
+ * rewrite somebody's data — a worse bug than the one this prevents.
+ */
+const CSV_FORMULA_START = /^'*[=+\-@\t\r]/;
+
+/** The same shape, once guarded: at least one apostrophe before the trigger. */
+const CSV_GUARDED_START = /^'+[=+\-@\t\r]/;
+
+/**
+ * Stops a spreadsheet executing the contents of a cell.
+ *
+ * RFC 4180 quoting below makes the file *parse*; it does nothing about what
+ * Excel, LibreOffice or Google Sheets *evaluate*. A cell beginning with `=`,
+ * `+`, `-`, `@`, a tab or a carriage return is a formula to all three, and
+ * quoting does not help — `"=1+1"` is still evaluated. The payloads that matter
+ * are `=HYPERLINK(…&A2)`, which exfiltrates the neighbouring cell when clicked,
+ * and the `=cmd|'/c …'!A0` family, which offers to run a command.
+ *
+ * Worth guarding even though most of this text is self-authored, because some
+ * of it is not: `parseReceipt` lifts a station name out of OCR'd receipt text,
+ * an imported file can carry anything, and a `pendingFillUp` carries a station
+ * and notes written by somebody else entirely.
+ *
+ * A leading apostrophe is the conventional fix: spreadsheets read it as "this
+ * cell is text" and do not display it.
+ */
+function guardCsvCell(value: string): string {
+  return CSV_FORMULA_START.test(value) ? `'${value}` : value;
+}
+
+/**
+ * Undoes `guardCsvCell`, so an export and a re-import agree.
+ *
+ * Applied to **every** cell on the way in, not only the text ones: the guard is
+ * blind to what a column means, so a guarded number has to lose its apostrophe
+ * before `Number()` sees it. It also honours the same convention from other
+ * tools, since prefixing an apostrophe on export is common.
+ */
+export function unguardCsvCell(value: string): string {
+  return CSV_GUARDED_START.test(value) ? value.slice(1) : value;
+}
+
+/**
+ * RFC 4180 quoting, after the formula guard.
+ *
+ * In that order: the guard can add a character, and whether the result needs
+ * quoting depends on the whole string.
+ */
 function csvCell(value: string): string {
-  return /[",\r\n]/.test(value) ? `"${value.split('"').join('""')}"` : value;
+  const guarded = guardCsvCell(value);
+  return /[",\r\n]/.test(guarded) ? `"${guarded.split('"').join('""')}"` : guarded;
 }
 
 export function toCsv(records: readonly FillUpRecord[]): string {
@@ -488,7 +542,11 @@ export function parseCsv(text: string): ParseResult<FillUpRecord[]> {
 
   const cell = (row: string[], name: string): string => {
     const position = index.get(name);
-    return position === undefined ? '' : (row[position] ?? '').trim();
+    if (position === undefined) return '';
+    // Unguarded after trimming, not before: a cell guarded because it began
+    // with a tab would otherwise have that tab trimmed away and the value
+    // would not survive the round trip.
+    return unguardCsvCell((row[position] ?? '').trim());
   };
 
   const records: FillUpRecord[] = [];

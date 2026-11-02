@@ -231,6 +231,109 @@ describe('CSV writing', () => {
   });
 });
 
+describe('CSV is escaped for the spreadsheet as well as for the parser', () => {
+  /**
+   * Issue #29. RFC 4180 quoting makes a file *parse*; it does nothing about
+   * what a spreadsheet *executes*. Excel, LibreOffice and Google Sheets all
+   * treat a cell beginning with `=`, `+`, `-`, `@`, a tab or a carriage return
+   * as a formula, and quoting does not help: `"=1+1"` is still evaluated.
+   *
+   * The text is not all self-authored, which is what makes this worth fixing:
+   * `parseReceipt` lifts a station name out of OCR'd receipt text, an imported
+   * file can carry anything, and a `pendingFillUp` (#3) carries a station and
+   * notes written by somebody else entirely.
+   */
+
+  /**
+   * The cell at `column` of the single data row, as a parser sees it.
+   *
+   * Uses `splitCsv` rather than splitting on commas, because one of the
+   * fixtures below is a formula containing both a comma and quotes — the exact
+   * case a naive split gets wrong.
+   */
+  function cellOf(record: FillUpRecord, column: string): string {
+    const rows = splitCsv(toCsv([record]));
+    return rows[1]![rows[0]!.indexOf(column)]!;
+  }
+
+  test.each([
+    ['a formula', '=HYPERLINK("http://evil.example","click")'],
+    ['a sum', '=SUM(A1:A9)'],
+    ['a plus', '+1+1'],
+    ['a minus', '-1+1'],
+    ['an at sign', '@SUM(A1)'],
+    ['a tab', '\tsneaky'],
+    ['a carriage return', '\rsneaky'],
+  ])('neutralises %s in a station name', (_label, station) => {
+    const cell = cellOf(fillUp('f1', { station }), 'station');
+    // The guard is a leading apostrophe, which spreadsheets read as "this is
+    // text" and do not display.
+    expect(cell.startsWith("'")).toBe(true);
+  });
+
+  test('neutralises it in the notes as well, not just the station', () => {
+    const cell = cellOf(fillUp('f1', { notes: '=1+1' }), 'notes');
+    expect(cell.startsWith("'")).toBe(true);
+  });
+
+  test('leaves ordinary text alone, so files do not fill with apostrophes', () => {
+    expect(cellOf(fillUp('f1', { station: 'Shell' }), 'station')).toBe('Shell');
+    expect(cellOf(fillUp('f1', { station: '7-Eleven' }), 'station')).toBe('7-Eleven');
+  });
+
+  test.each([
+    ['a formula', '=HYPERLINK("http://evil.example","click")'],
+    ['a leading tab', '\tsneaky'],
+    ['a leading minus', '-5'],
+    ['an apostrophe of its own', "'round the corner"],
+    ['an apostrophe in front of a formula', "'=1+1"],
+    ['two apostrophes in front of a formula', "''=1+1"],
+  ])('round-trips %s unchanged', (_label, station) => {
+    // The escape has to be reversible or an export/import cycle corrupts
+    // somebody's data — which would be a worse bug than the one being fixed.
+    // Note the last two cases: the guard escapes itself, so text that already
+    // begins with an apostrophe survives too.
+    const back = parseCsv(toCsv([fillUp('f1', { station })]));
+    expect(back.error).toBeNull();
+    expect(back.value?.[0]?.station).toBe(station);
+  });
+
+  test('round-trips a note that begins with a dash, which is ordinary writing', () => {
+    const notes = '- topped up before the airport run';
+    const back = parseCsv(toCsv([fillUp('f1', { notes })]));
+    expect(back.value?.[0]?.notes).toBe(notes);
+  });
+
+  test('reads a file some other tool guarded the same way', () => {
+    // Exporters that do this are common, so a leading apostrophe in front of a
+    // formula character is a convention worth honouring on the way in.
+    const csv =
+      'id,vehicle_id,date_iso,odometer_miles,gallons,price_per_gallon,station\n' +
+      "f1,v1,2025-01-15T09:30:00.000Z,10000,10,3.5,'=1+1\n";
+    expect(parseCsv(csv).value?.[0]?.station).toBe('=1+1');
+  });
+
+  test('still parses numbers that were guarded', () => {
+    // Nothing writes a negative measurement today — the draft gate refuses one
+    // — but the guard applies to every cell, so the reader must undo it before
+    // `Number()` sees the text, or a guarded number would read as NaN.
+    const csv =
+      'id,vehicle_id,date_iso,odometer_miles,gallons,price_per_gallon\n' +
+      "f1,v1,2025-01-15T09:30:00.000Z,'-10,10,3.5\n";
+    expect(parseCsv(csv).value?.[0]?.odometer).toBe(-10);
+  });
+
+  test('leaves the JSON backup alone, which nothing evaluates', () => {
+    const station = '=1+1';
+    const back = parseJsonBackup(
+      toJsonBackup({ vehicles: [], fillUps: [fillUp('f1', { station })], pendingFillUps: [] }),
+    );
+    expect(back.value?.fillUps[0]?.station).toBe(station);
+    expect(toJsonBackup({ vehicles: [], fillUps: [fillUp('f1', { station })], pendingFillUps: [] }))
+      .not.toContain("'=1+1");
+  });
+});
+
 describe('CSV reading', () => {
   test('round-trips the fields it carries', () => {
     const result = parseCsv(toCsv(snapshot.fillUps));
