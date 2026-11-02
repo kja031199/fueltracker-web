@@ -32,11 +32,18 @@ import type { ImportSummary } from './backup';
 import type { FillUpRecord } from './records';
 import { SCHEMA_VERSION } from './records';
 import { validateSnapshot } from './recordValidation';
-import type { PushSummary, RawSnapshot, RemoteStore } from './remote';
-import { rowsToPush, sendableRows } from './remote';
+import type { Collection, PullCursor, PushSummary, RawSnapshot, RemoteStore } from './remote';
+import { sendableRows } from './remote';
 import type { FuelTrackerStore } from './store';
 import type { MonotonicClock } from './syncClock';
 import { sharedSyncClock } from './syncClock';
+import {
+  InMemorySyncState,
+  SYNC_CURSOR_VERSION,
+  usableCursor,
+  type SyncCursor,
+  type SyncStateStore,
+} from './syncState';
 
 export interface SyncOutcome {
   readonly pulled: ImportSummary;
@@ -211,10 +218,26 @@ export async function syncOnce(
   store: FuelTrackerStore,
   remote: RemoteStore,
   clock: MonotonicClock = sharedSyncClock,
+  state: SyncStateStore = new InMemorySyncState(),
 ): Promise<SyncResult> {
+  // Where the last sync left off (#52). No usable cursor — a first sync, a
+  // different build, a damaged record, or a week since the last full read —
+  // means reading everything, which is what every sync did before.
+  let saved: SyncCursor | null = null;
+  try {
+    saved = await state.load();
+  } catch {
+    saved = null;
+  }
+  // Wall time, not the merge clock: that one jumps ahead after observing a
+  // fast device's rows, so a full read stamped with it would look like it
+  // happened in the future to the fresh clock after a reload, and every reload
+  // would fall back to a full read. Mutation testing caught exactly that.
+  const cursor = usableCursor(saved, clock.wall()) ? saved : null;
+
   let raw: RawSnapshot;
   try {
-    raw = await remote.pull();
+    raw = await remote.pull(cursor === null ? null : cursor.highWater);
   } catch (cause) {
     return failure(cause, 'Could not reach your account.');
   }
@@ -231,14 +254,33 @@ export async function syncOnce(
   // edit made here — silently, because losing a merge is not an error. Raising
   // this device's floor above everything it has seen makes the next local write
   // strictly newer, which is what turns "last write" back into "last edit".
-  clock.clearRefusals();
-  for (const row of [
-    ...remoteSnapshot.vehicles,
-    ...remoteSnapshot.fillUps,
-    ...remoteSnapshot.pendingFillUps,
-  ]) {
-    clock.observe(row.updatedAt);
+  // What the account holds, as far as this device knows: the versions from
+  // earlier syncs, overlaid with what this pull just returned. After a full
+  // read it is exactly the account's contents, which is what every sync used
+  // to compare against.
+  // A collection read in full replaces what was known about it, so a document
+  // that has disappeared from the account stops being "known" and is sent again.
+  const known: Record<string, number> = {};
+  if (cursor !== null) {
+    for (const [key, at] of Object.entries(cursor.known)) {
+      const name = key.slice(0, key.indexOf('/')) as Collection;
+      if (cursor.highWater[name] !== null && cursor.highWater[name] !== undefined) known[key] = at;
+    }
   }
+  for (const [name, rows] of [
+    ['vehicles', remoteSnapshot.vehicles],
+    ['fillUps', remoteSnapshot.fillUps],
+    ['pendingFillUps', remoteSnapshot.pendingFillUps],
+  ] as const) {
+    for (const row of rows) known[keyOf(name, row.id)] = row.updatedAt;
+  }
+
+  // Observed from **everything known**, not only from what was just pulled.
+  // An incremental pull returns only changes, and the clock's floor is not
+  // kept across reloads: without the known versions a reloaded device would
+  // forget a fast device's timestamps, and its next edit would lose to them.
+  clock.clearRefusals();
+  for (const at of Object.values(known)) clock.observe(at);
   const unbeatable = clock.refusedCount;
 
   const vehicles = partitionBySchema(remoteSnapshot.vehicles);
@@ -260,15 +302,22 @@ export async function syncOnce(
   // is stamped newer than anything there.
   const repaired = await store.repairOversizedText();
 
+  // The pull is in: remember how far it got, even if the push below fails.
+  // Only versions the account confirmed are recorded, so an unsent change
+  // stays newer than what is known and is retried next time.
+  const highWater = advance(cursor, raw.highWater);
+  const fullPulledAt = cursor === null ? clock.wall() : cursor.fullPulledAt;
+  await persist(state, { highWater, known, fullPulledAt });
+
   const localAfter = await store.exportSnapshot();
   // Anything with an id the account cannot address is held back here, by name,
   // rather than being handed to a batch it would abort.
   const unsendable: string[] = [];
   const outgoing: BackupSnapshot = {
-    vehicles: sendableRows(rowsToPush(localAfter.vehicles, remoteSnapshot.vehicles), unsendable),
-    fillUps: sendableRows(rowsToPush(localAfter.fillUps, remoteSnapshot.fillUps), unsendable),
+    vehicles: sendableRows(newerThanKnown('vehicles', localAfter.vehicles, known), unsendable),
+    fillUps: sendableRows(newerThanKnown('fillUps', localAfter.fillUps, known), unsendable),
     pendingFillUps: sendableRows(
-      rowsToPush(localAfter.pendingFillUps, remoteSnapshot.pendingFillUps),
+      newerThanKnown('pendingFillUps', localAfter.pendingFillUps, known),
       unsendable,
     ),
   };
@@ -281,6 +330,11 @@ export async function syncOnce(
     if (isRefusal(cause)) return { ok: false, kind: 'rejected', reason: REJECTED };
     return failure(cause, 'Changes are saved here but not uploaded yet.');
   }
+
+  // Nothing is recorded about what was just sent: the server stamped it, so
+  // the next pull returns it, and that is when its version becomes known. A
+  // push that half-failed (one batch of several) is therefore never mistaken
+  // for one that landed.
 
   return {
     ok: true,
@@ -299,4 +353,60 @@ export async function syncOnce(
 
 function describe(cause: unknown, fallback: string): string {
   return cause instanceof Error && cause.message !== '' ? `${fallback} (${cause.message})` : fallback;
+}
+
+function keyOf(collection: Collection, id: string): string {
+  return `${collection}/${id}`;
+}
+
+/** Local rows newer than the version the account is known to hold. */
+function newerThanKnown<T extends { readonly id: string; readonly updatedAt: number }>(
+  collection: Collection,
+  rows: readonly T[],
+  known: Readonly<Record<string, number>>,
+): T[] {
+  return rows.filter((row) => {
+    const held = known[keyOf(collection, row.id)];
+    return held === undefined || row.updatedAt > held;
+  });
+}
+
+/**
+ * The cursor after a pull: each collection moves to the newest stamp just
+ * read, and never backwards. After a full read, a collection whose documents
+ * carried no stamp at all goes to 0 — "everything unstamped has been seen" —
+ * because every write since the rules change is stamped, so anything newer
+ * will be.
+ */
+function advance(previous: SyncCursor | null, read: PullCursor | undefined): PullCursor {
+  const next = (name: Collection): number | null => {
+    const before = previous?.highWater[name] ?? null;
+    const seen = read?.[name] ?? null;
+    // A remote that does not stamp at all keeps every read a full one.
+    if (read === undefined) return null;
+    if (seen === null) return before ?? 0;
+    return before === null ? seen : Math.max(before, seen);
+  };
+  return { vehicles: next('vehicles'), fillUps: next('fillUps'), pendingFillUps: next('pendingFillUps') };
+}
+
+/**
+ * Saves the cursor. A failure to save costs a full read next time, never data,
+ * so it is not allowed to fail the sync.
+ */
+async function persist(
+  state: SyncStateStore,
+  parts: { highWater: PullCursor; known: Record<string, number>; fullPulledAt: number },
+): Promise<void> {
+  try {
+    await state.save({
+      version: SYNC_CURSOR_VERSION,
+      schemaVersion: SCHEMA_VERSION,
+      highWater: parts.highWater,
+      known: { ...parts.known },
+      fullPulledAt: parts.fullPulledAt,
+    });
+  } catch {
+    // Storage refused; the next sync starts from a full read.
+  }
 }

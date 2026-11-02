@@ -4,6 +4,7 @@ import type { FuelTrackerStore } from '../data/store';
 import type { AuthProvider } from '../data/auth';
 import { StubAuthProvider } from '../data/auth';
 import type { RemoteStore } from '../data/remote';
+import type { SyncStateStore } from '../data/syncState';
 import type { UnitPreferences } from '../domain/units';
 import { shouldOnboard } from '../domain/onboardingGate';
 import type { IdleTimeoutSetting } from '../domain/idleTimeout';
@@ -64,6 +65,11 @@ export interface AppProps {
   readonly remote?: RemoteStore | null;
   /** False when this build has no Firebase config, so sign-in cannot work. */
   readonly configured?: boolean;
+  /**
+   * Where incremental sync keeps its place: the signed-in account's database
+   * (#52). Omitted in tests, which get an in-memory one.
+   */
+  readonly syncState?: SyncStateStore;
 }
 
 export function App({
@@ -72,6 +78,7 @@ export function App({
   auth,
   remote = null,
   configured = true,
+  syncState,
 }: AppProps): ReactElement {
   // Memoised, or a new stub on every render would resubscribe forever.
   const authProvider = useMemo(() => auth ?? defaultAuth(), [auth]);
@@ -84,7 +91,20 @@ export function App({
   );
   const [idleSignOut, setIdleSignOut] = useState(false);
   const data = useAppData(store);
-  const sync = useSync(store, authState.status === 'signedIn' ? remote : null, data.reload);
+  const sync = useSync(
+    store,
+    authState.status === 'signedIn' ? remote : null,
+    data.reload,
+    syncState,
+  );
+  // Every screen that writes calls this afterwards: refresh what is shown, then
+  // sync shortly, rather than leaving the change for the next focus (#52).
+  const { reload } = data;
+  const { afterWrite } = sync;
+  const afterSave = useCallback(async () => {
+    await reload();
+    afterWrite();
+  }, [reload, afterWrite]);
   const backup = useBackupNudge(data.fillUpCount);
   const serviceWorker = useServiceWorker();
 
@@ -247,7 +267,7 @@ export function App({
             vehicles={data.vehicles}
             selectedVehicleId={data.selectedVehicleId}
             onSelect={data.selectVehicle}
-            onChanged={data.reload}
+            onChanged={afterSave}
           />
         )}
         {tab === 'settings' && (
@@ -255,7 +275,7 @@ export function App({
             units={units}
             onChange={changeUnits}
             store={store}
-            onImported={data.reload}
+            onImported={afterSave}
             onBackedUp={backup.recordBackup}
             lastBackupAt={backup.state.lastExportAt}
             account={authState.user}
@@ -281,7 +301,7 @@ export function App({
             vehicleId={data.selectedVehicleId}
             fillUps={data.fillUps}
             units={units}
-            onChanged={data.reload}
+            onChanged={afterSave}
           />
         )}
       </main>

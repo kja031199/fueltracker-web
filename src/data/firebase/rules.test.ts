@@ -36,13 +36,26 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { Bytes, collection, doc, getDoc, getDocs, setDoc, writeBatch } from 'firebase/firestore';
+import {
+  Bytes,
+  Timestamp,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  serverTimestamp,
+  setDoc,
+  where,
+  type Firestore,
+} from 'firebase/firestore';
 import { InMemoryRepository } from '../repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../records';
 import { FuelTrackerStore } from '../store';
 import { makeFuelEntryDraft } from '../../domain/fuelEntryDraft';
-import type { RemoteStore } from '../remote';
 import { syncOnce } from '../sync';
+import { FirestoreRemoteStore } from './remoteStore';
+import { InMemorySyncState } from '../syncState';
 
 const HOST = process.env.FIRESTORE_EMULATOR_HOST;
 // `describe.skipIf` rather than a thrown error: a checkout without the
@@ -306,13 +319,17 @@ describeWithEmulator('firestore.rules', () => {
       return {
         ...record,
         receiptImageData: bytes === null ? null : Bytes.fromUint8Array(bytes),
+        // Every write carries the server's stamp since #52, so every positive
+        // case does too — and every negative case differs only in what it
+        // means to test.
+        syncedAt: serverTimestamp(),
       };
     }
 
     it('accepts a vehicle exactly as the app writes it', async () => {
       const { vehicle } = await realRecords();
       const db = env.authenticatedContext(OWNER).firestore();
-      await assertSucceeds(setDoc(doc(db, `users/${OWNER}/vehicles/${vehicle.id}`), { ...vehicle }));
+      await assertSucceeds(setDoc(doc(db, `users/${OWNER}/vehicles/${vehicle.id}`), { ...vehicle, syncedAt: serverTimestamp() }));
     });
 
     it('accepts a fill-up exactly as the app writes it', async () => {
@@ -434,31 +451,12 @@ describeWithEmulator('firestore.rules', () => {
      * The exact failure, against the real rules: a 201-character station name
      * failed the whole batch with `permission-denied`, sync called that an
      * access refusal, and the owner was locked out with 0 of 3 documents
-     * uploaded. Driven through the real `syncOnce` and the real store.
-     *
-     * The remote here is an adapter, not `FirestoreRemoteStore`: that class
-     * builds its own Firestore instance from a web config, and the emulator
-     * hands out an authenticated one instead. The adapter writes exactly what
-     * the real push does — one `writeBatch`, `users/<uid>/<collection>/<id>`.
+     * uploaded. Driven through the real `syncOnce`, the real store and — since
+     * #52 — the real `FirestoreRemoteStore`, handed the emulator's
+     * authenticated instance.
      */
-    function emulatorRemote(): RemoteStore {
-      const db = env.authenticatedContext(OWNER).firestore();
-      return {
-        async pull() {
-          const read = async (name: string) =>
-            (await getDocs(collection(db, 'users', OWNER, name))).docs.map((d) => d.data());
-          return { vehicles: await read('vehicles'), fillUps: await read('fillUps'), pendingFillUps: [] };
-        },
-        async push(snapshot) {
-          const batch = writeBatch(db);
-          for (const row of snapshot.vehicles) batch.set(doc(db, 'users', OWNER, 'vehicles', row.id), { ...row });
-          for (const row of snapshot.fillUps) {
-            batch.set(doc(db, 'users', OWNER, 'fillUps', row.id), { ...row, receiptImageData: null });
-          }
-          await batch.commit();
-          return { written: snapshot.vehicles.length + snapshot.fillUps.length, receiptsOmitted: 0 };
-        },
-      };
+    function emulatorRemote(): FirestoreRemoteStore {
+      return FirestoreRemoteStore.over(env.authenticatedContext(OWNER).firestore() as unknown as Firestore, OWNER);
     }
 
     it('uploads every row, shortened to what the rules accept', async () => {
@@ -511,6 +509,106 @@ describeWithEmulator('firestore.rules', () => {
       const stored = (await getDoc(doc(db, 'users', OWNER, 'fillUps', 'f1'))).data();
       expect((stored?.['station'] as string).length).toBe(200);
       expect((stored?.['notes'] as string).length).toBe(4000);
+    });
+  });
+
+  describe('the server stamp incremental sync reads by (#52)', () => {
+    async function aFillUp(): Promise<FillUpRecord> {
+      const store = new FuelTrackerStore({
+        vehicles: new InMemoryRepository<VehicleRecord>(),
+        fillUps: new InMemoryRepository<FillUpRecord>(),
+        pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
+      });
+      const vehicle = await store.addVehicle({ name: 'Car' });
+      return store.addFillUp(
+        makeFuelEntryDraft({ date: new Date(2026, 0, 1), odometer: 1000, gallons: 10, pricePerGallon: 3 })!,
+        vehicle.id,
+      );
+    }
+
+    function wire(row: FillUpRecord): Record<string, unknown> {
+      return { ...row, receiptImageData: null, syncedAt: serverTimestamp() };
+    }
+
+    it('refuses a write without the stamp', async () => {
+      // Strict on purpose. A write without it would be invisible to every
+      // incremental read — on every other device, for good. An out-of-date
+      // copy of the app is refused instead, keeps the change on its device,
+      // and sends it once it updates.
+      const row = await aFillUp();
+      const db = env.authenticatedContext(OWNER).firestore();
+      const { syncedAt: _omitted, ...unstamped } = wire(row);
+      await assertFails(setDoc(doc(db, `users/${OWNER}/fillUps/${row.id}`), unstamped));
+    });
+
+    it('refuses a stamp the client chose', async () => {
+      // A client-supplied time could sit below another device's cursor and
+      // never be read. Only the server's own clock is trusted.
+      const row = await aFillUp();
+      const db = env.authenticatedContext(OWNER).firestore();
+      await assertFails(
+        setDoc(doc(db, `users/${OWNER}/fillUps/${row.id}`), { ...wire(row), syncedAt: Timestamp.fromMillis(0) }),
+      );
+    });
+
+    it('accepts the server stamp', async () => {
+      const row = await aFillUp();
+      const db = env.authenticatedContext(OWNER).firestore();
+      await assertSucceeds(setDoc(doc(db, `users/${OWNER}/fillUps/${row.id}`), wire(row)));
+    });
+
+    it('refuses an incremental read of somebody else’s tree', async () => {
+      const db = env.authenticatedContext(STRANGER).firestore();
+      await assertFails(
+        getDocs(query(collection(db, `users/${OWNER}/fillUps`), where('syncedAt', '>', Timestamp.fromMillis(0)))),
+      );
+    });
+
+    it('the real remote reads back only what changed since its cursor', async () => {
+      await env.clearFirestore();
+      const remote = FirestoreRemoteStore.over(
+        env.authenticatedContext(OWNER).firestore() as unknown as Firestore,
+        OWNER,
+      );
+      const first = await aFillUp();
+      await remote.push({ vehicles: [], fillUps: [first], pendingFillUps: [] });
+
+      const full = await remote.pull(null);
+      expect(full.fillUps).toHaveLength(1);
+      expect(full.highWater?.fillUps).toEqual(expect.any(Number));
+      // The stamp is the remote's business: records never carry it.
+      expect(full.fillUps[0]).not.toHaveProperty('syncedAt');
+
+      const quiet = await remote.pull(full.highWater ?? null);
+      expect(quiet.fillUps).toHaveLength(0);
+
+      const second = await aFillUp();
+      await remote.push({ vehicles: [], fillUps: [second], pendingFillUps: [] });
+      const changed = await remote.pull(full.highWater ?? null);
+      expect((changed.fillUps as FillUpRecord[]).map((row) => row.id)).toEqual([second.id]);
+    });
+
+    it('two syncs through the real remote: the second downloads nothing new', async () => {
+      await env.clearFirestore();
+      const remote = FirestoreRemoteStore.over(
+        env.authenticatedContext(OWNER).firestore() as unknown as Firestore,
+        OWNER,
+      );
+      const store = new FuelTrackerStore({
+        vehicles: new InMemoryRepository<VehicleRecord>(),
+        fillUps: new InMemoryRepository<FillUpRecord>(),
+        pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
+      });
+      await store.addVehicle({ name: 'Car' });
+      const state = new InMemorySyncState();
+
+      const first = await syncOnce(store, remote, undefined, state);
+      const second = await syncOnce(store, remote, undefined, state);
+      const third = await syncOnce(store, remote, undefined, state);
+
+      expect(first.ok && second.ok && third.ok).toBe(true);
+      if (!third.ok) return;
+      expect(third.outcome.pulled.vehiclesWritten + third.outcome.pulled.skippedOlder).toBe(0);
     });
   });
 });

@@ -88,7 +88,13 @@ service cloud.firestore {
           && request.resource.data.updatedAt is number
           && (request.resource.data.deletedAt == null
               || request.resource.data.deletedAt is number)
-          && request.resource.data.schemaVersion is number;
+          && request.resource.data.schemaVersion is number
+          // The server's commit time, and only that (#52). Incremental sync
+          // reads "everything stamped after my cursor", so a write without a
+          // stamp — or with one the client chose — could be invisible to
+          // every other device for good. An out-of-date copy of the app is
+          // refused here, keeps its change locally, and sends it once updated.
+          && request.resource.data.syncedAt == request.time;
       }
 
       function label(field, max) {
@@ -137,11 +143,11 @@ service cloud.firestore {
         allow write: if owner()
           && syncFields(id)
           && request.resource.data.keys().hasOnly([
-            'id', 'updatedAt', 'deletedAt', 'schemaVersion',
+            'id', 'updatedAt', 'deletedAt', 'schemaVersion', 'syncedAt',
             'name', 'make', 'model', 'year', 'createdAt'
           ])
           && request.resource.data.keys().hasAll([
-            'id', 'updatedAt', 'deletedAt', 'schemaVersion',
+            'id', 'updatedAt', 'deletedAt', 'schemaVersion', 'syncedAt',
             'name', 'make', 'model', 'year', 'createdAt'
           ])
           && label(request.resource.data.name, 200)
@@ -156,13 +162,13 @@ service cloud.firestore {
         allow write: if owner()
           && syncFields(id)
           && request.resource.data.keys().hasOnly([
-            'id', 'updatedAt', 'deletedAt', 'schemaVersion', 'vehicleId',
+            'id', 'updatedAt', 'deletedAt', 'schemaVersion', 'syncedAt', 'vehicleId',
             'date', 'odometer', 'gallons', 'pricePerGallon', 'isFullTank',
             'missedPreviousFillUp', 'fuelGrade', 'station', 'notes',
             'latitude', 'longitude', 'receiptImageData'
           ])
           && request.resource.data.keys().hasAll([
-            'id', 'updatedAt', 'deletedAt', 'schemaVersion', 'vehicleId',
+            'id', 'updatedAt', 'deletedAt', 'schemaVersion', 'syncedAt', 'vehicleId',
             'date', 'odometer', 'gallons', 'pricePerGallon', 'isFullTank',
             'missedPreviousFillUp', 'fuelGrade', 'station', 'notes',
             'latitude', 'longitude', 'receiptImageData'
@@ -178,13 +184,13 @@ service cloud.firestore {
         allow write: if owner()
           && syncFields(id)
           && request.resource.data.keys().hasOnly([
-            'id', 'updatedAt', 'deletedAt', 'schemaVersion', 'vehicleId',
+            'id', 'updatedAt', 'deletedAt', 'schemaVersion', 'syncedAt', 'vehicleId',
             'submittedAt', 'submitterName', 'date', 'odometer', 'gallons',
             'pricePerGallon', 'isFullTank', 'fuelGrade', 'station', 'notes',
             'latitude', 'longitude', 'receiptImageData'
           ])
           && request.resource.data.keys().hasAll([
-            'id', 'updatedAt', 'deletedAt', 'schemaVersion', 'vehicleId',
+            'id', 'updatedAt', 'deletedAt', 'schemaVersion', 'syncedAt', 'vehicleId',
             'submittedAt', 'submitterName', 'date', 'odometer', 'gallons',
             'pricePerGallon', 'isFullTank', 'fuelGrade', 'station', 'notes',
             'latitude', 'longitude', 'receiptImageData'

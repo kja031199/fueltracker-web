@@ -39,6 +39,7 @@ import { openSignedInAccount } from './data/accountStore';
 import type { AuthProvider, AuthState } from './data/auth';
 import { StubAuthProvider } from './data/auth';
 import type { RemoteStore } from './data/remote';
+import type { SyncStateStore } from './data/syncState';
 import { developmentUsesProduction, readSettings } from './data/firebase/settings';
 import { installCspWatch } from './ui/cspWatch';
 import { WrongProjectScreen } from './ui/WrongProjectScreen';
@@ -74,10 +75,17 @@ function render(
   store: FuelTrackerStore,
   remote: RemoteStore | null,
   configured: boolean,
+  syncState?: SyncStateStore,
 ): void {
   root.render(
     <StrictMode>
-      <App store={store} auth={auth} remote={remote} configured={configured} />
+      <App
+        store={store}
+        auth={auth}
+        remote={remote}
+        configured={configured}
+        {...(syncState === undefined ? {} : { syncState })}
+      />
     </StrictMode>,
   );
 }
@@ -144,7 +152,7 @@ async function start(): Promise<void> {
 
     const { uid } = state.user;
     if (open?.uid === uid) {
-      render(auth, open.account.store, open.remote, true);
+      render(auth, open.account.store, open.remote, true, open.account.syncState);
       return;
     }
 
@@ -161,7 +169,7 @@ async function start(): Promise<void> {
     }
 
     open = { uid, account, remote: new FirestoreRemoteStore(config, uid) };
-    render(auth, account.store, open.remote, true);
+    render(auth, account.store, open.remote, true, account.syncState);
   }
 
   auth.subscribe((state: AuthState) => {

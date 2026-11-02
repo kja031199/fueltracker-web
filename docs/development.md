@@ -79,6 +79,11 @@ Recorded so a regression in the tests themselves is visible:
 | Text: push backstop ignoring text / unstorable `vehicleId` accepted on import / sent on push | 1 / 1 / 1 |
 | Text: `boundText` splitting an emoji / a client limit drifting from the rules / `maxLength` removed | 1 / 2 / 1 |
 | Date window: chain over windowed rows / dashboard filtering first (both the #51 bug) | 5 / 1 |
+| Sync: always a full read / push everything / one shared mark / mark moving backwards | 2 / 5 / 2 / 1 |
+| Sync: unstamped read leaving the mark null / full read not rebuilding `known` / clock observing only pulled rows | 1 / 1 / 1 |
+| Sync: cursor version ignored / no weekly reconcile / full reads timed by the merge clock / junk cursor accepted | 1 / 1 / 1 / 1 |
+| Sync timing: focus not throttled / saves not coalesced / a save mid-sync dropped / App not syncing after a save | 2 / 1 / 2 / 1 |
+| Sync (emulator): rules accepting any `syncedAt` / push unstamped / records carrying it / remote ignoring the cursor | 1 / 4 / 1 / 2 |
 | Date window: segments not windowed / boundary exclusive / invalid date as a window | 4 / 6 / 1 |
 | Date window: no anchor / anchor without odometer guard / cost per mile ignoring it / intervals ignoring it / suspect norm from the window | 1 / 1 / 1 / 1 / 1 |
 | Sign-in adopting the legacy database (the #44 behaviour) | 3 |
