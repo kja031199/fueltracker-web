@@ -95,7 +95,12 @@ npm ci --prefix .github/firebase-cli
    series rather than relabelling the axis.
 5. **Local storage is per account**, `fueltracker-u-<uid>`, opened only after
    auth resolves. One shared database once leaked one person's fill-ups into
-   another person's Firestore account (`accountStore.ts`).
+   another person's Firestore account (`accountStore.ts`). **Nothing that runs
+   on sign-in moves data into an account** — sign-in happens before anything
+   knows whether the account is allowed. A per-account store holds what that
+   account wrote and what its own sync brought down. The pre-accounts rescue
+   broke this and was removed (#44); the legacy `fueltracker` database is
+   never opened, copied or deleted.
 6. **The Firebase SDK is imported only under `src/data/firebase/`.** Everything
    above talks to `AuthProvider` and `RemoteStore`, and no test imports the SDK
    — which is what keeps the suite offline and fast.

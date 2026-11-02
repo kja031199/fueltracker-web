@@ -35,7 +35,7 @@ import { InMemoryRepository } from './data/repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './data/records';
 import { FuelTrackerStore } from './data/store';
 import type { AccountStore } from './data/accountStore';
-import { adoptLegacyDatabase, openAccountStore } from './data/accountStore';
+import { openSignedInAccount } from './data/accountStore';
 import type { AuthProvider, AuthState } from './data/auth';
 import { StubAuthProvider } from './data/auth';
 import type { RemoteStore } from './data/remote';
@@ -152,11 +152,7 @@ async function start(): Promise<void> {
     open = null;
     renderOpening();
 
-    // One-time rescue of data written before accounts existed. Declines of its
-    // own accord if there is nothing to adopt, if the account already has rows,
-    // or if it has already run — see `adoptLegacyDatabase`.
-    await adoptLegacyDatabase(uid);
-    const account = await openAccountStore(uid);
+    const account = await openSignedInAccount(uid);
 
     if (mine !== generation) {
       // Another auth event overtook this one while the database was opening.

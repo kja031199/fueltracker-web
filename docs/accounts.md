@@ -157,10 +157,29 @@ destroy local edits made before someone signed out and before a sync could carry
 them up — turning a privacy fix into a data-loss one. Each person's rows stay on
 the device under their own name, so signing back in finds them.
 
-Data written before accounts existed is adopted once, into the first account to
-sign in, and the legacy database is deleted only after the copy is verified by
-row count. The adoption declines if the account already has rows, so it is a
-one-time rescue rather than a rule that whoever signs in inherits whatever was
-lying around. `accountStore.test.ts` covers all of that, including the leak
-itself — and that test was checked by reverting the fix, to confirm it fails
-against the old behaviour rather than merely passing against the new one.
+`accountStore.test.ts` covers the leak itself, and that test was checked by
+reverting the fix, to confirm it fails against the old behaviour rather than
+merely passing against the new one.
+
+### Data from before accounts existed is left where it is
+
+The pre-accounts build kept everything in a database called `fueltracker`.
+There used to be a one-time rescue that copied it into the first account to
+sign in and then deleted it. **It was removed in #44**, because it ran on
+sign-in — before any sync, so before anything knew whether that account was on
+the [allowlist](#who-can-sign-in). On a device that still held a legacy
+database, a stranger signing in first received the owner's rows, the owner's
+copy was deleted, and the no-access screen then offered the stranger an export
+of them.
+
+The rule now is that **nothing that runs on sign-in moves data into an
+account**. A per-account store holds what that account wrote and what its own
+sync brought down, nothing else. Moving the rescue to after a successful sync
+was considered and not done: it was a migration for a transition that
+finished long ago, every device the owner has used since then adopted its data
+at the time, and keeping it would keep a path alive whose only remaining users
+are hypothetical.
+
+A legacy database that still exists is left untouched. If one ever matters,
+its rows are readable in the browser's DevTools under **Application →
+IndexedDB → `fueltracker`**.

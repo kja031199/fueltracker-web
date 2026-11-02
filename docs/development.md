@@ -72,6 +72,9 @@ Recorded so a regression in the tests themselves is visible:
 | Idle timeout: a naive first implementation | 13 of 34 |
 | Backup reminder dismissing permanently instead of snoozing | 2 |
 | An action unpinned / its version comment dropped | 2 / 1 |
+| Sign-in adopting the legacy database (the #44 behaviour) | 3 |
+| Sign-in copying legacy rows but keeping the original / deleting it uncopied | 2 / 2 |
+| Sign-in merely opening the legacy database / opening the wrong account's | 1 / 1 |
 | Dev guard: `dev` signal / hostname signal dropped | 1 / 8 |
 | Dev guard: always refusing / id not normalised / constant wrong | 2 / 1 / 1 |
 | Local-host check: unanchored `127.` / `includes('localhost')` / no lower-casing / `[::1]` dropped | 1 / 2 / 1 / 2 |

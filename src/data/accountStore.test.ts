@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, test } from 'vitest';
+// Before Dexie: it captures the IndexedDB global when the module loads.
 import 'fake-indexeddb/auto';
+import Dexie from 'dexie';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import {
   LEGACY_DATABASE_NAME,
-  adoptLegacyDatabase,
   databaseNameFor,
   openAccountStore,
+  openSignedInAccount,
 } from './accountStore';
 import { DexieRepository, FuelTrackerDatabase } from './db';
 import { FuelTrackerStore } from './store';
@@ -93,126 +95,97 @@ describe('separating one device’s accounts', () => {
   });
 });
 
-describe('adopting the pre-account database', () => {
-  /** Writes rows into a legacy-named database, as the old build would have. */
-  async function seedLegacy(name: string): Promise<string> {
-    const db = new FuelTrackerDatabase(name);
+describe('the pre-account database is left alone (#44)', () => {
+  /**
+   * The rescue that used to live here copied the old shared `fueltracker`
+   * database into whichever account signed in first, then deleted it — on
+   * sign-in, before any sync, so before anybody knew whether that account was
+   * allowed. A refused stranger got the owner's rows, and since #41 the
+   * no-access screen offered to export them.
+   *
+   * These tests sign in at the storage layer, where every account looks the
+   * same: refusal is only learned later, when Firestore answers. That is the
+   * point. Nothing that runs on sign-in may move data into an account, because
+   * nothing that runs on sign-in knows who that account is allowed to be.
+   */
+
+  const legacyName = (): string => `${prefix}-${LEGACY_DATABASE_NAME}`;
+
+  /** Writes rows into a legacy-named database, as the pre-accounts build did. */
+  async function seedLegacy(): Promise<void> {
+    const db = new FuelTrackerDatabase(legacyName());
     await db.open();
     const store = new FuelTrackerStore({
       vehicles: new DexieRepository(db.vehicles),
       fillUps: new DexieRepository(db.fillUps),
       pendingFillUps: new DexieRepository(db.pendingFillUps),
     });
-    const vehicle = await store.addVehicle({ name: 'Legacy Car' });
+    const vehicle = await store.addVehicle({ name: 'Owner’s Car' });
     await store.addFillUp(draft(), vehicle.id);
     db.close();
-    return vehicle.id;
   }
 
-  test('existing data moves to the first account that signs in', async () => {
-    // Not a nicety: the owner's real fill-ups are in the unscoped database
-    // right now. Scoping the name without moving them would look exactly like
-    // data loss.
-    const legacy = `${prefix}-${LEGACY_DATABASE_NAME}`;
-    await seedLegacy(legacy);
+  /** Reads the legacy database back, or null if it is gone. */
+  async function legacyRows(): Promise<{ vehicles: number; fillUps: number } | null> {
+    if (!(await Dexie.exists(legacyName()))) return null;
+    const db = new FuelTrackerDatabase(legacyName());
+    await db.open();
+    const counts = { vehicles: await db.vehicles.count(), fillUps: await db.fillUps.count() };
+    db.close();
+    return counts;
+  }
 
-    const result = await adoptLegacyDatabase('uid-alice', prefix);
+  test('an account signing in gets none of the legacy rows', async () => {
+    // Acceptance (a). Whoever this is — the owner, or a stranger about to be
+    // refused — their store starts holding only what they write themselves.
+    await seedLegacy();
 
-    expect(result.adopted).toBe(true);
-    expect(result.vehicles).toBe(1);
-    expect(result.fillUps).toBe(1);
+    const stranger = await openSignedInAccount('uid-stranger', prefix);
+    const snapshot = await stranger.store.exportSnapshot();
+    stranger.close();
 
-    const alice = await openAccountStore('uid-alice', prefix);
-    expect(await alice.store.vehicles()).toHaveLength(1);
-    alice.close();
+    expect(snapshot.vehicles).toEqual([]);
+    expect(snapshot.fillUps).toEqual([]);
+    expect(snapshot.pendingFillUps).toEqual([]);
   });
 
-  test('running it twice adopts nothing the second time', async () => {
-    const legacy = `${prefix}-${LEGACY_DATABASE_NAME}`;
-    await seedLegacy(legacy);
+  test('the legacy database is still there afterwards, rows intact', async () => {
+    // Acceptance (b). Deleting it was the other half of the harm: the owner's
+    // only local copy ended up living under the stranger's uid.
+    await seedLegacy();
 
-    await adoptLegacyDatabase('uid-alice', prefix);
-    const second = await adoptLegacyDatabase('uid-alice', prefix);
+    const account = await openSignedInAccount('uid-stranger', prefix);
+    account.close();
 
-    expect(second.adopted).toBe(false);
-    const alice = await openAccountStore('uid-alice', prefix);
-    // Not doubled.
-    expect(await alice.store.vehicles()).toHaveLength(1);
-    alice.close();
+    expect(await legacyRows()).toEqual({ vehicles: 1, fillUps: 1 });
   });
 
-  test('a second account on the same device does not inherit the first one’s data', async () => {
-    // The adoption is a one-time rescue of the owner's own data, not a rule
-    // that whoever signs in gets whatever was lying around. Once it has been
-    // claimed it must never apply again.
-    const legacy = `${prefix}-${LEGACY_DATABASE_NAME}`;
-    await seedLegacy(legacy);
+  test('a second account on the same device gets nothing either', async () => {
+    await seedLegacy();
 
-    await adoptLegacyDatabase('uid-alice', prefix);
-    const forBob = await adoptLegacyDatabase('uid-bob', prefix);
-
-    expect(forBob.adopted).toBe(false);
-    const bob = await openAccountStore('uid-bob', prefix);
-    expect(await bob.store.vehicles()).toEqual([]);
+    (await openSignedInAccount('uid-alice', prefix)).close();
+    const bob = await openSignedInAccount('uid-bob', prefix);
+    const vehicles = await bob.store.vehicles();
     bob.close();
+
+    expect(vehicles).toEqual([]);
+    expect(await legacyRows()).toEqual({ vehicles: 1, fillUps: 1 });
   });
 
-  test('refuses to overwrite an account that already has data', async () => {
-    const legacy = `${prefix}-${LEGACY_DATABASE_NAME}`;
-    await seedLegacy(legacy);
+  test('signing in does not create a legacy database where there was none', async () => {
+    // Opening a Dexie database creates it. A sign-in path that so much as
+    // opened the legacy name would leave one behind on every device.
+    const account = await openSignedInAccount('uid-alice', prefix);
+    account.close();
 
-    const alice = await openAccountStore('uid-alice', prefix);
-    const own = await alice.store.addVehicle({ name: 'Already Mine' });
-    alice.close();
-
-    const result = await adoptLegacyDatabase('uid-alice', prefix);
-
-    expect(result.adopted).toBe(false);
-    const again = await openAccountStore('uid-alice', prefix);
-    const vehicles = await again.store.vehicles();
-    expect(vehicles).toHaveLength(1);
-    expect(vehicles[0]?.id).toBe(own.id);
-    again.close();
+    expect(await Dexie.exists(legacyName())).toBe(false);
   });
 
-  test('no legacy database is the ordinary case, not an error', async () => {
-    const result = await adoptLegacyDatabase('uid-alice', prefix);
-    expect(result.adopted).toBe(false);
-    expect(result.vehicles).toBe(0);
-  });
+  test('the account opens its own database, and only that', async () => {
+    const account = await openSignedInAccount('uid-alice', prefix);
+    account.close();
 
-  test('an empty legacy database is nothing to adopt', async () => {
-    const db = new FuelTrackerDatabase(`${prefix}-${LEGACY_DATABASE_NAME}`);
-    await db.open();
-    db.close();
-
-    const result = await adoptLegacyDatabase('uid-alice', prefix);
-    expect(result.adopted).toBe(false);
-  });
-
-  test('tombstones come across too', async () => {
-    // A deletion is a fact that has to survive the move. Dropping tombstones
-    // would resurrect deleted fill-ups on the next sync, because the account
-    // would have no record that they were ever removed.
-    const legacy = `${prefix}-${LEGACY_DATABASE_NAME}`;
-    const vehicleId = await seedLegacy(legacy);
-
-    const db = new FuelTrackerDatabase(legacy);
-    await db.open();
-    const store = new FuelTrackerStore({
-      vehicles: new DexieRepository(db.vehicles),
-      fillUps: new DexieRepository(db.fillUps),
-      pendingFillUps: new DexieRepository(db.pendingFillUps),
-    });
-    const extra = await store.addFillUp(draft({ odometer: 10_300 }), vehicleId);
-    await store.removeFillUp(extra.id);
-    db.close();
-
-    await adoptLegacyDatabase('uid-alice', prefix);
-
-    const alice = await openAccountStore('uid-alice', prefix);
-    const snapshot = await alice.store.exportSnapshot();
-    expect(snapshot.fillUps.filter((row) => row.deletedAt !== null)).toHaveLength(1);
-    alice.close();
+    expect(account.databaseName).toBe(databaseNameFor('uid-alice', prefix));
+    expect(await Dexie.exists(databaseNameFor('uid-alice', prefix))).toBe(true);
   });
 });
