@@ -24,12 +24,24 @@ anything, so the real flows can be exercised before it is enforced. A policy
 written without being able to load the deployed site is a guess, and the
 failure mode of a wrong guess is being locked out of your own app.
 
-It is **still report-only**, which means none of it is enforced yet (#28). The
-check that unblocks the flip is a five-minute job in a desktop browser, and
-[csp-check.md](csp-check.md) is the recipe: three console lines and five flows,
-producing a list of exactly what would have been blocked. The collector that
-makes it exact lives in `src/ui/cspWatch.ts` and records nothing until somebody
-arms it.
+It is **now enforced** (#28), and the check is why. Running
+[csp-check.md](csp-check.md) against the deployed site refused two scripts, both
+on the sign-in flow: Firebase Auth injects
+`https://apis.google.com/js/api.js` to host its auth iframe, and that file then
+loads a second gapi chunk from a generated path on the same origin. Enforcing
+the policy without having found that would have broken sign-in for every
+account on the next deploy — which is the entire argument for a report-only
+period, made concrete.
+
+`script-src` therefore names one off-origin source, `https://apis.google.com`,
+and a test asserts it is the *only* one. That does mean Google can serve
+arbitrary script to this page, which is already true of anybody using Firebase
+Auth's popup flow: there is no supported way to run it without that script.
+
+The collector that produced the evidence lives in `src/ui/cspWatch.ts` and
+records nothing until somebody arms it. It stays, because the next change to
+the policy needs the same check: this one cannot be reasoned about from a
+machine that cannot reach the deployed site.
 
 `script-src` is `'self'` with no nonce or hash machinery, which is possible only
 because the built page carries no inline script. Nothing in the build enforces
