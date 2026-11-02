@@ -72,6 +72,8 @@ Recorded so a regression in the tests themselves is visible:
 | Idle timeout: a naive first implementation | 13 of 34 |
 | Backup reminder dismissing permanently instead of snoozing | 2 |
 | An action unpinned / its version comment dropped | 2 / 1 |
+| A binary's checksum check deleted / moved after `tar` / its pinned hash removed | 2 / 1 / 1 |
+| One `persist-credentials: false` deleted / set to `true` | 1 / 1 |
 | Sign-in adopting the legacy database (the #44 behaviour) | 3 |
 | Sign-in copying legacy rows but keeping the original / deleting it uncopied | 2 / 2 |
 | Sign-in merely opening the legacy database / opening the wrong account's | 1 / 1 |

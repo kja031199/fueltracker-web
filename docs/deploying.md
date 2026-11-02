@@ -175,6 +175,35 @@ success while making the deploy tool older.
 The real mitigation for a credential sitting next to that much code is not to
 have a long-lived credential at all — see below.
 
+### The check binaries are verified, and checkout keeps its token (#46)
+
+Two gaps were left after #30. `src/test/workflows.test.ts` now enforces both.
+
+**gitleaks and lychee are checked against a pinned SHA-256 before they are
+extracted.** They used to be fetched by version and piped straight into `tar`.
+A release asset can be replaced after the fact, and a trojaned gitleaks that
+always exits 0 would turn the required secret scan into a green tick that
+checks nothing. The hashes sit in `checks.yml` beside each version, as
+`GITLEAKS_SHA256` and `LYCHEE_SHA256`, so changing a binary means a reviewed
+diff. The step downloads to a file, runs `sha256sum --check --strict`, and only
+then extracts, so a mismatch fails the job before anything runs.
+
+**Bumping a version means bumping its hash.** Take it from the release's
+published checksums where they exist. gitleaks ships
+`gitleaks_<version>_checksums.txt`. Then confirm it against a download of your
+own. Never take the hash from the same download step in CI, because a checksum
+fetched alongside the tarball only proves the two were replaced together.
+lychee v0.15.1 publishes no checksum, so its pin is the hash of two downloads
+made hours apart that agreed. That can't prove the first copy was genuine, but
+it does make any later change fail the job.
+
+**Every `actions/checkout` sets `persist-credentials: false`.** The default
+leaves the `GITHUB_TOKEN` in `.git/config` for every later step. Those steps
+include two `npm ci` installs, which run several hundred packages' lifecycle
+scripts. Nothing after checkout needs git authentication. If a future step
+does, give that one step a token explicitly rather than turning persistence
+back on.
+
 ### Workload Identity Federation, considered and deferred
 
 GitHub can mint a short-lived OIDC token per run and exchange it for Google
