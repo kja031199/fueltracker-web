@@ -105,6 +105,12 @@ brackets, which sent the one person who could act on it to check their wifi
 `instanceof FirestoreError`, because importing that would pull the Firebase SDK
 into `sync.ts` and the suite would stop running without it.
 
+A refusal does more than change the wording: it **closes the app** and shows
+the screen described in [accounts.md](accounts.md), because the alternative is
+somebody typing into a log that can never sync. An unreachable account changes
+nothing — that is the ordinary condition of an offline-first app, and the local
+copy keeps working.
+
 Sync runs on sign-in, on window focus, and on demand from Settings. There is no
 realtime listener and no sync-per-keystroke — the free tier allows 20,000 writes
 a day, which is enormous for one person's fuel log right up until something

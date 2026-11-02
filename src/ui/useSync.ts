@@ -53,6 +53,14 @@ export interface SyncStatus {
   readonly lastSyncedAt: number | null;
   /** What happened last time, worth showing. Null when there is nothing to say. */
   readonly message: string | null;
+  /**
+   * True once the account has **refused** us, as distinct from being out of
+   * reach (#40). It will not clear on its own — a refusal is a decision, not a
+   * condition — so the app can close itself rather than letting somebody type
+   * into a log that will never sync (#41). A successful sync clears it, which
+   * is how being added to the allowlist recovers without a reload.
+   */
+  readonly refused: boolean;
   readonly syncNow: () => Promise<void>;
 }
 
@@ -65,6 +73,7 @@ export function useSync(
   const [syncing, setSyncing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(() => loadLastSynced());
   const [message, setMessage] = useState<string | null>(null);
+  const [refused, setRefused] = useState(false);
   // Guards against two syncs overlapping — a focus event landing while the
   // mount sync is still in flight would otherwise push the same rows twice.
   const running = useRef(false);
@@ -77,8 +86,12 @@ export function useSync(
       const result = await syncOnce(store, remote);
       if (!result.ok) {
         setMessage(result.reason);
+        setRefused(result.kind === 'refused');
         return;
       }
+      // A sync that worked is the only thing that can clear a refusal, and it
+      // is what makes "ask the owner, then press Try again" recover in place.
+      setRefused(false);
       const { pulled, pushed, skippedNewerSchema, invalid, unbeatable, unsendable, at } =
         result.outcome;
       setLastSyncedAt(at);
@@ -138,5 +151,5 @@ export function useSync(
     return () => window.removeEventListener('focus', onFocus);
   }, [syncNow]);
 
-  return { syncing, lastSyncedAt, message, syncNow };
+  return { syncing, lastSyncedAt, message, refused, syncNow };
 }

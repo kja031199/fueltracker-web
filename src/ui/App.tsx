@@ -20,6 +20,7 @@ import { BackupBanner } from './BackupBanner';
 import { useBackupNudge } from './backupNudge';
 import { saveJsonBackup } from './exportBackup';
 import { SignInScreen } from './SignInScreen';
+import { NoAccessScreen } from './NoAccessScreen';
 import { VehiclesScreen } from './VehiclesScreen';
 import { SettingsScreen } from './SettingsScreen';
 import { DashboardScreen } from './DashboardScreen';
@@ -180,6 +181,28 @@ export function App({
           </p>
         </main>
       </div>
+    );
+  }
+
+  // Signed in, and the account said no (#41). Shown instead of the app rather
+  // than beside it: the first-run flow promises that a fuel log is kept in the
+  // reader's Google account, and for this reader that is false — they would be
+  // logging fill-ups that can never leave the device. A refusal does not clear
+  // on its own, so this is not a flash during a slow network; `refused` is only
+  // set for `permission-denied` and a successful sync clears it.
+  if (sync.refused) {
+    const hasLocalData = data.vehicles.length > 0 || data.fillUpCount > 0;
+    return (
+      <NoAccessScreen
+        account={authState.user}
+        onRetry={() => void sync.syncNow()}
+        retrying={sync.syncing}
+        onSignOut={() => void authProvider.signOut()}
+        // Offered only when there is something to lose. Somebody who had
+        // access, logged fill-ups and then lost it would otherwise have their
+        // own data stranded behind a Settings screen they cannot reach.
+        onExport={hasLocalData ? () => void saveJsonBackup(store) : undefined}
+      />
     );
   }
 
