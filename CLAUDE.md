@@ -33,6 +33,9 @@ Hosting at `fueltracker-899eb.web.app`.
   database.
 - `src/data/firebase/` — the **only** place the Firebase SDK is imported.
 - `src/ui/` — React: screens, hooks, hand-drawn SVG charts (`charts/`).
+  `App.tsx` gates on auth and holds per-browser preferences; `fuelLog.tsx`
+  (`FuelLogProvider` / `useFuelLog`) owns the data, sync and **every write**;
+  `AppShell` (in `App.tsx`) is the signed-in app (#56).
 
 No file or test counts here: the first version carried them and they were wrong
 a pull request later. Run `npm test` for the real figure.
@@ -119,6 +122,14 @@ npm ci --prefix .github/firebase-cli
    — which is what keeps the suite offline and fast.
 7. **The four sync fields are on every record**: client `id`, `updatedAt`,
    `deletedAt`, `schemaVersion`. They cannot be retrofitted over real data.
+8. **Screens write through `useFuelLog()`, never the store** (#56). Every
+   write action is built by `written` in `fuelLog.tsx`: store call, then
+   refresh, then `afterWrite()` (sync shortly). A throw skips both. Only
+   `fuelLog.tsx` and `App.tsx` (which just hands it over) may import
+   `data/store`; `storeBoundary.test.ts` fails otherwise, and
+   `FuelLog.test.tsx` proves every action reaches the remote. A new write is a
+   new action there — not a `store` prop and an `onChanged` callback, which is
+   the shape that made "sync after a write" depend on memory.
 
 ## Traps
 
@@ -283,6 +294,14 @@ npm ci --prefix .github/firebase-cli
   the range, and understates distance with it.
 
 ### Tests
+
+- **The tab is in the URL hash** (`#/dashboard`, `#/fillups`, `#/vehicles`,
+  `#/settings`; `useTabRoute.ts`, #56). jsdom keeps one URL per test file, so
+  `src/test/setup.ts` resets it after every test — otherwise a test that opens
+  Settings starts the next one there. A test that wants a tab passes
+  `initialTab` (used only when the hash names none) or sets the hash first.
+  **Don't call `new URL()` in app code that tests reach**: `Backup.test.tsx`
+  stubs the global `URL` to capture downloads.
 
 - **Tests never touch the network or a real device service.**
   `StubAuthProvider` and `InMemoryRemoteStore` exist for this. The iOS original

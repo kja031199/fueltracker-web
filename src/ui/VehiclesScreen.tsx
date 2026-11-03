@@ -2,16 +2,8 @@ import type { ReactElement } from 'react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import type { VehicleRecord } from '../data/records';
-import type { FuelTrackerStore } from '../data/store';
+import { useFuelLog } from './fuelLog';
 import { TEXT_LIMITS } from '../domain/textLimits';
-
-interface Props {
-  readonly store: FuelTrackerStore;
-  readonly vehicles: readonly VehicleRecord[];
-  readonly selectedVehicleId: string | null;
-  readonly onSelect: (id: string) => void;
-  readonly onChanged: () => Promise<void>;
-}
 
 /** "2021 Honda Civic", or nothing when only the year is known. */
 export function vehicleSubtitle(vehicle: VehicleRecord): string {
@@ -20,13 +12,10 @@ export function vehicleSubtitle(vehicle: VehicleRecord): string {
   return joined === String(vehicle.year) ? '' : joined;
 }
 
-export function VehiclesScreen({
-  store,
-  vehicles,
-  selectedVehicleId,
-  onSelect,
-  onChanged,
-}: Props): ReactElement {
+/** Vehicles, read from and written through the fuel log (#56). */
+export function VehiclesScreen(): ReactElement {
+  const { vehicles, selectedVehicleId, selectVehicle: onSelect, addVehicle, removeVehicle } =
+    useFuelLog();
   const [name, setName] = useState('');
   const [make, setMake] = useState('');
   const [model, setModel] = useState('');
@@ -39,7 +28,7 @@ export function VehiclesScreen({
     event.preventDefault();
     if (!canAdd) return;
     const parsedYear = Number.parseInt(year, 10);
-    await store.addVehicle({
+    await addVehicle({
       name: name.trim(),
       make: make.trim(),
       model: model.trim(),
@@ -49,13 +38,11 @@ export function VehiclesScreen({
     setName('');
     setMake('');
     setModel('');
-    await onChanged();
   }
 
   async function remove(id: string): Promise<void> {
-    await store.removeVehicle(id);
+    await removeVehicle(id);
     setConfirmingId(null);
-    await onChanged();
   }
 
   return (

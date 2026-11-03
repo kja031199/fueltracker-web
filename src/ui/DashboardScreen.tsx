@@ -1,7 +1,6 @@
 import type { ReactElement } from 'react';
 import { useMemo, useState } from 'react';
-import type { FillUpSummary, VehicleRecord } from '../data/records';
-import { toStats } from '../data/store';
+import { toStats } from '../data/records';
 import { computeFuelStatistics } from '../domain/fuelStatistics';
 import { dashboardKPIs, kpiAccessibilityLabel } from '../domain/kpi';
 import { hueFor } from '../domain/metric';
@@ -19,12 +18,10 @@ import { mapValues } from '../domain/models';
 import { MetricLineChart } from './charts/MetricLineChart';
 import { MonthlyBarChart } from './charts/MonthlyBarChart';
 import { WeekdayPriceChart } from './charts/WeekdayPriceChart';
+import { useFuelLog } from './fuelLog';
 
 interface Props {
-  readonly vehicles: readonly VehicleRecord[];
-  readonly selectedVehicleId: string | null;
-  readonly onSelect: (id: string) => void;
-  readonly fillUps: readonly FillUpSummary[];
+  /** A display preference of this browser, not data, so still a prop. */
   readonly units: UnitPreferences;
 }
 
@@ -41,13 +38,9 @@ interface Props {
  * while the dashboard keeps reading the full history — the two look similar and
  * mean different things.
  */
-export function DashboardScreen({
-  vehicles,
-  selectedVehicleId,
-  onSelect,
-  fillUps,
-  units,
-}: Props): ReactElement {
+export function DashboardScreen({ units }: Props): ReactElement {
+  // What to chart comes from the fuel log, like every other screen (#56).
+  const { vehicles, selectedVehicleId, selectVehicle: onSelect, fillUps } = useFuelLog();
   const [range, setRange] = useState<DashboardTimeRange>('All');
 
   const cutoff = useMemo(() => cutoffFrom(range), [range]);

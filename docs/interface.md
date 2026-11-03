@@ -1,8 +1,31 @@
 # Interface, charts and offline
 
-Three things the browser made us build differently: colour that is measured
-rather than asserted, charts drawn by hand, and an app that installs and keeps
-working with no network.
+How the app is put together for the reader: tabs with addresses, one place
+every change goes through — and three things the browser made us build
+differently: colour that is measured rather than asserted, charts drawn by
+hand, and an app that installs and keeps working with no network.
+
+## Tabs live in the address
+
+Each tab has an address — `#/dashboard`, `#/fillups`, `#/vehicles`,
+`#/settings` (#56). Reloading keeps you where you were, the phone's Back
+button steps back through the tabs you visited instead of leaving the app, and
+a link can open Settings directly. A hash, not a path, so it never reaches the
+server and needs no hosting rewrite.
+
+An address that names no tab — empty, mistyped, `#/SETTINGS`,
+`#/settings/extra` — shows the dashboard and is corrected in place, without a
+history entry, so Back from the app still leaves it rather than landing on the
+typo. Matching is exact on purpose: a looser rule is a second spelling of every
+URL that then has to be kept working.
+
+## Where a change goes
+
+Every screen reads the fuel log and writes to it through one context,
+`useFuelLog()` (`src/ui/fuelLog.tsx`, #56). Each write refreshes what is shown
+and schedules a sync a moment later (#52), in one place — so a screen added
+next year gets both without anyone remembering to ask. Screens cannot reach
+the store directly; a test enforces it.
 
 ## Contrast is enforced, not asserted
 

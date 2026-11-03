@@ -1,7 +1,6 @@
 import type { ReactElement } from 'react';
 import { useMemo, useState } from 'react';
-import type { FillUpRecord, FillUpSummary } from '../data/records';
-import type { FuelTrackerStore } from '../data/store';
+import type { FillUpRecord } from '../data/records';
 import type { FillUpFilter } from '../domain/fillUpFilter';
 import { EMPTY_FILTER, applyFilter, isFilterActive } from '../domain/fillUpFilter';
 import { DASHBOARD_TIME_RANGES } from '../domain/dashboardTimeRange';
@@ -12,13 +11,11 @@ import { currency, distance as formatDistance, volume as formatVolume } from '..
 import type { UnitPreferences } from '../domain/units';
 import { distance, volume } from '../domain/units';
 import { FillUpForm } from './FillUpForm';
+import { useFuelLog } from './fuelLog';
 
 interface Props {
-  readonly store: FuelTrackerStore;
-  readonly vehicleId: string | null;
-  readonly fillUps: readonly FillUpSummary[];
+  /** A display preference of this browser, not data, so still a prop. */
   readonly units: UnitPreferences;
-  readonly onChanged: () => Promise<void>;
 }
 
 /**
@@ -29,13 +26,9 @@ interface Props {
  * on the dashboard stays computed over the full history, so typing in the
  * search box can never change your reported MPG.
  */
-export function FillUpsScreen({
-  store,
-  vehicleId,
-  fillUps,
-  units,
-  onChanged,
-}: Props): ReactElement {
+export function FillUpsScreen({ units }: Props): ReactElement {
+  // The selected vehicle's history, and the writes, from the fuel log (#56).
+  const { selectedVehicleId: vehicleId, fillUps, loadFillUp, removeFillUp } = useFuelLog();
   const [filter, setFilter] = useState<FillUpFilter>(EMPTY_FILTER);
   // The **whole** row, photo included — never a list row (#53). The form saves
   // whatever it was given, so starting it from a summary would save the
@@ -68,7 +61,6 @@ export function FillUpsScreen({
   if (adding || editing !== null) {
     return (
       <FillUpForm
-        store={store}
         vehicleId={vehicleId}
         units={units}
         existing={fillUps}
@@ -76,7 +68,6 @@ export function FillUpsScreen({
         onSaved={async () => {
           setAdding(false);
           setEditing(null);
-          await onChanged();
         }}
         onCancel={() => {
           setAdding(false);
@@ -87,17 +78,15 @@ export function FillUpsScreen({
   }
 
   async function edit(id: string): Promise<void> {
-    const whole = await store.fillUp(id);
     // Gone since the list was drawn (deleted on another device and synced):
-    // refresh rather than open a form for something that no longer exists.
-    if (whole === undefined) await onChanged();
-    else setEditing(whole);
+    // `loadFillUp` refreshes the list rather than open a form for nothing.
+    const whole = await loadFillUp(id);
+    if (whole !== undefined) setEditing(whole);
   }
 
   async function remove(id: string): Promise<void> {
-    await store.removeFillUp(id);
+    await removeFillUp(id);
     setConfirmingId(null);
-    await onChanged();
   }
 
   const stations = [...new Set(fillUps.map((r) => r.station).filter((s) => s !== ''))].sort();
