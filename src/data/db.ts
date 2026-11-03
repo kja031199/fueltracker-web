@@ -34,15 +34,18 @@ import type { Repository } from './repository';
 import type { SyncCursor, SyncStateStore } from './syncState';
 import { parseCursor } from './syncState';
 
-export const DATABASE_NAME = 'fueltracker';
-
 export class FuelTrackerDatabase extends Dexie {
   declare vehicles: Table<VehicleRecord, string>;
   declare fillUps: Table<FillUpRecord, string>;
   declare pendingFillUps: Table<PendingFillUpRecord, string>;
   declare syncState: Table<{ readonly key: string } & Record<string, unknown>, string>;
 
-  constructor(name: string = DATABASE_NAME) {
+  /**
+   * `name` is required (#57). Its default used to be `'fueltracker'`, the
+   * legacy database every account once shared, which #44 stopped opening;
+   * `databaseNameFor(uid)` in `accountStore.ts` is where real names come from.
+   */
+  constructor(name: string) {
     super(name);
     this.version(1).stores({
       vehicles: 'id',

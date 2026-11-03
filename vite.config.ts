@@ -1,6 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { defineConfig, type Plugin } from 'vite';
+import type { Plugin } from 'vite';
+// From vitest rather than vite: the same function, typed to know the `test`
+// block below. This file is type-checked now (#57); with vite's own
+// `defineConfig`, that block was an unknown property nobody was checking.
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 

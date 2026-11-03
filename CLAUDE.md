@@ -15,8 +15,8 @@ Where they disagree with this file, fix both.
 ## What this is
 
 A browser rewrite of [FuelTracker](https://github.com/kja031199/FuelTrackingApp),
-a frozen iOS + watchOS app that serves as the specification. React, TypeScript,
-Vite, Dexie over IndexedDB, Firebase Auth and Firestore, deployed to Firebase
+a frozen iOS + watchOS app that serves as the specification. React 19,
+TypeScript 7, Vite, Dexie over IndexedDB, Firebase Auth and Firestore, deployed to Firebase
 Hosting at `fueltracker-899eb.web.app`.
 
 - `src/domain/` — pure logic, no storage and no React: statistics, units, the
@@ -24,7 +24,7 @@ Hosting at `fueltracker-899eb.web.app`.
   parsers (`scanning/`). **It imports nothing from `data/` or `ui/`**, and
   `src/test/layering.test.ts` enforces that (#54).
 - `src/data/` — records and persistence. `store.ts` is the write surface,
-  `repository.ts` the four-method abstraction, `db.ts` the Dexie binding,
+  `repository.ts` the storage abstraction, `db.ts` the Dexie binding,
   `sync.ts` the reconciliation, `records.ts` the record types and `Snapshot`,
   `recordValidation.ts` **the one decoder** for a row from anywhere (account,
   JSON backup or CSV), `backupFormat.ts` the file envelopes around it,
@@ -304,10 +304,21 @@ goes through a pull request.
 
 | Check | Fails on |
 |---|---|
-| Typecheck, test & build | a type error, a failing assertion, a broken build |
+| Typecheck, test & build | a type error, a hooks lint finding, a failing assertion, a broken build |
 | Firestore security rules | the rules letting one account read another |
 | Secret scan (gitleaks) | a credential in any commit |
 | Docs links (lychee) | a broken relative link or heading anchor |
+
+**The lint is oxlint, hooks rules only** (#57): `react-hooks/rules-of-hooks` and
+`react-hooks/exhaustive-deps`, as errors, in `.oxlintrc.json` with every
+category switched off — an allowlist, so an oxlint bump cannot add rules and
+redden the branch. Not ESLint: `typescript-eslint` needs TypeScript's JavaScript
+API, and TypeScript 7 has none (it supports `<6.1`). A finding is fixed, or
+disabled on that line with the reason written next to it. It runs as a step in
+the "Typecheck, test & build" job. `toolchain.test.ts` pins the config, the
+React runtime/types major versions and `vite.config.ts` being type-checked
+(it is in `tsconfig`'s `include`, and uses `defineConfig` from
+`vitest/config` so its `test` block type-checks).
 
 The build runs **before** the tests, because `manifest.test.ts` and
 `csp.test.ts` read `dist/` and would otherwise skip in silence. Merging deploys
@@ -318,8 +329,8 @@ intended ([docs/development.md](docs/development.md)).
 
 - [ ] The test was written first and seen to fail, and the PR says so.
 - [ ] Mutation-tested, if it guards data or access.
-- [ ] `npm run build`, `npm test`, `npm run typecheck` — exit codes read
-      directly, not through a pipe.
+- [ ] `npm run build`, `npm test`, `npm run typecheck`, `npm run lint` — exit
+      codes read directly, not through a pipe.
 - [ ] Rules touched? Emulator suite run, and `hasOnly` remembered.
 - [ ] No secrets and no Firebase config in the diff.
 - [ ] `README.md`, `docs/` and this file re-read against the diff — a claim

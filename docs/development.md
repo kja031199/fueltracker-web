@@ -10,6 +10,7 @@ an AI assistant working in this repository, read
 npm install
 npm run dev        # vite dev server
 npm test           # vitest
+npm run lint       # oxlint: the two React hooks rules, nothing else
 npm run typecheck  # tsc --noEmit
 npm run build      # typecheck, then a production build
 ```
@@ -29,7 +30,7 @@ comes.
 
 | Check | What fails it |
 |---|---|
-| **Typecheck, test & build** | A type error, a ported assertion no longer holding, or an app that no longer builds |
+| **Typecheck, test & build** | A type error, a React hooks lint finding, a ported assertion no longer holding, or an app that no longer builds |
 | **Firestore security rules** | The rules letting one account read another, or an allowlist still holding a placeholder |
 | **Secret scan** (gitleaks) | A credential-shaped string in **any commit**, not just the diff |
 | **Docs links** (lychee) | A broken relative link or `#heading-anchor` in Markdown |
@@ -140,6 +141,9 @@ Recorded so a regression in the tests themselves is visible:
 | OCR input: detail not shown / detail unbounded / a failed encode of the reading copy ignored | 1 / 1 / 1 |
 | Fuel line: rung removed / labels winning over it / first of two disagreeing lines trusted | 7 / 6 / 1 |
 | Fuel line: two-decimal price / whole-number quantity / range check / lookbehind / lookahead dropped | 1 / 1 / 1 / 1 / 1 |
+| Toolchain: `@types/react` / `@types/react-dom` back to 18 / lint script removed / description reverted | 1 / 1 / 1 / 1 |
+| Toolchain: exhaustive-deps off / only a warning / a rule category on wholesale / `vite.config.ts` out of `include` | 1 / 1 / 1 / 1 |
+| Database: the `'fueltracker'` default name restored (caught by `tsc`, an unused `@ts-expect-error`) | 1 |
 | Account state: key ignoring the uid / unscoped value kept / adopted / empty uid / unbounded uid | 21 / 5 / 6 / 2 / 1 |
 | Account state: hook ignoring a uid change / setter keeping the first uid / App passing no uid for sync time / backup / onboarding | 1 / 1 / 1 / 5 / 9 |
 | Preferences: storage access unguarded / failed write reported stored / decoder throw uncaught / empty text read as 0 / browser keys renamed | 1 / 1 / 23 / 1 / 9 |
