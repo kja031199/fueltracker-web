@@ -107,6 +107,13 @@ npm ci --prefix .github/firebase-cli
    account wrote and what its own sync brought down. The pre-accounts rescue
    broke this and was removed (#44); the legacy `fueltracker` database is
    never opened, copied or deleted.
+   **So is local state** (#55): every `localStorage` key goes through
+   `ui/preferences.ts` and declares a scope. `browser` keys (units, idle
+   timeout and its activity marker, the CSP watcher) are about the device;
+   `account` keys (backup marker, last sync time, onboarding) are stored as
+   `fueltracker.<name>.u.<uid>` and need the uid to read or write.
+   `storageBoundary.test.ts` fails if any other module touches web storage.
+   A new key: ask whose it is. If it is about a fuel log, it is `account`.
 6. **The Firebase SDK is imported only under `src/data/firebase/`.** Everything
    above talks to `AuthProvider` and `RemoteStore`, and no test imports the SDK
    — which is what keeps the suite offline and fast.

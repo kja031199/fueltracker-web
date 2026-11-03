@@ -11,7 +11,9 @@ import type { IdleTimeoutSetting } from '../domain/idleTimeout';
 import { IDLE_TIMEOUT_OFF } from '../domain/idleTimeout';
 import { clearActivity, loadIdleTimeoutSetting, saveIdleTimeoutSetting, useIdleTimeout } from './idleTimeout';
 import { applyPalette, preferredColorScheme, watchColorScheme } from './theme';
-import { loadHasOnboarded, loadUnitPreferences, saveHasOnboarded, saveUnitPreferences } from './unitSettings';
+import { loadUnitPreferences, saveUnitPreferences } from './unitSettings';
+import { HAS_ONBOARDED } from './onboarding';
+import { useAccountPreference } from './preferences';
 import { useAppData } from './useAppData';
 import { useAuth } from './useAuth';
 import { useSync } from './useSync';
@@ -54,7 +56,7 @@ function defaultAuth(): AuthProvider {
 
 export interface AppProps {
   readonly store: FuelTrackerStore;
-  /** Test seam: pins the palette instead of reading the system preference. */
+  /** Test seam: which tab the app opens on. */
   readonly initialTab?: Tab;
   /** Omitted in tests, where it defaults to a signed-in stub. */
   readonly auth?: AuthProvider;
@@ -84,8 +86,11 @@ export function App({
   const authProvider = useMemo(() => auth ?? defaultAuth(), [auth]);
   const authState = useAuth(authProvider);
   const [tab, setTab] = useState<Tab>(initialTab);
+  // Whose state this is (#55). Account-scoped preferences are read for this
+  // uid and re-read if it changes; signed out, they read as unset.
+  const uid = authState.status === 'signedIn' ? authState.user.uid : null;
   const [units, setUnits] = useState<UnitPreferences>(() => loadUnitPreferences());
-  const [hasOnboarded, setHasOnboarded] = useState<boolean>(() => loadHasOnboarded());
+  const [hasOnboarded, setHasOnboarded] = useAccountPreference(HAS_ONBOARDED, uid, false);
   const [idleTimeout, setIdleTimeout] = useState<IdleTimeoutSetting>(() =>
     loadIdleTimeoutSetting(),
   );
@@ -96,6 +101,7 @@ export function App({
     authState.status === 'signedIn' ? remote : null,
     data.reload,
     syncState,
+    uid,
   );
   // Every screen that writes calls this afterwards: refresh what is shown, then
   // sync shortly, rather than leaving the change for the next focus (#52).
@@ -105,7 +111,7 @@ export function App({
     await reload();
     afterWrite();
   }, [reload, afterWrite]);
-  const backup = useBackupNudge(data.fillUpCount);
+  const backup = useBackupNudge(data.fillUpCount, uid);
   const serviceWorker = useServiceWorker();
 
   const signedIn = authState.status === 'signedIn';
@@ -140,7 +146,6 @@ export function App({
   }
 
   function finishOnboarding(): void {
-    saveHasOnboarded();
     setHasOnboarded(true);
   }
 

@@ -7,6 +7,7 @@ import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/r
 import { FuelTrackerStore } from '../data/store';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { App } from './App';
+import { saveHasOnboarded } from './onboarding';
 import { TEXT_LIMITS } from '../domain/textLimits';
 
 function makeStore(): FuelTrackerStore {
@@ -33,7 +34,7 @@ async function setUp(
   seed: (store: FuelTrackerStore, vehicleId: string) => Promise<void> = async () => {},
   tab: 'fillups' | 'dashboard' = 'fillups',
 ): Promise<FuelTrackerStore> {
-  localStorage.setItem('fueltracker.hasOnboarded', 'true');
+  saveHasOnboarded('local');
   const store = makeStore();
   const vehicle = await store.addVehicle({ name: 'Daily Driver' });
   await seed(store, vehicle.id);
@@ -269,7 +270,7 @@ describe('text fields stop at what the account accepts (#50)', () => {
   });
 
   test('the vehicle form carries them too', async () => {
-    localStorage.setItem('fueltracker.hasOnboarded', 'true');
+    saveHasOnboarded('local');
     render(<App store={makeStore()} initialTab="vehicles" />);
 
     expect(await screen.findByLabelText('Name')).toHaveAttribute('maxLength', String(TEXT_LIMITS.name));
@@ -314,7 +315,7 @@ describe('the list holds summaries, and editing loads the whole row (#53)', () =
         return super.listForVehicle(vehicleId);
       }
     }
-    localStorage.setItem('fueltracker.hasOnboarded', 'true');
+    saveHasOnboarded('local');
     const fillUps = new CountingRepository<FillUpRecord>();
     const store = new FuelTrackerStore({
       vehicles: new InMemoryRepository<VehicleRecord>(),

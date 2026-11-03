@@ -8,6 +8,7 @@ import { FuelTrackerStore } from '../data/store';
 import { StubAuthProvider } from '../data/auth';
 import { ACTIVITY_STORAGE_KEY, loadIdleTimeoutSetting } from './idleTimeout';
 import { App } from './App';
+import { saveHasOnboarded } from './onboarding';
 
 /**
  * The idle timeout as a reader meets it.
@@ -38,7 +39,7 @@ async function storeWithAVehicle(): Promise<FuelTrackerStore> {
 
 beforeEach(() => {
   localStorage.clear();
-  localStorage.setItem('fueltracker.hasOnboarded', 'true');
+  saveHasOnboarded(USER.uid);
 });
 
 afterEach(cleanup);

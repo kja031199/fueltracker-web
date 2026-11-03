@@ -7,6 +7,7 @@ import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/r
 import { FuelTrackerStore } from '../data/store';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { App } from './App';
+import { saveHasOnboarded } from './onboarding';
 
 /**
  * The range picker on the dashboard (#51).
@@ -35,7 +36,7 @@ test('a range admitting one fill-up still shows the economy of the drive that en
     if (draft === null) throw new Error('fixture draft failed validation');
     await store.addFillUp(draft, vehicle.id);
   }
-  localStorage.setItem('fueltracker.hasOnboarded', 'true');
+  saveHasOnboarded('local');
   const user = userEvent.setup();
 
   render(<App store={store} initialTab="dashboard" />);
@@ -58,7 +59,7 @@ describe('the range still narrows what it should', () => {
       if (draft === null) throw new Error('fixture draft failed validation');
       await store.addFillUp(draft, vehicle.id);
     }
-    localStorage.setItem('fueltracker.hasOnboarded', 'true');
+    saveHasOnboarded('local');
     const user = userEvent.setup();
 
     render(<App store={store} initialTab="dashboard" />);

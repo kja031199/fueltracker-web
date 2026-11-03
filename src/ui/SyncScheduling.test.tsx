@@ -8,6 +8,7 @@ import { InMemoryRemoteStore } from '../data/remote';
 import { FuelTrackerStore } from '../data/store';
 import { StubAuthProvider } from '../data/auth';
 import { App } from './App';
+import { saveHasOnboarded } from './onboarding';
 import { SAVE_SYNC_DELAY_MS } from './syncScheduler';
 
 /** Sync timing as the app actually wires it (#52). */
@@ -27,7 +28,7 @@ function makeStore(): FuelTrackerStore {
 }
 
 test('a new vehicle reaches the account without the window losing and regaining focus', async () => {
-  localStorage.setItem('fueltracker.hasOnboarded', 'true');
+  saveHasOnboarded('u1');
   const remote = new InMemoryRemoteStore();
   const user = userEvent.setup();
   render(<App store={makeStore()} auth={signedIn()} remote={remote} initialTab="vehicles" />);
@@ -41,7 +42,7 @@ test('a new vehicle reaches the account without the window losing and regaining 
 });
 
 test('focusing the window again straight away does not re-read the account', async () => {
-  localStorage.setItem('fueltracker.hasOnboarded', 'true');
+  saveHasOnboarded('u1');
   const remote = new InMemoryRemoteStore();
   render(<App store={makeStore()} auth={signedIn()} remote={remote} />);
   await waitFor(() => expect(remote.pullLog).toHaveLength(1));

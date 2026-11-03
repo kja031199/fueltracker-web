@@ -7,7 +7,7 @@
  *
  * ## Per device, and per device on purpose
  *
- * `localStorage`, not a synced field. Whether this browser signs itself out is
+ * A **browser** preference (`preferences.ts`), not a synced field. Whether this browser signs itself out is
  * a property of *this* machine: a shared laptop wants it on, a phone that is
  * already locked by its owner's face does not. Syncing it would also mean a
  * new synced field, which the `hasOnly` rule in `firestore.rules` makes a
@@ -39,11 +39,38 @@ import {
   lastActivityFrom,
   normalizeIdleMinutes,
 } from '../domain/idleTimeout';
+import {
+  browserPreference,
+  numberCodec,
+  readPreference,
+  removePreference,
+  storageKey,
+  writePreference,
+} from './preferences';
 
-const SETTING_STORAGE_KEY = 'fueltracker.idleTimeout';
+/**
+ * The setting as stored. Only `enabled` decides whether it is legible at all;
+ * the minutes are normalised on the way out (see the module notes on why the
+ * two fall back in different directions).
+ */
+function decodeSetting(raw: string): IdleTimeoutSetting | null {
+  const parsed: unknown = JSON.parse(raw);
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  const candidate = parsed as Record<string, unknown>;
+  if (typeof candidate['enabled'] !== 'boolean') return null;
+  return { enabled: candidate['enabled'], minutes: normalizeIdleMinutes(candidate['minutes']) };
+}
+
+const SETTING = browserPreference<IdleTimeoutSetting>('idleTimeout', {
+  decode: decodeSetting,
+  encode: (setting) => JSON.stringify(setting),
+});
+
+/** Browser-wide on purpose: every tab, whoever is signed in, shares one clock. */
+const ACTIVITY = browserPreference('lastActivity', numberCodec);
 
 /** Exported so a test can assert the stored shape rather than guess at it. */
-export const ACTIVITY_STORAGE_KEY = 'fueltracker.lastActivity';
+export const ACTIVITY_STORAGE_KEY = storageKey(ACTIVITY);
 
 /**
  * How often the deadline is checked.
@@ -69,42 +96,21 @@ const WRITE_THROTTLE_MS = 5 * 1000;
 const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'wheel'] as const;
 
 export function loadIdleTimeoutSetting(): IdleTimeoutSetting {
-  try {
-    const raw = window.localStorage.getItem(SETTING_STORAGE_KEY);
-    if (raw === null) return IDLE_TIMEOUT_OFF;
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null) return IDLE_TIMEOUT_OFF;
-    const candidate = parsed as Record<string, unknown>;
-    if (typeof candidate['enabled'] !== 'boolean') return IDLE_TIMEOUT_OFF;
-    return {
-      enabled: candidate['enabled'],
-      minutes: normalizeIdleMinutes(candidate['minutes']),
-    };
-  } catch {
-    return IDLE_TIMEOUT_OFF;
-  }
+  return readPreference(SETTING) ?? IDLE_TIMEOUT_OFF;
 }
 
+/**
+ * Storage blocked: the setting then lasts only as long as the tab, which is the
+ * right way for this particular failure to degrade — it does not silently stay
+ * on.
+ */
 export function saveIdleTimeoutSetting(setting: IdleTimeoutSetting): void {
-  try {
-    window.localStorage.setItem(SETTING_STORAGE_KEY, JSON.stringify(setting));
-  } catch {
-    // Storage blocked. The setting then lasts only as long as the tab, which
-    // is the right way for this particular failure to degrade — it does not
-    // silently stay on.
-  }
+  writePreference(SETTING, setting);
 }
 
 /** The stored marker as a finite number, or `null` if there is not one. */
 function readActivityMarker(): number | null {
-  try {
-    const raw = window.localStorage.getItem(ACTIVITY_STORAGE_KEY);
-    if (raw === null) return null;
-    const value = Number(raw);
-    return Number.isFinite(value) ? value : null;
-  } catch {
-    return null;
-  }
+  return readPreference(ACTIVITY);
 }
 
 /**
@@ -117,22 +123,20 @@ export function loadLastActivity(now: number = Date.now()): number {
   return lastActivityFrom(readActivityMarker(), now);
 }
 
+/**
+ * Storage blocked: see `useIdleTimeout` — the in-tab watermark is what keeps a
+ * reader whose browser refuses storage from being signed out mid-sentence.
+ */
 export function recordActivity(now: number = Date.now()): void {
-  try {
-    window.localStorage.setItem(ACTIVITY_STORAGE_KEY, String(now));
-  } catch {
-    // See `useIdleTimeout`: the in-tab watermark is what keeps a reader whose
-    // browser refuses storage from being signed out mid-sentence.
-  }
+  writePreference(ACTIVITY, now);
 }
 
+/**
+ * Nothing depends on this succeeding: a stale marker only ever shortens the
+ * next session, never extends it.
+ */
 export function clearActivity(): void {
-  try {
-    window.localStorage.removeItem(ACTIVITY_STORAGE_KEY);
-  } catch {
-    // Nothing to do, and nothing depends on it: a stale marker only ever
-    // shortens the next session, never extends it.
-  }
+  removePreference(ACTIVITY);
 }
 
 /**

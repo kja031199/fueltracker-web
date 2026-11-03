@@ -28,29 +28,14 @@ import type { FuelTrackerStore } from '../data/store';
 import { syncOnce } from '../data/sync';
 import { InMemorySyncState, type SyncStateStore } from '../data/syncState';
 import { createSyncScheduler } from './syncScheduler';
+import { accountPreference, numberCodec, useAccountPreference } from './preferences';
 
-const LAST_SYNCED_KEY = 'fueltracker.lastSyncedAt';
-
-/** Reads the stored timestamp. Storage can be unavailable, so this never throws. */
-function loadLastSynced(): number | null {
-  try {
-    const raw = window.localStorage.getItem(LAST_SYNCED_KEY);
-    if (raw === null) return null;
-    const value = Number(raw);
-    return Number.isFinite(value) ? value : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveLastSynced(at: number): void {
-  try {
-    window.localStorage.setItem(LAST_SYNCED_KEY, String(at));
-  } catch {
-    // Private mode with storage blocked. The app still syncs; it just cannot
-    // remember when it last did.
-  }
-}
+/**
+ * When a sync last worked — an **account** preference (#55). Browser-wide, it
+ * showed one account the time of another account's sync. Storage blocked: the
+ * app still syncs, it just cannot remember when it last did.
+ */
+const LAST_SYNCED = accountPreference('lastSyncedAt', numberCodec);
 
 export interface SyncStatus {
   readonly syncing: boolean;
@@ -80,11 +65,13 @@ export function useSync(
    * app (#52). Omitted in tests, where an in-memory one per mount is used.
    */
   syncState?: SyncStateStore,
+  /** The signed-in uid, whose last-synced time this is. Null when signed out. */
+  account: string | null = null,
 ): SyncStatus {
   const [fallbackState] = useState<SyncStateStore>(() => new InMemorySyncState());
   const state = syncState ?? fallbackState;
   const [syncing, setSyncing] = useState(false);
-  const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(() => loadLastSynced());
+  const [lastSyncedAt, setLastSyncedAt] = useAccountPreference(LAST_SYNCED, account, null);
   const [message, setMessage] = useState<string | null>(null);
   const [refused, setRefused] = useState(false);
   const run = useCallback(async () => {
@@ -103,7 +90,6 @@ export function useSync(
       const { pulled, pushed, skippedNewerSchema, invalid, unbeatable, unsendable, repaired, at } =
         result.outcome;
       setLastSyncedAt(at);
-      saveLastSynced(at);
 
       const notes: string[] = [];
       // Two different kinds of bad row, counted together because the reader
@@ -149,7 +135,7 @@ export function useSync(
     } finally {
       setSyncing(false);
     }
-  }, [store, remote, onChanged, state]);
+  }, [store, remote, onChanged, state, setLastSyncedAt]);
 
   // One scheduler per mount, always calling the latest `run`. It owns the
   // timing and makes sure two syncs never overlap — a focus landing while the

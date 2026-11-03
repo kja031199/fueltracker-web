@@ -140,6 +140,10 @@ Recorded so a regression in the tests themselves is visible:
 | OCR input: detail not shown / detail unbounded / a failed encode of the reading copy ignored | 1 / 1 / 1 |
 | Fuel line: rung removed / labels winning over it / first of two disagreeing lines trusted | 7 / 6 / 1 |
 | Fuel line: two-decimal price / whole-number quantity / range check / lookbehind / lookahead dropped | 1 / 1 / 1 / 1 / 1 |
+| Account state: key ignoring the uid / unscoped value kept / adopted / empty uid / unbounded uid | 21 / 5 / 6 / 2 / 1 |
+| Account state: hook ignoring a uid change / setter keeping the first uid / App passing no uid for sync time / backup / onboarding | 1 / 1 / 1 / 5 / 9 |
+| Preferences: storage access unguarded / failed write reported stored / decoder throw uncaught / empty text read as 0 / browser keys renamed | 1 / 1 / 23 / 1 / 9 |
+| Storage boundary: detector reading comments as uses | 2 |
 | Sync (emulator): rules accepting any `syncedAt` / push unstamped / records carrying it / remote ignoring the cursor | 1 / 4 / 1 / 2 |
 | Date window: segments not windowed / boundary exclusive / invalid date as a window | 4 / 6 / 1 |
 | Date window: no anchor / anchor without odometer guard / cost per mile ignoring it / intervals ignoring it / suspect norm from the window | 1 / 1 / 1 / 1 / 1 |

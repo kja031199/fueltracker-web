@@ -19,12 +19,12 @@
  * A `securitypolicyviolation` listener dies on navigation, and two of the five
  * flows reload the page — so it would need re-pasting each time, and it would
  * miss anything blocked *during* a load, before the paste. A listener installed
- * by the app catches the first byte of every load, and `localStorage` carries
- * the findings across the reloads.
+ * by the app catches the first byte of every load, and browser storage carries
+ * the findings across the reloads (two **browser** preferences, `preferences.ts`).
  *
  * ## Dormant unless asked
  *
- * Nothing is recorded unless `localStorage['fueltracker.cspWatch']` is `on`.
+ * Nothing is recorded unless the `fueltracker.cspWatch` key is `on`.
  * A diagnostic that collects by default is one that fills somebody's storage
  * for no reason, and this one would log every blocked request forever.
  *
@@ -40,10 +40,29 @@
  * origin, the same three lines re-run the check.
  */
 
-/** Set to `on` to start recording. Absent or anything else means off. */
-export const CSP_WATCH_FLAG = 'fueltracker.cspWatch';
+import {
+  browserPreference,
+  flagCodec,
+  readPreference,
+  removePreference,
+  storageKey,
+  writePreference,
+} from './preferences';
 
-const LOG_KEY = 'fueltracker.cspViolations';
+/** Set to `on` to start recording. Absent or anything else means off. */
+const WATCHING = browserPreference('cspWatch', flagCodec('on'));
+
+/** The flag's storage key, exported so tests arm it the way a reader would. */
+export const CSP_WATCH_FLAG = storageKey(WATCHING);
+
+/** Filtered row by row on the way out, so one bad entry does not cost the rest. */
+const LOG = browserPreference<CspViolation[]>('cspViolations', {
+  decode: (raw) => {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(isViolation) : null;
+  },
+  encode: (list) => JSON.stringify(list),
+});
 
 /**
  * How many *distinct* violations are kept.
@@ -126,31 +145,19 @@ function isViolation(value: unknown): value is CspViolation {
 
 /** Everything recorded so far, across reloads. Never throws. */
 export function loadViolations(): CspViolation[] {
-  try {
-    const raw = window.localStorage.getItem(LOG_KEY);
-    if (raw === null) return [];
-    const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter(isViolation) : [];
-  } catch {
-    return [];
-  }
+  return readPreference(LOG) ?? [];
 }
 
+/**
+ * Storage blocked: the check then only covers the current page, which is worth
+ * saying in the report rather than crashing the app over.
+ */
 function save(list: readonly CspViolation[]): void {
-  try {
-    window.localStorage.setItem(LOG_KEY, JSON.stringify(list));
-  } catch {
-    // Storage blocked. The check then only covers the current page, which is
-    // worth saying in the report rather than crashing the app over.
-  }
+  writePreference(LOG, [...list]);
 }
 
 function watching(): boolean {
-  try {
-    return window.localStorage.getItem(CSP_WATCH_FLAG) === 'on';
-  } catch {
-    return false;
-  }
+  return readPreference(WATCHING) === true;
 }
 
 /**
@@ -200,19 +207,13 @@ export function installCspWatch(): void {
 
   const helper = {
     on(): string {
-      try {
-        window.localStorage.setItem(CSP_WATCH_FLAG, 'on');
-      } catch {
+      if (!writePreference(WATCHING, true)) {
         return 'Storage is blocked in this browser, so nothing can be recorded.';
       }
       return 'CSP watcher armed. Reload, run the flows, then call __fuelTrackerCsp.report().';
     },
     off(): string {
-      try {
-        window.localStorage.removeItem(CSP_WATCH_FLAG);
-      } catch {
-        /* nothing to turn off if storage never worked */
-      }
+      removePreference(WATCHING);
       return 'CSP watcher off. The log is kept; __fuelTrackerCsp.clear() empties it.';
     },
     report(): string {
