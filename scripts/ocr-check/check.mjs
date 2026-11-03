@@ -18,6 +18,10 @@
 // Why this exists rather than the CSP watcher: a violation inside a worker is
 // reported to the worker, not the page, so `__fuelTrackerCsp` never sees it.
 //
+// Pass `--photo <path>` to also run a real receipt photo through the app's
+// import pipeline. It is served only to the check and never copied anywhere;
+// keep real receipts (card digits, account numbers) out of the repository.
+//
 // Needs Playwright and Chromium. Not a dependency of this repository; in a
 // fresh clone: `npm i --no-save playwright && npx playwright install chromium`.
 
@@ -40,6 +44,9 @@ function loadPlaywright() {
 const { chromium } = loadPlaywright();
 
 const EXPECTED = ['GALLONS 10.512', 'TOTAL $41.23'];
+const photoArg = process.argv.indexOf('--photo');
+const PHOTO = photoArg === -1 ? null : process.argv[photoArg + 1];
+if (PHOTO !== null && (PHOTO === undefined || !existsSync(PHOTO))) throw new Error(`no such photo: ${PHOTO}`);
 
 // --- Build -----------------------------------------------------------------
 const out = mkdtempSync(join(tmpdir(), 'ocr-check-'));
@@ -66,6 +73,10 @@ const TYPES = {
 function serve(csp) {
   const server = createServer((request, response) => {
     const path = decodeURIComponent(new URL(request.url, 'http://x').pathname);
+    if (path === '/__local-photo' && PHOTO !== null) {
+      response.setHeader('Content-Type', 'image/jpeg');
+      return response.end(readFileSync(PHOTO));
+    }
     let file = normalize(join(out, path));
     if (!file.startsWith(out) || !existsSync(file) || statSync(file).isDirectory()) {
       file = join(out, 'index.html'); // firebase.json rewrites ** to /index.html
@@ -126,6 +137,33 @@ await scenario('production', PRODUCTION_CSP, async ({ page, offOrigin, console: 
   report('2. makes no request outside this origin', offOrigin.length === 0, offOrigin.join(', '));
   const violations = logs.filter((line) => /Content.Security.Policy|Refused/i.test(line));
   if (violations.length > 0) console.log(`      console: ${violations.join(' | ')}`);
+});
+
+await scenario('import', PRODUCTION_CSP, async ({ page, console: logs }) => {
+  // The path a real scan takes: a JPEG file through prepareImage → recognise →
+  // parseReceipt. Scenario 1 alone passed while every real scan failed.
+  const result = await page.evaluate(() => window.runImport());
+  report(
+    "5. the app's real import pipeline fills in gallons and price",
+    result?.ok === true && result.gallons === 10.512 && result.pricePerGallon === 3.919 && result.note === null,
+    JSON.stringify(result) + (result?.note ? `; console: ${logs.slice(-2).join(' | ')}` : ''),
+  );
+  if (PHOTO !== null) {
+    const real = await page.evaluate(() => window.runImportFrom('/__local-photo'));
+    if (process.env.OCR_DEBUG) {
+      const read = await page.evaluate(() => window.readFrom('/__local-photo'));
+      console.log('      recognised lines:\n' + (read?.lines ?? []).map((line) => `        ${JSON.stringify(line)}`).join('\n'));
+    }
+    // Passes when the photo is *read* and values are offered. Whether they are
+    // the right values is for a person holding the receipt to judge: this
+    // script cannot know them, and a check that claimed to would be lying.
+    // OCR_DEBUG=1 prints the recognised lines, for diagnosing the parser.
+    report(
+      '6. a real receipt photo (local only) is read and values offered — check them by eye',
+      real?.ok === true && real.gallons !== null && real.pricePerGallon !== null,
+      JSON.stringify(real),
+    );
+  }
 });
 
 await scenario('offline', PRODUCTION_CSP, async ({ page, context, failures, console: logs }) => {

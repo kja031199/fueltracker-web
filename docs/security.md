@@ -81,6 +81,12 @@ the live check came back clean. `recognise()` then hung, because
 `createWorker` never settles when the core aborts. It now gives up after
 `READER_LOAD_TIMEOUT_MS` and says the reader is unavailable.
 
+**#17 alone did not make scanning work.** Once the reader loaded, the first
+real scan on a phone still failed: the app handed tesseract an `ImageBitmap`,
+which its loader reads as zero bytes. Every throw was reported as the reader
+being unavailable, so the message said to check the connection. The reader now
+receives a JPEG `Blob`, and a failure says which part failed and why.
+
 The OCR browser check in [development.md](development.md#the-ocr-browser-check)
 is what found all of this, and it is what to run after touching the scanner or
 the CSP.

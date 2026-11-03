@@ -41,11 +41,23 @@ export const MAX_OCR_DIMENSION = 2400;
 
 export const STORED_QUALITY = 0.7;
 
+/** JPEG quality of the copy handed to OCR: high, because recognition wants edges. */
+export const OCR_QUALITY = 0.92;
+
 export interface PreparedImage {
   /** Re-encoded, bounded JPEG bytes — the only thing that reaches storage. */
   readonly stored: Uint8Array;
-  /** A larger bitmap for recognition. Never persisted. */
-  readonly forOcr: ImageBitmap;
+  /**
+   * A larger copy for recognition, **as an encoded image `Blob`**. Never
+   * persisted.
+   *
+   * Not an `ImageBitmap`, which it used to be. tesseract.js reads a Blob, File
+   * or canvas, and anything else falls through its loader to
+   * `new Uint8Array(image)` — zero bytes for a bitmap — so every real scan
+   * failed with "pix not read", reported as the reader not loading. Typed
+   * `Blob` so a bitmap cannot be handed over again.
+   */
+  readonly forOcr: Blob;
   readonly width: number;
   readonly height: number;
 }
@@ -78,20 +90,13 @@ async function draw(bitmap: ImageBitmap, max: number): Promise<HTMLCanvasElement
   return canvas;
 }
 
-function canvasToBytes(canvas: HTMLCanvasElement, quality: number): Promise<Uint8Array | null> {
-  return new Promise((resolve) => {
-    canvas.toBlob(
-      (blob) => {
-        if (blob === null) {
-          resolve(null);
-          return;
-        }
-        void blob.arrayBuffer().then((buffer) => resolve(new Uint8Array(buffer)));
-      },
-      'image/jpeg',
-      quality,
-    );
-  });
+function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob | null> {
+  return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+}
+
+async function canvasToBytes(canvas: HTMLCanvasElement, quality: number): Promise<Uint8Array | null> {
+  const blob = await canvasToBlob(canvas, quality);
+  return blob === null ? null : new Uint8Array(await blob.arrayBuffer());
 }
 
 /**
@@ -118,20 +123,15 @@ export async function prepareImage(file: Blob): Promise<PrepareResult> {
   const stored = await canvasToBytes(storedCanvas, STORED_QUALITY);
   if (stored === null) return { ok: false, reason: 'no-canvas' };
 
-  const ocrScale = fitScale(bitmap.width, bitmap.height, MAX_OCR_DIMENSION);
-  const forOcr =
-    ocrScale === 1
-      ? bitmap
-      : await createImageBitmap(bitmap, {
-          resizeWidth: Math.max(1, Math.round(bitmap.width * ocrScale)),
-          resizeHeight: Math.max(1, Math.round(bitmap.height * ocrScale)),
-          resizeQuality: 'high',
-        });
+  // Drawn and encoded the same way as the stored copy, only larger and at a
+  // higher quality, so what tesseract receives is an image file it can read.
+  const ocrCanvas = await draw(bitmap, MAX_OCR_DIMENSION);
+  const forOcr = ocrCanvas === null ? null : await canvasToBlob(ocrCanvas, OCR_QUALITY);
+  const { width, height } = bitmap;
+  bitmap.close();
+  if (forOcr === null) return { ok: false, reason: 'no-canvas' };
 
-  return {
-    ok: true,
-    image: { stored, forOcr, width: bitmap.width, height: bitmap.height },
-  };
+  return { ok: true, image: { stored, forOcr, width, height } };
 }
 
 export function describeFailure(reason: PrepareFailure): string {
