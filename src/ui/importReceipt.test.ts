@@ -63,6 +63,23 @@ describe('a readable receipt', () => {
   });
 });
 
+describe('a warehouse-club receipt with a misread summary line', () => {
+  test("offers the fuel line's gallons, corroborated, with no note", async () => {
+    // A real Sam's Club scan: the "@" line exact, the summary GALLONS line read
+    // as the price. 4.099 × 4.099 is within 1% of $16.77, so corroboration
+    // could not catch it; the parser has to choose the right line.
+    const outcome = await importReceiptPhoto(photo(), {
+      recognise: ocr(["Sam's Club", 'p 4.092 @ 4.099', 'UNLEAD ~~ 16.77 0', 'SUBTOTAL 16.77', 'GALLONS : 4.099']),
+      now: () => NOW,
+    });
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.suggestion.gallons).toBe(4.092);
+    expect(outcome.suggestion.pricePerGallon).toBe(4.099);
+    expect(outcome.suggestion.note).toBeNull();
+  });
+});
+
 describe('a misread receipt', () => {
   test('declines numbers that do not corroborate, and says so', async () => {
     // The measured perspective-skew failure: 16.234 gallons instead of 10.234,

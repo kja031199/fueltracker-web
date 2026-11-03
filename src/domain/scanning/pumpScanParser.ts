@@ -4,6 +4,10 @@
  *
  * Strategy, in order of trust:
  *
+ * 0. **A receipt's fuel line** — "4.092 @ 4.099", quantity at unit price. Both
+ *    numbers are printed side by side and say what they are, so this outranks
+ *    a label (see `fuelLine` for why, and for what does not count as one).
+ *    Pump displays never print one, so it changes nothing for them.
  * 1. **Labels** — lines like "GALLONS 8.712", or "PRICE/GAL" followed by a
  *    value on the next display line.
  * 2. **Arithmetic consistency** — a (total, gallons, price) triple where
@@ -221,13 +225,60 @@ function applyDecimalHeuristics(numbers: readonly ScannedNumber[], reading: Muta
   }
 }
 
+/**
+ * "4.092 @ 4.099", optionally with units and a dollar sign around it:
+ * "10.512 GAL @ $3.919/G". **Three decimals on both sides**, which is how fuel
+ * is sold and priced, so a merchandise line — "2 @ 1.99" — never matches. The
+ * lookarounds stop it matching the middle of a longer number.
+ */
+const FUEL_LINE = /(?<![\d.])(\d+\.\d{3})\s*(?:GALLONS?|GAL|G)?\s*@\s*\$?\s*(\d+\.\d{3})(?![\d.])/g;
+
+/**
+ * The receipt's fuel line, if it has exactly one.
+ *
+ * ## Why it outranks a label
+ *
+ * Warehouse-club receipts print gallons twice: in the fuel line, and again in a
+ * "FUEL SALES SUMMARY" at the bottom, set in small type next to other numbers.
+ * On a real Sam's Club receipt the summary's "GALLONS : 4.092" was misread on
+ * both runs — as 4.099 (the price) and as 4.045 — while "4.092 @ 4.099" came
+ * back exact both times. Labels used to win, so 4.099 gallons was offered; and
+ * corroboration could not catch it, since 4.099 × 4.099 is within 1% of $16.77.
+ *
+ * Two *different* fuel lines return `null`: picking one would be a guess, and
+ * the ladder below then decides exactly as it did before this rung existed.
+ */
+function fuelLine(lines: readonly string[]): { gallons: number; price: number } | null {
+  let found: { gallons: number; price: number } | null = null;
+  for (const line of lines) {
+    for (const match of line.matchAll(FUEL_LINE)) {
+      const gallons = Number(match[1]);
+      const price = Number(match[2]);
+      if (!inRange(gallons, GALLONS_RANGE) || !inRange(price, PRICE_RANGE)) continue;
+      if (found === null) {
+        found = { gallons, price };
+      } else if (found.gallons !== gallons || found.price !== price) {
+        return null;
+      }
+    }
+  }
+  return found;
+}
+
 export function parsePump(rawLines: readonly string[]): PumpReading {
   const reading: MutableReading = { gallons: null, pricePerGallon: null, totalCost: null };
   const numbers: ScannedNumber[] = [];
   let pendingLabel: Label | null = null;
 
-  for (const rawLine of rawLines) {
-    const line = normalize(rawLine);
+  const lines = rawLines.map(normalize);
+  const fuel = fuelLine(lines);
+  if (fuel !== null) {
+    // Set first, so `assign`'s first-value-wins keeps any label from replacing it.
+    reading.gallons = fuel.gallons;
+    reading.pricePerGallon = fuel.price;
+  }
+
+  for (const line of lines) {
     const lineNumbers = extractNumbers(line);
     numbers.push(...lineNumbers);
 

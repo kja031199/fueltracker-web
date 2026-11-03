@@ -56,6 +56,15 @@ accident. Each one is recorded here and pinned by a test.
   platform — the only way an assertion can catch a *numbering* mistake and not
   just a *rotation* one. (`Intl` reports the first weekday in ISO numbering,
   1 = Monday; everything else here uses 1 = Sunday.)
+- **A receipt's fuel line outranks a label.** The original parser trusts a
+  labelled value first, so on a real Sam's Club receipt the small-print summary
+  line, misread as `GALLONS : 4.099` (the price), beat the exact
+  `4.092 @ 4.099` fuel line. Corroboration could not catch it: 4.099 × 4.099
+  is within 1% of the $16.77 total. Here exactly one `qty @ price` line, with
+  three decimals on both sides and both values in range, is taken first. Two
+  different fuel lines are ignored, and the old order decides. Pump displays
+  never print one, so pump reading is unchanged. **The iOS app still has the
+  weakness**; the same rung would fix it there.
 
 ## What this version cannot do
 

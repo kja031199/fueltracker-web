@@ -182,6 +182,12 @@ npm ci --prefix .github/firebase-cli
   failed on the photo), each with a `detail` shown to the reader. Never fold
   the two together again: that is what sent a scan that loaded fine to
   "check your connection".
+- **On a receipt, the `@` fuel line beats a `GALLONS` label** (`fuelLine` in
+  `pumpScanParser.ts`). Warehouse-club receipts repeat gallons in a small-print
+  summary, and OCR misread it on both runs of a real receipt; corroboration's
+  1% tolerance cannot tell 4.092 gallons from 4.099. Don't reorder the trust
+  ladder back to labels first, and don't relax `FUEL_LINE`'s three decimals on
+  both sides: that is what keeps `2 @ 1.99` from becoming a fuel line.
 - **`runtimeCaching` matchers are copied into `sw.js` as source text.** Use a
   RegExp, never a function that closes over a variable in `vite.config.ts`. The
   first tesseract route used `base`, threw inside `sw.js`, never matched, and

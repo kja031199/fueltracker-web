@@ -262,3 +262,23 @@ describe('hostile and abnormal input', () => {
     expect(parseReceipt(['SHELL', '01/02/2020']).purchaseDate).not.toBeNull();
   });
 });
+
+describe('a warehouse-club receipt', () => {
+  test("takes the fuel line's gallons over a misread summary line", () => {
+    // A real Sam's Club receipt, reduced to the lines that matter. The summary
+    // GALLONS line came back as the price; the "@" line was exact.
+    const receipt = parse([
+      "Sam's Club",
+      '10/01/26 17:32',
+      'p 4.092 @ 4.099',
+      'UNLEAD ~~ 16.77 0',
+      'SUBTOTAL 16.77',
+      'FUEL SALES SUMMARY',
+      'GALLONS : 4.099',
+    ]);
+    expect(receipt.reading.gallons).toBe(4.092);
+    expect(receipt.reading.pricePerGallon).toBe(4.099);
+    expect(receipt.reading.totalCost).toBe(16.77);
+    expect(receipt.stationName).toBe("Sam's Club");
+  });
+});
