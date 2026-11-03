@@ -141,6 +141,10 @@ Recorded so a regression in the tests themselves is visible:
 | OCR input: detail not shown / detail unbounded / a failed encode of the reading copy ignored | 1 / 1 / 1 |
 | Fuel line: rung removed / labels winning over it / first of two disagreeing lines trusted | 7 / 6 / 1 |
 | Fuel line: two-decimal price / whole-number quantity / range check / lookbehind / lookahead dropped | 1 / 1 / 1 / 1 / 1 |
+| Fuel log: an action bypassing `written` (remove fill-up / import) / no sync after writes / no refresh / a failed write syncing | 1 / 1 / 6 / 5 / 1 |
+| Fuel log: opening a vanished fill-up syncing / not refreshing / a screen importing the store again | 1 / 1 / 1 |
+| Tabs: hash ignored on load / choosing replaces history / no `hashchange` / correction pushing an entry / no correction | 2 / 1 / 2 / 1 / 3 |
+| Tabs: `parseTab` case-insensitive / prefix-matching / without the `#/` check | 1 / 1 / 1 |
 | Toolchain: `@types/react` / `@types/react-dom` back to 18 / lint script removed / description reverted | 1 / 1 / 1 / 1 |
 | Toolchain: exhaustive-deps off / only a warning / a rule category on wholesale / `vite.config.ts` out of `include` | 1 / 1 / 1 / 1 |
 | Database: the `'fueltracker'` default name restored (caught by `tsc`, an unused `@ts-expect-error`) | 1 |

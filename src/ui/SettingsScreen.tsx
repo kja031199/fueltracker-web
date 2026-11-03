@@ -1,14 +1,13 @@
 import type { ReactElement } from 'react';
 import { useRef, useState } from 'react';
 import type { UnitPreferences } from '../domain/units';
-import type { FuelTrackerStore } from '../data/store';
+import type { Snapshot } from '../data/records';
 import type { AuthUser } from '../data/auth';
-import type { SyncStatus } from './useSync';
+import { useFuelLog } from './fuelLog';
 import { backupFilename } from '../data/backup';
 import { parseCsv, parseJsonBackup, toCsv } from '../data/backupFormat';
 import { downloadText } from './download';
 import { AccountId } from './AccountId';
-import { saveJsonBackup } from './exportBackup';
 import type { IdleTimeoutSetting } from '../domain/idleTimeout';
 import { IDLE_MINUTE_CHOICES, IDLE_TIMEOUT_OFF } from '../domain/idleTimeout';
 import {
@@ -23,12 +22,9 @@ import {
 interface Props {
   readonly units: UnitPreferences;
   readonly onChange: (units: UnitPreferences) => void;
-  readonly store: FuelTrackerStore;
-  readonly onImported: () => Promise<void>;
   /** Omitted by tests that are not about the account. */
   readonly account?: AuthUser;
   readonly onSignOut?: () => void;
-  readonly sync?: SyncStatus;
   /** False when this build has no backend configured, so nothing syncs. */
   readonly syncEnabled?: boolean;
   /** Records that a JSON backup was taken, for the reminder. */
@@ -63,23 +59,23 @@ export function describeSyncTime(at: number | null, now: number = Date.now()): s
 export function SettingsScreen({
   units,
   onChange,
-  store,
-  onImported,
   account,
   onSignOut,
-  sync,
   syncEnabled = false,
   onBackedUp,
   lastBackupAt = null,
   idleTimeout = IDLE_TIMEOUT_OFF,
   onIdleTimeoutChange,
 }: Props): ReactElement {
+  // Backup, restore and sync all go through the fuel log (#56): an import
+  // refreshes the screens and schedules a sync without this screen asking.
+  const { sync, saveBackup, exportSnapshot, importBackup } = useFuelLog();
   const fileInput = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [problems, setProblems] = useState<readonly string[]>([]);
 
   async function exportJson(): Promise<void> {
-    const saved = await saveJsonBackup(store);
+    const saved = await saveBackup();
     // Recorded so the reminder knows this happened. Only a JSON export counts
     // — see the CSV handler below.
     onBackedUp?.(saved.fillUps);
@@ -90,7 +86,7 @@ export function SettingsScreen({
   }
 
   async function exportCsv(): Promise<void> {
-    const snapshot = await store.exportSnapshot();
+    const snapshot = await exportSnapshot();
     // Tombstones are a backup concern, not a spreadsheet one — a deleted
     // fill-up is not a row anybody wants in their expenses.
     const live = snapshot.fillUps.filter((record) => record.deletedAt === null);
@@ -115,9 +111,8 @@ export function SettingsScreen({
 
     const snapshot = isCsv
       ? { vehicles: [], fillUps: parsed.value as never[], pendingFillUps: [] }
-      : (parsed.value as Awaited<ReturnType<FuelTrackerStore['exportSnapshot']>>);
-    const summary = await store.importBackup(snapshot);
-    await onImported();
+      : (parsed.value as Snapshot);
+    const summary = await importBackup(snapshot);
 
     setStatus(
       `Imported ${summary.fillUpsWritten} fill-up(s) and ${summary.vehiclesWritten} vehicle(s). ` +
@@ -210,7 +205,7 @@ export function SettingsScreen({
             account access.
           </AccountId>
 
-          {syncEnabled && sync !== undefined ? (
+          {syncEnabled ? (
             <>
               <p style={{ margin: '0 0 8px' }}>
                 Last synced {describeSyncTime(sync.lastSyncedAt)}.

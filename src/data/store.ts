@@ -17,7 +17,6 @@
 
 import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
-import type { FuelEntryStats } from '../domain/models';
 import type { FillUpRecord, PendingFillUpRecord, SyncFields, VehicleRecord, Snapshot } from './records';
 import { SCHEMA_VERSION } from './records';
 import type { Repository, VehicleScopedRepository } from './repository';
@@ -385,26 +384,6 @@ export class FuelTrackerStore {
   }
 }
 
-/**
- * Stored rows in the shape the statistics layer reads.
- *
- * The bridge between the two halves of the app, and the only place that knows
- * both. Statistics never sees a record and storage never sees a `Date`-shaped
- * entry.
- */
-export function toStats(
-  records: readonly Pick<
-    FillUpRecord,
-    'id' | 'date' | 'odometer' | 'gallons' | 'pricePerGallon' | 'isFullTank' | 'missedPreviousFillUp'
-  >[],
-): FuelEntryStats[] {
-  return records.map((record) => ({
-    id: record.id,
-    date: new Date(record.date),
-    odometer: record.odometer,
-    gallons: record.gallons,
-    pricePerGallon: record.pricePerGallon,
-    isFullTank: record.isFullTank,
-    missedPreviousFillUp: record.missedPreviousFillUp,
-  }));
-}
+// `toStats` lives beside the records it maps (#56), so a screen can use it
+// without importing the store; re-exported here for existing callers.
+export { toStats } from './records';

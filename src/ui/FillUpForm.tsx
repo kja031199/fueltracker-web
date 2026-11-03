@@ -15,12 +15,11 @@ import { currency, distance as formatDistance } from '../domain/format';
 import type { UnitPreferences } from '../domain/units';
 import { distance, volume } from '../domain/units';
 import type { FillUpRecord, FillUpSummary } from '../data/records';
-import type { FuelTrackerStore } from '../data/store';
+import { useFuelLog } from './fuelLog';
 import { importReceiptPhoto } from './importReceipt';
 import { TEXT_LIMITS } from '../domain/textLimits';
 
 interface Props {
-  readonly store: FuelTrackerStore;
   readonly vehicleId: string;
   readonly units: UnitPreferences;
   /** Existing fill-ups on this vehicle, for the odometer sanity check. */
@@ -96,7 +95,6 @@ function displayText(value: number | null, toDisplay: (canonical: number) => num
  * scanning; `docs/port.md` says why.
  */
 export function FillUpForm({
-  store,
   vehicleId,
   units,
   existing,
@@ -104,6 +102,8 @@ export function FillUpForm({
   onSaved,
   onCancel,
 }: Props): ReactElement {
+  // Saving goes through the fuel log, which refreshes and syncs (#56).
+  const { addFillUp, updateFillUp } = useFuelLog();
   const [form, setForm] = useState<FillUpFormState>(() =>
     editing === null ? emptyFillUpForm() : formFrom(editing),
   );
@@ -226,8 +226,8 @@ export function FillUpForm({
     if (draft === null) return;
     setSaving(true);
     try {
-      if (editing === null) await store.addFillUp(draft, vehicleId);
-      else await store.updateFillUp(editing.id, draft, vehicleId);
+      if (editing === null) await addFillUp(draft, vehicleId);
+      else await updateFillUp(editing.id, draft, vehicleId);
       await onSaved();
     } finally {
       setSaving(false);

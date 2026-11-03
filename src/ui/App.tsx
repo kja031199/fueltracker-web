@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FuelTrackerStore } from '../data/store';
-import type { AuthProvider } from '../data/auth';
+import type { AuthProvider, AuthUser } from '../data/auth';
 import { StubAuthProvider } from '../data/auth';
 import type { RemoteStore } from '../data/remote';
 import type { SyncStateStore } from '../data/syncState';
@@ -14,24 +14,36 @@ import { applyPalette, preferredColorScheme, watchColorScheme } from './theme';
 import { loadUnitPreferences, saveUnitPreferences } from './unitSettings';
 import { HAS_ONBOARDED } from './onboarding';
 import { useAccountPreference } from './preferences';
-import { useAppData } from './useAppData';
 import { useAuth } from './useAuth';
-import { useSync } from './useSync';
+import { FuelLogProvider, useFuelLog } from './fuelLog';
+import type { Tab } from './useTabRoute';
+import { useTabRoute } from './useTabRoute';
 import { useServiceWorker } from './useServiceWorker';
 import { UpdateBanner } from './UpdateBanner';
 import { BackupBanner } from './BackupBanner';
 import { useBackupNudge } from './backupNudge';
-import { saveJsonBackup } from './exportBackup';
 import { SignInScreen } from './SignInScreen';
 import { NoAccessScreen } from './NoAccessScreen';
+import { WelcomeScreen } from './WelcomeScreen';
+import { StorageErrorScreen } from './StorageErrorScreen';
 import { VehiclesScreen } from './VehiclesScreen';
 import { SettingsScreen } from './SettingsScreen';
 import { DashboardScreen } from './DashboardScreen';
 import { FillUpsScreen } from './FillUpsScreen';
 
-type Tab = 'dashboard' | 'fillups' | 'vehicles' | 'settings';
+/**
+ * The composition root (#56): **auth → this browser's preferences → the fuel
+ * log → the screens.**
+ *
+ * - `App` gates on auth and holds what belongs to the browser: units, the idle
+ *   sign-out, the palette. It is one of two components allowed to name the
+ *   store, and only hands it to the provider.
+ * - `FuelLogProvider` owns the data, sync, and every write (`fuelLog.tsx`).
+ * - `AppShell` is the signed-in app: account-scoped state (onboarding, the
+ *   backup reminder), the tab in the URL hash (`useTabRoute`), and the screens.
+ */
 
-const TABS: readonly { readonly id: Tab; readonly label: string }[] = [
+const TAB_LABELS: readonly { readonly id: Tab; readonly label: string }[] = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'fillups', label: 'Fill-ups' },
   { id: 'vehicles', label: 'Vehicles' },
@@ -85,34 +97,11 @@ export function App({
   // Memoised, or a new stub on every render would resubscribe forever.
   const authProvider = useMemo(() => auth ?? defaultAuth(), [auth]);
   const authState = useAuth(authProvider);
-  const [tab, setTab] = useState<Tab>(initialTab);
-  // Whose state this is (#55). Account-scoped preferences are read for this
-  // uid and re-read if it changes; signed out, they read as unset.
-  const uid = authState.status === 'signedIn' ? authState.user.uid : null;
   const [units, setUnits] = useState<UnitPreferences>(() => loadUnitPreferences());
-  const [hasOnboarded, setHasOnboarded] = useAccountPreference(HAS_ONBOARDED, uid, false);
   const [idleTimeout, setIdleTimeout] = useState<IdleTimeoutSetting>(() =>
     loadIdleTimeoutSetting(),
   );
   const [idleSignOut, setIdleSignOut] = useState(false);
-  const data = useAppData(store);
-  const sync = useSync(
-    store,
-    authState.status === 'signedIn' ? remote : null,
-    data.reload,
-    syncState,
-    uid,
-  );
-  // Every screen that writes calls this afterwards: refresh what is shown, then
-  // sync shortly, rather than leaving the change for the next focus (#52).
-  const { reload } = data;
-  const { afterWrite } = sync;
-  const afterSave = useCallback(async () => {
-    await reload();
-    afterWrite();
-  }, [reload, afterWrite]);
-  const backup = useBackupNudge(data.fillUpCount, uid);
-  const serviceWorker = useServiceWorker();
 
   const signedIn = authState.status === 'signedIn';
   const endIdleSession = useCallback(() => {
@@ -145,18 +134,6 @@ export function App({
     saveIdleTimeoutSetting(next);
   }
 
-  function finishOnboarding(): void {
-    setHasOnboarded(true);
-  }
-
-  const onboarding = useMemo(
-    // Decided from loaded data, so a returning reader whose flag was cleared
-    // (a new browser profile, an imported backup) is not marched through a
-    // first-run flow over data they already have.
-    () => !data.loading && shouldOnboard(hasOnboarded, data.vehicles.length),
-    [data.loading, data.vehicles.length, hasOnboarded],
-  );
-
   // The auth gate comes before everything, and `loading` is a state of its own
   // rather than being folded into "signed out". Firebase restores a persisted
   // session asynchronously, so treating "not signed in yet" as "signed out"
@@ -187,7 +164,66 @@ export function App({
     );
   }
 
-  if (data.loading) {
+  return (
+    <FuelLogProvider
+      store={store}
+      remote={remote}
+      uid={authState.user.uid}
+      {...(syncState === undefined ? {} : { syncState })}
+    >
+      <AppShell
+        account={authState.user}
+        onSignOut={() => void authProvider.signOut()}
+        initialTab={initialTab}
+        units={units}
+        onUnitsChange={changeUnits}
+        idleTimeout={idleTimeout}
+        onIdleTimeoutChange={changeIdleTimeout}
+        syncEnabled={remote !== null}
+      />
+    </FuelLogProvider>
+  );
+}
+
+interface AppShellProps {
+  readonly account: AuthUser;
+  readonly onSignOut: () => void;
+  readonly initialTab: Tab;
+  readonly units: UnitPreferences;
+  readonly onUnitsChange: (units: UnitPreferences) => void;
+  readonly idleTimeout: IdleTimeoutSetting;
+  readonly onIdleTimeoutChange: (setting: IdleTimeoutSetting) => void;
+  readonly syncEnabled: boolean;
+}
+
+/** The signed-in app, inside the fuel log. */
+function AppShell({
+  account,
+  onSignOut,
+  initialTab,
+  units,
+  onUnitsChange,
+  idleTimeout,
+  onIdleTimeoutChange,
+  syncEnabled,
+}: AppShellProps): ReactElement {
+  const log = useFuelLog();
+  const [tab, setTab] = useTabRoute(initialTab);
+  // Account-scoped (#55): read for this uid, and re-read if it changes.
+  const [hasOnboarded, setHasOnboarded] = useAccountPreference(HAS_ONBOARDED, account.uid, false);
+  const backup = useBackupNudge(log.fillUpCount, account.uid);
+  const serviceWorker = useServiceWorker();
+
+  // Decided from loaded data, so a returning reader whose flag was cleared (a
+  // new browser profile, an imported backup) is not marched through a
+  // first-run flow over data they already have.
+  const onboarding = !log.loading && shouldOnboard(hasOnboarded, log.vehicles.length);
+
+  function backUp(): void {
+    void log.saveBackup().then((saved) => backup.recordBackup(saved.fillUps));
+  }
+
+  if (log.loading) {
     return (
       <div className="app">
         <p className="empty">Loading your fuel log…</p>
@@ -195,19 +231,7 @@ export function App({
     );
   }
 
-  if (data.error !== null) {
-    return (
-      <div className="app">
-        <main className="app__main">
-          <h1 className="app__title">FuelTracker</h1>
-          <p className="warning">
-            Local storage is unavailable, so nothing can be saved or loaded. Private browsing or a
-            blocked-storage setting is the usual cause. ({data.error})
-          </p>
-        </main>
-      </div>
-    );
-  }
+  if (log.error !== null) return <StorageErrorScreen detail={log.error} />;
 
   // Signed in, and the account said no (#41). Shown instead of the app rather
   // than beside it: the first-run flow promises that a fuel log is kept in the
@@ -215,103 +239,49 @@ export function App({
   // logging fill-ups that can never leave the device. A refusal does not clear
   // on its own, so this is not a flash during a slow network; `refused` is only
   // set for `permission-denied` and a successful sync clears it.
-  if (sync.refused) {
-    const hasLocalData = data.vehicles.length > 0 || data.fillUpCount > 0;
+  if (log.sync.refused) {
+    const hasLocalData = log.vehicles.length > 0 || log.fillUpCount > 0;
     return (
       <NoAccessScreen
-        account={authState.user}
-        onRetry={() => void sync.syncNow()}
-        retrying={sync.syncing}
-        onSignOut={() => void authProvider.signOut()}
+        account={account}
+        onRetry={() => void log.sync.syncNow()}
+        retrying={log.sync.syncing}
+        onSignOut={onSignOut}
         // Offered only when there is something to lose. Somebody who had
         // access, logged fill-ups and then lost it would otherwise have their
         // own data stranded behind a Settings screen they cannot reach.
-        onExport={hasLocalData ? () => void saveJsonBackup(store) : undefined}
+        onExport={hasLocalData ? () => void log.saveBackup() : undefined}
       />
     );
   }
 
-  if (onboarding) {
-    return (
-      <div className="app">
-        <main className="app__main">
-          <h1 className="app__title">Welcome to FuelTracker</h1>
-          <section className="card">
-            <p>
-              Log every fill-up and this works out your real fuel economy, what you actually spend,
-              and which day of the week you tend to catch the cheapest price.
-            </p>
-            <p>
-              Your fuel log is saved on this device and kept in your Google account, so it survives
-              clearing your browser data and follows you to your phone. Only you can read it.
-            </p>
-            <button className="button" type="button" onClick={finishOnboarding}>
-              Get started
-            </button>
-          </section>
-        </main>
-      </div>
-    );
-  }
+  if (onboarding) return <WelcomeScreen onStart={() => setHasOnboarded(true)} />;
 
   return (
     <div className="app">
       <UpdateBanner state={serviceWorker} />
-      <BackupBanner
-        reason={backup.reason}
-        onBackUp={() => {
-          void saveJsonBackup(store).then((saved) => backup.recordBackup(saved.fillUps));
-        }}
-        onDismiss={backup.snooze}
-      />
+      <BackupBanner reason={backup.reason} onBackUp={backUp} onDismiss={backup.snooze} />
       <h1 className="app__title">FuelTracker</h1>
       <main className="app__main">
-        {tab === 'vehicles' && (
-          <VehiclesScreen
-            store={store}
-            vehicles={data.vehicles}
-            selectedVehicleId={data.selectedVehicleId}
-            onSelect={data.selectVehicle}
-            onChanged={afterSave}
-          />
-        )}
+        {tab === 'vehicles' && <VehiclesScreen />}
         {tab === 'settings' && (
           <SettingsScreen
             units={units}
-            onChange={changeUnits}
-            store={store}
-            onImported={afterSave}
+            onChange={onUnitsChange}
             onBackedUp={backup.recordBackup}
             lastBackupAt={backup.state.lastExportAt}
-            account={authState.user}
-            onSignOut={() => void authProvider.signOut()}
+            account={account}
+            onSignOut={onSignOut}
             idleTimeout={idleTimeout}
-            onIdleTimeoutChange={changeIdleTimeout}
-            sync={sync}
-            syncEnabled={remote !== null}
+            onIdleTimeoutChange={onIdleTimeoutChange}
+            syncEnabled={syncEnabled}
           />
         )}
-        {tab === 'dashboard' && (
-          <DashboardScreen
-            vehicles={data.vehicles}
-            selectedVehicleId={data.selectedVehicleId}
-            onSelect={data.selectVehicle}
-            fillUps={data.fillUps}
-            units={units}
-          />
-        )}
-        {tab === 'fillups' && (
-          <FillUpsScreen
-            store={store}
-            vehicleId={data.selectedVehicleId}
-            fillUps={data.fillUps}
-            units={units}
-            onChanged={afterSave}
-          />
-        )}
+        {tab === 'dashboard' && <DashboardScreen units={units} />}
+        {tab === 'fillups' && <FillUpsScreen units={units} />}
       </main>
       <nav className="tabs" aria-label="Sections">
-        {TABS.map((entry) => (
+        {TAB_LABELS.map((entry) => (
           <button
             key={entry.id}
             className="tabs__button"

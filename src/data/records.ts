@@ -25,6 +25,7 @@
  */
 
 import type { FuelGrade } from '../domain/fuelGrade';
+import type { FuelEntryStats } from '../domain/models';
 
 /** Bump when a stored shape changes in a way a reader must know about. */
 export const SCHEMA_VERSION = 1;
@@ -143,4 +144,28 @@ export type FillUpSummary = Omit<FillUpRecord, 'receiptImageData'> & {
 export function toSummary(record: FillUpRecord): FillUpSummary {
   const { receiptImageData: _bytes, ...rest } = record;
   return { ...rest, hasReceipt: hasReceipt(record) };
+}
+
+/**
+ * Stored rows in the shape the statistics layer reads.
+ *
+ * The bridge between the two halves of the app, and the only place that knows
+ * both. Statistics never sees a record and storage never sees a `Date`-shaped
+ * entry.
+ */
+export function toStats(
+  records: readonly Pick<
+    FillUpRecord,
+    'id' | 'date' | 'odometer' | 'gallons' | 'pricePerGallon' | 'isFullTank' | 'missedPreviousFillUp'
+  >[],
+): FuelEntryStats[] {
+  return records.map((record) => ({
+    id: record.id,
+    date: new Date(record.date),
+    odometer: record.odometer,
+    gallons: record.gallons,
+    pricePerGallon: record.pricePerGallon,
+    isFullTank: record.isFullTank,
+    missedPreviousFillUp: record.missedPreviousFillUp,
+  }));
 }
