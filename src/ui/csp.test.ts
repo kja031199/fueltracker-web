@@ -132,10 +132,23 @@ describe('the policy', () => {
   it('does not weaken script-src', () => {
     // Asserted directly, so loosening it later has to be a visible, deliberate
     // edit to this file rather than a quiet addition to a long header string.
-    const scriptSrc = policy().get('script-src') ?? '';
-    expect(scriptSrc).toContain("'self'");
-    expect(scriptSrc).not.toContain('unsafe-inline');
-    expect(scriptSrc).not.toContain('unsafe-eval');
+    // Compared as tokens, not substrings: `'wasm-unsafe-eval'` (below) contains
+    // the text `unsafe-eval`, and a substring check would either forbid the one
+    // or quietly permit the other.
+    const tokens = (policy().get('script-src') ?? '').split(/\s+/);
+    expect(tokens).toContain("'self'");
+    expect(tokens).not.toContain("'unsafe-inline'");
+    expect(tokens).not.toContain("'unsafe-eval'");
+  });
+
+  it('lets WebAssembly compile, and nothing else that eval would', () => {
+    // #17. The receipt reader is WebAssembly, and since #39 enforced this
+    // policy, compiling it needs `'wasm-unsafe-eval'` — without it a scan
+    // fails inside its worker, where the page's violation watcher cannot see
+    // it. The token permits `WebAssembly.compile` and nothing else: no `eval`,
+    // no `new Function`.
+    const tokens = (policy().get('script-src') ?? '').split(/\s+/);
+    expect(tokens).toContain("'wasm-unsafe-eval'");
   });
 
   it('names every origin the app contacts at runtime', () => {
@@ -144,14 +157,23 @@ describe('the policy', () => {
     expect(connect).toContain('googleapis.com');
     // The auth handler, which the sign-in popup completes against.
     expect(connect).toContain('firebaseapp.com');
-    // tesseract.js fetches its worker, wasm core and language data from here
-    // at scan time. Easy to miss, because nothing in this repository's source
-    // mentions it — it is a default inside the library.
-    expect(connect).toContain('cdn.jsdelivr.net');
   });
 
-  it('allows the blob worker and blob images receipts rely on', () => {
-    expect(policy().get('worker-src') ?? '').toContain('blob:');
+  it('names no CDN: the receipt reader is served from this origin', () => {
+    // #17. tesseract.js used to fetch its worker, wasm core and language data
+    // from jsDelivr at scan time — third-party code, fetched at runtime and
+    // run with this origin's access to the fuel log. It is self-hosted now,
+    // so the CDN has no business in any directive.
+    for (const [directive, sources] of policy()) {
+      expect(sources, directive).not.toContain('jsdelivr');
+    }
+  });
+
+  it('runs workers from this origin only, and still shows receipt previews', () => {
+    // The reader's worker is a real same-origin script now (`workerBlobURL:
+    // false`), so `blob:` workers — code with no URL anybody can audit — are
+    // no longer needed. Blob *images* still are: that is the receipt preview.
+    expect(policy().get('worker-src')).toBe("'self'");
     expect(policy().get('img-src') ?? '').toContain('blob:');
   });
 

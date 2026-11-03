@@ -21,14 +21,19 @@ refused — so **enforcing the policy without running this check would have
 broken sign-in for every account on the next deploy**. `script-src` now names
 `https://apis.google.com`, and nothing else off-origin.
 
-Nothing else was refused: Firestore sync and the receipt scan were already
-covered by `connect-src`.
+Nothing else was *reported*. Firestore sync was genuinely covered by
+`connect-src`. **The receipt scan was not.** Enforcing the policy refused both
+the reader's core, loaded with `importScripts` from jsDelivr, and its
+WebAssembly compile. It refused them inside a worker, where this watcher cannot
+see, so the scan was broken from here until #17 while this report read clean.
+The [OCR browser check](development.md#the-ocr-browser-check) exists because of
+that.
 
 ## Why reasoning is not a substitute
 
 A policy written without being able to load the deployed site is a guess. The
 authoring environment cannot reach the deployed origin, the Firebase auth
-domain or `cdn.jsdelivr.net`, and signing in needs a real Google account — so
+domain, and signing in needs a real Google account — so
 the only honest evidence is a run in a real browser against the real site.
 
 Report-only is what makes that safe: the browser evaluates the policy and
@@ -71,9 +76,12 @@ kind of work once.
    that does not sever `window.opener`.
 2. **Add a fill-up, then Settings → Sync now.** Exercises Firestore's
    WebChannel connection against `connect-src`.
-3. **Scan a receipt** (Fill-ups → add → the photo button). Fetches the OCR
-   engine and language data from `cdn.jsdelivr.net` and runs it in a worker
-   created from a blob — `connect-src` and `worker-src blob:`.
+3. **Scan a receipt** (Fill-ups → add → the photo button). The reader is
+   served from this origin since #17, and **its violations will not show up
+   here**: they happen inside a worker, which the watcher cannot see. That is
+   how the reader was broken from #39 to #17 while this check came back clean.
+   Its own check is the [OCR browser check](development.md#the-ocr-browser-check);
+   do this step only to confirm the scan works end to end.
 4. **Save a backup** (Settings → Export JSON, or the banner if it is showing).
    A blob download.
 5. **Reload with the network off** (DevTools → Network → Offline, then reload).

@@ -34,6 +34,7 @@
     "url": "https://github.com/kja031199/fueltracker-web.git"
   },
   "dependencies": {
+    "@tesseract.js-data/eng": "^1.0.0",
     "dexie": "^4.4.6",
     "exifr": "^7.1.3",
     "firebase": "^13.1.0",
