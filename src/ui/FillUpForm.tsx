@@ -87,11 +87,13 @@ function displayText(value: number | null, toDisplay: (canonical: number) => num
  * numbers. This is the mirror of the chart rule: convert the value, never
  * relabel it.
  *
- * ## What is deliberately missing
+ * ## Photos fill blanks; they never overwrite
  *
- * No camera scanning and no photo import. The parsers for both are ported and
- * tested, but wiring them needs image intake and OCR, which is a later phase.
- * Manual entry is the complete path today.
+ * A receipt photo can be attached and read (`importReceipt.ts`): its gallons,
+ * price, date and station go into fields that are still empty, and only when
+ * the numbers corroborate each other. Manual entry stays the complete path —
+ * scanning saves typing, it is never required. There is no live camera or pump
+ * scanning; `docs/port.md` says why.
  */
 export function FillUpForm({
   store,

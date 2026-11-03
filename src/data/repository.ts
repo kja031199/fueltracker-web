@@ -1,9 +1,12 @@
 /**
  * The whole persistence abstraction.
  *
- * Four methods, deliberately. No query builder, no sync engine, no conflict
- * resolution — those belong to a later phase and guessing at their shape now
- * would bake in assumptions before there is anything to check them against.
+ * A handful of methods, deliberately, and no query builder. Sync and conflict
+ * resolution are not in here: they live above it (`sync.ts`, `syncClock.ts`)
+ * and use nothing but these methods, which is what keeps every storage engine
+ * interchangeable underneath them. The one per-vehicle read, `listForVehicle`,
+ * is on `VehicleScopedRepository` rather than here, because only fill-ups and
+ * pending fill-ups have a vehicle (#53).
  *
  * Two implementations exist and both matter: `DexieRepository` is what the app
  * runs on, and `InMemoryRepository` below is what the tests run on and what a

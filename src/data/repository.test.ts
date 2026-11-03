@@ -193,3 +193,15 @@ describe('DexieRepository persistence', () => {
     db.close();
   });
 });
+
+describe('FuelTrackerDatabase has no default name (#57)', () => {
+  test('a caller must say which database it means', () => {
+    // The default used to be the legacy shared `fueltracker` database — the one
+    // #44 stopped opening. With no default, forgetting the name is a type
+    // error rather than a quiet open of the wrong store. If a default ever
+    // comes back, this directive itself fails `tsc`.
+    // @ts-expect-error — the name is required
+    const make = (): FuelTrackerDatabase => new FuelTrackerDatabase();
+    expect(typeof make).toBe('function');
+  });
+});

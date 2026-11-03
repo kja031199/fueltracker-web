@@ -51,6 +51,13 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Hooks only: rules-of-hooks and exhaustive-deps, as errors (#57). oxlint
+      # rather than typescript-eslint, which cannot parse with TypeScript 7.
+      # A step in this job rather than a new required check, so making it
+      # required costs nothing.
+      - name: Lint
+        run: npm run lint
+
       # Built **before** the tests, not after. A suite that passes while the app
       # fails to build is a green check over something nobody can load — and
       # the manifest tests read the built output, so running the build second

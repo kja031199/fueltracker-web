@@ -32,6 +32,7 @@ The rewrite is not a port of the UI. SwiftUI does not run on the web and SwiftDa
 npm install
 npm run dev        # vite dev server
 npm test           # vitest
+npm run lint       # oxlint: the two React hooks rules, nothing else
 npm run build      # typecheck, then a production build
 ```
 

@@ -45,8 +45,10 @@ export interface BackupFile extends Snapshot {
  * Receipt bytes as base64.
  *
  * A backup that silently drops photos is a backup that lies, so they travel
- * with the file. They are `null` on every row today — image intake is a later
- * phase — so this costs nothing now and is correct once it does not.
+ * with the file. A photo is re-encoded to a bounded size when it is attached
+ * (`receiptImage.ts`), so it is usually a few hundred kilobytes — and on the
+ * way back in, the 4 MB storage ceiling is checked on the base64 *before* it is
+ * decoded.
  *
  * Chunked rather than one spread call: `String.fromCharCode(...bytes)` blows the
  * call stack somewhere around a hundred thousand arguments, and a receipt can
