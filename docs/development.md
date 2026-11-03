@@ -71,6 +71,20 @@ directory; the probe never ships), serves it with **the headers from
    and fail *cleanly*, with "unavailable" rather than a hang. This proves the
    check can fail, and it reproduces the live site's failure exactly.
 
+5. **The app's real import pipeline** reads a receipt. A drawn receipt,
+   encoded as a JPEG `File`, goes through `importReceiptPhoto` → `prepareImage`
+   → `recognise` → `parseReceipt`, and the suggested gallons and price must be
+   exactly right. Scenarios 1–4 call `recognise` with a `Blob` directly, and so
+   passed while every real scan failed: the pipeline handed tesseract an
+   `ImageBitmap`, which it reads as zero bytes. This scenario is the one that
+   would have caught it.
+6. **Optional, local only:** `--photo <path>` runs a real receipt photo
+   through the same pipeline and prints what it offers. It passes when values
+   are offered, and **whether they are right is for you to judge** with the
+   receipt in hand. `OCR_DEBUG=1` also prints the recognised lines, which is
+   how to diagnose the parser. **Never commit a real receipt**: card digits,
+   account and transaction numbers.
+
 It takes a couple of minutes, mostly scenario 4 waiting out the load bound. It
 is not in CI, by decision: CI covers the same ground through `csp.test.ts`,
 `ocr.test.ts` and `ocrAssets.test.ts`. **Run it after changing the scanner, the
@@ -122,6 +136,8 @@ Recorded so a regression in the tests themselves is visible:
 | OCR: `workerPath` / `langPath` left out (CDN default) / blob worker again / no load timeout / late worker left running | 1 / 1 / 1 / 2 / 1 |
 | OCR CSP: without `'wasm-unsafe-eval'` / with full `'unsafe-eval'` / CDN back / `blob:` workers back | 1 / 1 / 1 / 1 |
 | OCR build: reader precached / route back to a closure / wrong core variant / runtime route removed | 1 / 1 / 1 / 2 |
+| OCR input: reader handed the bitmap again / a read failure reported as unavailable / load detail dropped | 1 / 1 / 3 |
+| OCR input: detail not shown / detail unbounded / a failed encode of the reading copy ignored | 1 / 1 / 1 |
 | Sync (emulator): rules accepting any `syncedAt` / push unstamped / records carrying it / remote ignoring the cursor | 1 / 4 / 1 / 2 |
 | Date window: segments not windowed / boundary exclusive / invalid date as a window | 4 / 6 / 1 |
 | Date window: no anchor / anchor without odometer guard / cost per mile ignoring it / intervals ignoring it / suspect norm from the window | 1 / 1 / 1 / 1 / 1 |

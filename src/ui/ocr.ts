@@ -29,16 +29,43 @@
  * pump parser stays, because it costs nothing and reads receipt fuel lines.
  */
 
-export type OcrFailure = 'unavailable' | 'no-text';
+/**
+ * Why a scan read nothing — kept apart because they send the reader to
+ * different places. Until after #63 a failure *while reading the photo* was
+ * reported as `'unavailable'`, so a phone that had loaded the reader fine was
+ * told to check its connection, and the real cause (the photo arriving as zero
+ * bytes) was invisible.
+ *
+ * - `unavailable` — the reader did not load (network, CSP, timeout);
+ * - `unreadable` — it loaded, and failed on this photo;
+ * - `no-text` — it read the photo and found nothing.
+ */
+export type OcrFailure = 'unavailable' | 'unreadable' | 'no-text';
 
 export type OcrResult =
   | { readonly ok: true; readonly lines: string[]; readonly confidence: number }
-  | { readonly ok: false; readonly reason: OcrFailure };
+  | {
+      readonly ok: false;
+      readonly reason: OcrFailure;
+      /** The underlying error, shortened, so a screenshot says what failed. */
+      readonly detail?: string;
+    };
 
-export function describeOcrFailure(reason: OcrFailure): string {
+/** Longest detail shown: enough to name an error, short enough for a phone. */
+const MAX_DETAIL = 200;
+
+function detailOf(cause: unknown): string {
+  const text = cause instanceof Error ? cause.message : String(cause);
+  return text.length > MAX_DETAIL ? `${text.slice(0, MAX_DETAIL - 1)}…` : text;
+}
+
+export function describeOcrFailure(reason: OcrFailure, detail?: string): string {
+  const suffix = detail === undefined || detail === '' ? '' : ` (Details: ${detail})`;
   switch (reason) {
     case 'unavailable':
-      return 'The text reader could not be loaded. It is downloaded from this site the first time you scan, so that first scan needs a connection.';
+      return `The text reader could not be loaded. It is downloaded from this site the first time you scan, so that first scan needs a connection.${suffix}`;
+    case 'unreadable':
+      return `The text reader could not read that photo. Try another shot, or just type the numbers in.${suffix}`;
     case 'no-text':
       return 'No readable text in that photo. Try a flatter, better-lit shot, or just type the numbers in.';
   }
@@ -117,12 +144,17 @@ async function loadReader(): Promise<OcrWorker> {
   }
 }
 
-export async function recognise(image: ImageBitmap | Blob): Promise<OcrResult> {
+/**
+ * Reads the text in an encoded image. **A `Blob` only**: tesseract.js turns an
+ * `ImageBitmap` into zero bytes, which is how every real scan failed until
+ * after #63.
+ */
+export async function recognise(image: Blob): Promise<OcrResult> {
   let worker: OcrWorker;
   try {
     worker = await loadReader();
-  } catch {
-    return { ok: false, reason: 'unavailable' };
+  } catch (cause) {
+    return { ok: false, reason: 'unavailable', detail: detailOf(cause) };
   }
 
   try {
@@ -133,8 +165,8 @@ export async function recognise(image: ImageBitmap | Blob): Promise<OcrResult> {
       .filter((line: string) => line !== '');
     if (lines.length === 0) return { ok: false, reason: 'no-text' };
     return { ok: true, lines, confidence: data.confidence };
-  } catch {
-    return { ok: false, reason: 'unavailable' };
+  } catch (cause) {
+    return { ok: false, reason: 'unreadable', detail: detailOf(cause) };
   } finally {
     await worker.terminate().catch(() => {});
   }

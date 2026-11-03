@@ -154,3 +154,49 @@ describe('hostile files', () => {
     expect(outcome.suggestion.pricePerGallon).toBeNull();
   });
 });
+
+describe('what the reader is handed (after #63)', () => {
+  test('a Blob, never an ImageBitmap', async () => {
+    // tesseract.js reads a Blob, File or canvas. An ImageBitmap falls through
+    // its loader to `new Uint8Array(bitmap)` — zero bytes — and the scan fails
+    // on every photo. That was the app until this test: the first real scan on
+    // a phone, after #63 made the reader load at all, reported it unavailable.
+    let handed: unknown = null;
+    await importReceiptPhoto(photo(), {
+      recognise: async (image) => {
+        handed = image;
+        return { ok: true, lines: RECEIPT_LINES, confidence: 90 };
+      },
+      now: () => NOW,
+    });
+    expect(handed).toBeInstanceOf(Blob);
+    expect((handed as Blob).size).toBeGreaterThan(0);
+  });
+});
+
+
+describe('a browser that will not encode the reading copy', () => {
+  test('says so, and never hands the reader nothing', async () => {
+    // The stored copy encodes; the larger copy for reading does not — a
+    // canvas that size can exceed what a phone allows. Better a plain message
+    // than the reader being called with no image at all.
+    let encodes = 0;
+    const proto = HTMLCanvasElement.prototype as unknown as Record<string, unknown>;
+    proto['toBlob'] = (cb: (b: Blob | null) => void) => {
+      encodes += 1;
+      cb(encodes === 1 ? new Blob([new Uint8Array([1, 2, 3])]) : null);
+    };
+    let called = false;
+
+    const outcome = await importReceiptPhoto(photo(), {
+      recognise: async () => {
+        called = true;
+        return { ok: true, lines: RECEIPT_LINES, confidence: 90 };
+      },
+      now: () => NOW,
+    });
+
+    expect(called).toBe(false);
+    expect(outcome).toMatchObject({ ok: false, message: expect.stringMatching(/image/i) });
+  });
+});

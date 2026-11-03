@@ -30,7 +30,7 @@ export type ImportOutcome =
 
 /** Injected so tests can drive this without loading Tesseract. */
 export interface ImportDeps {
-  readonly recognise: (image: ImageBitmap | Blob) => Promise<OcrResult>;
+  readonly recognise: (image: Blob) => Promise<OcrResult>;
   readonly now: () => Date;
 }
 
@@ -60,7 +60,7 @@ export async function importReceiptPhoto(
         date: capturedAt,
         station: null,
         receiptImageData: prepared.image.stored,
-        note: describeOcrFailure(ocr.reason),
+        note: describeOcrFailure(ocr.reason, ocr.detail),
       },
     };
   }

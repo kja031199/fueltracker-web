@@ -173,6 +173,15 @@ npm ci --prefix .github/firebase-cli
   `'self'`. **Its CSP failures happen inside a worker, so `cspWatch` cannot see
   them**: after touching the scanner, the CSP or the service worker, run
   `node scripts/ocr-check/check.mjs`.
+- **tesseract.js reads a `Blob`, `File` or canvas, never an `ImageBitmap`.**
+  Anything else falls through its loader to `new Uint8Array(image)`, which is
+  zero bytes, and the read fails with "pix not read". That is how every real
+  scan failed after #63 made the reader load at all. `prepareImage` hands OCR a
+  JPEG `Blob`, and `recognise(image: Blob)` refuses anything else. OCR failures
+  are `unavailable` (the reader didn't load) or `unreadable` (it loaded, but
+  failed on the photo), each with a `detail` shown to the reader. Never fold
+  the two together again: that is what sent a scan that loaded fine to
+  "check your connection".
 - **`runtimeCaching` matchers are copied into `sw.js` as source text.** Use a
   RegExp, never a function that closes over a variable in `vite.config.ts`. The
   first tesseract route used `base`, threw inside `sw.js`, never matched, and
