@@ -198,3 +198,108 @@ describe('hostile input', () => {
     expect(isEmptyReading(second)).toBe(true);
   });
 });
+
+/**
+ * The fuel line a warehouse-club receipt prints: "4.092 @ 4.099" — quantity at
+ * unit price, both read straight off the paper. Its summary "GALLONS" line was
+ * misread on both runs of a real Sam's Club receipt (as 4.099, then 4.045), and
+ * a label used to outrank everything, so 4.099 gallons was offered — and passed
+ * corroboration, because 4.099 × 4.099 is within 1% of $16.77.
+ */
+describe('the fuel "@" line', () => {
+  // The fuel-relevant lines of that receipt, as OCR returned them.
+  const samsClub = (summary: string): string[] => [
+    'p 4.092 @ 4.099',
+    'UNLEAD ~~ 16.77 0',
+    'SUBTOTAL 16.77',
+    'TOTAL EN',
+    'VISA TEND 16.77',
+    'CHANGE DUE 0.00',
+    'FUEL SALES SUMMARY',
+    summary,
+  ];
+
+  test('outranks a summary GALLONS line misread as the price', () => {
+    const reading = parsePump(samsClub('GALLONS : 4.099'));
+    expect(reading.gallons).toBe(4.092);
+    expect(reading.pricePerGallon).toBe(4.099);
+    expect(reading.totalCost).toBe(16.77);
+  });
+
+  test('outranks a summary GALLONS line misread as another number', () => {
+    const reading = parsePump(samsClub('GALLONS : 4.045'));
+    expect(reading.gallons).toBe(4.092);
+    expect(reading.pricePerGallon).toBe(4.099);
+  });
+
+  test('outranks a labelled price too', () => {
+    const reading = parsePump(['10.512 @ 3.919', 'PRICE/GAL 3.991', 'TOTAL 41.20']);
+    expect(reading.pricePerGallon).toBe(3.919);
+    expect(reading.gallons).toBe(10.512);
+  });
+
+  test('reads the units and currency receipts print around it', () => {
+    for (const line of [
+      '10.512 GAL @ $3.919',
+      '10.512 GALLONS @ 3.919/GAL',
+      '10.512G @ $3.919/G',
+      'REGULAR 10.512@3.919 41.20',
+      '10.512 @ $3.91 9/10',
+    ]) {
+      const reading = parsePump([line, 'GALLONS 9.999']);
+      expect(reading.gallons, line).toBe(10.512);
+      expect(reading.pricePerGallon, line).toBe(3.919);
+    }
+  });
+
+  test('the same fuel line printed twice is still one fuel line', () => {
+    const reading = parsePump(['4.092 @ 4.099', 'GALLONS : 4.099', '4.092 @ 4.099']);
+    expect(reading.gallons).toBe(4.092);
+  });
+
+  test('two fuel lines that disagree: neither is trusted over the labels', () => {
+    // Refusing beats guessing — the old ladder decides, exactly as before.
+    const lines = ['4.092 @ 4.099', '5.000 @ 3.999', 'GALLONS 8.712', 'PRICE/GAL 3.499'];
+    const reading = parsePump(lines);
+    expect(reading.gallons).toBe(8.712);
+    expect(reading.pricePerGallon).toBe(3.499);
+  });
+
+  test('merchandise lines do not count: whole quantities, cent prices', () => {
+    for (const line of ['2 @ 1.99', '1 @ 4.099', '2.00 @ 1.99', '3 @ 4.099 EA', '4.092 @ 4.09']) {
+      expect(parsePump([line, 'GALLONS 8.712']).gallons, line).toBe(8.712);
+    }
+  });
+
+  test('an implausible pair is ignored, not half-used', () => {
+    for (const line of ['99.999 @ 4.099', '4.092 @ 0.999', '0.100 @ 4.099', '4.092 @ 12.999']) {
+      const reading = parsePump([line, 'GALLONS 8.712', 'PRICE/GAL 3.499']);
+      expect(reading.gallons, line).toBe(8.712);
+      expect(reading.pricePerGallon, line).toBe(3.499);
+    }
+  });
+
+  test('a pair cut out of a longer number is not a fuel line', () => {
+    // OCR noise that merges digits must not yield a trusted pair from its middle.
+    for (const line of ['4.092 @ 4.0995', '8.4.092 @ 4.099', '4.092 @ 4.099.5']) {
+      const reading = parsePump([line, 'GALLONS 8.712', 'PRICE/GAL 3.499']);
+      expect(reading.gallons, line).toBe(8.712);
+      expect(reading.pricePerGallon, line).toBe(3.499);
+    }
+  });
+
+  test('an "@" with nothing usable either side changes nothing', () => {
+    expect(parsePump(['@', '@ @ @', '4.092 @', '@ 4.099', 'EMAIL ME @ HOME'])).toEqual(
+      EMPTY_PUMP_READING,
+    );
+  });
+
+  test('a flood of fuel lines is bounded and refuses to choose', () => {
+    const flood = Array.from({ length: 5000 }, (_, i) => `${(1 + (i % 50)).toFixed(3)} @ 3.${String(100 + (i % 800)).slice(0, 3)}`);
+    const started = Date.now();
+    const reading = parsePump(flood);
+    expect(Date.now() - started).toBeLessThan(1000);
+    if (reading.gallons !== null) expect(reading.gallons).toBeLessThanOrEqual(60);
+    if (reading.pricePerGallon !== null) expect(reading.pricePerGallon).toBeLessThanOrEqual(9.999);
+  });
+});

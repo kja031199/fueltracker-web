@@ -138,6 +138,8 @@ Recorded so a regression in the tests themselves is visible:
 | OCR build: reader precached / route back to a closure / wrong core variant / runtime route removed | 1 / 1 / 1 / 2 |
 | OCR input: reader handed the bitmap again / a read failure reported as unavailable / load detail dropped | 1 / 1 / 3 |
 | OCR input: detail not shown / detail unbounded / a failed encode of the reading copy ignored | 1 / 1 / 1 |
+| Fuel line: rung removed / labels winning over it / first of two disagreeing lines trusted | 7 / 6 / 1 |
+| Fuel line: two-decimal price / whole-number quantity / range check / lookbehind / lookahead dropped | 1 / 1 / 1 / 1 / 1 |
 | Sync (emulator): rules accepting any `syncedAt` / push unstamped / records carrying it / remote ignoring the cursor | 1 / 4 / 1 / 2 |
 | Date window: segments not windowed / boundary exclusive / invalid date as a window | 4 / 6 / 1 |
 | Date window: no anchor / anchor without odometer guard / cost per mile ignoring it / intervals ignoring it / suspect norm from the window | 1 / 1 / 1 / 1 / 1 |
