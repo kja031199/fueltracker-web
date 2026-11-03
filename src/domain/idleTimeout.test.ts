@@ -1,11 +1,10 @@
 import { describe, expect, test } from 'vitest';
 import {
   DEFAULT_IDLE_MINUTES,
-  IDLE_MINUTE_CHOICES,
-  IDLE_TIMEOUT_OFF,
   MAX_IDLE_MINUTES,
   MIN_IDLE_MINUTES,
   hasIdleTimedOut,
+  idleMinutesFromConfig,
   lastActivityFrom,
   msUntilIdleTimeout,
   normalizeIdleMinutes,
@@ -18,110 +17,129 @@ import {
  * no event listeners, so the thing that decides whether to end someone's
  * session can be tested rather than inferred from a render.
  *
- * The bar for this one is higher than for the backup nudge, because both
- * failure directions are real. Failing *open* — never timing out because a
- * stored value was garbage — defeats the feature silently. Failing *closed* —
- * signing someone out mid-sentence because a clock moved — destroys trust in a
- * setting that was optional to begin with.
+ * Since #70 the period is set once, by the administrator, for everyone, and
+ * there is no "off". So the failure direction that matters most is failing
+ * *open*: a typo or a forgotten setting must not quietly remove the
+ * protection. Every unreadable value becomes the default, never "never".
  */
 
 const MINUTE = 60 * 1000;
 const NOW = 1_700_000_000_000;
-const ON = { enabled: true, minutes: 30 };
+const PERIOD = 30;
 
-describe('the default', () => {
-  test('is off', () => {
-    // The issue's acceptance criterion, and the iOS original's choice for
-    // `AppLock`. An app that starts signing people out without being asked is
-    // a bug report, not a security feature.
-    expect(IDLE_TIMEOUT_OFF.enabled).toBe(false);
+describe('the administrator\'s value', () => {
+  test.each([
+    ['30', 30],
+    ['45', 45],
+    [' 45 ', 45],
+    ['00045', 45],
+    ['1', 1],
+    ['1440', 1440],
+  ])('reads %j as %i minutes', (raw, minutes) => {
+    expect(idleMinutesFromConfig(raw)).toBe(minutes);
   });
 
-  test('carries a sensible period for when it is switched on', () => {
-    expect(IDLE_TIMEOUT_OFF.minutes).toBe(DEFAULT_IDLE_MINUTES);
-    expect(IDLE_MINUTE_CHOICES).toContain(DEFAULT_IDLE_MINUTES);
+  test('a number is accepted as well as text', () => {
+    expect(idleMinutesFromConfig(45)).toBe(45);
+  });
+
+  test.each([
+    ['unset', undefined],
+    ['empty (an unset repository Variable)', ''],
+    ['blank', '   '],
+    ['zero', '0'],
+    ['negative', '-5'],
+    ['a word', 'thirty'],
+    ['"off" — there is no off (#70)', 'off'],
+    ['"never"', 'never'],
+    ['"false"', 'false'],
+    ['a unit suffix', '30min'],
+    ['a fraction', '7.5'],
+    ['exponent notation', '1e3'],
+    ['hex', '0x1E'],
+    ['Infinity', 'Infinity'],
+    ['NaN', 'NaN'],
+    ['non-ASCII digits', '\u0663\u0660'],
+    ['two numbers', '30 60'],
+    ['null', null],
+    ['an object', { minutes: 30 }],
+    ['NaN as a number', Number.NaN],
+    ['zero as a number', 0],
+  ])('falls back to the default for %s — never to "no timeout"', (_label, raw) => {
+    expect(idleMinutesFromConfig(raw)).toBe(DEFAULT_IDLE_MINUTES);
+  });
+
+  test('a period past a day is held to a day, not dropped', () => {
+    // Still on: an absurd value is a mistake about *how long*, not a request
+    // to switch the protection off.
+    expect(idleMinutesFromConfig('99999')).toBe(MAX_IDLE_MINUTES);
+    expect(idleMinutesFromConfig('9'.repeat(400))).toBe(MAX_IDLE_MINUTES);
+  });
+
+  test('the default is a sensible half hour', () => {
+    expect(DEFAULT_IDLE_MINUTES).toBe(30);
   });
 });
 
 describe('hasIdleTimedOut', () => {
   test('is false while the session is still fresh', () => {
-    expect(hasIdleTimedOut(ON, NOW - 5 * MINUTE, NOW)).toBe(false);
+    expect(hasIdleTimedOut(PERIOD, NOW - 5 * MINUTE, NOW)).toBe(false);
   });
 
   test('is true once the period has passed', () => {
-    expect(hasIdleTimedOut(ON, NOW - 31 * MINUTE, NOW)).toBe(true);
+    expect(hasIdleTimedOut(PERIOD, NOW - 31 * MINUTE, NOW)).toBe(true);
   });
 
   test('expires exactly at the boundary, not a tick after it', () => {
-    // Stated rather than left to chance: "30 minutes" means the session is
-    // over at 30:00. A `>` here would hold the session open for one more poll
-    // interval, which is a quiet way for a setting to mean something other
-    // than what it says.
-    expect(hasIdleTimedOut(ON, NOW - 30 * MINUTE, NOW)).toBe(true);
-    expect(hasIdleTimedOut(ON, NOW - 30 * MINUTE + 1, NOW)).toBe(false);
+    // "30 minutes" means the session is over at 30:00. A `>` here would hold
+    // it open for one more poll interval.
+    expect(hasIdleTimedOut(PERIOD, NOW - 30 * MINUTE, NOW)).toBe(true);
+    expect(hasIdleTimedOut(PERIOD, NOW - 30 * MINUTE + 1, NOW)).toBe(false);
   });
 
-  test('never fires while the setting is off, however old the activity is', () => {
-    expect(hasIdleTimedOut(IDLE_TIMEOUT_OFF, NOW - 400 * 24 * 60 * MINUTE, NOW)).toBe(false);
+  test('a long absence always ends the session — there is no off', () => {
+    expect(hasIdleTimedOut(PERIOD, NOW - 400 * 24 * 60 * MINUTE, NOW)).toBe(true);
   });
 
   test('does not fire on a last activity in the future', () => {
-    // A clock corrected backwards — NTP, a timezone fiddle, a laptop waking
-    // from sleep — makes the stored marker newer than the present. Signing
-    // someone out for that would be a clock bug presenting as a lockout.
-    expect(hasIdleTimedOut(ON, NOW + 60 * MINUTE, NOW)).toBe(false);
+    // A clock corrected backwards makes the stored marker newer than the
+    // present. Signing someone out for that is a clock bug as a lockout.
+    expect(hasIdleTimedOut(PERIOD, NOW + 60 * MINUTE, NOW)).toBe(false);
   });
 
   test('does not fire on an identical timestamp', () => {
-    expect(hasIdleTimedOut(ON, NOW, NOW)).toBe(false);
+    expect(hasIdleTimedOut(PERIOD, NOW, NOW)).toBe(false);
   });
 
   test('treats a nonsense period as the default rather than as "never"', () => {
-    // The direction that matters. A hand-edited or older-build value must not
-    // be able to turn an enabled timeout into an inert one.
     for (const minutes of [0, -30, Number.NaN, Number.POSITIVE_INFINITY]) {
-      expect(hasIdleTimedOut({ enabled: true, minutes }, NOW - 31 * MINUTE, NOW)).toBe(true);
-      expect(hasIdleTimedOut({ enabled: true, minutes }, NOW - MINUTE, NOW)).toBe(false);
+      expect(hasIdleTimedOut(minutes, NOW - 31 * MINUTE, NOW)).toBe(true);
+      expect(hasIdleTimedOut(minutes, NOW - MINUTE, NOW)).toBe(false);
     }
   });
 
   test('treats a non-finite last activity as activity now', () => {
-    expect(hasIdleTimedOut(ON, Number.NaN, NOW)).toBe(false);
+    expect(hasIdleTimedOut(PERIOD, Number.NaN, NOW)).toBe(false);
   });
 });
 
 describe('msUntilIdleTimeout', () => {
-  test('is null when the setting is off, so no timer is ever armed', () => {
-    expect(msUntilIdleTimeout(IDLE_TIMEOUT_OFF, NOW, NOW)).toBeNull();
-  });
-
   test('counts down from the last activity', () => {
-    expect(msUntilIdleTimeout(ON, NOW - 10 * MINUTE, NOW)).toBe(20 * MINUTE);
+    expect(msUntilIdleTimeout(PERIOD, NOW - 10 * MINUTE, NOW)).toBe(20 * MINUTE);
   });
 
   test('is zero rather than negative once the period has passed', () => {
-    // The caller feeds this to `setTimeout`, which treats a negative delay as
-    // zero anyway — but returning a negative number invites arithmetic that
-    // reads as "there is still time left".
-    expect(msUntilIdleTimeout(ON, NOW - 90 * MINUTE, NOW)).toBe(0);
+    expect(msUntilIdleTimeout(PERIOD, NOW - 90 * MINUTE, NOW)).toBe(0);
   });
 
   test('gives a full period for a last activity in the future', () => {
-    expect(msUntilIdleTimeout(ON, NOW + 10 * MINUTE, NOW)).toBe(30 * MINUTE);
+    expect(msUntilIdleTimeout(PERIOD, NOW + 10 * MINUTE, NOW)).toBe(30 * MINUTE);
   });
 });
 
 describe('normalizeIdleMinutes', () => {
-  test('keeps an offered choice unchanged', () => {
-    for (const minutes of IDLE_MINUTE_CHOICES) {
-      expect(normalizeIdleMinutes(minutes)).toBe(minutes);
-    }
-  });
-
-  test('accepts a plausible period that is not one of the offered choices', () => {
-    // The select offers four, but a stored 45 is a perfectly sane period and
-    // rejecting it would silently change a reader's setting.
-    expect(normalizeIdleMinutes(45)).toBe(45);
+  test('keeps a plausible period unchanged', () => {
+    for (const minutes of [5, 15, 30, 45, 60]) expect(normalizeIdleMinutes(minutes)).toBe(minutes);
   });
 
   test.each([

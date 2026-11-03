@@ -15,3 +15,11 @@ declare const __TESSERACT_ASSETS__: string;
 declare module 'exifr/dist/mini.esm.mjs' {
   export function parse(input: unknown, options?: unknown): Promise<Record<string, unknown> | undefined>;
 }
+
+interface ImportMetaEnv {
+  /**
+   * Minutes of inactivity before anyone is signed out (#70). A repository
+   * Variable, read by `adminSettings.ts`; unset or malformed means 30.
+   */
+  readonly VITE_IDLE_TIMEOUT_MINUTES?: string;
+}

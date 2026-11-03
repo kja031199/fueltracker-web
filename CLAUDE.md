@@ -111,8 +111,8 @@ npm ci --prefix .github/firebase-cli
    broke this and was removed (#44); the legacy `fueltracker` database is
    never opened, copied or deleted.
    **So is local state** (#55): every `localStorage` key goes through
-   `ui/preferences.ts` and declares a scope. `browser` keys (units, idle
-   timeout and its activity marker, the CSP watcher) are about the device;
+   `ui/preferences.ts` and declares a scope. `browser` keys (units, the
+   idle-timeout activity marker, the CSP watcher) are about the device;
    `account` keys (backup marker, last sync time, onboarding) are stored as
    `fueltracker.<name>.u.<uid>` and need the uid to read or write.
    `storageBoundary.test.ts` fails if any other module touches web storage.
@@ -283,10 +283,15 @@ npm ci --prefix .github/firebase-cli
   so the guard escapes itself, and `unguardCsvCell` removes exactly one. Keep
   the pair reversible, keep it on every cell, keep it after trimming — one test
   defends each (#29).
-- **The idle timeout is off by default and deletes nothing.** It gates the
-  session, not the data, which stays readable in DevTools; say so in any copy
-  about it. Its fallbacks point in opposite directions on purpose: an unreadable
-  *period* becomes the default, an unreadable *setting* reads as off.
+- **The idle timeout is the administrator's, always on, and deletes nothing**
+  (#70). One period for everyone from `VITE_IDLE_TIMEOUT_MINUTES`
+  (`adminSettings.ts`, parsed by `idleMinutesFromConfig`); Settings states it
+  and offers no control. **Every bad value fails closed to 30** — unset, empty,
+  `0`, `off`, decimals — and there is no "off" on purpose: a typo must never
+  switch the protection off. The pre-#70 per-browser setting is deleted at
+  startup and never read. It gates the session, not the data, which stays
+  readable in DevTools; say so in any copy about it. `App`'s `idleMinutes` prop
+  exists only so tests can pin a period.
 
 - **Never filter fill-ups before computing statistics for a date range.** Pass
   the whole history and `{ from }` to `computeFuelStatistics` (#51). An MPG

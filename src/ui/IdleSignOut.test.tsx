@@ -1,27 +1,28 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { InMemoryRepository } from '../data/repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
 import { FuelTrackerStore } from '../data/store';
 import { StubAuthProvider } from '../data/auth';
-import { ACTIVITY_STORAGE_KEY, loadIdleTimeoutSetting } from './idleTimeout';
+import { ACTIVITY_STORAGE_KEY } from './idleTimeout';
+import { ADMIN_IDLE_MINUTES } from './adminSettings';
+import { DEFAULT_IDLE_MINUTES, idleMinutesFromConfig } from '../domain/idleTimeout';
 import { App } from './App';
 import { saveHasOnboarded } from './onboarding';
 
 /**
  * The idle timeout as a reader meets it.
  *
- * The rule is covered in `domain/idleTimeout.test.ts` and the plumbing in
- * `idleTimeout.test.tsx`. This file is about the two things only the whole app
- * can answer: that the setting is off until somebody turns it on, and that the
- * sign-in screen then *says why* the session ended rather than looking like a
- * dropped session.
+ * Since #70 it is not a choice: one period, set by the administrator
+ * (`VITE_IDLE_TIMEOUT_MINUTES`), applies to everyone, always. This file pins
+ * the parts only the whole app can answer — Settings states the period and
+ * offers no way to change it, an old per-browser choice cannot switch it off,
+ * and the sign-in screen then *says why* the session ended.
  *
- * The honest-copy assertions are not decoration. This feature protects less
- * than its name suggests — the fuel log stays on the device and stays readable
- * in DevTools — and a lock that implies more safety than it delivers is worse
+ * The honest-copy assertions are not decoration. This protects less than its
+ * name suggests — the fuel log stays on the device and stays readable in
+ * DevTools — and a lock that implies more safety than it delivers is worse
  * than none. If the copy that admits that is ever deleted, these fail.
  */
 
@@ -44,50 +45,40 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
-describe('the security setting', () => {
-  test('is off until somebody turns it on', async () => {
-    render(<App store={await storeWithAVehicle()} initialTab="settings" />);
-    const toggle = await screen.findByRole('checkbox', { name: /sign out after/i });
-    expect(toggle).not.toBeChecked();
+describe('Settings', () => {
+  test('states the period, and offers no way to change it or turn it off', async () => {
+    render(<App store={await storeWithAVehicle()} initialTab="settings" idleMinutes={45} />);
+    await screen.findByRole('heading', { name: /security/i });
+    expect(screen.getByText(/signed out after 45 minutes of inactivity/i)).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: /sign out/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /inactive/i })).not.toBeInTheDocument();
   });
 
-  test('says what it does not protect, next to the switch', async () => {
+  test('says what it does not protect', async () => {
     render(<App store={await storeWithAVehicle()} initialTab="settings" />);
-    await screen.findByRole('checkbox', { name: /sign out after/i });
-    // Both limits the owner accepted when choosing this shape.
+    await screen.findByRole('heading', { name: /security/i });
     expect(screen.getByText(/stays on this device/i)).toBeInTheDocument();
     expect(screen.getByText(/needs a connection/i)).toBeInTheDocument();
   });
+});
 
-  test('turning it on is remembered', async () => {
-    const user = userEvent.setup();
-    const store = await storeWithAVehicle();
-    const view = render(<App store={store} initialTab="settings" />);
-
-    await user.click(await screen.findByRole('checkbox', { name: /sign out after/i }));
-    expect(loadIdleTimeoutSetting().enabled).toBe(true);
-
-    view.unmount();
-    render(<App store={store} initialTab="settings" />);
-    expect(await screen.findByRole('checkbox', { name: /sign out after/i })).toBeChecked();
+describe('the period', () => {
+  test("is the administrator's, read once at build time, with a 30-minute floor for a bad value", () => {
+    // In tests the Variable is normally unset, so this is the default — but
+    // it is the wiring that is pinned, not the number.
+    expect(ADMIN_IDLE_MINUTES).toBe(idleMinutesFromConfig(import.meta.env.VITE_IDLE_TIMEOUT_MINUTES));
+    expect(idleMinutesFromConfig(undefined)).toBe(DEFAULT_IDLE_MINUTES);
   });
 
-  test('the period can be changed, and is remembered', async () => {
-    const user = userEvent.setup();
-    render(<App store={await storeWithAVehicle()} initialTab="settings" />);
-
-    await user.click(await screen.findByRole('checkbox', { name: /sign out after/i }));
-    await user.selectOptions(screen.getByRole('combobox', { name: /inactive for/i }), '5');
-
-    expect(loadIdleTimeoutSetting()).toEqual({ enabled: true, minutes: 5 });
+  test('an old per-browser choice is deleted when the app starts', async () => {
+    localStorage.setItem('fueltracker.idleTimeout', JSON.stringify({ enabled: false, minutes: 30 }));
+    render(<App store={await storeWithAVehicle()} />);
+    await screen.findByRole('navigation', { name: /sections/i });
+    expect(localStorage.getItem('fueltracker.idleTimeout')).toBeNull();
   });
 });
 
 describe('a session that went idle', () => {
-  beforeEach(() => {
-    localStorage.setItem('fueltracker.idleTimeout', JSON.stringify({ enabled: true, minutes: 30 }));
-  });
-
   test('is over by the time the page is open again', async () => {
     // The whole point: a tab left open on an unattended laptop. Opening it
     // must not show the fuel log, and a reload must not be a way back in.
@@ -106,24 +97,45 @@ describe('a session that went idle', () => {
     localStorage.setItem(ACTIVITY_STORAGE_KEY, String(Date.now() - 2 * 60 * 60 * 1000));
     const auth = new StubAuthProvider({ status: 'signedIn', user: USER }, USER);
 
-    render(<App store={await storeWithAVehicle()} auth={auth} />);
+    render(<App store={await storeWithAVehicle()} auth={auth} idleMinutes={45} />);
 
     const notice = await screen.findByRole('status');
-    expect(notice).toHaveTextContent(/inactiv/i);
+    expect(notice).toHaveTextContent(/45 minutes of inactivity/i);
     // Saying "signed out" and leaving it there would imply the log was
     // protected. It is still in this browser, and the honest sentence says so.
     expect(notice).toHaveTextContent(/still/i);
+    // Nobody chose this any more, so the notice must not say they did.
+    expect(notice).not.toHaveTextContent(/you turned on|your setting/i);
   });
 
-  test('stays open when nobody asked for a timeout', async () => {
+  test('ends even if this browser once switched the timeout off', async () => {
+    // The point of #70: a choice made here before cannot opt out.
     localStorage.setItem('fueltracker.idleTimeout', JSON.stringify({ enabled: false, minutes: 30 }));
-    localStorage.setItem(ACTIVITY_STORAGE_KEY, String(Date.now() - 400 * 24 * 60 * 60 * 1000));
+    localStorage.setItem(ACTIVITY_STORAGE_KEY, String(Date.now() - 2 * 60 * 60 * 1000));
+    const auth = new StubAuthProvider({ status: 'signedIn', user: USER }, USER);
+
+    render(<App store={await storeWithAVehicle()} auth={auth} />);
+
+    expect(await screen.findByRole('button', { name: /continue with google/i })).toBeInTheDocument();
+  });
+
+  test('a stored longer period cannot stretch the administrator\'s', async () => {
+    localStorage.setItem('fueltracker.idleTimeout', JSON.stringify({ enabled: true, minutes: 1440 }));
+    localStorage.setItem(ACTIVITY_STORAGE_KEY, String(Date.now() - 10 * 60 * 1000));
+    const auth = new StubAuthProvider({ status: 'signedIn', user: USER }, USER);
+
+    render(<App store={await storeWithAVehicle()} auth={auth} idleMinutes={5} />);
+
+    expect(await screen.findByRole('button', { name: /continue with google/i })).toBeInTheDocument();
+  });
+
+  test('a recent session stays open', async () => {
+    localStorage.setItem(ACTIVITY_STORAGE_KEY, String(Date.now() - 60 * 1000));
     const auth = new StubAuthProvider({ status: 'signedIn', user: USER }, USER);
 
     render(<App store={await storeWithAVehicle()} auth={auth} />);
 
     expect(await screen.findByRole('navigation', { name: /sections/i })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /continue with google/i })).not.toBeInTheDocument();
   });
 
   test('ends while the page is sitting open, not only across a reload', async () => {

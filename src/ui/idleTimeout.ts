@@ -1,44 +1,27 @@
 /**
- * Where the idle-timeout setting lives, and the hook that enforces it.
+ * The hook that enforces the idle timeout, and the activity marker it reads.
  *
  * The decision is in `domain/idleTimeout.ts`; this is only storage, events and
  * React. Keeping them apart is what lets the rule be tested without a DOM —
  * the same split `backupNudge.ts` makes over `exportReminder.ts`.
  *
- * ## Per device, and per device on purpose
+ * ## Not a setting any more (#70)
  *
- * A **browser** preference (`preferences.ts`), not a synced field. Whether this browser signs itself out is
- * a property of *this* machine: a shared laptop wants it on, a phone that is
- * already locked by its owner's face does not. Syncing it would also mean a
- * new synced field, which the `hasOnly` rule in `firestore.rules` makes a
- * two-part deploy — for a setting nobody wants shared.
+ * The period is the administrator's (`adminSettings.ts`), the same for
+ * everyone, and always on. The per-browser on/off choice that used to live
+ * here is deleted at startup by `forgetIdleTimeoutSetting`, never read: an old
+ * "off" must not be a way to opt out.
  *
  * ## The activity marker is shared between tabs, deliberately
  *
- * Both the setting and the last-activity timestamp are read from storage, so
- * two tabs of the app agree. A per-tab timer would sign someone out of the tab
- * they left open *while they were using the app in the other one*, which is
- * indistinguishable from a bug.
- *
- * ## Fallbacks point in two different directions, which is not an accident
- *
- * An unreadable **period** falls back to the default, because the reader's
- * consent is legible and only the number is broken — reading it as "off" would
- * let a storage glitch switch off a protection somebody asked for. An
- * unreadable **setting** falls back to off, because there is then no evidence
- * of consent at all, and signing someone out of their own app on the strength
- * of corrupt data is an action they never requested. See
- * `domain/idleTimeout.ts` for the same reasoning about timestamps.
+ * The last-activity timestamp is a **browser** preference read from storage,
+ * so two tabs of the app agree. A per-tab timer would sign someone out of the
+ * tab they left open *while they were using the app in the other one*, which
+ * is indistinguishable from a bug.
  */
 
 import { useEffect, useRef } from 'react';
-import type { IdleTimeoutSetting } from '../domain/idleTimeout';
-import {
-  IDLE_TIMEOUT_OFF,
-  hasIdleTimedOut,
-  lastActivityFrom,
-  normalizeIdleMinutes,
-} from '../domain/idleTimeout';
+import { hasIdleTimedOut, lastActivityFrom } from '../domain/idleTimeout';
 import {
   browserPreference,
   numberCodec,
@@ -49,22 +32,19 @@ import {
 } from './preferences';
 
 /**
- * The setting as stored. Only `enabled` decides whether it is legible at all;
- * the minutes are normalised on the way out (see the module notes on why the
- * two fall back in different directions).
+ * The per-browser choice from before #70: on or off, and a period. The period
+ * is the administrator's now, so this is only ever **deleted** — never read,
+ * because reading it is how an old "off" would switch the protection off.
  */
-function decodeSetting(raw: string): IdleTimeoutSetting | null {
-  const parsed: unknown = JSON.parse(raw);
-  if (typeof parsed !== 'object' || parsed === null) return null;
-  const candidate = parsed as Record<string, unknown>;
-  if (typeof candidate['enabled'] !== 'boolean') return null;
-  return { enabled: candidate['enabled'], minutes: normalizeIdleMinutes(candidate['minutes']) };
-}
-
-const SETTING = browserPreference<IdleTimeoutSetting>('idleTimeout', {
-  decode: decodeSetting,
-  encode: (setting) => JSON.stringify(setting),
+const LEGACY_SETTING = browserPreference<never>('idleTimeout', {
+  decode: () => null,
+  encode: () => '',
 });
+
+/** Deletes the pre-#70 per-browser setting. Called once as the app starts. */
+export function forgetIdleTimeoutSetting(): void {
+  removePreference(LEGACY_SETTING);
+}
 
 /** Browser-wide on purpose: every tab, whoever is signed in, shares one clock. */
 const ACTIVITY = browserPreference('lastActivity', numberCodec);
@@ -94,19 +74,6 @@ const WRITE_THROTTLE_MS = 5 * 1000;
 
 /** The events that count as "still here". */
 const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'wheel'] as const;
-
-export function loadIdleTimeoutSetting(): IdleTimeoutSetting {
-  return readPreference(SETTING) ?? IDLE_TIMEOUT_OFF;
-}
-
-/**
- * Storage blocked: the setting then lasts only as long as the tab, which is the
- * right way for this particular failure to degrade — it does not silently stay
- * on.
- */
-export function saveIdleTimeoutSetting(setting: IdleTimeoutSetting): void {
-  writePreference(SETTING, setting);
-}
 
 /** The stored marker as a finite number, or `null` if there is not one. */
 function readActivityMarker(): number | null {
@@ -140,11 +107,11 @@ export function clearActivity(): void {
 }
 
 /**
- * Signs the reader out after a period of inactivity, when they have asked for
- * that.
+ * Signs the reader out after `minutes` of inactivity.
  *
- * Does **nothing at all** while the setting is off: no listeners, no timer, no
- * stored marker. A disabled feature should leave no trace to explain later.
+ * `null` means there is no session to end — nobody is signed in — and then it
+ * does **nothing at all**: no listeners, no timer, no stored marker. Arming it
+ * on the sign-in screen would sign out the person trying to sign in.
  *
  * `onExpire` is called at most once per arming. It is a network call, and by
  * the time it has run the sign-in screen is already showing — calling it on
@@ -152,18 +119,15 @@ export function clearActivity(): void {
  * it, which is what lets someone sign back in and get a fresh period without
  * reloading the page.
  */
-export function useIdleTimeout(setting: IdleTimeoutSetting, onExpire: () => void): void {
+export function useIdleTimeout(minutes: number | null, onExpire: () => void): void {
   // Held in a ref so a changing callback identity does not tear down the
   // listeners and restart the countdown on every render.
   const expire = useRef(onExpire);
   expire.current = onExpire;
 
-  const { enabled, minutes } = setting;
-
   useEffect(() => {
-    if (!enabled) return;
-
-    const effective: IdleTimeoutSetting = { enabled: true, minutes };
+    if (minutes === null) return;
+    const period = minutes;
 
     // The in-tab watermark. It exists for the browser that refuses storage: if
     // activity cannot be written, it has to be remembered here, or someone
@@ -188,7 +152,7 @@ export function useIdleTimeout(setting: IdleTimeoutSetting, onExpire: () => void
     function check(): void {
       if (fired) return;
       const now = Date.now();
-      if (!hasIdleTimedOut(effective, since(now), now)) return;
+      if (!hasIdleTimedOut(period, since(now), now)) return;
       fired = true;
       expire.current();
     }
@@ -222,5 +186,5 @@ export function useIdleTimeout(setting: IdleTimeoutSetting, onExpire: () => void
       for (const event of ACTIVITY_EVENTS) window.removeEventListener(event, onActivity);
       document.removeEventListener('visibilitychange', check);
     };
-  }, [enabled, minutes]);
+  }, [minutes]);
 }
