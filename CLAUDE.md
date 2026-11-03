@@ -162,12 +162,21 @@ npm ci --prefix .github/firebase-cli
   twice without it. `script-src 'self'` holds for everything else only because
   the built page has no inline script, which the same file enforces.
 - **Changing the policy needs the live check**, not reasoning: the deployed
-  origin, the auth domain and the OCR CDN are all unreachable from here, and
+  origin and the auth domain are unreachable from here, and
   signing in needs a real Google account. `cspWatch.ts` collects the evidence
   when armed from the console, and `docs/csp-check.md` is the recipe.
-- **OCR fetches from `cdn.jsdelivr.net` at scan time.** `createWorker('eng')`
-  takes no paths, so the domain appears nowhere in this source. It must stay in
-  `connect-src` (#17).
+- **The OCR reader is self-hosted** (#17). It lives in `tesseract/<version>/`,
+  copied from `node_modules` by the `tesseractAssets` plugin in `vite.config.ts`.
+  It is **not precached**, but cached at runtime on first scan. Pass **all
+  three** paths to `createWorker`, because a missing one silently falls back to
+  jsDelivr. `script-src` needs `'wasm-unsafe-eval'`, and `worker-src` is
+  `'self'`. **Its CSP failures happen inside a worker, so `cspWatch` cannot see
+  them**: after touching the scanner, the CSP or the service worker, run
+  `node scripts/ocr-check/check.mjs`.
+- **`runtimeCaching` matchers are copied into `sw.js` as source text.** Use a
+  RegExp, never a function that closes over a variable in `vite.config.ts`. The
+  first tesseract route used `base`, threw inside `sw.js`, never matched, and
+  offline scanning failed. `ocrAssets.test.ts` checks the route is a RegExp.
 
 ### Data and sync
 

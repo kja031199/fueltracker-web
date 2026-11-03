@@ -48,19 +48,45 @@ because the built page carries no inline script. Nothing in the build enforces
 that — Vite happens to emit a single `<script src>` — so a test does, since the
 alternative is discovering it in production.
 
-### The one third-party request
+### The receipt reader is served from this origin
 
-Scanning a receipt fetches tesseract.js's worker, its wasm core and the English
-language data from **`cdn.jsdelivr.net`**, at scan time. `createWorker('eng')`
-takes no paths, and those defaults live inside the library, so nothing in this
-repository's own source mentions the domain. It means jsdelivr learns that
-somebody started a scan — not the image, not the result — and that scanning
-fails where that CDN is blocked.
+Scanning a receipt used to fetch tesseract.js's worker, its wasm core and the
+English language data from **`cdn.jsdelivr.net`** at scan time. `createWorker('eng')`
+took no paths, and the defaults live inside the library. That worker ran **with
+this origin's identity**, so it could read IndexedDB: the whole fuel log,
+receipt photos included. Neither defence reached it. The CSP is an origin
+allowlist and cannot tell a substituted file from the real one, and SRI never
+sees `fetch` → `Worker`.
 
-Everything else is same-origin apart from Google's own endpoints for auth and
-Firestore. Self-hosting the tesseract assets would remove the dependency and
-costs several megabytes of hosting transfer per scan; it has not been done, and
-this paragraph is the honest version of that choice.
+Since #17 those files are copied out of `node_modules` at build time into
+`tesseract/<tesseract.js version>/`, so they are exactly what `package-lock.json`
+pinned. Nothing is committed. `ocr.ts` passes all three paths, because a path
+left out silently falls back to the CDN. Only the LSTM core variants are
+shipped, and a device downloads one of the three.
+
+- **Not precached.** That is about 7 MB (one ~3.9 MB core, 2.9 MB of language
+  data, the worker), so installing the app costs what it did. The service
+  worker caches them **on first scan**, after which scanning works offline,
+  like everything else.
+- **The worker is a real same-origin script** (`workerBlobURL: false`), so
+  `worker-src` is `'self'` alone, with no `blob:` code that has no URL to audit.
+- **`script-src` carries `'wasm-unsafe-eval'`**, which allows compiling
+  WebAssembly and nothing else (no `eval`, no `new Function`).
+
+**Scanning was broken on the live site from #39 to #17.** Enforcing the policy
+refused both the core's `importScripts` from jsDelivr and the WebAssembly
+compile, and it refused them *inside the worker*. A violation there is reported
+to the worker, not the page, so the CSP watcher from #38 could not see it, and
+the live check came back clean. `recognise()` then hung, because
+`createWorker` never settles when the core aborts. It now gives up after
+`READER_LOAD_TIMEOUT_MS` and says the reader is unavailable.
+
+The OCR browser check in [development.md](development.md#the-ocr-browser-check)
+is what found all of this, and it is what to run after touching the scanner or
+the CSP.
+
+Everything the app contacts is now same-origin apart from Google's own
+endpoints for auth and Firestore.
 
 ## What the dependency audit says, and what was accepted
 

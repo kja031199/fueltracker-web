@@ -46,6 +46,36 @@ stand between a correct change and `main`.
 lockfile pins and fails if the lockfile and manifest disagree, instead of
 silently resolving a different tree.
 
+## The OCR browser check
+
+Receipt scanning runs WebAssembly in a worker, and **a CSP violation inside a
+worker is reported to the worker, not the page**. Unit tests and the CSP
+watcher both miss it. From #39 to #17 the live site's reader was refused on
+every scan, and nothing noticed. So scanning has a real-browser check:
+
+```bash
+npm i --no-save playwright && npx playwright install chromium   # once, if not installed
+node scripts/ocr-check/check.mjs
+```
+
+It builds the app with a probe page added (`OCR_PROBE=1`, into a temporary
+directory; the probe never ships), serves it with **the headers from
+`firebase.json`**, and drives Chromium through four scenarios:
+
+1. The production CSP reads a receipt drawn on a canvas.
+2. No request leaves this origin. Anything that tries is aborted, so a CDN
+   fallback fails the scan rather than hiding in a count.
+3. After one scan with the service worker installed, the scan works
+   **offline**.
+4. **Negative control:** the same CSP without `'wasm-unsafe-eval'` must fail,
+   and fail *cleanly*, with "unavailable" rather than a hang. This proves the
+   check can fail, and it reproduces the live site's failure exactly.
+
+It takes a couple of minutes, mostly scenario 4 waiting out the load bound. It
+is not in CI, by decision: CI covers the same ground through `csp.test.ts`,
+`ocr.test.ts` and `ocrAssets.test.ts`. **Run it after changing the scanner, the
+CSP or the service worker.**
+
 ## Mutation testing
 
 Tests are checked by breaking the thing they guard on purpose and confirming
@@ -89,6 +119,9 @@ Recorded so a regression in the tests themselves is visible:
 | Local reads: summaries keeping photo bytes / `hasReceipt` always false / edit form started from a list row | 1 / 1 / 1 |
 | Local reads: no re-read after a reload / `deletedAt` index missing / Dexie count including tombstones | 2 / 3 / 3 |
 | Local reads: per-vehicle read including tombstones (Dexie / in memory) | 1 / 5 |
+| OCR: `workerPath` / `langPath` left out (CDN default) / blob worker again / no load timeout / late worker left running | 1 / 1 / 1 / 2 / 1 |
+| OCR CSP: without `'wasm-unsafe-eval'` / with full `'unsafe-eval'` / CDN back / `blob:` workers back | 1 / 1 / 1 / 1 |
+| OCR build: reader precached / route back to a closure / wrong core variant / runtime route removed | 1 / 1 / 1 / 2 |
 | Sync (emulator): rules accepting any `syncedAt` / push unstamped / records carrying it / remote ignoring the cursor | 1 / 4 / 1 / 2 |
 | Date window: segments not windowed / boundary exclusive / invalid date as a window | 4 / 6 / 1 |
 | Date window: no anchor / anchor without odometer guard / cost per mile ignoring it / intervals ignoring it / suspect norm from the window | 1 / 1 / 1 / 1 / 1 |
