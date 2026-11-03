@@ -8,8 +8,7 @@ import { backupFilename } from '../data/backup';
 import { parseCsv, parseJsonBackup, toCsv } from '../data/backupFormat';
 import { downloadText } from './download';
 import { AccountId } from './AccountId';
-import type { IdleTimeoutSetting } from '../domain/idleTimeout';
-import { IDLE_MINUTE_CHOICES, IDLE_TIMEOUT_OFF } from '../domain/idleTimeout';
+import { DEFAULT_IDLE_MINUTES } from '../domain/idleTimeout';
 import {
   DISTANCE_UNITS,
   ECONOMY_UNITS,
@@ -31,10 +30,8 @@ interface Props {
   readonly onBackedUp?: (fillUpCount: number) => void;
   /** Epoch ms of the last JSON backup, or null if there has never been one. */
   readonly lastBackupAt?: number | null;
-  /** The idle-timeout setting for this browser. Off unless somebody asked. */
-  readonly idleTimeout?: IdleTimeoutSetting;
-  /** Omitted by tests that are not about the session timeout. */
-  readonly onIdleTimeoutChange?: (setting: IdleTimeoutSetting) => void;
+  /** The administrator's inactivity period (#70). Shown, never editable. */
+  readonly idleMinutes?: number;
 }
 
 /** "3 minutes ago", falling back to a date once it stops being recent. */
@@ -64,8 +61,7 @@ export function SettingsScreen({
   syncEnabled = false,
   onBackedUp,
   lastBackupAt = null,
-  idleTimeout = IDLE_TIMEOUT_OFF,
-  onIdleTimeoutChange,
+  idleMinutes = DEFAULT_IDLE_MINUTES,
 }: Props): ReactElement {
   // Backup, restore and sync all go through the fuel log (#56): an import
   // refreshes the screens and schedules a sync without this screen asking.
@@ -241,54 +237,29 @@ export function SettingsScreen({
         </section>
       )}
 
-      {onIdleTimeoutChange !== undefined && (
-        <section className="card" aria-labelledby="security-heading">
-          <h2 className="card__title" id="security-heading">
-            Security
-          </h2>
-          <p style={{ margin: '0 0 8px' }}>
-            <label>
-              <input
-                type="checkbox"
-                checked={idleTimeout.enabled}
-                onChange={(event) =>
-                  onIdleTimeoutChange({ ...idleTimeout, enabled: event.target.checked })
-                }
-              />{' '}
-              Sign out after a period of inactivity
-            </label>
-          </p>
-          <p style={{ margin: '0 0 8px' }}>
-            <label htmlFor="idle-minutes">Sign out when inactive for </label>
-            <select
-              id="idle-minutes"
-              value={idleTimeout.minutes}
-              disabled={!idleTimeout.enabled}
-              onChange={(event) =>
-                onIdleTimeoutChange({ ...idleTimeout, minutes: Number(event.target.value) })
-              }
-            >
-              {IDLE_MINUTE_CHOICES.map((minutes) => (
-                <option key={minutes} value={minutes}>
-                  {minutes} minutes
-                </option>
-              ))}
-            </select>
-          </p>
-          {/* The limits, next to the switch rather than in a help page. This
-              protects less than its name suggests, and a lock that implies
-              more safety than it delivers is worse than none. */}
-          <p style={{ margin: '0 0 8px' }}>
-            Your fuel log stays on this device either way. This ends the session; it does not hide
-            your fill-ups from anyone who opens the browser&rsquo;s developer tools, and it is a
-            small addition to locking the device itself.
-          </p>
-          <p className="warning" style={{ margin: 0 }}>
-            Signing back in needs a connection, so a device that is offline cannot get back into the
-            app until it reconnects. That is the trade for leaving this on.
-          </p>
-        </section>
-      )}
+      <section className="card" aria-labelledby="security-heading">
+        <h2 className="card__title" id="security-heading">
+          Security
+        </h2>
+        {/* Stated, not offered (#70): the period is set for everyone by the
+            administrator, and there is nothing here to change or switch off. */}
+        <p style={{ margin: '0 0 8px' }}>
+          For security, you are signed out after {idleMinutes} minutes of inactivity. This applies
+          to everyone using FuelTracker and cannot be changed here.
+        </p>
+        {/* The limits, next to the statement rather than in a help page. This
+            protects less than its name suggests, and a lock that implies more
+            safety than it delivers is worse than none. */}
+        <p style={{ margin: '0 0 8px' }}>
+          Your fuel log stays on this device either way. Signing out ends the session; it does not
+          hide your fill-ups from anyone who opens the browser&rsquo;s developer tools, and it is a
+          small addition to locking the device itself.
+        </p>
+        <p className="warning" style={{ margin: 0 }}>
+          Signing back in needs a connection, so a device that is offline cannot get back into the
+          app until it reconnects.
+        </p>
+      </section>
 
       <section className="card" aria-labelledby="storage-heading">
         <h2 className="card__title" id="storage-heading">

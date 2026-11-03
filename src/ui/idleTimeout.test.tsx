@@ -2,16 +2,10 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { act, cleanup, renderHook } from '@testing-library/react';
 import {
-  DEFAULT_IDLE_MINUTES,
-  IDLE_TIMEOUT_OFF,
-  type IdleTimeoutSetting,
-} from '../domain/idleTimeout';
-import {
   ACTIVITY_STORAGE_KEY,
-  loadIdleTimeoutSetting,
+  forgetIdleTimeoutSetting,
   loadLastActivity,
   recordActivity,
-  saveIdleTimeoutSetting,
   useIdleTimeout,
 } from './idleTimeout';
 
@@ -20,13 +14,13 @@ import {
  *
  * The rule itself is covered exhaustively there. This file is about the parts
  * that need a browser: does a stale marker end the session on the next load,
- * does real activity hold it open, does a disabled setting truly do nothing,
+ * does real activity hold it open, does a signed-out page truly do nothing,
  * and does a browser that refuses storage still behave.
  */
 
 const MINUTE = 60 * 1000;
 const NOW = 1_700_000_000_000;
-const ON: IdleTimeoutSetting = { enabled: true, minutes: 30 };
+const ON = 30;
 
 beforeEach(() => {
   localStorage.clear();
@@ -43,43 +37,32 @@ afterEach(() => {
   cleanup();
 });
 
-describe('the stored setting', () => {
-  test('is off when nothing has ever been stored', () => {
-    expect(loadIdleTimeoutSetting()).toEqual(IDLE_TIMEOUT_OFF);
-  });
-
-  test('round-trips', () => {
-    saveIdleTimeoutSetting({ enabled: true, minutes: 15 });
-    expect(loadIdleTimeoutSetting()).toEqual({ enabled: true, minutes: 15 });
-  });
-
-  test('keeps an enabled setting whose period is unreadable, with the default period', () => {
-    // The reader's consent was recorded and is legible; only the number is
-    // broken. Reading this as "off" would be a storage glitch switching off a
-    // protection somebody asked for.
-    localStorage.setItem('fueltracker.idleTimeout', JSON.stringify({ enabled: true, minutes: 0 }));
-    expect(loadIdleTimeoutSetting()).toEqual({ enabled: true, minutes: DEFAULT_IDLE_MINUTES });
-  });
-
+describe('the per-browser setting from before #70', () => {
+  // The period is the administrator's now, for everyone. A choice somebody
+  // made in this browser earlier — off, or a longer period — must not survive
+  // to override it, so it is deleted rather than read.
   test.each([
-    ['text that is not JSON', 'not json'],
-    ['a JSON string', '"on"'],
-    ['null', 'null'],
-    ['an object with no enabled flag', '{"minutes":30}'],
-  ])('falls back to off for %s', (_label, raw) => {
-    // The other direction from the period above, on purpose. With no legible
-    // record that the reader turned this on, signing them out is an action
-    // they never asked for — and the device lock they should already have is
-    // the stronger protection anyway.
+    ['switched off', '{"enabled":false,"minutes":30}'],
+    ['a longer period', '{"enabled":true,"minutes":1440}'],
+    ['garbage', 'not json'],
+  ])('is removed when it was %s', (_label, raw) => {
     localStorage.setItem('fueltracker.idleTimeout', raw);
-    expect(loadIdleTimeoutSetting()).toEqual(IDLE_TIMEOUT_OFF);
+    forgetIdleTimeoutSetting();
+    expect(localStorage.getItem('fueltracker.idleTimeout')).toBeNull();
   });
 
-  test('survives storage being unavailable', () => {
-    const blown = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+  test('removing it leaves the activity marker alone', () => {
+    recordActivity();
+    localStorage.setItem('fueltracker.idleTimeout', '{"enabled":false}');
+    forgetIdleTimeoutSetting();
+    expect(localStorage.getItem(ACTIVITY_STORAGE_KEY)).toBe(String(NOW));
+  });
+
+  test('removing it survives storage being unavailable', () => {
+    const blown = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
       throw new Error('private mode');
     });
-    expect(loadIdleTimeoutSetting()).toEqual(IDLE_TIMEOUT_OFF);
+    expect(() => forgetIdleTimeoutSetting()).not.toThrow();
     blown.mockRestore();
   });
 });
@@ -107,9 +90,9 @@ describe('the activity marker', () => {
 });
 
 describe('useIdleTimeout', () => {
-  function arm(setting: IdleTimeoutSetting): { expired: () => number } {
+  function arm(minutes: number | null): { expired: () => number } {
     const onExpire = vi.fn();
-    renderHook(() => useIdleTimeout(setting, onExpire));
+    renderHook(() => useIdleTimeout(minutes, onExpire));
     return { expired: () => onExpire.mock.calls.length };
   }
 
@@ -178,17 +161,17 @@ describe('useIdleTimeout', () => {
     expect(session.expired()).toBe(1);
   });
 
-  test('does nothing at all while the setting is off', () => {
-    const session = arm(IDLE_TIMEOUT_OFF);
+  test('does nothing at all while nobody is signed in', () => {
+    // `null` is how the app says "no session to end": arming it on the sign-in
+    // screen would sign out the person trying to sign in.
+    const session = arm(null);
     act(() => vi.advanceTimersByTime(7 * 24 * 60 * MINUTE));
     expect(session.expired()).toBe(0);
-    // And it writes no marker: a disabled feature should leave no trace to
-    // explain later.
     expect(localStorage.getItem(ACTIVITY_STORAGE_KEY)).toBeNull();
   });
 
   test('a shorter period is honoured', () => {
-    const session = arm({ enabled: true, minutes: 5 });
+    const session = arm(5);
     act(() => vi.advanceTimersByTime(6 * MINUTE));
     expect(session.expired()).toBe(1);
   });

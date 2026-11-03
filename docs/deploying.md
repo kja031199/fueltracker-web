@@ -122,6 +122,13 @@ in it are load-bearing:
   configuration really was baked in rather than merely present on the runner.
   Not the project id: since #45 that is a constant in the source, so every
   bundle carries it, configured or not.
+- **`VITE_IDLE_TIMEOUT_MINUTES` is the one optional Variable** (#70): the
+  inactivity sign-out for everyone, in whole minutes. It is deliberately left
+  out of the missing-configuration check, because unset — or anything that is
+  not whole minutes — already means 30, never "no timeout". Held to 1–1440, and
+  there is no "off". A change takes effect on the next deploy.
+  `toolchain.test.ts` fails if the workflow stops passing it to the build,
+  which would otherwise ignore the Variable without a word.
 
 Rules are deployed in a step of their own, **before** hosting, for the `hasOnly`
 reason below. It is not a required check: it runs after merge, and a failed

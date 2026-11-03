@@ -141,6 +141,9 @@ Recorded so a regression in the tests themselves is visible:
 | OCR input: detail not shown / detail unbounded / a failed encode of the reading copy ignored | 1 / 1 / 1 |
 | Fuel line: rung removed / labels winning over it / first of two disagreeing lines trusted | 7 / 6 / 1 |
 | Fuel line: two-decimal price / whole-number quantity / range check / lookbehind / lookahead dropped | 1 / 1 / 1 / 1 / 1 |
+| Admin idle timeout: bad text / unset failing open / decimals accepted / no trim / overflow not held to a day / `>` at the boundary | 17 / 8 / 2 / 1 / 1 / 1 |
+| Admin idle timeout: module hard-coding 30 / App ignoring it / armed while signed out / legacy setting kept / legacy "off" honoured | 1 / 1 / 1 / 1 / 1 |
+| Admin idle timeout: Settings showing a fixed 30 / notice saying the reader chose it / deploy not passing the Variable | 1 / 1 / 1 |
 | Fuel log: an action bypassing `written` (remove fill-up / import) / no sync after writes / no refresh / a failed write syncing | 1 / 1 / 6 / 5 / 1 |
 | Fuel log: opening a vanished fill-up syncing / not refreshing / a screen importing the store again | 1 / 1 / 1 |
 | Tabs: hash ignored on load / choosing replaces history / no `hashchange` / correction pushing an entry / no correction | 2 / 1 / 2 / 1 / 3 |

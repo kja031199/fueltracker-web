@@ -71,3 +71,13 @@ describe('the type checker sees the build config', () => {
     expect(include).toContain('vite.config.ts');
   });
 });
+
+describe('the deploy hands the build its admin settings (#70)', () => {
+  test('the inactivity period is passed from the repository Variable', () => {
+    // Vite inlines VITE_* at build time. A Variable set in the repository but
+    // not passed here would be silently ignored, and everyone would get the
+    // default — exactly the kind of misconfiguration nobody notices.
+    const workflow = readFileSync('.github/workflows/deploy.yml', 'utf8');
+    expect(workflow).toMatch(/VITE_IDLE_TIMEOUT_MINUTES: \$\{\{ vars\.VITE_IDLE_TIMEOUT_MINUTES \}\}/);
+  });
+});

@@ -7,7 +7,7 @@ how to run it; everything here is the detail behind it.
   from the frozen iOS original, what the browser took away, and the list of
   things left out on purpose rather than left unfinished.
 - **[accounts.md](accounts.md)** — signing in with Google, the allowlist that
-  decides who may, the optional idle timeout, and why local storage is
+  decides who may, the admin-set idle timeout, and why local storage is
   separated per account.
 - **[sync.md](sync.md)** — where the data lives, how two devices reconcile,
   what a deletion actually deletes, the logical clock, and why nothing arriving

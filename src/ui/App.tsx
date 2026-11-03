@@ -7,9 +7,8 @@ import type { RemoteStore } from '../data/remote';
 import type { SyncStateStore } from '../data/syncState';
 import type { UnitPreferences } from '../domain/units';
 import { shouldOnboard } from '../domain/onboardingGate';
-import type { IdleTimeoutSetting } from '../domain/idleTimeout';
-import { IDLE_TIMEOUT_OFF } from '../domain/idleTimeout';
-import { clearActivity, loadIdleTimeoutSetting, saveIdleTimeoutSetting, useIdleTimeout } from './idleTimeout';
+import { clearActivity, forgetIdleTimeoutSetting, useIdleTimeout } from './idleTimeout';
+import { ADMIN_IDLE_MINUTES } from './adminSettings';
 import { applyPalette, preferredColorScheme, watchColorScheme } from './theme';
 import { loadUnitPreferences, saveUnitPreferences } from './unitSettings';
 import { HAS_ONBOARDED } from './onboarding';
@@ -35,8 +34,8 @@ import { FillUpsScreen } from './FillUpsScreen';
  * The composition root (#56): **auth → this browser's preferences → the fuel
  * log → the screens.**
  *
- * - `App` gates on auth and holds what belongs to the browser: units, the idle
- *   sign-out, the palette. It is one of two components allowed to name the
+ * - `App` gates on auth and holds what belongs to the browser — units, the
+ *   palette — and enforces the administrator's idle sign-out (#70). It is one of two components allowed to name the
  *   store, and only hands it to the provider.
  * - `FuelLogProvider` owns the data, sync, and every write (`fuelLog.tsx`).
  * - `AppShell` is the signed-in app: account-scoped state (onboarding, the
@@ -84,6 +83,12 @@ export interface AppProps {
    * (#52). Omitted in tests, which get an in-memory one.
    */
   readonly syncState?: SyncStateStore;
+  /**
+   * Minutes of inactivity before signing out. The administrator's value
+   * (`VITE_IDLE_TIMEOUT_MINUTES`, #70) unless a test pins another; never
+   * anything the reader chose.
+   */
+  readonly idleMinutes?: number;
 }
 
 export function App({
@@ -93,14 +98,12 @@ export function App({
   remote = null,
   configured = true,
   syncState,
+  idleMinutes = ADMIN_IDLE_MINUTES,
 }: AppProps): ReactElement {
   // Memoised, or a new stub on every render would resubscribe forever.
   const authProvider = useMemo(() => auth ?? defaultAuth(), [auth]);
   const authState = useAuth(authProvider);
   const [units, setUnits] = useState<UnitPreferences>(() => loadUnitPreferences());
-  const [idleTimeout, setIdleTimeout] = useState<IdleTimeoutSetting>(() =>
-    loadIdleTimeoutSetting(),
-  );
   const [idleSignOut, setIdleSignOut] = useState(false);
 
   const signedIn = authState.status === 'signedIn';
@@ -111,10 +114,15 @@ export function App({
     setIdleSignOut(true);
     void authProvider.signOut();
   }, [authProvider]);
-  // Armed only while signed in: there is nothing to end otherwise, and passing
-  // the real setting on the sign-in screen would have it sign out the person
-  // who is trying to sign in.
-  useIdleTimeout(signedIn ? idleTimeout : IDLE_TIMEOUT_OFF, endIdleSession);
+  // Armed only while signed in: there is nothing to end otherwise, and arming
+  // it on the sign-in screen would sign out the person trying to sign in.
+  useIdleTimeout(signedIn ? idleMinutes : null, endIdleSession);
+
+  // The per-browser on/off choice from before #70 is deleted, never read, so
+  // an old "off" cannot opt this browser out of the administrator's timeout.
+  useEffect(() => {
+    forgetIdleTimeoutSetting();
+  }, []);
 
   // The palette is applied from the ported values rather than written as CSS,
   // so what the browser paints is what the contrast tests measure.
@@ -127,11 +135,6 @@ export function App({
   function changeUnits(next: UnitPreferences): void {
     setUnits(next);
     saveUnitPreferences(next);
-  }
-
-  function changeIdleTimeout(next: IdleTimeoutSetting): void {
-    setIdleTimeout(next);
-    saveIdleTimeoutSetting(next);
   }
 
   // The auth gate comes before everything, and `loading` is a state of its own
@@ -155,9 +158,9 @@ export function App({
         configured={configured}
         notice={
           idleSignOut
-            ? `You were signed out after ${idleTimeout.minutes} minutes of inactivity, which is ` +
-              'the setting you turned on. Your fuel log is still in this browser — signing in ' +
-              'again picks up where you left off.'
+            ? `For security, you were signed out after ${idleMinutes} minutes of inactivity. ` +
+              'Your fuel log is still in this browser — signing in again picks up where you ' +
+              'left off.'
             : null
         }
       />
@@ -177,8 +180,7 @@ export function App({
         initialTab={initialTab}
         units={units}
         onUnitsChange={changeUnits}
-        idleTimeout={idleTimeout}
-        onIdleTimeoutChange={changeIdleTimeout}
+        idleMinutes={idleMinutes}
         syncEnabled={remote !== null}
       />
     </FuelLogProvider>
@@ -191,8 +193,7 @@ interface AppShellProps {
   readonly initialTab: Tab;
   readonly units: UnitPreferences;
   readonly onUnitsChange: (units: UnitPreferences) => void;
-  readonly idleTimeout: IdleTimeoutSetting;
-  readonly onIdleTimeoutChange: (setting: IdleTimeoutSetting) => void;
+  readonly idleMinutes: number;
   readonly syncEnabled: boolean;
 }
 
@@ -203,8 +204,7 @@ function AppShell({
   initialTab,
   units,
   onUnitsChange,
-  idleTimeout,
-  onIdleTimeoutChange,
+  idleMinutes,
   syncEnabled,
 }: AppShellProps): ReactElement {
   const log = useFuelLog();
@@ -272,8 +272,7 @@ function AppShell({
             lastBackupAt={backup.state.lastExportAt}
             account={account}
             onSignOut={onSignOut}
-            idleTimeout={idleTimeout}
-            onIdleTimeoutChange={onIdleTimeoutChange}
+            idleMinutes={idleMinutes}
             syncEnabled={syncEnabled}
           />
         )}

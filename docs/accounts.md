@@ -114,33 +114,54 @@ in this one.
 
 ## Signing out when the tab goes idle
 
-Off by default, under Settings → Security: sign out after 5, 15, 30 or 60
-minutes without a pointer or a keystroke. It exists because Firebase Auth
-persists a session and never expires it, so a tab left open on a borrowed laptop
-otherwise keeps access indefinitely.
+Everyone is signed out after a period without a pointer or a keystroke — **30
+minutes unless the administrator sets otherwise**. It exists because Firebase
+Auth persists a session and never expires it, so a tab left open on a borrowed
+laptop otherwise keeps access indefinitely.
 
-What it does **not** do matters as much, and the setting says so next to the
-switch rather than in a help page:
+**It is not a setting** (#70). It used to be an opt-in under Settings →
+Security, off by default, with a choice of period per browser. Now one period
+applies to every user, always, and Settings only states it:
+
+- **The administrator sets it** with the `VITE_IDLE_TIMEOUT_MINUTES`
+  repository Variable (Settings → Secrets and variables → Actions → Variables),
+  next to the Firebase ones. It is read at build time, so a change takes effect
+  on the next deploy; an open tab keeps the old period until the update
+  reaches it. See [deploying.md](deploying.md#deploys-happen-on-merge).
+- **A missing or malformed value means 30 minutes, never "no timeout".** Whole
+  minutes only: unset, empty, `0`, `off`, `7.5`, `1e3` and `30min` all become
+  30, and anything past a day is held to a day (1440). There is deliberately
+  **no off value** — switching the protection off is a code change, not a
+  typo or a forgotten Variable, because failing open is the failure nobody
+  notices.
+- **Old per-browser choices are deleted, not honoured.** The app removes the
+  pre-#70 `fueltracker.idleTimeout` entry at startup without reading it, so a
+  browser that had switched the timeout off, or chosen a longer period, cannot
+  opt out.
+
+What it does **not** do matters as much, and Settings says so next to the
+period rather than in a help page:
 
 - **Signing out does not remove the fuel log.** The per-account database stays
   on the device on purpose, so signing back in finds the history and any edits
   that had not synced yet. Anyone who opens the browser's developer tools can
   still read it. This ends a session; it is a small addition to locking the
   device itself, which is the protection that actually matters.
+- **It is enforced by the app, on the device.** It is not a server-side session
+  limit: someone with DevTools can stop it, and the Firebase refresh token keeps
+  its own lifetime. Ending sessions on the server would be separate work.
 - **Signing back in needs a connection.** A device that is offline cannot get
-  back into the app until it reconnects. That is the trade for leaving this on,
-  and it is why the default is off for an app that otherwise works offline.
+  back into the app until it reconnects — the trade an always-on timeout makes
+  for an app that otherwise works offline.
 
 The rule is a pure function (`domain/idleTimeout.ts`) and the browser part — the
 activity marker, the events, the polling — is separate (`ui/idleTimeout.ts`), so
 the thing that decides to end someone's session is tested directly rather than
-inferred from a render. Two details are deliberate. The last-activity marker
-lives in `localStorage`, browser-wide rather than per account, so two tabs agree and nobody is signed out of the tab
-they left open while they were working in the other one. And the fallbacks point
-in **opposite directions on purpose**: an unreadable *period* becomes the
-30-minute default, never "no timeout", because that failure would be invisible;
-an unreadable *setting* reads as off, because there is then no evidence anybody
-asked for this and signing them out would be an action they never requested.
+inferred from a render. The last-activity marker lives in `localStorage`,
+browser-wide rather than per account, so two tabs agree and nobody is signed out
+of the tab they left open while they were working in the other one. An
+unbelievable marker — unreadable, or in the future after a clock change —
+restarts the countdown rather than ending the session or holding it open.
 
 ## Local storage is separated by account
 
@@ -176,12 +197,12 @@ Every key now goes through `ui/preferences.ts` and declares whose it is:
 
 | Scope | Keys | Stored as |
 |---|---|---|
-| browser | units, idle sign-out setting, last-activity marker, CSP watcher | `fueltracker.<name>` (unchanged) |
+| browser | units, last-activity marker, CSP watcher | `fueltracker.<name>` (unchanged) |
 | account | last backup, last sync, welcomed | `fueltracker.<name>.u.<uid>` |
 
-The idle sign-out setting stays with the browser on purpose: it is about the
-machine (a shared laptop wants it, a phone with a face lock does not), and the
-activity marker is shared so two tabs agree.
+The activity marker stays with the browser on purpose, so two tabs agree. (The
+idle sign-out *setting* was a browser key too, until #70 made the period the
+administrator's; its old entry is deleted at startup.)
 
 **Values written before the split are dropped, not adopted.** Nobody can tell
 which account wrote an unscoped `fueltracker.lastBackup`, and adopting it would
