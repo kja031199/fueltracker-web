@@ -135,7 +135,7 @@ The rule is a pure function (`domain/idleTimeout.ts`) and the browser part — t
 activity marker, the events, the polling — is separate (`ui/idleTimeout.ts`), so
 the thing that decides to end someone's session is tested directly rather than
 inferred from a render. Two details are deliberate. The last-activity marker
-lives in `localStorage`, so two tabs agree and nobody is signed out of the tab
+lives in `localStorage`, browser-wide rather than per account, so two tabs agree and nobody is signed out of the tab
 they left open while they were working in the other one. And the fallbacks point
 in **opposite directions on purpose**: an unreadable *period* becomes the
 30-minute default, never "no timeout", because that failure would be invisible;
@@ -160,6 +160,39 @@ the device under their own name, so signing back in finds them.
 `accountStore.test.ts` covers the leak itself, and that test was checked by
 reverting the fix, to confirm it fails against the old behaviour rather than
 merely passing against the new one.
+
+### So is the state kept beside it (#55)
+
+The *data* was separated in #44; the small pieces of *state* kept in
+`localStorage` were not, and three of them belong to a person rather than to a
+device. On a shared computer, account B:
+
+- could go without a **backup reminder** while holding data that existed
+  nowhere else, because the reminder compared B's fill-ups with A's last export;
+- was shown the time of **A's last sync** in Settings;
+- was never **welcomed**, because A already had been.
+
+Every key now goes through `ui/preferences.ts` and declares whose it is:
+
+| Scope | Keys | Stored as |
+|---|---|---|
+| browser | units, idle sign-out setting, last-activity marker, CSP watcher | `fueltracker.<name>` (unchanged) |
+| account | last backup, last sync, welcomed | `fueltracker.<name>.u.<uid>` |
+
+The idle sign-out setting stays with the browser on purpose: it is about the
+machine (a shared laptop wants it, a phone with a face lock does not), and the
+activity marker is shared so two tabs agree.
+
+**Values written before the split are dropped, not adopted.** Nobody can tell
+which account wrote an unscoped `fueltracker.lastBackup`, and adopting it would
+hand one person's state to whoever signs in next — the same mistake as the
+pre-accounts rescue below. The cost is small and errs towards saying too much: a
+backup reminder may appear once, and "Last synced" reads "not yet" until the
+sync that runs on sign-in.
+
+`AccountState.test.tsx` plays the shared-device cases through the real app, and
+`storageBoundary.test.ts` keeps `preferences.ts` the only module that touches
+web storage, so a new key cannot quietly skip the question.
 
 ### Data from before accounts existed is left where it is
 

@@ -6,6 +6,7 @@ import { InMemoryRepository } from '../data/repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
 import { FuelTrackerStore } from '../data/store';
 import { App } from './App';
+import { saveHasOnboarded } from './onboarding';
 
 function makeStore(): FuelTrackerStore {
   return new FuelTrackerStore({
@@ -57,7 +58,7 @@ describe('first run', () => {
 
 describe('vehicles', () => {
   async function renderPastOnboarding(store: FuelTrackerStore): Promise<void> {
-    localStorage.setItem('fueltracker.hasOnboarded', 'true');
+    saveHasOnboarded('local');
     render(<App store={store} initialTab="vehicles" />);
     await screen.findByRole('heading', { name: /add a vehicle/i });
   }
@@ -114,7 +115,7 @@ describe('vehicles', () => {
 
 describe('settings', () => {
   async function renderSettings(): Promise<void> {
-    localStorage.setItem('fueltracker.hasOnboarded', 'true');
+    saveHasOnboarded('local');
     const store = makeStore();
     await store.addVehicle({ name: 'Car' });
     render(<App store={store} initialTab="settings" />);
@@ -155,7 +156,7 @@ describe('settings', () => {
 describe('navigation', () => {
   test('marks the current tab for assistive technology, not just visually', async () => {
     const user = userEvent.setup();
-    localStorage.setItem('fueltracker.hasOnboarded', 'true');
+    saveHasOnboarded('local');
     const store = makeStore();
     await store.addVehicle({ name: 'Car' });
     render(<App store={store} />);
@@ -176,7 +177,7 @@ describe('cleaning up old tombstones', () => {
     // the writer does nothing about the ones already there, so the app runs
     // the cleanup on load — and this is the test that the wiring exists at
     // all, which is the part a pure-function suite cannot prove.
-    localStorage.setItem('fueltracker.hasOnboarded', 'true');
+    saveHasOnboarded('local');
     const fillUps = new InMemoryRepository<FillUpRecord>([
       {
         id: 'legacy',

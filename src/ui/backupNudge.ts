@@ -4,30 +4,38 @@
  * The decision itself is in `domain/exportReminder.ts`; this is only storage
  * and React. Keeping them apart is what lets the rule be tested without a DOM.
  *
- * ## Per device, deliberately
+ * ## Per account, and per device
  *
- * `localStorage`, so exporting on a laptop does not stop the phone asking.
+ * An **account** preference (`preferences.ts`, #55). Per account because the
+ * question is "has *this person's* data been saved anywhere?" — browser-wide,
+ * account B's reminder compared B's fill-ups with A's last export, and could
+ * stay silent while B held data that existed nowhere else.
+ *
+ * Still per device, so exporting on a laptop does not stop the phone asking.
  * That is a known cost, accepted: the alternative is syncing the marker, which
  * means a new synced field, which the `hasOnly` rule in `firestore.rules`
  * makes a two-part deploy. Over-nagging is the cheaper failure — and a prompt
  * on the phone is still *correct* if the laptop is the thing that was lost.
  *
- * Every read is defensive, in the style of `unitSettings.ts`: storage can be
- * unavailable in private mode, and a stored value can be anything at all if it
- * was hand-edited or written by an older build. A bad value reads as "never
- * backed up", which errs toward prompting rather than toward silence.
+ * A missing, unreadable or hand-edited value reads as "never backed up", which
+ * errs toward prompting rather than toward silence. Storage that refuses the
+ * write degrades the same way: the prompt reappears on the next load.
  */
 
 import { useCallback, useEffect, useState } from 'react';
 import type { BackupPromptReason, BackupState } from '../domain/exportReminder';
+import {
+  accountPreference,
+  jsonCodec,
+  readPreference,
+  useAccountPreference,
+} from './preferences';
 import {
   NEVER_BACKED_UP,
   afterBackup,
   afterSnooze,
   backupPromptReason,
 } from '../domain/exportReminder';
-
-const STORAGE_KEY = 'fueltracker.lastBackup';
 
 function isBackupState(value: unknown): value is BackupState {
   if (typeof value !== 'object' || value === null) return false;
@@ -42,26 +50,10 @@ function isBackupState(value: unknown): value is BackupState {
   );
 }
 
-export function loadBackupState(): BackupState {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw === null) return NEVER_BACKED_UP;
-    const parsed: unknown = JSON.parse(raw);
-    return isBackupState(parsed) ? parsed : NEVER_BACKED_UP;
-  } catch {
-    // Unavailable storage, or text that is not JSON. Either way the honest
-    // answer is that we have no evidence of a backup.
-    return NEVER_BACKED_UP;
-  }
-}
+const LAST_BACKUP = accountPreference('lastBackup', jsonCodec(isBackupState));
 
-export function saveBackupState(state: BackupState): void {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    // Private mode with storage blocked. The prompt then reappears next load,
-    // which is the right way for this particular failure to degrade.
-  }
+export function loadBackupState(uid: string | null): BackupState {
+  return readPreference(LAST_BACKUP, uid) ?? NEVER_BACKED_UP;
 }
 
 export interface BackupNudge {
@@ -74,8 +66,8 @@ export interface BackupNudge {
   readonly snooze: () => void;
 }
 
-export function useBackupNudge(fillUpCount: number): BackupNudge {
-  const [state, setState] = useState<BackupState>(() => loadBackupState());
+export function useBackupNudge(fillUpCount: number, uid: string | null): BackupNudge {
+  const [state, setState] = useAccountPreference(LAST_BACKUP, uid, NEVER_BACKED_UP);
   // Recomputed on a timer as well as on render, so a banner appears on a page
   // left open across the threshold rather than only after an interaction.
   const [now, setNow] = useState<number>(() => Date.now());
@@ -85,19 +77,15 @@ export function useBackupNudge(fillUpCount: number): BackupNudge {
     return () => clearInterval(timer);
   }, []);
 
-  const recordBackup = useCallback((count: number) => {
-    const next = afterBackup(count, Date.now());
-    setState(next);
-    saveBackupState(next);
-  }, []);
+  const recordBackup = useCallback(
+    (count: number) => setState(afterBackup(count, Date.now())),
+    [setState],
+  );
 
-  const snooze = useCallback(() => {
-    setState((current) => {
-      const next = afterSnooze(current, Date.now());
-      saveBackupState(next);
-      return next;
-    });
-  }, []);
+  const snooze = useCallback(
+    () => setState(afterSnooze(state, Date.now())),
+    [setState, state],
+  );
 
   return { state, reason: backupPromptReason(state, fillUpCount, now), recordBackup, snooze };
 }

@@ -7,6 +7,7 @@ import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/r
 import { FuelTrackerStore } from '../data/store';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { App } from './App';
+import { saveHasOnboarded } from './onboarding';
 
 function makeStore(): FuelTrackerStore {
   return new FuelTrackerStore({
@@ -54,7 +55,7 @@ function captureDownloads(): { name: string; text: string }[] {
 }
 
 async function renderSettings(store: FuelTrackerStore): Promise<void> {
-  localStorage.setItem('fueltracker.hasOnboarded', 'true');
+  saveHasOnboarded('local');
   render(<App store={store} initialTab="settings" />);
   await screen.findByRole('heading', { name: /backup and restore/i });
 }

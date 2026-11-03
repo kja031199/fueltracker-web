@@ -9,6 +9,7 @@ import { StubAuthProvider } from '../data/auth';
 import type { PushSummary, RawSnapshot, RemoteStore } from '../data/remote';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { App } from './App';
+import { saveHasOnboarded } from './onboarding';
 
 /**
  * What somebody sees when they are signed in but not on the allowlist.
@@ -209,7 +210,7 @@ describe('a refused change is not a refused account (#50)', () => {
         throw error;
       },
     };
-    localStorage.setItem('fueltracker.hasOnboarded', 'true');
+    saveHasOnboarded(USER.uid);
     const store = makeStore();
     await store.addVehicle({ name: 'Civic' });
 

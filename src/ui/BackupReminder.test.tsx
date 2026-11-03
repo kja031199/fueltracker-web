@@ -72,7 +72,7 @@ describe('the backup reminder', () => {
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: /save a backup/i })).not.toBeInTheDocument(),
     );
-    expect(loadBackupState().lastExportAt).not.toBeNull();
+    expect(loadBackupState('local').lastExportAt).not.toBeNull();
   });
 
   test('dismissing snoozes rather than silencing', async () => {
@@ -88,7 +88,7 @@ describe('the backup reminder', () => {
       expect(screen.queryByRole('button', { name: /save a backup/i })).not.toBeInTheDocument(),
     );
 
-    const stored = loadBackupState();
+    const stored = loadBackupState('local');
     expect(stored.snoozedUntil).not.toBeNull();
     expect(stored.lastExportAt).toBeNull();
 
@@ -112,7 +112,7 @@ describe('the backup reminder', () => {
   });
 
   test('treats a hand-edited stored value as no backup at all', async () => {
-    localStorage.setItem('fueltracker.lastBackup', '{"lastExportAt":"recently"}');
+    localStorage.setItem('fueltracker.lastBackup.u.local', '{"lastExportAt":"recently"}');
     render(<App store={await storeWith(MINIMUM_ENTRIES_TO_PROMPT)} />);
     expect(await screen.findByText(/never saved a backup/i)).toBeInTheDocument();
   });
@@ -165,7 +165,7 @@ describe('Settings', () => {
     await user.click(await screen.findByRole('button', { name: /export spreadsheet/i }));
     await screen.findByText(/Saved \d+ fill-up\(s\) as CSV/i);
 
-    expect(loadBackupState().lastExportAt).toBeNull();
+    expect(loadBackupState('local').lastExportAt).toBeNull();
     expect(screen.getByRole('button', { name: /save a backup/i })).toBeInTheDocument();
   });
 
@@ -176,6 +176,6 @@ describe('Settings', () => {
     await user.click(await screen.findByRole('button', { name: /export backup \(JSON\)/i }));
     await screen.findByText(/Saved a backup of/i);
 
-    expect(loadBackupState().lastExportAt).not.toBeNull();
+    expect(loadBackupState('local').lastExportAt).not.toBeNull();
   });
 });
