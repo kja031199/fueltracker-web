@@ -307,11 +307,27 @@ export async function syncOnce(
     vehicles.tooNew.length + fillUps.tooNew.length + pending.tooNew.length;
 
   const localBefore = await store.exportSnapshot();
-  const pulled = await store.importBackup({
-    vehicles: vehicles.readable,
-    fillUps: preserveLocalReceipts(fillUps.readable, localBefore.fillUps),
-    pendingFillUps: pending.readable,
-  });
+  // Ties: this device and the account hold different versions of a row with
+  // the same `updatedAt` — two devices wrote it in the same millisecond. Both
+  // sides pick the same winner (`tieWinner`). Where the account's wins, the
+  // merge takes it; where this device's wins, it is re-stamped below so it is
+  // sent and every other device takes it. Without this, each kept its own
+  // version and neither ever sent it.
+  const localWins = tiesWonLocally(
+    { vehicles: vehicles.readable, fillUps: fillUps.readable, pendingFillUps: pending.readable },
+    localBefore,
+  );
+  const pulled = await store.importBackup(
+    {
+      vehicles: vehicles.readable,
+      fillUps: preserveLocalReceipts(fillUps.readable, localBefore.fillUps),
+      pendingFillUps: pending.readable,
+    },
+    (incoming, existing) => tieWinner(incoming, existing) === 'first',
+  );
+  for (const [collection, ids] of Object.entries(localWins) as [Collection, string[]][]) {
+    if (ids.length > 0) await store.restamp(collection, ids);
+  }
 
   // Rows an older build stored with text longer than the account accepts are
   // shortened before the push is built, or each one fails the whole batch on
@@ -435,4 +451,57 @@ async function persist(
   } catch {
     // Storage refused; the next sync starts from a full read.
   }
+}
+
+/**
+ * Which of two versions of a row, stamped with the same `updatedAt`, wins.
+ * The answer depends only on the two rows — never on which one is local — so
+ * every device that meets the same tie settles it the same way.
+ *
+ * - **A deletion beats an edit.** Somebody deleted it on purpose; an edit made
+ *   in the same millisecond was made without knowing that.
+ * - Otherwise the row whose canonical text (sorted keys, receipt bytes left
+ *   out) sorts later. Arbitrary, but the same everywhere, which is all a tie
+ *   needs.
+ * - `'same'` when they do not really differ: two deletions, or rows equal
+ *   apart from a receipt photo, which sync omits when it is too large and is
+ *   therefore not an edit.
+ */
+export function tieWinner(
+  first: { readonly deletedAt: number | null },
+  second: { readonly deletedAt: number | null },
+): 'first' | 'second' | 'same' {
+  const firstDeleted = first.deletedAt !== null;
+  const secondDeleted = second.deletedAt !== null;
+  if (firstDeleted && secondDeleted) return 'same';
+  if (firstDeleted !== secondDeleted) return firstDeleted ? 'first' : 'second';
+  const a = canonical(first);
+  const b = canonical(second);
+  if (a === b) return 'same';
+  return a > b ? 'first' : 'second';
+}
+
+function canonical(row: object): string {
+  return JSON.stringify(
+    Object.entries(row)
+      .filter(([key]) => key !== 'receiptImageData')
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+  );
+}
+
+/** Ids, per collection, where this device's version wins a tie with the account's. */
+function tiesWonLocally(remote: Snapshot, local: Snapshot): Record<Collection, string[]> {
+  const won: Record<Collection, string[]> = { vehicles: [], fillUps: [], pendingFillUps: [] };
+  for (const collection of ['vehicles', 'fillUps', 'pendingFillUps'] as const) {
+    const mine = new Map<string, { readonly updatedAt: number; readonly deletedAt: number | null }>(
+      local[collection].map((row) => [row.id, row]),
+    );
+    for (const row of remote[collection]) {
+      const held = mine.get(row.id);
+      if (held !== undefined && held.updatedAt === row.updatedAt && tieWinner(row, held) === 'second') {
+        won[collection].push(row.id);
+      }
+    }
+  }
+  return won;
 }

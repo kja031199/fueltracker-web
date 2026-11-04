@@ -59,10 +59,25 @@ export interface ImportSummary {
  * throwaway. It also makes re-importing the same file a no-op instead of a way
  * to duplicate an entire history.
  */
-function shouldReplace(incoming: SyncFields, existing: SyncFields | undefined): boolean {
+function shouldReplace(
+  incoming: SyncFields,
+  existing: SyncFields | undefined,
+  tieBreak?: TieBreak,
+): boolean {
   if (existing === undefined) return true;
+  if (incoming.updatedAt === existing.updatedAt && tieBreak !== undefined) {
+    return tieBreak(incoming, existing);
+  }
   return incoming.updatedAt > existing.updatedAt;
 }
+
+/**
+ * Whether `incoming` should replace `existing` when both carry the **same**
+ * `updatedAt` — two devices that wrote one row in the same millisecond. Sync
+ * passes one (see `tieWinner` in `sync.ts`); a restored file does not, so
+ * re-importing a backup stays a no-op.
+ */
+export type TieBreak = (incoming: SyncFields, existing: SyncFields) => boolean;
 
 /**
  * Merges a parsed backup into storage.
@@ -84,6 +99,7 @@ function shouldReplace(incoming: SyncFields, existing: SyncFields | undefined): 
 export async function importBackup(
   repos: Repositories,
   snapshot: Snapshot,
+  tieBreak?: TieBreak,
 ): Promise<ImportSummary> {
   const rejected: string[] = [];
   let skippedOlder = 0;
@@ -99,7 +115,7 @@ export async function importBackup(
   // and a sync pull come through, and it used to store rows exactly as found:
   // one long station name in a backup then failed every upload afterwards.
   for (const incoming of snapshot.vehicles.map(boundVehicleText)) {
-    if (!shouldReplace(incoming, existingVehicles.get(incoming.id))) {
+    if (!shouldReplace(incoming, existingVehicles.get(incoming.id), tieBreak)) {
       skippedOlder += 1;
       continue;
     }
@@ -119,7 +135,7 @@ export async function importBackup(
       rejected.push(`fill-up ${incoming.id}: its vehicle id cannot be stored`);
       continue;
     }
-    if (!shouldReplace(incoming, existingFillUps.get(incoming.id))) {
+    if (!shouldReplace(incoming, existingFillUps.get(incoming.id), tieBreak)) {
       skippedOlder += 1;
       continue;
     }
@@ -155,7 +171,7 @@ export async function importBackup(
       rejected.push(`submission ${incoming.id}: its vehicle id cannot be stored`);
       continue;
     }
-    if (!shouldReplace(incoming, existingPending.get(incoming.id))) {
+    if (!shouldReplace(incoming, existingPending.get(incoming.id), tieBreak)) {
       skippedOlder += 1;
       continue;
     }

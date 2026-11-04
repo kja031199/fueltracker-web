@@ -24,7 +24,7 @@ import type { FillUpSummary } from './records';
 import { toSummary } from './records';
 import type { Tombstoner } from './tombstone';
 import { isScrubbed, tombstoneFillUp, tombstonePending, tombstoneVehicle } from './tombstone';
-import type { ImportSummary } from './backup';
+import type { ImportSummary, TieBreak } from './backup';
 import { exportSnapshot, importBackup } from './backup';
 import { TEXT_LIMITS, boundText } from '../domain/textLimits';
 import { boundFillUpText, boundPendingText, boundVehicleText } from './recordText';
@@ -382,8 +382,22 @@ export class FuelTrackerStore {
   }
 
   /** Merges a parsed backup in. See `data/backup.ts` for the rules. */
-  async importBackup(snapshot: Snapshot): Promise<ImportSummary> {
-    return importBackup(this.repos, snapshot);
+  async importBackup(snapshot: Snapshot, tieBreak?: TieBreak): Promise<ImportSummary> {
+    return importBackup(this.repos, snapshot, tieBreak);
+  }
+
+  /**
+   * Re-stamps rows with the store's clock, unchanged otherwise — deleted rows
+   * included. Sync uses it when this device's version of a row wins a tie
+   * with the account's (see `tieWinner`): a newer stamp is what gets it sent,
+   * and what makes every other device take it.
+   */
+  async restamp(collection: 'vehicles' | 'fillUps' | 'pendingFillUps', ids: readonly string[]): Promise<void> {
+    const repo = this.repos[collection] as Repository<SyncFields>;
+    for (const id of ids) {
+      const row = (await repo.get(id)) ?? (await repo.listDeleted()).find((r) => r.id === id);
+      if (row !== undefined) await repo.put({ ...row, updatedAt: this.clock.now() });
+    }
   }
 
   private recordFromDraft(
