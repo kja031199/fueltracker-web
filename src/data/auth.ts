@@ -27,6 +27,12 @@ export interface AuthUser {
   readonly uid: string;
   readonly email: string;
   readonly displayName: string;
+  /**
+   * Whether Google has verified `email` (#66). Only a verified address can
+   * accept an invitation to a shared car — the rules check the same flag.
+   * Optional so a stub without it reads as unverified.
+   */
+  readonly emailVerified?: boolean;
 }
 
 export type AuthState =

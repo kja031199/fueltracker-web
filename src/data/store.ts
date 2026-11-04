@@ -24,7 +24,7 @@ import type { FillUpSummary } from './records';
 import { toSummary } from './records';
 import type { Tombstoner } from './tombstone';
 import { isScrubbed, tombstoneFillUp, tombstonePending, tombstoneVehicle } from './tombstone';
-import type { ImportSummary } from './backup';
+import type { ImportSummary, TieBreak } from './backup';
 import { exportSnapshot, importBackup } from './backup';
 import { TEXT_LIMITS, boundText } from '../domain/textLimits';
 import { boundFillUpText, boundPendingText, boundVehicleText } from './recordText';
@@ -60,6 +60,11 @@ export class FuelTrackerStore {
   constructor(
     private readonly repos: Repositories,
     private readonly clock: StoreClock = systemClock,
+    /**
+     * The signed-in account, stamped on each new fill-up as `enteredBy`
+     * (#66). `null` where there is no account: tests, the demo, local-only.
+     */
+    private readonly author: string | null = null,
   ) {}
 
   // MARK: Vehicles
@@ -113,7 +118,7 @@ export class FuelTrackerStore {
    * code review, is what stops an unvalidated entry reaching storage.
    */
   async addFillUp(draft: FuelEntryDraft, vehicleId: string): Promise<FillUpRecord> {
-    const record = this.recordFromDraft(draft, vehicleId, this.clock.newId());
+    const record = { ...this.recordFromDraft(draft, vehicleId, this.clock.newId()), enteredBy: this.author };
     await this.repos.fillUps.put(record);
     return record;
   }
@@ -126,7 +131,10 @@ export class FuelTrackerStore {
    * never producing a draft in the first place.
    */
   async updateFillUp(id: string, draft: FuelEntryDraft, vehicleId: string): Promise<FillUpRecord> {
-    const record = this.recordFromDraft(draft, vehicleId, id);
+    // Who entered it does not change because someone else corrected it — and
+    // on a shared car the rules refuse an edit that tries.
+    const existing = await this.repos.fillUps.get(id);
+    const record = { ...this.recordFromDraft(draft, vehicleId, id), enteredBy: existing?.enteredBy ?? null };
     await this.repos.fillUps.put(record);
     return record;
   }
@@ -141,6 +149,27 @@ export class FuelTrackerStore {
   async removeFillUp(id: string): Promise<void> {
     const at = this.clock.now();
     await this.repos.fillUps.remove(id, (row) => tombstoneFillUp(row, at));
+  }
+
+  /**
+   * Forgets a car this device held only because it was shared with this
+   * account, once that access has ended (#66): the car and every fill-up and
+   * submission of it, live and deleted, are **hard**-deleted.
+   *
+   * No tombstones, on purpose. Those rows are the owner's; this account never
+   * had the right to delete them, and a tombstone would try to sync exactly
+   * that deletion. Never call this for a car that is yours — `removeVehicle`
+   * is the deletion that syncs.
+   */
+  async forgetVehicle(vehicleId: string): Promise<void> {
+    for (const repo of [this.repos.fillUps, this.repos.pendingFillUps]) {
+      const rows = [
+        ...(await repo.listForVehicle(vehicleId)),
+        ...(await repo.listDeleted()).filter((row) => row.vehicleId === vehicleId),
+      ];
+      for (const row of rows) await repo.purge(row.id);
+    }
+    await this.repos.vehicles.purge(vehicleId);
   }
 
   /**
@@ -353,8 +382,24 @@ export class FuelTrackerStore {
   }
 
   /** Merges a parsed backup in. See `data/backup.ts` for the rules. */
-  async importBackup(snapshot: Snapshot): Promise<ImportSummary> {
-    return importBackup(this.repos, snapshot);
+  async importBackup(snapshot: Snapshot, tieBreak?: TieBreak): Promise<ImportSummary> {
+    return importBackup(this.repos, snapshot, tieBreak);
+  }
+
+  /**
+   * Re-stamps rows with the store's clock, unchanged otherwise — deleted rows
+   * included. Sync uses it when this device's version of a row wins a tie
+   * with the account's (see `tieWinner`): a newer stamp is what gets it sent,
+   * and what makes every other device take it.
+   */
+  async restamp(collection: 'vehicles' | 'fillUps' | 'pendingFillUps', ids: readonly string[]): Promise<void> {
+    const repo = this.repos[collection] as Repository<SyncFields>;
+    for (const id of ids) {
+      const row = (await repo.get(id)) ?? (await repo.listDeleted()).find((r) => r.id === id);
+      // Strictly newer than it was, whatever clock this store was given:
+      // a re-stamp that ties again settles nothing.
+      if (row !== undefined) await repo.put({ ...row, updatedAt: Math.max(this.clock.now(), row.updatedAt + 1) });
+    }
   }
 
   private recordFromDraft(

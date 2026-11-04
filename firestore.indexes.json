@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "fillUps",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "vehicleId", "order": "ASCENDING" },
+        { "fieldPath": "syncedAt", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

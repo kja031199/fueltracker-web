@@ -1,10 +1,11 @@
 /**
  * Checking that a record from the account is actually the shape it claims.
  *
- * ## Why this is needed even though nobody else can write there
+ * ## Why this is needed even though the rules guard every write
  *
- * `firestore.rules` already guarantees that only the owner can write to their
- * own tree, so this is not defending against another user. It defends against
+ * `firestore.rules` already guarantees that only the owner — and, for a shared
+ * car's fill-ups, its members (#66) — can write to a tree, and holds every
+ * write to the record's shape. It defends against
  * everything else that can put a wrong-shaped document there: a future build
  * with a different schema, a half-finished write, a hand edit in the Firebase
  * console, or a bug in this app that gets fixed later but leaves bad rows
@@ -192,6 +193,7 @@ export function validateFillUp(value: unknown): FillUpRecord | string {
       latitude: null,
       longitude: null,
       receiptImageData: null,
+      enteredBy: enteredBy(value.enteredBy),
     };
   }
 
@@ -212,7 +214,20 @@ export function validateFillUp(value: unknown): FillUpRecord | string {
     latitude: coordinate(value.latitude),
     longitude: coordinate(value.longitude),
     receiptImageData: receipt(value.receiptImageData),
+    enteredBy: enteredBy(value.enteredBy),
   };
+}
+
+/**
+ * Who logged a fill-up (#66): a uid, or `null` for nobody known. Anything
+ * implausible — absent (an older build), empty, not text, longer than any
+ * uid — reads as nobody. Never a reason to drop the fill-up: the odometer
+ * reading is what the statistics need, and the name is a courtesy.
+ */
+function enteredBy(value: unknown): string | null {
+  return typeof value === 'string' && value !== '' && value.length <= TEXT_LIMITS.enteredBy
+    ? value
+    : null;
 }
 
 export function validatePending(value: unknown): PendingFillUpRecord | string {

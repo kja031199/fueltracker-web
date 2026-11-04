@@ -5,6 +5,7 @@ import type { AuthProvider, AuthUser } from '../data/auth';
 import { StubAuthProvider } from '../data/auth';
 import type { RemoteStore } from '../data/remote';
 import type { SyncStateStore } from '../data/syncState';
+import type { SharingSync } from '../data/shareSync';
 import type { UnitPreferences } from '../domain/units';
 import { shouldOnboard } from '../domain/onboardingGate';
 import { clearActivity, forgetIdleTimeoutSetting, useIdleTimeout } from './idleTimeout';
@@ -20,6 +21,7 @@ import { useTabRoute } from './useTabRoute';
 import { useServiceWorker } from './useServiceWorker';
 import { UpdateBanner } from './UpdateBanner';
 import { BackupBanner } from './BackupBanner';
+import { InvitationsBanner } from './InvitationsBanner';
 import { useBackupNudge } from './backupNudge';
 import { SignInScreen } from './SignInScreen';
 import { NoAccessScreen } from './NoAccessScreen';
@@ -89,6 +91,12 @@ export interface AppProps {
    * anything the reader chose.
    */
   readonly idleMinutes?: number;
+  /**
+   * Cars shared with and by this account (#66): the Firestore sharing remote
+   * plus this account's per-car cursors. Omitted in tests that are not about
+   * sharing, and wherever nothing syncs.
+   */
+  readonly sharing?: SharingSync | null;
 }
 
 export function App({
@@ -99,6 +107,7 @@ export function App({
   configured = true,
   syncState,
   idleMinutes = ADMIN_IDLE_MINUTES,
+  sharing = null,
 }: AppProps): ReactElement {
   // Memoised, or a new stub on every render would resubscribe forever.
   const authProvider = useMemo(() => auth ?? defaultAuth(), [auth]);
@@ -172,6 +181,7 @@ export function App({
       store={store}
       remote={remote}
       uid={authState.user.uid}
+      sharing={sharing}
       {...(syncState === undefined ? {} : { syncState })}
     >
       <AppShell
@@ -261,6 +271,7 @@ function AppShell({
     <div className="app">
       <UpdateBanner state={serviceWorker} />
       <BackupBanner reason={backup.reason} onBackUp={backUp} onDismiss={backup.snooze} />
+      <InvitationsBanner />
       <h1 className="app__title">FuelTracker</h1>
       <main className="app__main">
         {tab === 'vehicles' && <VehiclesScreen />}

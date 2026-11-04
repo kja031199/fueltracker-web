@@ -31,6 +31,12 @@ export const TEXT_LIMITS = {
   notes: 4000,
   fuelGrade: 40,
   submitterName: 200,
+  // Sharing a car (#66): who logged a fill-up, and the invitation and
+  // membership documents. A uid is at most 128 characters in Firebase.
+  enteredBy: 128,
+  ownerUid: 128,
+  ownerName: 200,
+  vehicleName: 200,
 } as const;
 
 export type TextField = keyof typeof TEXT_LIMITS;

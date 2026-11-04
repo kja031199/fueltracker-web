@@ -78,11 +78,11 @@ const BATCH_LIMIT = 500;
  * cursor returns precisely what is new. About 1.8 × 10^15 today: well inside
  * `Number.MAX_SAFE_INTEGER`.
  */
-function toMicros(stamp: Timestamp): number {
+export function toMicros(stamp: Timestamp): number {
   return stamp.seconds * 1_000_000 + Math.floor(stamp.nanoseconds / 1_000);
 }
 
-function fromMicros(micros: number): Timestamp {
+export function fromMicros(micros: number): Timestamp {
   const seconds = Math.floor(micros / 1_000_000);
   return new Timestamp(seconds, (micros - seconds * 1_000_000) * 1_000);
 }
@@ -145,12 +145,12 @@ export class FirestoreRemoteStore implements RemoteStore {
     // asks for. A client-chosen time could sit below another device's cursor
     // and never be read, so it is the server's or nothing.
     for (const row of snapshot.fillUps) {
-      const { data, omitted } = this.encodeReceipt(row);
+      const { data, omitted } = encodeReceipt(row);
       if (omitted) receiptsOmitted += 1;
       writes.push({ path: 'fillUps', id: row.id, data });
     }
     for (const row of snapshot.pendingFillUps) {
-      const { data, omitted } = this.encodeReceipt(row);
+      const { data, omitted } = encodeReceipt(row);
       if (omitted) receiptsOmitted += 1;
       writes.push({ path: 'pendingFillUps', id: row.id, data });
     }
@@ -200,19 +200,6 @@ export class FirestoreRemoteStore implements RemoteStore {
     });
     return { rows, highWater };
   }
-
-  private encodeReceipt(
-    row: FillUpRecord | PendingFillUpRecord,
-  ): { readonly data: object; readonly omitted: boolean } {
-    const bytes = row.receiptImageData;
-    if (bytes === null || bytes.byteLength === 0) {
-      return { data: { ...row, receiptImageData: null }, omitted: false };
-    }
-    if (bytes.byteLength > MAX_SYNCED_RECEIPT_BYTES) {
-      return { data: { ...row, receiptImageData: null }, omitted: true };
-    }
-    return { data: { ...row, receiptImageData: Bytes.fromUint8Array(bytes) }, omitted: false };
-  }
 }
 
 /**
@@ -224,7 +211,7 @@ export class FirestoreRemoteStore implements RemoteStore {
  * result: keeping the two apart means the type conversion cannot quietly become
  * the place where validation is assumed to have happened.
  */
-function decode(data: Record<string, unknown>): Record<string, unknown> {
+export function decode(data: Record<string, unknown>): Record<string, unknown> {
   // The stamp is the remote's bookkeeping, not part of a record: it is read
   // above for the cursor and dropped here, so no record ever carries it.
   const { syncedAt: _stamp, ...rest } = data;
@@ -233,4 +220,23 @@ function decode(data: Record<string, unknown>): Record<string, unknown> {
     ...rest,
     receiptImageData: receipt instanceof Bytes ? receipt.toUint8Array() : null,
   };
+}
+
+/**
+ * A fill-up or submission as it is written: the receipt as Firestore `Bytes`,
+ * or dropped (and counted) when it is larger than one document can hold. The
+ * shared-car remote writes fill-ups with this too (#66), so the two can never
+ * disagree about what a row looks like on the wire.
+ */
+export function encodeReceipt(
+  row: FillUpRecord | PendingFillUpRecord,
+): { readonly data: object; readonly omitted: boolean } {
+  const bytes = row.receiptImageData;
+  if (bytes === null || bytes.byteLength === 0) {
+    return { data: { ...row, receiptImageData: null }, omitted: false };
+  }
+  if (bytes.byteLength > MAX_SYNCED_RECEIPT_BYTES) {
+    return { data: { ...row, receiptImageData: null }, omitted: true };
+  }
+  return { data: { ...row, receiptImageData: Bytes.fromUint8Array(bytes) }, omitted: false };
 }

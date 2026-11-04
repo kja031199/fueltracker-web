@@ -32,7 +32,8 @@ import type { Table } from 'dexie';
 import type { FillUpRecord, PendingFillUpRecord, SyncFields, VehicleRecord } from './records';
 import type { Repository } from './repository';
 import type { SyncCursor, SyncStateStore } from './syncState';
-import { parseCursor } from './syncState';
+import { parseCursor, parseLedger, type ShareLedger } from './syncState';
+import type { Membership } from './sharing';
 
 export class FuelTrackerDatabase extends Dexie {
   declare vehicles: Table<VehicleRecord, string>;
@@ -78,15 +79,44 @@ export class FuelTrackerDatabase extends Dexie {
  * the two can only ever be cleared together. See `syncState.ts`.
  */
 export class DexieSyncState implements SyncStateStore {
-  constructor(private readonly db: FuelTrackerDatabase) {}
+  /**
+   * `key` names whose cursor this is: `'cursor'` for the account's own tree,
+   * and one key per car shared with it (#66), since each is read separately.
+   */
+  constructor(
+    private readonly db: FuelTrackerDatabase,
+    private readonly key: string = 'cursor',
+  ) {}
 
   async load(): Promise<SyncCursor | null> {
-    const row = await this.db.syncState.get('cursor');
+    const row = await this.db.syncState.get(this.key);
     return parseCursor(row?.['cursor']);
   }
 
   async save(cursor: SyncCursor): Promise<void> {
-    await this.db.syncState.put({ key: 'cursor', cursor });
+    await this.db.syncState.put({ key: this.key, cursor });
+  }
+
+  async clear(): Promise<void> {
+    await this.db.syncState.delete(this.key);
+  }
+}
+
+/**
+ * The cars this device holds because they were shared with it (#66), kept so
+ * that one which stops being shared — left on another device, or removed by
+ * its owner — is recognised as such and forgotten here too.
+ */
+export class DexieShareLedger implements ShareLedger {
+  constructor(private readonly db: FuelTrackerDatabase) {}
+
+  async load(): Promise<Membership[]> {
+    const row = await this.db.syncState.get('shares');
+    return parseLedger(row?.['shares']);
+  }
+
+  async save(list: readonly Membership[]): Promise<void> {
+    await this.db.syncState.put({ key: 'shares', shares: [...list] });
   }
 }
 
@@ -142,5 +172,9 @@ export class DexieRepository<T extends SyncFields> implements Repository<T> {
   async listDeleted(): Promise<T[]> {
     const rows = await this.table.toArray();
     return rows.filter((row) => row.deletedAt !== null);
+  }
+
+  async purge(id: string): Promise<void> {
+    await this.table.delete(id);
   }
 }

@@ -46,6 +46,10 @@ Two allowed accounts are as separate as an allowed account and a stranger: the
 same `request.auth.uid == uid` check scopes both. The rules suite asserts that
 directly whenever the list holds more than one entry.
 
+**One written exception: a car you choose to share** — see
+[Sharing a car](#sharing-a-car-66) below. It opens that one car to the people
+who accept your invitation, and nothing else of yours.
+
 Uids rather than email addresses, for three reasons:
 
 - A uid is opaque, so a public repository stays free of anybody's personal
@@ -162,6 +166,53 @@ browser-wide rather than per account, so two tabs agree and nobody is signed out
 of the tab they left open while they were working in the other one. An
 unbelievable marker — unreadable, or in the future after a clock change —
 restarts the countdown rather than ending the session or holding it open.
+
+## Sharing a car (#66)
+
+Two people who drive one car — a couple, say — can both log its fill-ups and
+both see everything: every fill-up, the economy, the costs and the charts.
+
+**How it works for the people using it.** The owner opens Vehicles → Share on
+a car and enters the other person's Google address. The next time that person
+opens FuelTracker, a banner asks whether to accept; nothing is shared until
+they do. From then on the car appears for both, says who logged each fill-up,
+and either can add, correct and delete its fill-ups. The owner can remove
+someone, the other person can leave, and either way the car disappears from
+their devices. The other person must be on the [allowlist](#who-can-sign-in)
+like anyone else.
+
+**What is exposed, said before anything is shared.** The car's whole history —
+receipt photos, notes and stations included — and nothing else of the
+owner's: not their other cars, not their other fill-ups, not submissions.
+
+**Where the data lives: in the owner's account.** The car stays where it was,
+and `firestore.rules` lets the people listed under that car's `members` read
+it and read and write **its** fill-ups. No data moves when a car is shared,
+so an existing car and its whole history can be shared as it is.
+
+- **Joining needs an invitation to your own verified Google address.** The
+  rules compare the invitation with the address on the sign-in, lowercased,
+  and only when Google has verified it. Nobody can add anyone else, and a
+  member cannot add a third person.
+- **A member's fill-ups carry their own uid** (`enteredBy`), which the rules
+  require on a new one and forbid changing on an edit or a deletion. A member
+  cannot move a fill-up to another car, write the car itself, or erase a
+  fill-up outright — a deletion is a tombstone, as everywhere else.
+- **Membership is kept apart from the car's record**, in its own `members`
+  subcollection, so the owner's sync — which pushes the car record whole —
+  can never overwrite somebody joining.
+- **The member's own account lists the shares** (`memberships`), so their
+  other devices find the car too.
+
+**When it ends** — removed, left, or the owner deleted the car — the car is
+removed from the member's devices with no trace pushed anywhere: those rows
+were never the member's to delete. Fill-ups the member logged **and synced**
+stay with the owner. One logged but not yet synced when access ends goes with
+the car, because there is nowhere left it may be sent.
+
+The rules are pinned on the emulator by `sharingRules.test.ts`, and the whole
+two-person flow — invite, accept, both logging, removal — runs end to end
+against the real rules in `sharing.test.ts`.
 
 ## Local storage is separated by account
 

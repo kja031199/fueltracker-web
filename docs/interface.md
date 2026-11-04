@@ -27,6 +27,23 @@ and schedules a sync a moment later (#52), in one place — so a screen added
 next year gets both without anyone remembering to ask. Screens cannot reach
 the store directly; a test enforces it.
 
+## Sharing a car, and the missed fill-up hint (#66)
+
+Vehicles → **Share** on your own car invites someone by their Google address,
+lists who has it, and lets you remove them or withdraw an invitation nobody
+answered. It says what sharing exposes *before* anyone is invited: the car's
+whole history, photos and notes included, and nothing else of yours. A car
+shared *with* you says whose it is and offers **Leave** instead of Share and
+Delete. An invitation waits in a banner until it is accepted or declined —
+joining is never something the app does on its own. On a shared car each
+fill-up says who entered it; on a car nobody shares, it does not.
+
+Two people logging one car is how a fill-up goes missing, and a missing one
+stretches the next economy figure across two tanks. So the fill-up form hints
+— never blocks — when the distance since the last fill-up is more than twice
+the car's usual (`domain/odometerGap.ts`: the median, once there are three
+gaps to judge by), pointing at "Missed logging a fill before this one".
+
 ## Contrast is enforced, not asserted
 
 The accent colours are not `orange` and `teal`. Stock palettes are tuned to look

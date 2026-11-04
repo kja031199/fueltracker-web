@@ -117,4 +117,4 @@ jobs:
           .github/firebase-cli/node_modules/.bin/firebase emulators:exec
           --only firestore
           --project fueltracker-rules-test
-          "npx vitest run src/data/firebase/rules.test.ts"
+          "npx vitest run src/data/firebase/"

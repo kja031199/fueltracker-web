@@ -80,6 +80,10 @@ export const tombstoneFillUp: Tombstoner<FillUpRecord> = (row, at) => ({
   latitude: null,
   longitude: null,
   receiptImageData: null,
+  // Kept, not cleared (#66): on a shared car the rules compare it, so a
+  // member's deletion — a tombstone written over the row — must carry the
+  // same name the row had. It names an account, not anything the row said.
+  ...(row.enteredBy === undefined ? {} : { enteredBy: row.enteredBy }),
 });
 
 export const tombstonePending: Tombstoner<PendingFillUpRecord> = (row, at) => ({

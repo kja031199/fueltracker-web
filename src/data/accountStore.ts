@@ -26,7 +26,8 @@
  * the machine.
  */
 
-import { DexieRepository, DexieSyncState, FuelTrackerDatabase } from './db';
+import { DexieRepository, DexieShareLedger, DexieSyncState, FuelTrackerDatabase } from './db';
+import type { SharingSync } from './shareSync';
 import type { SyncStateStore } from './syncState';
 import { FuelTrackerStore } from './store';
 import { sharedSyncClock } from './syncClock';
@@ -63,6 +64,12 @@ export interface AccountStore {
   readonly store: FuelTrackerStore;
   /** Where incremental sync keeps its place, in this account's database (#52). */
   readonly syncState: SyncStateStore;
+  /**
+   * Where a car shared with this account keeps its own sync cursor, and the
+   * ledger of which shared cars this device holds (#66). Everything sharing
+   * needs except the remote itself, which the caller supplies.
+   */
+  readonly sharingState: Omit<SharingSync, 'remote'>;
   readonly databaseName: string;
   /** Releases the connection. Called when the signed-in account changes. */
   close(): void;
@@ -76,7 +83,7 @@ export interface AccountStore {
  * learns never reaches the timestamps the store issues, and a device with a
  * fast clock goes on winning. See `syncClock.ts`.
  */
-function storeOver(db: FuelTrackerDatabase): FuelTrackerStore {
+function storeOver(db: FuelTrackerDatabase, uid: string): FuelTrackerStore {
   return new FuelTrackerStore(
     {
       vehicles: new DexieRepository(db.vehicles),
@@ -84,6 +91,8 @@ function storeOver(db: FuelTrackerDatabase): FuelTrackerStore {
       pendingFillUps: new DexieRepository(db.pendingFillUps),
     },
     sharedSyncClock,
+    // Stamped on each new fill-up, so a shared car can say who logged it (#66).
+    uid,
   );
 }
 
@@ -93,8 +102,13 @@ export async function openAccountStore(uid: string, prefix = ''): Promise<Accoun
   const db = new FuelTrackerDatabase(databaseName);
   await db.open();
   return {
-    store: storeOver(db),
+    store: storeOver(db, uid),
     syncState: new DexieSyncState(db),
+    sharingState: {
+      stateFor: (key) => new DexieSyncState(db, key),
+      forgetState: (key) => new DexieSyncState(db, key).clear(),
+      ledger: new DexieShareLedger(db),
+    },
     databaseName,
     close: () => db.close(),
   };

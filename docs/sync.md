@@ -233,6 +233,18 @@ clock*. It is safe precisely because `updatedAt` is never displayed: the date
 you see is the separate `date` field, so inflating the ordering value costs
 nothing.
 
+**Two devices in the same millisecond.** The logical clock makes a device's own
+writes strictly newer than everything it has *seen* — not than what another
+device wrote at the same moment. Two devices can stamp one row with the same
+`updatedAt`, and last-write-wins had no answer for a tie: each kept its own
+version, neither sent it, and they disagreed for ever. Sharing a car made it
+likely (two people, one car), and a shared-car test caught it failing 11 runs
+in 12. A tie is now settled by `tieWinner`, identically on every device: a
+deletion beats an edit, otherwise the rows' canonical text decides. Where the
+account's version wins, the merge takes it; where this device's wins, it is
+re-stamped so it is sent and everyone else takes it. `syncTies.test.ts`
+reproduces the race deterministically with frozen clocks.
+
 Adoption is bounded at 30 days. A row claiming `Number.MAX_SAFE_INTEGER` would
 push the clock to the edge of integer precision, where `+ 1` stops producing a
 larger number and every later write ties — and under a `>` comparison a tie
@@ -359,6 +371,30 @@ Two consequences, both deliberate: a large photo is the one thing a cleared
 browser can still lose, and an incoming row never *removes* a receipt the local
 copy has — otherwise an edit made on a second device would overwrite the only
 remaining copy of the image with null.
+
+### Shared cars sync separately (#66)
+
+A member of a shared car has two places to sync with: their own account, and
+that car in its owner's account. `syncAll` (`shareSync.ts`) runs them in turn:
+
+1. **The account's own sync, excluding every shared car.** Without that scope
+   the owner's car would be pushed into the member's account — a copy that
+   would then diverge for ever.
+2. **One sync per shared car**, through `SharingRemote.scoped`: that car's
+   fill-ups only, never the car itself. Each has its own cursor in the
+   account's database, keyed `share:{owner}__{car}`.
+3. **Ended shares are forgotten**: a car in the device's ledger but no longer
+   shared, one whose sync is refused, and one the owner deleted are removed
+   with `forgetVehicle` — a hard delete with no tombstone.
+
+If the list of shares cannot be read, the account's own sync still runs and
+nothing is forgotten on the strength of a failed read. The owner needs none of
+this: a member's fill-ups simply appear in the owner's own account.
+
+A member's incremental read asks for `vehicleId == car` **and** `syncedAt >
+mark`, which needs a composite index (`firestore.indexes.json`). Until it is
+deployed — see [deploying.md](deploying.md#the-shared-car-index-is-deployed-by-hand-66)
+— the read falls back to the whole car: correct, only less economical.
 
 ## Backups, imports and the shape of a row
 

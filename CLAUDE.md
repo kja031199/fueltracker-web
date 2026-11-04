@@ -78,7 +78,7 @@ Use the pinned CLI, which is what CI runs:
 npm ci --prefix .github/firebase-cli
 .github/firebase-cli/node_modules/.bin/firebase emulators:exec \
   --only firestore --project fueltracker-rules-test \
-  "npx vitest run src/data/firebase/rules.test.ts"
+  "npx vitest run src/data/firebase/"
 ```
 
 (`firebase-tools` is the CLI; `firebase` is the SDK and ships no binary.)
@@ -98,7 +98,9 @@ npm ci --prefix .github/firebase-cli
 3. **Deletions are tombstones, and a tombstone carries only the sync fields.**
    A hard delete leaves nothing to propagate. `tombstone.ts` owns the shape and
    `Repository.remove` takes the builder as an argument; nothing may spread a
-   whole row into a tombstone (#25).
+   whole row into a tombstone (#25). A fill-up's tombstone also keeps
+   `vehicleId` and `enteredBy`, which the rules check on a shared car (#66).
+   The one hard delete is `Repository.purge`, for `forgetVehicle` only.
 4. **Storage is canonical** — miles, US gallons, US MPG — converted only at the
    display boundary. L/100km is the *reciprocal* of MPG, so charts convert the
    series rather than relabelling the axis.
@@ -130,6 +132,14 @@ npm ci --prefix .github/firebase-cli
    `FuelLog.test.tsx` proves every action reaches the remote. A new write is a
    new action there — not a `store` prop and an `onChanged` callback, which is
    the shape that made "sync after a write" depend on memory.
+9. **A shared car stays in its owner's tree** (#66). Members read it and read
+   and write **its** fill-ups through the rules; nothing else of the owner's.
+   Membership lives in `vehicles/{id}/members`, never in the vehicle record
+   (the owner's last-write-wins push would erase it). A member's own sync
+   must exclude shared cars and each shared car's sync must push only its
+   fill-ups — the `scope` on `syncOnce`; get either wrong and a car is copied
+   into the wrong account. An ended share is `forgetVehicle`d: a hard delete,
+   **no tombstone**, because those rows were never the member's to delete.
 
 ## Traps
 
@@ -297,6 +307,26 @@ npm ci --prefix .github/firebase-cli
   the whole history and `{ from }` to `computeFuelStatistics` (#51). An MPG
   segment spans two rows, so filtering first drops the one that crosses into
   the range, and understates distance with it.
+
+- **Last-write-wins ties are settled by `tieWinner`, not left alone.** Two
+  devices can stamp one row with the same `updatedAt`; the strict `>` in the
+  merge and the push then kept each device's own version for ever. On a tie a
+  deletion wins, otherwise the canonical text; a local winner is `restamp`ed
+  so it propagates. Don't "simplify" the tie-break away, and keep it a function
+  of the two rows only — never of which is local — or devices disagree.
+- **`enteredBy` is optional on `FillUpRecord`** and `SCHEMA_VERSION` was not
+  bumped for it: an older build would skip a newer-schema row entirely, which
+  is worse than dropping a name. Validation reads anything implausible as
+  `null`; the tombstone keeps it, because the rules compare it on a member's
+  deletion.
+- **The shared-car index is not deployed by CI** — the deploy account lacks
+  the role, deliberately. `firestore.indexes.json` is deployed once by hand
+  (docs/deploying.md); `withIndexFallback` reads the whole car meanwhile.
+- **Emulator tests: every file under `src/data/firebase/` runs in CI.** The
+  sharing rules have their own file (`sharingRules.test.ts`) and an
+  end-to-end two-person flow (`sharing.test.ts`). Run the spike-style checks
+  from the repo with an **absolute** rules path — a relative one silently
+  loaded the app's own rules once and "proved" the wrong file.
 
 ### Tests
 

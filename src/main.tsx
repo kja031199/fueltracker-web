@@ -40,6 +40,7 @@ import type { AuthProvider, AuthState } from './data/auth';
 import { StubAuthProvider } from './data/auth';
 import type { RemoteStore } from './data/remote';
 import type { SyncStateStore } from './data/syncState';
+import type { SharingSync } from './data/shareSync';
 import { developmentUsesProduction, readSettings } from './data/firebase/settings';
 import { installCspWatch } from './ui/cspWatch';
 import { WrongProjectScreen } from './ui/WrongProjectScreen';
@@ -76,6 +77,7 @@ function render(
   remote: RemoteStore | null,
   configured: boolean,
   syncState?: SyncStateStore,
+  sharing?: SharingSync,
 ): void {
   root.render(
     <StrictMode>
@@ -85,6 +87,7 @@ function render(
         remote={remote}
         configured={configured}
         {...(syncState === undefined ? {} : { syncState })}
+        {...(sharing === undefined ? {} : { sharing })}
       />
     </StrictMode>,
   );
@@ -123,9 +126,10 @@ async function start(): Promise<void> {
   const config = settings;
 
   // Imported lazily so the Firebase SDK stays out of the initial chunk.
-  const [{ FirebaseAuthProvider }, { FirestoreRemoteStore }] = await Promise.all([
+  const [{ FirebaseAuthProvider }, { FirestoreRemoteStore }, { FirestoreSharingRemote }] = await Promise.all([
     import('./data/firebase/authProvider'),
     import('./data/firebase/remoteStore'),
+    import('./data/firebase/sharingRemote'),
   ]);
 
   const auth = new FirebaseAuthProvider(config);
@@ -134,7 +138,13 @@ async function start(): Promise<void> {
   // as well as on sign-in, and rebuilding them each time would reopen the
   // database and hand React new prop identities, which would refire the sync
   // effect and spend quota re-reading the account for nothing.
-  let open: { readonly uid: string; readonly account: AccountStore; readonly remote: RemoteStore } | null =
+  let open: {
+    readonly uid: string;
+    readonly account: AccountStore;
+    readonly remote: RemoteStore;
+    /** Cars shared with and by this account (#66). */
+    readonly sharing: SharingSync;
+  } | null =
     null;
   // Guards against two auth events being handled concurrently: opening a
   // database is asynchronous, and the later event must win.
@@ -152,7 +162,7 @@ async function start(): Promise<void> {
 
     const { uid } = state.user;
     if (open?.uid === uid) {
-      render(auth, open.account.store, open.remote, true, open.account.syncState);
+      render(auth, open.account.store, open.remote, true, open.account.syncState, open.sharing);
       return;
     }
 
@@ -168,8 +178,22 @@ async function start(): Promise<void> {
       return;
     }
 
-    open = { uid, account, remote: new FirestoreRemoteStore(config, uid) };
-    render(auth, account.store, open.remote, true, account.syncState);
+    const { user } = state;
+    open = {
+      uid,
+      account,
+      remote: new FirestoreRemoteStore(config, uid),
+      sharing: {
+        ...account.sharingState,
+        remote: FirestoreSharingRemote.forAccount(config, {
+          uid,
+          name: user.displayName,
+          email: user.email,
+          emailVerified: user.emailVerified === true,
+        }),
+      },
+    };
+    render(auth, account.store, open.remote, true, account.syncState, open.sharing);
   }
 
   auth.subscribe((state: AuthState) => {

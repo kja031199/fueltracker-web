@@ -27,12 +27,14 @@
  */
 
 import type { ReactElement, ReactNode } from 'react';
-import { createContext, useCallback, useContext, useMemo } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { FillUpRecord, Snapshot, VehicleRecord } from '../data/records';
 import type { ImportSummary } from '../data/backup';
 import type { RemoteStore } from '../data/remote';
 import type { FuelTrackerStore, NewVehicle } from '../data/store';
 import type { SyncStateStore } from '../data/syncState';
+import type { SharingSync } from '../data/shareSync';
+import type { Invite, Member, Membership } from '../data/sharing';
 import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
 import type { AppData } from './useAppData';
 import { useAppData } from './useAppData';
@@ -41,8 +43,54 @@ import { saveJsonBackup } from './exportBackup';
 import type { SyncStatus } from './useSync';
 import { useSync } from './useSync';
 
+/**
+ * Sharing a car (#66), as the screens see it. `enabled` is false without an
+ * account to share through (no backend, or signed out), and then every list is
+ * empty and every action refuses.
+ */
+export interface SharingView {
+  readonly enabled: boolean;
+  /** Cars shared *with* this account. */
+  readonly sharedWithMe: readonly Membership[];
+  /** Invitations waiting for this account's verified email. */
+  readonly invitesForMe: readonly Invite[];
+  /** The membership a car is held by, or undefined when it is this account's own. */
+  membershipFor(vehicleId: string): Membership | undefined;
+  /** Invites `email` to one of this account's cars. */
+  invite(vehicle: Pick<VehicleRecord, 'id' | 'name'>, email: string): Promise<void>;
+  withdrawInvite(vehicleId: string, email: string): Promise<void>;
+  /** Unanswered invitations this account sent for one car. */
+  invitesSentFor(vehicleId: string): Promise<Invite[]>;
+  /** Who a car is shared with — this account's own car, or one shared with it. */
+  membersOf(vehicleId: string): Promise<Member[]>;
+  removeMember(vehicleId: string, memberUid: string): Promise<void>;
+  /** Joins, then syncs so the car arrives at once. */
+  accept(invite: Invite): Promise<void>;
+  decline(invite: Invite): Promise<void>;
+  /** Leaves, then syncs, which forgets the car on this device. */
+  leave(membership: Membership): Promise<void>;
+}
+
+const SHARING_OFF: SharingView = {
+  enabled: false,
+  sharedWithMe: [],
+  invitesForMe: [],
+  membershipFor: () => undefined,
+  invite: () => Promise.reject(new Error('Sharing needs an account.')),
+  withdrawInvite: async () => {},
+  invitesSentFor: async () => [],
+  membersOf: async () => [],
+  removeMember: async () => {},
+  accept: () => Promise.reject(new Error('Sharing needs an account.')),
+  decline: async () => {},
+  leave: async () => {},
+};
+
 export interface FuelLog extends Omit<AppData, 'reload'> {
   readonly sync: SyncStatus;
+  readonly sharing: SharingView;
+  /** The signed-in account's uid, for "entered by you". Null when there is none. */
+  readonly me: string | null;
 
   // Writes: each refreshes what is shown and schedules a sync.
   addVehicle(vehicle: NewVehicle): Promise<VehicleRecord>;
@@ -75,6 +123,8 @@ export interface FuelLogProviderProps {
   readonly syncState?: SyncStateStore;
   /** Whose log this is, for the account-scoped last-sync time (#55). */
   readonly uid: string | null;
+  /** Cars shared with and by this account (#66). Omitted where nothing syncs. */
+  readonly sharing?: SharingSync | null;
   readonly children: ReactNode;
 }
 
@@ -83,10 +133,12 @@ export function FuelLogProvider({
   remote,
   syncState,
   uid,
+  sharing = null,
   children,
 }: FuelLogProviderProps): ReactElement {
   const data = useAppData(store);
-  const sync = useSync(store, remote, data.reload, syncState, uid);
+  const sync = useSync(store, remote, data.reload, syncState, uid, remote === null ? null : sharing);
+  const sharingView = useSharingView(remote === null ? null : sharing, uid, sync.syncNow, sync.lastSyncedAt);
   const { reload } = data;
   const { afterWrite } = sync;
 
@@ -107,6 +159,8 @@ export function FuelLogProvider({
     return {
       ...shown,
       sync,
+      sharing: sharingView,
+      me: uid,
       addVehicle: written((vehicle: NewVehicle) => store.addVehicle(vehicle)),
       removeVehicle: written((id: string) => store.removeVehicle(id)),
       addFillUp: written((draft: FuelEntryDraft, vehicleId: string) => store.addFillUp(draft, vehicleId)),
@@ -123,7 +177,7 @@ export function FuelLogProvider({
       exportSnapshot: () => store.exportSnapshot(),
       saveBackup: () => saveJsonBackup(store),
     };
-  }, [data, sync, written, store, reload]);
+  }, [data, sync, written, store, reload, sharingView, uid]);
 
   return <FuelLogContext.Provider value={log}>{children}</FuelLogContext.Provider>;
 }
@@ -135,4 +189,70 @@ export function useFuelLog(): FuelLog {
     throw new Error('useFuelLog() was called outside <FuelLogProvider>; App renders the screens inside one.');
   }
   return log;
+}
+
+/**
+ * The sharing lists, kept fresh: read on mount and after every sync, from the
+ * device's ledger first so a shared car is recognised as one even offline.
+ * A failed read keeps the last good lists rather than emptying them.
+ */
+function useSharingView(
+  sharing: SharingSync | null,
+  uid: string | null,
+  syncNow: () => Promise<void>,
+  lastSyncedAt: number | null,
+): SharingView {
+  const [sharedWithMe, setSharedWithMe] = useState<readonly Membership[]>([]);
+  const [invitesForMe, setInvitesForMe] = useState<readonly Invite[]>([]);
+
+  const refresh = useCallback(async () => {
+    if (sharing === null) return;
+    const held = await sharing.ledger.load().catch(() => null);
+    if (held !== null) setSharedWithMe(held);
+    const [current, invites] = await Promise.all([
+      sharing.remote.memberships().catch(() => null),
+      sharing.remote.invitesForMe().catch(() => null),
+    ]);
+    if (current !== null) setSharedWithMe(current);
+    if (invites !== null) setInvitesForMe(invites);
+  }, [sharing]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh, lastSyncedAt]);
+
+  return useMemo<SharingView>(() => {
+    if (sharing === null || uid === null) return SHARING_OFF;
+    const { remote } = sharing;
+    const membershipFor = (vehicleId: string): Membership | undefined =>
+      sharedWithMe.find((membership) => membership.vehicleId === vehicleId);
+    return {
+      enabled: true,
+      sharedWithMe,
+      invitesForMe,
+      membershipFor,
+      invite: async (vehicle, email) => {
+        await remote.invite(vehicle, email);
+      },
+      withdrawInvite: (vehicleId, email) => remote.withdrawInvite(vehicleId, email),
+      invitesSentFor: async (vehicleId) =>
+        (await remote.invitesSent()).filter((invite) => invite.vehicleId === vehicleId),
+      membersOf: (vehicleId) => remote.members(membershipFor(vehicleId)?.ownerUid ?? uid, vehicleId),
+      removeMember: (vehicleId, memberUid) => remote.removeMember(vehicleId, memberUid),
+      accept: async (invite) => {
+        await remote.accept(invite);
+        await refresh();
+        await syncNow();
+      },
+      decline: async (invite) => {
+        await remote.decline(invite);
+        await refresh();
+      },
+      leave: async (membership) => {
+        await remote.leave(membership);
+        await syncNow();
+        await refresh();
+      },
+    };
+  }, [sharing, uid, sharedWithMe, invitesForMe, refresh, syncNow]);
 }

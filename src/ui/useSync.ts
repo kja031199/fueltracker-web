@@ -25,7 +25,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RemoteStore } from '../data/remote';
 import type { FuelTrackerStore } from '../data/store';
-import { syncOnce } from '../data/sync';
+import { syncAll, type SharingSync } from '../data/shareSync';
+import { sharedSyncClock } from '../data/syncClock';
 import { InMemorySyncState, type SyncStateStore } from '../data/syncState';
 import { createSyncScheduler } from './syncScheduler';
 import { accountPreference, numberCodec, useAccountPreference } from './preferences';
@@ -67,6 +68,11 @@ export function useSync(
   syncState?: SyncStateStore,
   /** The signed-in uid, whose last-synced time this is. Null when signed out. */
   account: string | null = null,
+  /**
+   * Cars shared with and by this account (#66): each shared car is synced
+   * with its owner's account after this account's own sync. Null without one.
+   */
+  sharing: SharingSync | null = null,
 ): SyncStatus {
   const [fallbackState] = useState<SyncStateStore>(() => new InMemorySyncState());
   const state = syncState ?? fallbackState;
@@ -78,7 +84,8 @@ export function useSync(
     if (remote === null) return;
     setSyncing(true);
     try {
-      const result = await syncOnce(store, remote, undefined, state);
+      const all = await syncAll(store, remote, sharing, sharedSyncClock, state);
+      const result = all.own;
       if (!result.ok) {
         setMessage(result.reason);
         setRefused(result.kind === 'refused');
@@ -127,15 +134,26 @@ export function useSync(
           `${unbeatable} row(s) are dated far in the future, probably by a device with a wrong clock — changes you make to those here may not stick until its clock is fixed`,
         );
       }
+      // Shared cars (#66). An ended share is said by name: a car vanishing
+      // from the list without a word reads as data loss.
+      for (const ended of all.shares.ended) {
+        notes.push(`${ended.vehicleName || 'A car'} is no longer shared with you, so it was removed from this device`);
+      }
+      if (all.shares.failed.length > 0) {
+        notes.push(`${all.shares.failed.length} shared car(s) could not be reached and will be retried`);
+      }
       setMessage(notes.length === 0 ? null : `Synced. ${notes.join('; ')}.`);
 
       const changed =
         pulled.vehiclesWritten + pulled.fillUpsWritten + pulled.pendingWritten > 0;
-      if (changed || repaired > 0) await onChanged();
+      // A shared car's sync can bring rows too; reloading is cheap next to
+      // showing someone a fill-up their partner logged a minute ago late.
+      const sharesMoved = all.shares.synced.length + all.shares.ended.length > 0;
+      if (changed || repaired > 0 || sharesMoved) await onChanged();
     } finally {
       setSyncing(false);
     }
-  }, [store, remote, onChanged, state, setLastSyncedAt]);
+  }, [store, remote, onChanged, state, setLastSyncedAt, sharing]);
 
   // One scheduler per mount, always calling the latest `run`. It owns the
   // timing and makes sure two syncs never overlap — a focus landing while the

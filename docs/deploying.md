@@ -146,6 +146,28 @@ with an obvious error, but a *stale* one deploys perfectly happily and serves
 last week's code with no sign that anything is wrong. The hook is scoped to the
 hosting target, so `--only firestore:rules` stays fast and skips the build.
 
+### The shared-car index is deployed by hand (#66)
+
+A member's sync of a shared car reads with a query that needs a composite index
+on `fillUps` (`vehicleId`, `syncedAt`), declared in `firestore.indexes.json`.
+**Deploy it once**, from a machine signed in to Firebase:
+
+```bash
+.github/firebase-cli/node_modules/.bin/firebase deploy --only firestore:indexes --project <project-id>
+```
+
+It is not part of `deploy.yml` on purpose: deploying indexes needs the Cloud
+Datastore Index Admin role, and the deploy account holds only Hosting Admin,
+Rules Admin and Service Usage Consumer — see
+[Workload Identity Federation](#workload-identity-federation-considered-and-deferred).
+Granting a fourth role for a file that changes once in a long while is the
+wrong trade. Nothing breaks without it: the read falls back to the whole car
+(`withIndexFallback`), so sharing works from the first deploy, just with more
+reads until the index exists. `toolchain.test.ts` keeps the index declared.
+
+The rules tests now include every file under `src/data/firebase/` — the CI step
+runs the directory, so a new emulator test file cannot be skipped by accident.
+
 The rules deploy is not optional. A database created in production mode denies
 everything until they are uploaded, so sign-in succeeds and then every read
 fails with permission-denied. `firebase deploy` with no `--only` covers both.
