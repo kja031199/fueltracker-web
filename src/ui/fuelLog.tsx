@@ -36,6 +36,7 @@ import type { SyncStateStore } from '../data/syncState';
 import type { SharingSync } from '../data/shareSync';
 import type { Invite, Member, Membership } from '../data/sharing';
 import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
+import type { Submission } from '../data/fillUpLink';
 import type { AppData } from './useAppData';
 import { useAppData } from './useAppData';
 import type { BackupSummary } from './exportBackup';
@@ -99,6 +100,16 @@ export interface FuelLog extends Omit<AppData, 'reload'> {
   updateFillUp(id: string, draft: FuelEntryDraft, vehicleId: string): Promise<FillUpRecord>;
   removeFillUp(id: string): Promise<void>;
   importBackup(snapshot: Snapshot): Promise<ImportSummary>;
+  /**
+   * Queues a fill-up that arrived by link (#3) for review. Refused as
+   * `'not-yours'` for a car shared *with* this account: requests are made
+   * from a car's owner, so a submission for somebody else's car was not sent
+   * here to be received.
+   */
+  receiveSubmission(submission: Submission): Promise<ReceiveResult>;
+  /** The fill-up it became, or null when it could not be (its car is gone, it no longer validates). */
+  approveSubmission(id: string): Promise<FillUpRecord | null>;
+  rejectSubmission(id: string): Promise<void>;
 
   // Reads.
   /**
@@ -113,6 +124,8 @@ export interface FuelLog extends Omit<AppData, 'reload'> {
   /** Downloads a JSON backup and says what it held. */
   saveBackup(): Promise<BackupSummary>;
 }
+
+export type ReceiveResult = 'queued' | 'duplicate' | 'no-such-car' | 'not-yours';
 
 const FuelLogContext = createContext<FuelLog | null>(null);
 
@@ -141,6 +154,7 @@ export function FuelLogProvider({
   const sharingView = useSharingView(remote === null ? null : sharing, uid, sync.syncNow, sync.lastSyncedAt);
   const { reload } = data;
   const { afterWrite } = sync;
+  const shared = remote === null ? null : sharing;
 
   /** The rule, once: write, then refresh, then sync. A throw skips both. */
   const written = useCallback(
@@ -156,6 +170,16 @@ export function FuelLogProvider({
 
   const log = useMemo<FuelLog>(() => {
     const { reload: _reload, ...shown } = data;
+    const receive = written((submission: Submission) => store.receiveSubmission(submission));
+    // The device's ledger is read as well as the lists in state, which are
+    // filled asynchronously: a link opened as the app starts is checked
+    // against what this device knows, not against lists still loading.
+    const heldByMembership = async (vehicleId: string): Promise<boolean> => {
+      if (sharingView.membershipFor(vehicleId) !== undefined) return true;
+      if (shared === null) return false;
+      const held = await shared.ledger.load().catch(() => null);
+      return held?.some((membership) => membership.vehicleId === vehicleId) ?? false;
+    };
     return {
       ...shown,
       sync,
@@ -169,6 +193,10 @@ export function FuelLogProvider({
       ),
       removeFillUp: written((id: string) => store.removeFillUp(id)),
       importBackup: written((snapshot: Snapshot) => store.importBackup(snapshot)),
+      receiveSubmission: async (submission: Submission): Promise<ReceiveResult> =>
+        (await heldByMembership(submission.vehicleId)) ? 'not-yours' : receive(submission),
+      approveSubmission: written((id: string) => store.approvePendingFillUp(id)),
+      rejectSubmission: written((id: string) => store.rejectPendingFillUp(id)),
       loadFillUp: async (id: string) => {
         const whole = await store.fillUp(id);
         if (whole === undefined) await reload();
@@ -177,7 +205,7 @@ export function FuelLogProvider({
       exportSnapshot: () => store.exportSnapshot(),
       saveBackup: () => saveJsonBackup(store),
     };
-  }, [data, sync, written, store, reload, sharingView, uid]);
+  }, [data, sync, written, store, reload, sharingView, uid, shared]);
 
   return <FuelLogContext.Provider value={log}>{children}</FuelLogContext.Provider>;
 }

@@ -12,6 +12,7 @@ import type { UnitPreferences } from '../domain/units';
 import { distance, volume } from '../domain/units';
 import { FillUpForm } from './FillUpForm';
 import { useFuelLog } from './fuelLog';
+import { PendingReview } from './PendingReview';
 
 interface Props {
   /** A display preference of this browser, not data, so still a prop. */
@@ -56,7 +57,12 @@ export function FillUpsScreen({ units }: Props): ReactElement {
   );
 
   if (vehicleId === null) {
-    return <p className="empty">Add a vehicle first — fill-ups belong to one.</p>;
+    return (
+      <div>
+        <PendingReview units={units} />
+        <p className="empty">Add a vehicle first — fill-ups belong to one.</p>
+      </div>
+    );
   }
 
   if (adding || editing !== null) {
@@ -94,6 +100,7 @@ export function FillUpsScreen({ units }: Props): ReactElement {
 
   return (
     <div>
+      <PendingReview units={units} />
       <button className="button" type="button" onClick={() => setAdding(true)}>
         Log a fill-up
       </button>

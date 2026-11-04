@@ -10,6 +10,9 @@ import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { FuelLogProvider, useFuelLog, type FuelLog } from './fuelLog';
 import { SAVE_SYNC_DELAY_MS } from './syncScheduler';
+import { InMemorySharingWorld } from '../data/sharing';
+import type { SharingSync } from '../data/shareSync';
+import { InMemoryShareLedger, InMemorySyncState } from '../data/syncState';
 
 /**
  * The one place a write happens (#56).
@@ -67,7 +70,7 @@ async function remoteRow(remote: InMemoryRemoteStore, id: string): Promise<Recor
   const before = remote.pullLog.length;
   const snapshot = await remote.pull();
   remote.pullLog.length = before;
-  const rows = [...snapshot.vehicles, ...snapshot.fillUps] as Record<string, unknown>[];
+  const rows = [...snapshot.vehicles, ...snapshot.fillUps, ...snapshot.pendingFillUps] as Record<string, unknown>[];
   return rows.find((row) => row['id'] === id);
 }
 
@@ -146,6 +149,82 @@ describe('every write reaches the account without anyone remembering to ask', ()
     });
     expect(log().vehicles.map((v) => v.id)).toContain(vehicle.id);
     await waitFor(async () => expect(await remoteRow(remote, vehicle.id)).toBeDefined(), SYNC_WINDOW);
+  });
+
+  // Fill-ups sent by link (#3).
+  function sent(vehicleId: string, id = 'sub-1') {
+    return { id, vehicleId, submitterName: 'Sam', submittedAt: 1, draft: draft(2000) };
+  }
+
+  test('receiveSubmission', async () => {
+    const { store, remote, log } = await mount();
+    const vehicle = await store.addVehicle({ name: 'Civic' });
+    await act(async () => {
+      expect(await log().receiveSubmission(sent(vehicle.id))).toBe('queued');
+    });
+    expect(log().pending.map((row) => row.id)).toEqual(['sub-1']); // refreshed
+    await waitFor(async () => expect(await remoteRow(remote, 'sub-1')).toBeDefined(), SYNC_WINDOW);
+  });
+
+  test('approveSubmission', async () => {
+    const { store, remote, log } = await mount();
+    const vehicle = await store.addVehicle({ name: 'Civic' });
+    await store.receiveSubmission(sent(vehicle.id));
+    let id = '';
+    await act(async () => {
+      id = (await log().approveSubmission('sub-1'))?.id ?? '';
+    });
+    expect(log().pending).toHaveLength(0);
+    expect(log().fillUpCount).toBe(1);
+    await waitFor(async () => expect(await remoteRow(remote, id)).toBeDefined(), SYNC_WINDOW);
+    await waitFor(async () => expect(await tombstoned(remote, 'sub-1')).toBe(true), SYNC_WINDOW);
+  });
+
+  test('rejectSubmission', async () => {
+    const { store, remote, log } = await mount();
+    const vehicle = await store.addVehicle({ name: 'Civic' });
+    await store.receiveSubmission(sent(vehicle.id));
+    await act(async () => {
+      await log().rejectSubmission('sub-1');
+    });
+    expect(log().pending).toHaveLength(0);
+    await waitFor(async () => expect(await tombstoned(remote, 'sub-1')).toBe(true), SYNC_WINDOW);
+  });
+
+  test('a car this device holds as shared with it is not yours to receive for, even before the lists catch up', async () => {
+    const store = makeStore();
+    const vehicle = await store.addVehicle({ name: 'Civic' });
+    const world = new InMemorySharingWorld();
+    const shareRemote = world.sharingFor({ uid: 'u1', name: 'Me', email: 'me@example.com', emailVerified: true });
+    // Offline for the membership list: only the device's ledger knows.
+    shareRemote.memberships = () => Promise.reject(new Error('offline'));
+    const ledger = new InMemoryShareLedger();
+    const sharing: SharingSync = {
+      remote: shareRemote,
+      stateFor: () => new InMemorySyncState(),
+      forgetState: async () => {},
+      ledger,
+    };
+    const remote = new InMemoryRemoteStore();
+    const wrapper = ({ children }: { children: ReactNode }): ReactNode => (
+      <FuelLogProvider store={store} remote={remote} uid="u1" sharing={sharing}>
+        {children}
+      </FuelLogProvider>
+    );
+    const { result } = renderHook(() => useFuelLog(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await waitFor(() => expect(remote.pullLog.length).toBeGreaterThan(0));
+    await waitFor(() => expect(result.current.sync.syncing).toBe(false));
+    expect(result.current.sharing.membershipFor(vehicle.id)).toBeUndefined();
+
+    // A sync has just recorded the share; the lists in state have not caught up.
+    await ledger.save([{ ownerUid: 'owner', vehicleId: vehicle.id, ownerName: 'Kyle', vehicleName: 'Civic' }]);
+    let outcome = '';
+    await act(async () => {
+      outcome = await result.current.receiveSubmission(sent(vehicle.id));
+    });
+    expect(outcome).toBe('not-yours');
+    expect(await store.pendingFillUps()).toHaveLength(0);
   });
 });
 

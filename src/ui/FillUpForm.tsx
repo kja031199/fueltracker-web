@@ -18,6 +18,8 @@ import type { FillUpRecord, FillUpSummary } from '../data/records';
 import { useFuelLog } from './fuelLog';
 import { importReceiptPhoto } from './importReceipt';
 import { TEXT_LIMITS } from '../domain/textLimits';
+import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
+import { LINK_TEXT_LIMITS } from '../data/fillUpLink';
 import { unusualOdometerJump } from '../domain/odometerGap';
 
 interface Props {
@@ -30,6 +32,18 @@ interface Props {
   readonly editing: FillUpRecord | null;
   readonly onSaved: () => Promise<void>;
   readonly onCancel: () => void;
+  /**
+   * Filling in a fill-up for someone else's car, to send back by link (#3):
+   * the draft goes to `onDraft` and nothing is written here. A link carries
+   * text only and nothing about the owner's log, so there is no photo, no
+   * "missed the previous fill-up", and no odometer check against a history
+   * this reader cannot see; text is held to the link's limits as it is typed
+   * rather than shortened unseen on the way out.
+   */
+  readonly forLink?: {
+    readonly title: string;
+    readonly onDraft: (draft: FuelEntryDraft) => Promise<void>;
+  };
 }
 
 /** A stored record read back into canonical form state. */
@@ -102,6 +116,7 @@ export function FillUpForm({
   editing,
   onSaved,
   onCancel,
+  forLink,
 }: Props): ReactElement {
   // Saving goes through the fuel log, which refreshes and syncs (#56).
   const { addFillUp, updateFillUp } = useFuelLog();
@@ -237,7 +252,8 @@ export function FillUpForm({
     if (draft === null) return;
     setSaving(true);
     try {
-      if (editing === null) await addFillUp(draft, vehicleId);
+      if (forLink !== undefined) await forLink.onDraft(draft);
+      else if (editing === null) await addFillUp(draft, vehicleId);
       else await updateFillUp(editing.id, draft, vehicleId);
       await onSaved();
     } finally {
@@ -262,41 +278,43 @@ export function FillUpForm({
       aria-labelledby="fillup-form-heading"
     >
       <h2 className="card__title" id="fillup-form-heading">
-        {editing === null ? 'New fill-up' : 'Edit fill-up'}
+        {forLink?.title ?? (editing === null ? 'New fill-up' : 'Edit fill-up')}
       </h2>
 
-      <div className="field">
-        <button
-          className="button button--secondary"
-          type="button"
-          onClick={() => photoInput.current?.click()}
-          disabled={scanning}
-        >
-          {scanning ? 'Reading the photo…' : 'Fill in from a receipt photo'}
-        </button>
-        <input
-          ref={photoInput}
-          type="file"
-          accept="image/*"
-          hidden
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            event.target.value = '';
-            if (file !== undefined) void importPhoto(file);
-          }}
-        />
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0 }}>
-          Photograph a paper receipt and the gallons, price, date and station are filled in for
-          you — into empty fields only, so nothing you typed is overwritten. Pump displays are not
-          supported; their segment digits are not readable by this. Needs a connection the first
-          time.
-        </p>
-        {scanNote !== null && (
-          <p className="warning" role="status" style={{ marginTop: 6 }}>
-            {scanNote}
+      {forLink === undefined && (
+        <div className="field">
+          <button
+            className="button button--secondary"
+            type="button"
+            onClick={() => photoInput.current?.click()}
+            disabled={scanning}
+          >
+            {scanning ? 'Reading the photo…' : 'Fill in from a receipt photo'}
+          </button>
+          <input
+            ref={photoInput}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = '';
+              if (file !== undefined) void importPhoto(file);
+            }}
+          />
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0 }}>
+            Photograph a paper receipt and the gallons, price, date and station are filled in for
+            you — into empty fields only, so nothing you typed is overwritten. Pump displays are not
+            supported; their segment digits are not readable by this. Needs a connection the first
+            time.
           </p>
-        )}
-      </div>
+          {scanNote !== null && (
+            <p className="warning" role="status" style={{ marginTop: 6 }}>
+              {scanNote}
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="field">
         <label className="field__label" htmlFor="fillup-date">
@@ -401,18 +419,20 @@ export function FillUpForm({
         </label>
       </div>
 
-      <div className="field field--inline">
-        <input
-          id="fillup-missed"
-          type="checkbox"
-          checked={form.missedPreviousFillUp}
-          onChange={(event) => update('missedPreviousFillUp', event.target.checked)}
-          style={{ minHeight: 'auto', width: 20, height: 20 }}
-        />
-        <label className="field__label" htmlFor="fillup-missed">
-          Missed logging a fill before this one
-        </label>
-      </div>
+      {forLink === undefined && (
+        <div className="field field--inline">
+          <input
+            id="fillup-missed"
+            type="checkbox"
+            checked={form.missedPreviousFillUp}
+            onChange={(event) => update('missedPreviousFillUp', event.target.checked)}
+            style={{ minHeight: 'auto', width: 20, height: 20 }}
+          />
+          <label className="field__label" htmlFor="fillup-missed">
+            Missed logging a fill before this one
+          </label>
+        </div>
+      )}
 
       <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: 0 }}>
         Marking full tanks is what lets the app work out exact economy between
@@ -444,7 +464,7 @@ export function FillUpForm({
         </label>
         <input
           id="fillup-station"
-          maxLength={TEXT_LIMITS.station}
+          maxLength={forLink === undefined ? TEXT_LIMITS.station : LINK_TEXT_LIMITS.station}
           value={form.station}
           onChange={(event) => update('station', event.target.value)}
         />
@@ -456,7 +476,7 @@ export function FillUpForm({
         </label>
         <textarea
           id="fillup-notes"
-          maxLength={TEXT_LIMITS.notes}
+          maxLength={forLink === undefined ? TEXT_LIMITS.notes : LINK_TEXT_LIMITS.notes}
           rows={2}
           value={form.notes}
           onChange={(event) => update('notes', event.target.value)}
@@ -465,7 +485,7 @@ export function FillUpForm({
 
       <div className="row-actions">
         <button className="button" type="submit" disabled={!canSave}>
-          {editing === null ? 'Save fill-up' : 'Save changes'}
+          {forLink !== undefined ? 'Create link' : editing === null ? 'Save fill-up' : 'Save changes'}
         </button>
         <button className="button button--secondary" type="button" onClick={onCancel}>
           Cancel

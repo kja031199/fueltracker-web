@@ -17,7 +17,7 @@ import { useAccountPreference } from './preferences';
 import { useAuth } from './useAuth';
 import { FuelLogProvider, useFuelLog } from './fuelLog';
 import type { Tab } from './useTabRoute';
-import { useTabRoute } from './useTabRoute';
+import { useRoute } from './useTabRoute';
 import { useServiceWorker } from './useServiceWorker';
 import { UpdateBanner } from './UpdateBanner';
 import { BackupBanner } from './BackupBanner';
@@ -31,6 +31,8 @@ import { VehiclesScreen } from './VehiclesScreen';
 import { SettingsScreen } from './SettingsScreen';
 import { DashboardScreen } from './DashboardScreen';
 import { FillUpsScreen } from './FillUpsScreen';
+import { SubmitScreen } from './SubmitScreen';
+import { IncomingScreen } from './IncomingScreen';
 
 /**
  * The composition root (#56): **auth → this browser's preferences → the fuel
@@ -41,7 +43,8 @@ import { FillUpsScreen } from './FillUpsScreen';
  *   store, and only hands it to the provider.
  * - `FuelLogProvider` owns the data, sync, and every write (`fuelLog.tsx`).
  * - `AppShell` is the signed-in app: account-scoped state (onboarding, the
- *   backup reminder), the tab in the URL hash (`useTabRoute`), and the screens.
+ *   backup reminder), the route in the URL hash (`useRoute`) — a tab, or a
+ *   fill-up link (#3) — and the screens.
  */
 
 const TAB_LABELS: readonly { readonly id: Tab; readonly label: string }[] = [
@@ -218,7 +221,9 @@ function AppShell({
   syncEnabled,
 }: AppShellProps): ReactElement {
   const log = useFuelLog();
-  const [tab, setTab] = useTabRoute(initialTab);
+  const [route, setTab] = useRoute(initialTab);
+  const leaveLink = useCallback(() => setTab('dashboard', { replace: true }), [setTab]);
+  const showReceived = useCallback(() => setTab('fillups', { replace: true }), [setTab]);
   // Account-scoped (#55): read for this uid, and re-read if it changes.
   const [hasOnboarded, setHasOnboarded] = useAccountPreference(HAS_ONBOARDED, account.uid, false);
   const backup = useBackupNudge(log.fillUpCount, account.uid);
@@ -265,6 +270,24 @@ function AppShell({
     );
   }
 
+  // Fill-up links (#3) come before the first-run screen: somebody asked to
+  // log a fill-up may have no cars of their own, and would otherwise be walked
+  // through setting up a log they do not want before seeing what they came for.
+  if (route.kind === 'submit') {
+    return (
+      <SubmitScreen
+        payload={route.payload}
+        accountName={account.displayName}
+        units={units}
+        onDone={leaveLink}
+      />
+    );
+  }
+  if (route.kind === 'incoming') {
+    return <IncomingScreen payload={route.payload} onReceived={showReceived} onDone={leaveLink} />;
+  }
+  const { tab } = route;
+
   if (onboarding) return <WelcomeScreen onStart={() => setHasOnboarded(true)} />;
 
   return (
@@ -274,7 +297,7 @@ function AppShell({
       <InvitationsBanner />
       <h1 className="app__title">FuelTracker</h1>
       <main className="app__main">
-        {tab === 'vehicles' && <VehiclesScreen />}
+        {tab === 'vehicles' && <VehiclesScreen ownerName={account.displayName} />}
         {tab === 'settings' && (
           <SettingsScreen
             units={units}

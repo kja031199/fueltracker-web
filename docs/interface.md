@@ -19,6 +19,11 @@ history entry, so Back from the app still leaves it rather than landing on the
 typo. Matching is exact on purpose: a looser rule is a second spelling of every
 URL that then has to be kept working.
 
+A fill-up link (#3) — `#/submit/<payload>` or `#/incoming/<payload>` — is a
+route of its own and is never corrected, or the link would be thrown away
+before anything read it. Leaving one replaces it in history, so Back does not
+open it a second time.
+
 ## Where a change goes
 
 Every screen reads the fuel log and writes to it through one context,
@@ -43,6 +48,39 @@ stretches the next economy figure across two tanks. So the fill-up form hints
 — never blocks — when the distance since the last fill-up is more than twice
 the car's usual (`domain/odometerGap.ts`: the median, once there are three
 gaps to judge by), pointing at "Missed logging a fill before this one".
+
+## Fill-ups sent by link (#3)
+
+Somebody else filled up your car. Instead of reading the numbers to you, they
+send them:
+
+1. **You ask.** Vehicles → **Request a fill-up** on one of your own cars shows
+   a link with **Copy** and, where the browser has a share sheet, **Share…**.
+   It names the car and you, nothing else. A car shared *with* you has no
+   such button; it is its owner's to ask about.
+2. **They answer.** Opening it signed in shows a form for that car — no
+   vehicle picker, their own units, their name filled in from their account —
+   and **Create link** gives them a link to send back. Nothing is saved to
+   *their* log; the fill-up exists only in that link. This comes before the
+   first-run screen, because whoever filled up may have no cars of their own.
+3. **You review.** Opening their link queues it and takes you to Fill-ups,
+   where **Waiting for review** lists every car's submissions with
+   **Approve** and **Reject**. Nothing is in your log until you approve it,
+   and approval checks the numbers again. A submission whose car you have
+   since deleted can only be rejected.
+
+The link is the transport — there is no server in between, and the part
+after `#` never reaches one. It carries text only: no receipt photo (it would
+not fit), no location (nobody needs to send that by link), and not "missed
+the previous fill-up", which is a fact about *your* log that the sender cannot
+see — tick it yourself after approving if it applies.
+
+Each problem is said plainly, with what to do next: a damaged or cut-off link,
+one far too long to be real, one from a newer version of the app, a fill-up
+whose numbers or date are impossible, a car that is not in your log (after a
+sync, in case it simply had not arrived yet), a car that is shared with you
+rather than yours, and a link you have already received — opening it twice,
+or after approving it, never adds it twice.
 
 ## Contrast is enforced, not asserted
 

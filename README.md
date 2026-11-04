@@ -9,7 +9,8 @@ Track gas fill-ups and fuel economy in your browser. **Sign in with Google; your
 > as KPIs and charts, **export a backup you can restore**, **install it and use
 > it with no network at all**, **photograph a receipt** to fill the form in, and
 > **sign in with Google so your log survives a cleared browser and follows you
-> to your phone**, and **share a car with someone so you both log it**. There is a test file beside nearly every module, plus a suite
+> to your phone**, and **share a car with someone so you both log it**, or **ask whoever filled
+> it up to send you the fill-up by link**, which waits for your approval. There is a test file beside nearly every module, plus a suite
 > that runs the security rules against the Firestore emulator. What is *not*
 > here was left out on purpose, not left unfinished — see
 > [what was deliberately not built](docs/port.md#what-was-deliberately-not-built).
