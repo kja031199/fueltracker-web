@@ -81,3 +81,24 @@ describe('the deploy hands the build its admin settings (#70)', () => {
     expect(workflow).toMatch(/VITE_IDLE_TIMEOUT_MINUTES: \$\{\{ vars\.VITE_IDLE_TIMEOUT_MINUTES \}\}/);
   });
 });
+
+describe('the index a shared car’s sync reads by (#66)', () => {
+  test('firestore.indexes.json holds the composite index the member query needs', () => {
+    // `where vehicleId == car` with `where syncedAt > mark`, in
+    // firebase/sharingRemote.ts. Without it the read falls back to the whole
+    // car — correct, just more reads — so it is declared here and deployed
+    // once by hand (docs/deploying.md), keeping the deploy account's roles.
+    const indexes = JSON.parse(readFileSync('firestore.indexes.json', 'utf8')) as {
+      indexes: { collectionGroup: string; queryScope: string; fields: { fieldPath: string }[] }[];
+    };
+    const found = indexes.indexes.find(
+      (index) =>
+        index.collectionGroup === 'fillUps' &&
+        index.queryScope === 'COLLECTION' &&
+        index.fields.map((field) => field.fieldPath).join(',') === 'vehicleId,syncedAt',
+    );
+    expect(found).toBeDefined();
+    const firebase = JSON.parse(readFileSync('firebase.json', 'utf8')) as { firestore: { indexes?: string } };
+    expect(firebase.firestore.indexes).toBe('firestore.indexes.json');
+  });
+});

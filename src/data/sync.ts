@@ -213,12 +213,30 @@ function failure(cause: unknown, fallback: string): SyncResult {
   return { ok: false, kind: 'unreachable', reason: describe(cause, fallback) };
 }
 
+/**
+ * Which local rows belong to the remote being synced (#66). An account's own
+ * sync must not push a car that was shared *with* it — that would copy the
+ * owner's car into the member's own account — and a shared car's sync must
+ * push only that car's fill-ups. `true` means "this remote's row". Without a
+ * scope, every row is, as before sharing existed.
+ */
+export type RowScope = (
+  collection: Collection,
+  row: { readonly id: string; readonly vehicleId?: string },
+) => boolean;
+
+export interface SyncOptions {
+  readonly scope?: RowScope;
+}
+
 export async function syncOnce(
   store: FuelTrackerStore,
   remote: RemoteStore,
   clock: MonotonicClock = sharedSyncClock,
   state: SyncStateStore = new InMemorySyncState(),
+  options: SyncOptions = {},
 ): Promise<SyncResult> {
+  const inScope: RowScope = options.scope ?? ((): boolean => true);
   // Where the last sync left off (#52). No usable cursor — a first sync, a
   // different build, a damaged record, or a week since the last full read —
   // means reading everything, which is what every sync did before.
@@ -312,11 +330,20 @@ export async function syncOnce(
   // Anything with an id the account cannot address is held back here, by name,
   // rather than being handed to a batch it would abort.
   const unsendable: string[] = [];
+  // Only this remote's rows (#66): see `RowScope`.
   const outgoing: Snapshot = {
-    vehicles: sendableRows(newerThanKnown('vehicles', localAfter.vehicles, known), unsendable),
-    fillUps: sendableRows(newerThanKnown('fillUps', localAfter.fillUps, known), unsendable),
+    vehicles: sendableRows(
+      newerThanKnown('vehicles', localAfter.vehicles, known).filter((row) => inScope('vehicles', row)),
+      unsendable,
+    ),
+    fillUps: sendableRows(
+      newerThanKnown('fillUps', localAfter.fillUps, known).filter((row) => inScope('fillUps', row)),
+      unsendable,
+    ),
     pendingFillUps: sendableRows(
-      newerThanKnown('pendingFillUps', localAfter.pendingFillUps, known),
+      newerThanKnown('pendingFillUps', localAfter.pendingFillUps, known).filter((row) =>
+        inScope('pendingFillUps', row),
+      ),
       unsendable,
     ),
   };
