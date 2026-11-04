@@ -16,7 +16,6 @@ import {
   serverTimestamp,
   setDoc,
   where,
-  type Firestore,
 } from 'firebase/firestore';
 import { InMemoryRepository } from '../repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../records';
@@ -78,11 +77,11 @@ async function fillUpFor(id: string, vehicleId: string, enteredBy: string | null
 describeWithEmulator('sharing a car (#66)', () => {
   let env: RulesTestEnvironment;
 
-  const as = (uid: string, email: string, verified = true): Firestore =>
+  const as = (uid: string, email: string, verified = true) =>
     env.authenticatedContext(uid, { email, email_verified: verified }).firestore();
-  const owner = (): Firestore => as(OWNER, OWNER_EMAIL);
-  const partner = (): Firestore => as(PARTNER, PARTNER_EMAIL);
-  const stranger = (): Firestore => as(STRANGER, 'stranger@example.com');
+  const owner = () => as(OWNER, OWNER_EMAIL);
+  const partner = () => as(PARTNER, PARTNER_EMAIL);
+  const stranger = () => as(STRANGER, 'stranger@example.com');
 
   const invite = (vehicleId = SHARED, email = PARTNER_EMAIL): Record<string, unknown> => ({
     ownerUid: OWNER,

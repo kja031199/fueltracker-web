@@ -61,6 +61,13 @@ export interface FillUpRecord extends SyncFields {
   readonly latitude: number | null;
   readonly longitude: number | null;
   readonly receiptImageData: Uint8Array | null;
+  /**
+   * The account that logged it (#66) — a uid, or `null` when nobody is known.
+   * Optional because rows written before sharing existed have none. Set when a
+   * fill-up is added, kept through every edit and deletion; on a shared car
+   * the rules hold a member to their own uid.
+   */
+  readonly enteredBy?: string | null;
 }
 
 /**

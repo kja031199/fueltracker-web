@@ -21,7 +21,7 @@ const VEHICLE = { id: 'v1', ...sync, name: 'Car', make: 'Honda', model: 'Civic',
 const FILL_UP = {
   id: 'f1', ...sync, vehicleId: 'v1', date: 1_700_000_000_000, odometer: 10_000, gallons: 10,
   pricePerGallon: 3, isFullTank: true, missedPreviousFillUp: false, fuelGrade: 'Regular',
-  station: 'Shell', notes: '', latitude: null, longitude: null, receiptImageData: null,
+  station: 'Shell', notes: '', latitude: null, longitude: null, receiptImageData: null, enteredBy: null,
 };
 const PENDING = {
   id: 'p1', ...sync, vehicleId: 'v1', submittedAt: 500, submitterName: 'Sam', date: 1_700_000_000_000,

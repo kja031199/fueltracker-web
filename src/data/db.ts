@@ -143,4 +143,8 @@ export class DexieRepository<T extends SyncFields> implements Repository<T> {
     const rows = await this.table.toArray();
     return rows.filter((row) => row.deletedAt !== null);
   }
+
+  async purge(id: string): Promise<void> {
+    await this.table.delete(id);
+  }
 }

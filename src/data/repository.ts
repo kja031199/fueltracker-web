@@ -54,6 +54,15 @@ export interface Repository<T extends SyncFields> {
    * photo — to return one number was the most wasteful query in the app.
    */
   countLive(): Promise<number>;
+  /**
+   * **Hard**-deletes a row, leaving no tombstone. Not a way to delete anything
+   * that is yours — that is `remove`, whose tombstone syncs. This exists for
+   * one case only: forgetting the rows of a car that was shared *with* this
+   * account once that access ends (#66). Those rows were never this account's
+   * to delete, and a tombstone would try to push a deletion of the owner's
+   * data. Only `FuelTrackerStore.forgetVehicle` calls it.
+   */
+  purge(id: string): Promise<void>;
 }
 
 /**
@@ -108,6 +117,10 @@ export class InMemoryRepository<T extends SyncFields> implements Repository<T> {
 
   async listDeleted(): Promise<T[]> {
     return [...this.rows.values()].filter((row) => row.deletedAt !== null);
+  }
+
+  async purge(id: string): Promise<void> {
+    this.rows.delete(id);
   }
 
   async countLive(): Promise<number> {

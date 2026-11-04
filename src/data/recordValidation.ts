@@ -192,6 +192,7 @@ export function validateFillUp(value: unknown): FillUpRecord | string {
       latitude: null,
       longitude: null,
       receiptImageData: null,
+      enteredBy: enteredBy(value.enteredBy),
     };
   }
 
@@ -212,7 +213,20 @@ export function validateFillUp(value: unknown): FillUpRecord | string {
     latitude: coordinate(value.latitude),
     longitude: coordinate(value.longitude),
     receiptImageData: receipt(value.receiptImageData),
+    enteredBy: enteredBy(value.enteredBy),
   };
+}
+
+/**
+ * Who logged a fill-up (#66): a uid, or `null` for nobody known. Anything
+ * implausible — absent (an older build), empty, not text, longer than any
+ * uid — reads as nobody. Never a reason to drop the fill-up: the odometer
+ * reading is what the statistics need, and the name is a courtesy.
+ */
+function enteredBy(value: unknown): string | null {
+  return typeof value === 'string' && value !== '' && value.length <= TEXT_LIMITS.enteredBy
+    ? value
+    : null;
 }
 
 export function validatePending(value: unknown): PendingFillUpRecord | string {

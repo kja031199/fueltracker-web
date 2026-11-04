@@ -47,6 +47,7 @@ function fillUp(id: string, overrides: Partial<FillUpRecord> = {}): FillUpRecord
     latitude: null,
     longitude: null,
     receiptImageData: null,
+    enteredBy: null,
     ...overrides,
   };
 }

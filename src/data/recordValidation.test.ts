@@ -45,12 +45,14 @@ const FILL_UP = {
   latitude: null,
   longitude: null,
   receiptImageData: null,
+  enteredBy: null,
 };
 
 // Deliberately not spread from FILL_UP: a submission has no
 // `missedPreviousFillUp`, and copying one in would make this fixture describe a
 // record shape that does not exist.
-const { missedPreviousFillUp: _unused, ...FILL_UP_WITHOUT_MISSED } = FILL_UP;
+// Nor `enteredBy` (#66), which only fill-ups carry.
+const { missedPreviousFillUp: _unused, enteredBy: _who, ...FILL_UP_WITHOUT_MISSED } = FILL_UP;
 const PENDING = {
   ...FILL_UP_WITHOUT_MISSED,
   id: 'p1',

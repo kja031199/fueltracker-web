@@ -76,7 +76,7 @@ export interface AccountStore {
  * learns never reaches the timestamps the store issues, and a device with a
  * fast clock goes on winning. See `syncClock.ts`.
  */
-function storeOver(db: FuelTrackerDatabase): FuelTrackerStore {
+function storeOver(db: FuelTrackerDatabase, uid: string): FuelTrackerStore {
   return new FuelTrackerStore(
     {
       vehicles: new DexieRepository(db.vehicles),
@@ -84,6 +84,8 @@ function storeOver(db: FuelTrackerDatabase): FuelTrackerStore {
       pendingFillUps: new DexieRepository(db.pendingFillUps),
     },
     sharedSyncClock,
+    // Stamped on each new fill-up, so a shared car can say who logged it (#66).
+    uid,
   );
 }
 
@@ -93,7 +95,7 @@ export async function openAccountStore(uid: string, prefix = ''): Promise<Accoun
   const db = new FuelTrackerDatabase(databaseName);
   await db.open();
   return {
-    store: storeOver(db),
+    store: storeOver(db, uid),
     syncState: new DexieSyncState(db),
     databaseName,
     close: () => db.close(),
