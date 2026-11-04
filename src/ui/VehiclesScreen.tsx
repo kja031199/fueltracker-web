@@ -3,6 +3,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import type { VehicleRecord } from '../data/records';
 import { useFuelLog } from './fuelLog';
+import { SharePanel } from './SharePanel';
 import { TEXT_LIMITS } from '../domain/textLimits';
 
 /** "2021 Honda Civic", or nothing when only the year is known. */
@@ -14,8 +15,11 @@ export function vehicleSubtitle(vehicle: VehicleRecord): string {
 
 /** Vehicles, read from and written through the fuel log (#56). */
 export function VehiclesScreen(): ReactElement {
-  const { vehicles, selectedVehicleId, selectVehicle: onSelect, addVehicle, removeVehicle } =
+  const { vehicles, selectedVehicleId, selectVehicle: onSelect, addVehicle, removeVehicle, sharing } =
     useFuelLog();
+  // Which car's sharing panel is open, and which shared car is being left.
+  const [sharingId, setSharingId] = useState<string | null>(null);
+  const [leavingId, setLeavingId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [make, setMake] = useState('');
   const [model, setModel] = useState('');
@@ -106,6 +110,9 @@ export function VehiclesScreen(): ReactElement {
             {vehicles.map((vehicle) => {
               const subtitle = vehicleSubtitle(vehicle);
               const selected = vehicle.id === selectedVehicleId;
+              // A car shared *with* you is its owner's: you can leave it, not
+              // delete or share it (#66).
+              const membership = sharing.membershipFor(vehicle.id);
               return (
                 <li className="card" key={vehicle.id}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
@@ -114,6 +121,11 @@ export function VehiclesScreen(): ReactElement {
                       {subtitle !== '' && (
                         <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
                           {subtitle}
+                        </div>
+                      )}
+                      {membership !== undefined && (
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                          Shared with you by {membership.ownerName || 'its owner'}
                         </div>
                       )}
                     </div>
@@ -131,7 +143,37 @@ export function VehiclesScreen(): ReactElement {
                         Select
                       </button>
                     )}
-                    {confirmingId === vehicle.id ? (
+                    {membership !== undefined ? (
+                      leavingId === vehicle.id ? (
+                        <>
+                          <button
+                            className="button button--danger"
+                            type="button"
+                            onClick={() => {
+                              setLeavingId(null);
+                              void sharing.leave(membership);
+                            }}
+                          >
+                            Leave {vehicle.name}
+                          </button>
+                          <button
+                            className="button button--secondary"
+                            type="button"
+                            onClick={() => setLeavingId(null)}
+                          >
+                            Stay
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          className="button button--secondary"
+                          type="button"
+                          onClick={() => setLeavingId(vehicle.id)}
+                        >
+                          Leave
+                        </button>
+                      )
+                    ) : confirmingId === vehicle.id ? (
                       <>
                         {/* Deleting a vehicle takes its whole history with it,
                             so it asks first rather than offering an undo that
@@ -142,6 +184,7 @@ export function VehiclesScreen(): ReactElement {
                           onClick={() => void remove(vehicle.id)}
                         >
                           Delete {vehicle.name} and its fill-ups
+                          {sharing.enabled ? ', for everyone it is shared with' : ''}
                         </button>
                         <button
                           className="button button--secondary"
@@ -152,15 +195,34 @@ export function VehiclesScreen(): ReactElement {
                         </button>
                       </>
                     ) : (
-                      <button
-                        className="button button--danger"
-                        type="button"
-                        onClick={() => setConfirmingId(vehicle.id)}
-                      >
-                        Delete
-                      </button>
+                      <>
+                        {sharing.enabled && (
+                          <button
+                            className="button button--secondary"
+                            type="button"
+                            aria-expanded={sharingId === vehicle.id}
+                            onClick={() => setSharingId(sharingId === vehicle.id ? null : vehicle.id)}
+                          >
+                            {sharingId === vehicle.id ? 'Done sharing' : 'Share'}
+                          </button>
+                        )}
+                        <button
+                          className="button button--danger"
+                          type="button"
+                          onClick={() => setConfirmingId(vehicle.id)}
+                        >
+                          Delete
+                        </button>
+                      </>
                     )}
                   </div>
+                  {membership !== undefined && leavingId === vehicle.id && (
+                    <p style={{ margin: '8px 0 0' }}>
+                      Leaving removes {vehicle.name} from this device and your others. Fill-ups you logged
+                      stay with {membership.ownerName || 'its owner'}.
+                    </p>
+                  )}
+                  {membership === undefined && sharingId === vehicle.id && <SharePanel vehicle={vehicle} />}
                 </li>
               );
             })}

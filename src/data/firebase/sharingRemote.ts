@@ -27,10 +27,12 @@ import {
 } from 'firebase/firestore';
 import type { Snapshot } from '../records';
 import type { PullCursor, PushSummary, RawSnapshot, RemoteStore } from '../remote';
+import { getFirestore } from 'firebase/firestore';
 import type { Account, Invite, Member, Membership, SharingRemote } from '../sharing';
 import { Refused, inviteKey, membershipKey, normalizeEmail } from '../sharing';
 import { parseLedger } from '../syncState';
 import { decode, encodeReceipt, fromMicros, toMicros } from './remoteStore';
+import { firebaseApp, type FirebaseSettings } from './config';
 
 const BATCH_LIMIT = 500;
 
@@ -68,6 +70,11 @@ export class FirestoreSharingRemote implements SharingRemote {
     private readonly db: Firestore,
     private readonly me: Account,
   ) {}
+
+  /** Over the app's Firestore, for the signed-in account. */
+  static forAccount(settings: FirebaseSettings, me: Account): FirestoreSharingRemote {
+    return new FirestoreSharingRemote(getFirestore(firebaseApp(settings)), me);
+  }
 
   private verifiedEmail(): string | null {
     return this.me.emailVerified ? this.me.email.toLowerCase() : null;

@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { FillUpRecord } from '../data/records';
 import type { FillUpFilter } from '../domain/fillUpFilter';
 import { EMPTY_FILTER, applyFilter, isFilterActive } from '../domain/fillUpFilter';
@@ -29,6 +29,7 @@ interface Props {
 export function FillUpsScreen({ units }: Props): ReactElement {
   // The selected vehicle's history, and the writes, from the fuel log (#56).
   const { selectedVehicleId: vehicleId, fillUps, loadFillUp, removeFillUp } = useFuelLog();
+  const enteredByName = useEnteredByNames(vehicleId);
   const [filter, setFilter] = useState<FillUpFilter>(EMPTY_FILTER);
   // The **whole** row, photo included — never a list row (#53). The form saves
   // whatever it was given, so starting it from a summary would save the
@@ -224,6 +225,11 @@ export function FillUpsScreen({ units }: Props): ReactElement {
                     {record.notes !== '' && (
                       <div style={{ fontSize: '0.9rem' }}>{record.notes}</div>
                     )}
+                    {enteredByName !== null && record.enteredBy != null && enteredByName.has(record.enteredBy) && (
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                        Entered by {enteredByName.get(record.enteredBy)}
+                      </div>
+                    )}
                   </div>
                   <strong>{currency(record.gallons * record.pricePerGallon)}</strong>
                 </div>
@@ -269,4 +275,38 @@ export function FillUpsScreen({ units }: Props): ReactElement {
       </section>
     </div>
   );
+}
+
+/**
+ * Who each uid is, on a car that is shared (#66) — `null` on a car that is
+ * not, where "entered by you" on every row would only be noise. The owner's
+ * name comes from the membership; everyone else's from the car's members.
+ */
+function useEnteredByNames(vehicleId: string | null): ReadonlyMap<string, string> | null {
+  const { sharing, me } = useFuelLog();
+  const [names, setNames] = useState<ReadonlyMap<string, string> | null>(null);
+  const membership = vehicleId === null ? undefined : sharing.membershipFor(vehicleId);
+  const { enabled, membersOf } = sharing;
+
+  useEffect(() => {
+    let cancelled = false;
+    setNames(null);
+    if (!enabled || vehicleId === null || me === null) return;
+    void membersOf(vehicleId)
+      .then((members) => {
+        if (cancelled) return;
+        if (membership === undefined && members.length === 0) return; // not shared
+        const map = new Map<string, string>();
+        for (const member of members) map.set(member.uid, member.name || member.email);
+        if (membership !== undefined) map.set(membership.ownerUid, membership.ownerName || 'its owner');
+        map.set(me, 'you');
+        setNames(map);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, membersOf, vehicleId, me, membership]);
+
+  return names;
 }

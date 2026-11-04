@@ -36,6 +36,7 @@ function toUser(user: User): AuthUser {
     uid: user.uid,
     email: user.email ?? '',
     displayName: user.displayName ?? '',
+    emailVerified: user.emailVerified,
   };
 }
 
