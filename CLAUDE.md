@@ -78,7 +78,7 @@ Use the pinned CLI, which is what CI runs:
 npm ci --prefix .github/firebase-cli
 .github/firebase-cli/node_modules/.bin/firebase emulators:exec \
   --only firestore --project fueltracker-rules-test \
-  "npx vitest run src/data/firebase/rules.test.ts"
+  "npx vitest run src/data/firebase/"
 ```
 
 (`firebase-tools` is the CLI; `firebase` is the SDK and ships no binary.)

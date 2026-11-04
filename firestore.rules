@@ -15,6 +15,16 @@ rules_version = '2';
 // Everything not matched here is denied: Firestore's default is deny, and there
 // is no catch-all allow anywhere below.
 //
+// ## One written exception: a shared car (#66)
+//
+// "Your own tree, nobody else's" has exactly one exception. An owner can share
+// one car, and the accounts listed under that car's `members` subcollection
+// can read it, and read and write **its** fill-ups — in the owner's tree,
+// where the car stays. Nothing else in the owner's tree becomes visible: not
+// their other cars, not other cars' fill-ups, not pending submissions. A
+// member joins only by accepting an invite addressed to their own verified
+// Google email; nobody can add anybody else.
+//
 // ## Two jobs, not one
 //
 // Identity — "is this your tree?" — was the only question this file used to
@@ -37,34 +47,83 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    match /users/{uid} {
+    // The accounts allowed to use this deployment at all.
+    //
+    // Google sign-in is open to every Google account on earth, and until #27
+    // that was enough to get in: the rules confined a stranger to their own
+    // tree and then let them write in it freely — on this project's quota,
+    // inside its 1 GiB, invisible to the owner, because nobody can see
+    // anybody else's tree. Being bounded to your own corner is not the same
+    // as being allowed through the door.
+    //
+    // A list of uids rather than emails or a document to look up, for three
+    // reasons. A uid is opaque, so this file stays free of anybody's
+    // personal data even though the repository is public. A list literal
+    // costs nothing to evaluate, where an `exists()` against an allowlist
+    // document would add a billed read to **every** request — a strange
+    // thing to spend on a rule about quota. And a list a reader can see is a
+    // list a reviewer can check.
+    //
+    // The cost, stated: adding somebody is a deploy of this file, and their
+    // uid only exists once they have signed in and been refused once.
+    // `docs/accounts.md` has the steps.
+    function allowed() {
+      return request.auth != null && request.auth.uid in [
+        'Vz0Y9I7XU0TX6L1yvfzw8BJnIfG2',
+        'h2VnTaHnwnWWF4gtPvXTQcJcGAC2'
+      ];
+    }
 
-      // The accounts allowed to use this deployment at all.
-      //
-      // Google sign-in is open to every Google account on earth, and until #27
-      // that was enough to get in: the rules confined a stranger to their own
-      // tree and then let them write in it freely — on this project's quota,
-      // inside its 1 GiB, invisible to the owner, because nobody can see
-      // anybody else's tree. Being bounded to your own corner is not the same
-      // as being allowed through the door.
-      //
-      // A list of uids rather than emails or a document to look up, for three
-      // reasons. A uid is opaque, so this file stays free of anybody's
-      // personal data even though the repository is public. A list literal
-      // costs nothing to evaluate, where an `exists()` against an allowlist
-      // document would add a billed read to **every** request — a strange
-      // thing to spend on a rule about quota. And a list a reader can see is a
-      // list a reviewer can check.
-      //
-      // The cost, stated: adding somebody is a deploy of this file, and their
-      // uid only exists once they have signed in and been refused once.
-      // `docs/accounts.md` has the steps.
-      function allowed() {
-        return request.auth != null && request.auth.uid in [
-          'Vz0Y9I7XU0TX6L1yvfzw8BJnIfG2',
-          'h2VnTaHnwnWWF4gtPvXTQcJcGAC2'
-        ];
-      }
+    // A member of `owner`'s car `vehicleId` (#66): an allowlisted account with
+    // a document under that car's `members`. One billed `exists()` per check —
+    // only ever spent on a request that is not the owner's own.
+    function memberOf(owner, vehicleId) {
+      return allowed()
+        && vehicleId is string
+        && exists(/databases/$(database)/documents/users/$(owner)/vehicles/$(vehicleId)/members/$(request.auth.uid));
+    }
+
+    // The signed-in account's Google email, lowercased — only when Google has
+    // verified it. An unverified address proves nothing about who holds it.
+    function verifiedEmail() {
+      return request.auth.token.email_verified == true
+        && request.auth.token.email is string;
+    }
+
+    // An invitation (#66): `invites/{ownerUid}__{vehicleId}__{email}`. The id
+    // is deterministic so a member rule can find it with one `exists()`, and
+    // so one car cannot hold two invitations for the same address.
+    match /invites/{inviteId} {
+      allow read: if allowed()
+        && (resource.data.ownerUid == request.auth.uid
+            || (verifiedEmail() && resource.data.email == request.auth.token.email.lower()));
+      allow create: if allowed()
+        && request.resource.data.keys().hasOnly(['ownerUid', 'vehicleId', 'email', 'ownerName', 'vehicleName', 'createdAt'])
+        && request.resource.data.keys().hasAll(['ownerUid', 'vehicleId', 'email', 'ownerName', 'vehicleName', 'createdAt'])
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.vehicleId is string
+        && request.resource.data.vehicleId.size() > 0
+        && request.resource.data.vehicleId.size() <= 200
+        && request.resource.data.email is string
+        && request.resource.data.email.size() > 2
+        && request.resource.data.email.size() <= 320
+        && request.resource.data.email == request.resource.data.email.lower()
+        && request.resource.data.ownerName is string
+        && request.resource.data.ownerName.size() <= 200
+        && request.resource.data.vehicleName is string
+        && request.resource.data.vehicleName.size() <= 200
+        && request.resource.data.createdAt is number
+        && inviteId == request.auth.uid + '__' + request.resource.data.vehicleId + '__' + request.resource.data.email
+        // Only for a live car of your own.
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid)/vehicles/$(request.resource.data.vehicleId))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)/vehicles/$(request.resource.data.vehicleId)).data.deletedAt == null;
+      // Withdrawn by the owner, or declined (or used up) by the invitee.
+      allow delete: if allowed()
+        && (resource.data.ownerUid == request.auth.uid
+            || (verifiedEmail() && resource.data.email == request.auth.token.email.lower()));
+    }
+
+    match /users/{uid} {
 
       // Allowed through the door, and signed in as the owner of this path.
       // Both halves are tested on their own in rules.test.ts, because a single
@@ -139,7 +198,7 @@ service cloud.firestore {
       allow read: if owner();
 
       match /vehicles/{id} {
-        allow read: if owner();
+        allow read: if owner() || memberOf(uid, id);
         allow write: if owner()
           && syncFields(id)
           && request.resource.data.keys().hasOnly([
@@ -155,17 +214,76 @@ service cloud.firestore {
           && label(request.resource.data.model, 200)
           && number(request.resource.data.year)
           && number(request.resource.data.createdAt);
+
+        // Who the car is shared with (#66). Kept apart from the vehicle
+        // record on purpose: the owner's sync pushes that record whole, last
+        // write wins, and a member list inside it would be overwritten by any
+        // device that had not yet seen someone join.
+        match /members/{memberUid} {
+          // The owner, the member themselves, and the other members — so a
+          // shared car can say who logged each fill-up.
+          allow read: if owner() || memberOf(uid, id);
+          // Joining: only yourself, only with an invitation addressed to your
+          // own verified email, and never into your own car.
+          allow create: if allowed()
+            && request.auth.uid == memberUid
+            && request.auth.uid != uid
+            && verifiedEmail()
+            && exists(/databases/$(database)/documents/invites/$(uid + '__' + id + '__' + request.auth.token.email.lower()))
+            && request.resource.data.keys().hasOnly(['uid', 'name', 'email', 'joinedAt'])
+            && request.resource.data.keys().hasAll(['uid', 'name', 'email', 'joinedAt'])
+            && request.resource.data.uid == memberUid
+            && label(request.resource.data.name, 200)
+            && request.resource.data.email == request.auth.token.email.lower()
+            && number(request.resource.data.joinedAt);
+          // Removed by the owner, or leaving.
+          allow delete: if owner() || (allowed() && request.auth.uid == memberUid);
+        }
+      }
+
+      // Cars shared *with* this account (#66): one document per car, written
+      // by the member when they accept, so their other devices can find it.
+      match /memberships/{membershipId} {
+        allow read: if owner();
+        allow delete: if owner();
+        allow create, update: if owner()
+          && request.resource.data.keys().hasOnly(['ownerUid', 'vehicleId', 'ownerName', 'vehicleName'])
+          && request.resource.data.keys().hasAll(['ownerUid', 'vehicleId', 'ownerName', 'vehicleName'])
+          && label(request.resource.data.ownerUid, 128)
+          && label(request.resource.data.vehicleId, 200)
+          && label(request.resource.data.ownerName, 200)
+          && label(request.resource.data.vehicleName, 200)
+          && membershipId == request.resource.data.ownerUid + '__' + request.resource.data.vehicleId;
       }
 
       match /fillUps/{id} {
-        allow read: if owner();
+        // The owner, or a member of **this fill-up's** car (#66). A member's
+        // query must say `where vehicleId == <shared car>`, or it is refused.
+        allow read: if owner() || memberOf(uid, resource.data.vehicleId);
+        // A member writes fill-ups for the shared car only: a new one is
+        // stamped with their own uid, and an edit (or a deletion, which is a
+        // tombstone) can neither move it to another car nor change who
+        // entered it.
+        allow create: if !owner()
+          && memberOf(uid, request.resource.data.vehicleId)
+          && request.resource.data.get('enteredBy', null) == request.auth.uid
+          && fillUpShape(id);
+        allow update: if !owner()
+          && memberOf(uid, resource.data.vehicleId)
+          && memberOf(uid, request.resource.data.vehicleId)
+          && request.resource.data.get('enteredBy', null) == resource.data.get('enteredBy', null)
+          && fillUpShape(id);
         allow write: if owner()
-          && syncFields(id)
+          && fillUpShape(id);
+      }
+
+      function fillUpShape(id) {
+        return syncFields(id)
           && request.resource.data.keys().hasOnly([
             'id', 'updatedAt', 'deletedAt', 'schemaVersion', 'syncedAt', 'vehicleId',
             'date', 'odometer', 'gallons', 'pricePerGallon', 'isFullTank',
             'missedPreviousFillUp', 'fuelGrade', 'station', 'notes',
-            'latitude', 'longitude', 'receiptImageData'
+            'latitude', 'longitude', 'receiptImageData', 'enteredBy'
           ])
           && request.resource.data.keys().hasAll([
             'id', 'updatedAt', 'deletedAt', 'schemaVersion', 'syncedAt', 'vehicleId',
@@ -176,6 +294,9 @@ service cloud.firestore {
           && label(request.resource.data.vehicleId, 200)
           && request.resource.data.vehicleId.size() > 0
           && request.resource.data.missedPreviousFillUp is bool
+          // Who logged it (#66): optional, so an older build can still write.
+          && (request.resource.data.get('enteredBy', null) == null
+              || label(request.resource.data.enteredBy, 128))
           && measurements();
       }
 
