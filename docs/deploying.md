@@ -150,11 +150,22 @@ hosting target, so `--only firestore:rules` stays fast and skips the build.
 
 A member's sync of a shared car reads with a query that needs a composite index
 on `fillUps` (`vehicleId`, `syncedAt`), declared in `firestore.indexes.json`.
-**Deploy it once**, from a machine signed in to Firebase:
+**Deploy it once**, from the repository folder on your own machine:
 
 ```bash
+git checkout main && git pull                          # firestore.indexes.json arrived in #72
+npm ci --prefix .github/firebase-cli                   # the pinned CLI — not installed by `npm ci`
+.github/firebase-cli/node_modules/.bin/firebase login  # once per machine; opens a browser
 .github/firebase-cli/node_modules/.bin/firebase deploy --only firestore:indexes --project <project-id>
 ```
+
+The second line is the one that is easy to miss: the CLI has its own manifest in
+`.github/firebase-cli/`, kept out of the app's dependencies, so the path in the
+last line does not exist until it has been installed — the shell says `no such
+file or directory`. The index then builds for a few minutes (Firebase console →
+Firestore → Indexes) and is in use once it shows **Enabled**. If the deploy asks
+whether to delete indexes that are not in the file, answer **No**: there should
+be none, and one made by hand in the console would go.
 
 It is not part of `deploy.yml` on purpose: deploying indexes needs the Cloud
 Datastore Index Admin role, and the deploy account holds only Hosting Admin,
