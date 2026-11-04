@@ -99,7 +99,7 @@ export default defineConfig({
         name: 'FuelTracker',
         short_name: 'FuelTracker',
         description:
-          'Track gas fill-ups and fuel economy. Local-first: no account, no server.',
+          'Track gas fill-ups and fuel economy. Kept on your device and synced to your own Google account.',
         start_url: base,
         scope: base,
         display: 'standalone',
@@ -171,7 +171,8 @@ export default defineConfig({
       devOptions: { enabled: false },
     }),
   ],
-  // Built for GitHub Pages, which serves from a repository subpath.
+  // `/` on Firebase Hosting. `PAGES_BASE` is left over from GitHub Pages,
+  // which served from a repository subpath; nothing sets it any more.
   base,
   build: {
     rollupOptions: {

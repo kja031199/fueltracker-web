@@ -161,10 +161,6 @@ Recorded so a regression in the tests themselves is visible:
 | Links: route corrected to the dashboard / multi-segment / case-insensitive / leaving adds history / onboarding first | 1 / 2 / 1 / 2 / 12 |
 | Links: request on every car / shared car received / ledger not consulted / no retry after a sync | 6 / 1 / 1 / 1 |
 | Links: Approve on a deleted car / refusal not shown / submitter's log written / one id for every visit / name not pre-filled / link form keeping the photo / keeping storage limits | 1 / 1 / 1 / 1 / 2 / 1 / 1 |
-
-Survives, and equivalent: dropping the array check from the link decoder — a
-JSON array cannot carry the version field, so it is refused as damaged either
-way.
 | Toolchain: `@types/react` / `@types/react-dom` back to 18 / lint script removed / description reverted | 1 / 1 / 1 / 1 |
 | Toolchain: exhaustive-deps off / only a warning / a rule category on wholesale / `vite.config.ts` out of `include` | 1 / 1 / 1 / 1 |
 | Database: the `'fueltracker'` default name restored (caught by `tsc`, an unused `@ts-expect-error`) | 1 |
@@ -181,6 +177,11 @@ way.
 | Dev guard: `dev` signal / hostname signal dropped | 1 / 8 |
 | Dev guard: always refusing / id not normalised / constant wrong | 2 / 1 / 1 |
 | Local-host check: unanchored `127.` / `includes('localhost')` / no lower-casing / `[::1]` dropped | 1 / 2 / 1 / 2 |
+| Page and manifest descriptions claiming "no account, no server" again | 1 / 1 |
+
+Survives, and equivalent: dropping the array check from the link decoder — a
+JSON array cannot carry the version field, so it is refused as damaged either
+way.
 
 The first row is the one to understand before touching `firestore.rules`:
 identity-only rules — the version that asked "is this your tree?" and nothing

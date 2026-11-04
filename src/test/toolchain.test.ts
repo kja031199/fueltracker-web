@@ -54,11 +54,22 @@ describe('the hooks lint', () => {
   });
 });
 
-describe('the package says what the app is', () => {
-  test('no longer claims there is no account and no server', () => {
-    // Sign-in is required, and the log syncs to Firestore.
-    const description = String(json('package.json')['description']);
-    expect(description).not.toMatch(/no account|no server/i);
+describe('the app says what it is', () => {
+  // Sign-in is required, and the log syncs to Firestore. Checking only
+  // package.json missed the two places a reader actually sees: the page's
+  // meta description and the installed app's manifest description.
+  const NO_ACCOUNT = /no account|no server/i;
+
+  test('the package no longer claims there is no account and no server', () => {
+    expect(String(json('package.json')['description'])).not.toMatch(NO_ACCOUNT);
+  });
+
+  test('nor does the page description', () => {
+    expect(readFileSync('index.html', 'utf8')).not.toMatch(NO_ACCOUNT);
+  });
+
+  test('nor does the installed app, through its manifest', () => {
+    expect(readFileSync('vite.config.ts', 'utf8')).not.toMatch(NO_ACCOUNT);
   });
 });
 
