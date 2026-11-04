@@ -319,6 +319,27 @@ npm ci --prefix .github/firebase-cli
   is worse than dropping a name. Validation reads anything implausible as
   `null`; the tombstone keeps it, because the rules compare it on a member's
   deletion.
+- **Fill-up links (#3) are untrusted input, decoded in `data/fillUpLink.ts`.**
+  The payload lives in the URL fragment (never sent to a server) as
+  base64url JSON. The order matters: length cap **before** decoding, base64url
+  alphabet only, fatal UTF-8, every field type-checked, ids through
+  `isStorableId`, numbers through `makeFuelEntryDraft`, a date no older than
+  1990 and at most a day ahead. Text only — never a photo, coordinates or
+  "missed previous" (`PendingFillUpRecord` has no field for it). Text is cut to
+  `LINK_TEXT_LIMITS` on the way out *and* in; the form's `maxLength` matches,
+  so a sender is not truncated unseen.
+- **Receiving is idempotent by the sender's id.** `receiveSubmission` looks for
+  the id among live **and** tombstoned submissions, so a link opened twice, or
+  after approve/reject, queues nothing. Don't switch it to `submitFillUp`,
+  which mints a fresh id. `approvePendingFillUp` refuses a car that has gone.
+  The fuel log refuses (`'not-yours'`) a car shared *with* this account, checking
+  the device's ledger as well as the lists in state, which load
+  asynchronously. `IncomingScreen` answers "no such car" only after a fresh
+  `syncNow()` (which waits for any running sync and then runs its own).
+- **Link routes are never corrected to the dashboard** (`parseRoute`), and
+  they render **before** the first-run screen. Leaving one uses
+  `choose(tab, { replace: true })` so Back does not reopen it — or re-receive
+  it as "already received".
 - **The shared-car index is not deployed by CI** — the deploy account lacks
   the role, deliberately. `firestore.indexes.json` is deployed once by hand
   (docs/deploying.md); `withIndexFallback` reads the whole car meanwhile.

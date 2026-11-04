@@ -155,3 +155,27 @@ describe('parseTab', () => {
     }
   });
 });
+
+describe('link routes (#3)', () => {
+  test('a submit or incoming link is a route of its own, carrying its payload', async () => {
+    const { parseRoute } = await import('./useTabRoute');
+    expect(parseRoute('#/submit/abc_-123')).toEqual({ kind: 'submit', payload: 'abc_-123' });
+    expect(parseRoute('#/incoming/XYZ')).toEqual({ kind: 'incoming', payload: 'XYZ' });
+    expect(parseRoute('#/settings')).toEqual({ kind: 'tab', tab: 'settings' });
+  });
+
+  test.each(['#/submit/', '#/submit', '#/incoming/', '#/submit/a/b', '#submit/abc', '#/SUBMIT/abc', '#/incoming/a/'])(
+    '%s is no route',
+    async (hash) => {
+      const { parseRoute } = await import('./useTabRoute');
+      expect(parseRoute(hash)).toBeNull();
+    },
+  );
+
+  test('opening a link is not "corrected" to the dashboard', async () => {
+    window.history.replaceState(null, '', '/#/incoming/not-a-real-payload');
+    render(<App store={makeStore()} />);
+    await screen.findByRole('heading', { name: 'Fill-up link' });
+    expect(window.location.hash).toBe('#/incoming/not-a-real-payload');
+  });
+});

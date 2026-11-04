@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import type { FillUpSummary, VehicleRecord } from '../data/records';
+import type { FillUpSummary, PendingFillUpRecord, VehicleRecord } from '../data/records';
 import type { FuelTrackerStore } from '../data/store';
 
 export interface AppData {
@@ -27,6 +27,11 @@ export interface AppData {
    * vehicle would quietly keep them under the prompt threshold.
    */
   readonly fillUpCount: number;
+  /**
+   * Fill-ups sent by link and waiting for review (#3), newest first, across
+   * every car.
+   */
+  readonly pending: readonly PendingFillUpRecord[];
   readonly loading: boolean;
   /** Set when loading failed — storage can be unavailable, not just empty. */
   readonly error: string | null;
@@ -44,6 +49,7 @@ export function useAppData(store: FuelTrackerStore): AppData {
   // value that changes for unrelated reasons.
   const [revision, setRevision] = useState(0);
   const [fillUpCount, setFillUpCount] = useState(0);
+  const [pending, setPending] = useState<readonly PendingFillUpRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
@@ -53,6 +59,7 @@ export function useAppData(store: FuelTrackerStore): AppData {
       const loaded = await store.vehicles();
       setVehicles(loaded);
       setFillUpCount(await store.fillUpCount());
+      setPending(await store.pendingFillUps());
       setSelectedVehicleId((current) => {
         // Keep the current selection if it still exists; otherwise fall back to
         // the first vehicle, so deleting the selected one cannot strand the UI
@@ -110,5 +117,5 @@ export function useAppData(store: FuelTrackerStore): AppData {
 
   const selectVehicle = useCallback((id: string) => setSelectedVehicleId(id), []);
 
-  return { vehicles, fillUps, fillUpCount, loading, error, selectedVehicleId, selectVehicle, reload };
+  return { vehicles, fillUps, fillUpCount, pending, loading, error, selectedVehicleId, selectVehicle, reload };
 }

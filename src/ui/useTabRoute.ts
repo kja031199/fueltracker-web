@@ -15,6 +15,13 @@
  * - **A hash that names no tab** (empty, mistyped, hostile) shows the default
  *   and is corrected with `replaceState`, which adds no entry: Back from the
  *   app should leave it, not land on the typo.
+ * - **A fill-up link** (#3) — `#/submit/<payload>` or `#/incoming/<payload>` —
+ *   is a route of its own and is never "corrected": doing so would throw the
+ *   link away before anything read it. Its payload is handed over as it
+ *   stands; deciding whether it is any good is `data/fillUpLink.ts`'s job,
+ *   so a damaged link is still shown — and named as damaged — rather than
+ *   silently dropped on the dashboard. Leaving a link uses `replace`, so Back
+ *   does not reopen it.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -39,29 +46,60 @@ export function hashFor(tab: Tab): string {
   return `${PREFIX}${tab}`;
 }
 
-/** The tab to show, and how to choose another. */
-export function useTabRoute(fallback: Tab): readonly [Tab, (tab: Tab) => void] {
-  const [tab, setTab] = useState<Tab>(() => parseTab(window.location.hash) ?? fallback);
+export type Route =
+  | { readonly kind: 'tab'; readonly tab: Tab }
+  | { readonly kind: 'submit'; readonly payload: string }
+  | { readonly kind: 'incoming'; readonly payload: string };
+
+/** Exactly `#/submit/<one segment>` or `#/incoming/<one segment>`. */
+const LINK_ROUTE = /^#\/(submit|incoming)\/([^/]+)$/;
+
+/** The route a hash names, or `null`. As strict as `parseTab`. */
+export function parseRoute(hash: string): Route | null {
+  const tab = parseTab(hash);
+  if (tab !== null) return { kind: 'tab', tab };
+  const link = LINK_ROUTE.exec(hash);
+  if (link === null) return null;
+  const [, kind, payload = ''] = link;
+  return kind === 'submit' ? { kind: 'submit', payload } : { kind: 'incoming', payload };
+}
+
+export interface ChooseOptions {
+  /**
+   * Replace the current history entry instead of adding one. For leaving a
+   * fill-up link: Back should not land on it again.
+   */
+  readonly replace?: boolean;
+}
+
+/** The route to show, and how to choose a tab. */
+export function useRoute(fallback: Tab): readonly [Route, (tab: Tab, options?: ChooseOptions) => void] {
+  const [route, setRoute] = useState<Route>(
+    () => parseRoute(window.location.hash) ?? { kind: 'tab', tab: fallback },
+  );
 
   useEffect(() => {
-    // Correct an address that names no tab, without spending a history entry.
-    if (parseTab(window.location.hash) === null) {
-      const { pathname, search } = window.location;
-      window.history.replaceState(window.history.state, '', `${pathname}${search}${hashFor(fallback)}`);
-    }
+    // Correct an address that names nothing, without spending a history entry.
+    if (parseRoute(window.location.hash) === null) replaceHash(hashFor(fallback));
     function follow(): void {
-      setTab(parseTab(window.location.hash) ?? fallback);
+      setRoute(parseRoute(window.location.hash) ?? { kind: 'tab', tab: fallback });
     }
     window.addEventListener('hashchange', follow);
     return () => window.removeEventListener('hashchange', follow);
   }, [fallback]);
 
-  const choose = useCallback((next: Tab) => {
+  const choose = useCallback((next: Tab, options: ChooseOptions = {}) => {
     // Shown at once rather than on the `hashchange` that follows, which some
     // browsers deliver a task later.
-    setTab(next);
-    window.location.hash = hashFor(next);
+    setRoute({ kind: 'tab', tab: next });
+    if (options.replace === true) replaceHash(hashFor(next));
+    else window.location.hash = hashFor(next);
   }, []);
 
-  return [tab, choose] as const;
+  return [route, choose] as const;
+}
+
+function replaceHash(hash: string): void {
+  const { pathname, search } = window.location;
+  window.history.replaceState(window.history.state, '', `${pathname}${search}${hash}`);
 }

@@ -4,6 +4,7 @@ import type { FormEvent } from 'react';
 import type { VehicleRecord } from '../data/records';
 import { useFuelLog } from './fuelLog';
 import { SharePanel } from './SharePanel';
+import { RequestLinkPanel } from './RequestLinkPanel';
 import { TEXT_LIMITS } from '../domain/textLimits';
 
 /** "2021 Honda Civic", or nothing when only the year is known. */
@@ -14,11 +15,13 @@ export function vehicleSubtitle(vehicle: VehicleRecord): string {
 }
 
 /** Vehicles, read from and written through the fuel log (#56). */
-export function VehiclesScreen(): ReactElement {
+export function VehiclesScreen({ ownerName = '' }: { readonly ownerName?: string } = {}): ReactElement {
   const { vehicles, selectedVehicleId, selectVehicle: onSelect, addVehicle, removeVehicle, sharing } =
     useFuelLog();
   // Which car's sharing panel is open, and which shared car is being left.
   const [sharingId, setSharingId] = useState<string | null>(null);
+  // Which car's fill-up request link is showing (#3).
+  const [requestingId, setRequestingId] = useState<string | null>(null);
   const [leavingId, setLeavingId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [make, setMake] = useState('');
@@ -196,6 +199,14 @@ export function VehiclesScreen(): ReactElement {
                       </>
                     ) : (
                       <>
+                        <button
+                          className="button button--secondary"
+                          type="button"
+                          aria-expanded={requestingId === vehicle.id}
+                          onClick={() => setRequestingId(requestingId === vehicle.id ? null : vehicle.id)}
+                        >
+                          {requestingId === vehicle.id ? 'Done' : 'Request a fill-up'}
+                        </button>
                         {sharing.enabled && (
                           <button
                             className="button button--secondary"
@@ -223,6 +234,9 @@ export function VehiclesScreen(): ReactElement {
                     </p>
                   )}
                   {membership === undefined && sharingId === vehicle.id && <SharePanel vehicle={vehicle} />}
+                  {membership === undefined && requestingId === vehicle.id && (
+                    <RequestLinkPanel vehicle={vehicle} ownerName={ownerName} />
+                  )}
                 </li>
               );
             })}

@@ -154,6 +154,17 @@ Recorded so a regression in the tests themselves is visible:
 | Fuel log: opening a vanished fill-up syncing / not refreshing / a screen importing the store again | 1 / 1 / 1 |
 | Tabs: hash ignored on load / choosing replaces history / no `hashchange` / correction pushing an entry / no correction | 2 / 1 / 2 / 1 / 3 |
 | Tabs: `parseTab` case-insensitive / prefix-matching / without the `#/` check | 1 / 1 / 1 |
+| Links (#3): length cap / base64url alphabet / fatal UTF-8 / version / kind / id checks / request car check | 3 / 1 / 1 / 3 / 4 / 2 / 3 |
+| Links: future date / ancient date / no clock slack / full-tank type / draft gate skipped / junk `submittedAt` kept | 1 / 1 / 1 / 1 / 6 / 3 |
+| Links: text unbounded in / out / a photo carried / "missed" carried | 1 / 1 / 1 / 1 |
+| Links: duplicates queued / tombstones forgotten / missing car queued / deleted car approved / sender's name unbounded | 4 / 2 / 2 / 1 / 1 |
+| Links: route corrected to the dashboard / multi-segment / case-insensitive / leaving adds history / onboarding first | 1 / 2 / 1 / 2 / 12 |
+| Links: request on every car / shared car received / ledger not consulted / no retry after a sync | 6 / 1 / 1 / 1 |
+| Links: Approve on a deleted car / refusal not shown / submitter's log written / one id for every visit / name not pre-filled / link form keeping the photo / keeping storage limits | 1 / 1 / 1 / 1 / 2 / 1 / 1 |
+
+Survives, and equivalent: dropping the array check from the link decoder — a
+JSON array cannot carry the version field, so it is refused as damaged either
+way.
 | Toolchain: `@types/react` / `@types/react-dom` back to 18 / lint script removed / description reverted | 1 / 1 / 1 / 1 |
 | Toolchain: exhaustive-deps off / only a warning / a rule category on wholesale / `vite.config.ts` out of `include` | 1 / 1 / 1 / 1 |
 | Database: the `'fueltracker'` default name restored (caught by `tsc`, an unused `@ts-expect-error`) | 1 |

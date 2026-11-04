@@ -25,6 +25,7 @@ import { toSummary } from './records';
 import type { Tombstoner } from './tombstone';
 import { isScrubbed, tombstoneFillUp, tombstonePending, tombstoneVehicle } from './tombstone';
 import type { ImportSummary, TieBreak } from './backup';
+import type { Submission } from './fillUpLink';
 import { exportSnapshot, importBackup } from './backup';
 import { TEXT_LIMITS, boundText } from '../domain/textLimits';
 import { boundFillUpText, boundPendingText, boundVehicleText } from './recordText';
@@ -239,6 +240,43 @@ export class FuelTrackerStore {
     return record;
   }
 
+  /**
+   * Queues a submission that arrived by link (#3), under the id the link
+   * carried — so opening the same link twice, or after it was approved or
+   * rejected, queues nothing (`'duplicate'`). A car that is not here, or was
+   * deleted, is `'no-such-car'`. The draft was validated when the link was
+   * decoded, and is validated again on approval.
+   */
+  async receiveSubmission(submission: Submission): Promise<'queued' | 'duplicate' | 'no-such-car'> {
+    if ((await this.repos.vehicles.get(submission.vehicleId)) === undefined) return 'no-such-car';
+    const seen =
+      (await this.repos.pendingFillUps.get(submission.id)) ??
+      (await this.repos.pendingFillUps.listDeleted()).find((row) => row.id === submission.id);
+    if (seen !== undefined) return 'duplicate';
+    const { draft } = submission;
+    await this.repos.pendingFillUps.put({
+      id: submission.id,
+      updatedAt: this.clock.now(),
+      deletedAt: null,
+      schemaVersion: SCHEMA_VERSION,
+      vehicleId: submission.vehicleId,
+      submittedAt: submission.submittedAt,
+      submitterName: boundText(submission.submitterName, TEXT_LIMITS.submitterName),
+      date: draft.date.getTime(),
+      odometer: draft.odometer,
+      gallons: draft.gallons,
+      pricePerGallon: draft.pricePerGallon,
+      isFullTank: draft.isFullTank,
+      fuelGrade: draft.fuelGrade,
+      station: boundText(draft.station, TEXT_LIMITS.station),
+      notes: boundText(draft.notes, TEXT_LIMITS.notes),
+      latitude: null,
+      longitude: null,
+      receiptImageData: null,
+    });
+    return 'queued';
+  }
+
   async pendingFillUps(): Promise<PendingFillUpRecord[]> {
     const rows = await this.repos.pendingFillUps.list();
     return rows.sort((a, b) => b.submittedAt - a.submittedAt);
@@ -257,6 +295,9 @@ export class FuelTrackerStore {
   async approvePendingFillUp(id: string): Promise<FillUpRecord | null> {
     const pending = await this.repos.pendingFillUps.get(id);
     if (pending === undefined) return null;
+    // The car may have been deleted while the submission waited; a fill-up
+    // for a car that is gone would be invisible and uncountable (#3).
+    if ((await this.repos.vehicles.get(pending.vehicleId)) === undefined) return null;
 
     const draft = makeFuelEntryDraft({
       date: new Date(pending.date),

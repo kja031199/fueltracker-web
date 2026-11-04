@@ -98,10 +98,8 @@ honest list: things that were possible and were **chosen against**.
   rather than charging, so the monthly bill never materialised. The privacy
   claim at the top of this file is no longer structural — there is now a server
   to trust, and `firestore.rules` is what makes it trustworthy.
-- **No multi-user sharing.** Sync is strictly one person's data across their own
-  devices. The rules grant access to `users/{uid}` and nothing else, so the
-  shareable-submission link (issue #3) still needs its transport designed; the
-  data model for it is built and tested, with no UI on it.
+- **No multi-user sharing** — since built: sharing a car (#66) and fill-ups
+  sent by link (#3), below.
 - **No pump-display scanning.** Dropped on measurement, not on principle. A
   seven-segment pump display rendered *pristinely* — no glare, no angle, no
   blur — came back at confidence 36 with the output `GAL =, ( (CZ`. A scanner
@@ -109,12 +107,14 @@ honest list: things that were possible and were **chosen against**.
   harder to notice than a blank field.
 - **No PDF export.** CSV and JSON cover the two real jobs — a spreadsheet and a
   restore — and a PDF is neither.
-- **No shareable submission link.** The submit → review → approve data model is
-  built and tested; only the transport is missing, and on the web a URL *is* the
-  transport, so this is now genuinely buildable. It is
-  [issue #3](https://github.com/kja031199/fueltracker-web/issues/3) rather than
-  something abandoned — but a public endpoint anyone can open raises questions
-  (scope, revocation, rate limiting) that `CKShare` used to answer for free.
+- **The shareable submission link — since built** ([#3](https://github.com/kja031199/fueltracker-web/issues/3)).
+  On iOS it waited on `CKShare` and a paid account; on the web a URL *is* the
+  transport. It avoided the questions a public endpoint raises (scope,
+  revocation, rate limiting) by not having one: the fill-up travels in the
+  link's fragment, both people are signed in, and the sender writes nothing to
+  anyone's account — only its owner, by opening the link, queues it. Text only:
+  no receipt photo, no location, and no "missed the previous fill-up"
+  (`docs/interface.md`).
 
 ## One thing inherited that is probably wrong
 
