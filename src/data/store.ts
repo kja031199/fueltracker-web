@@ -396,7 +396,9 @@ export class FuelTrackerStore {
     const repo = this.repos[collection] as Repository<SyncFields>;
     for (const id of ids) {
       const row = (await repo.get(id)) ?? (await repo.listDeleted()).find((r) => r.id === id);
-      if (row !== undefined) await repo.put({ ...row, updatedAt: this.clock.now() });
+      // Strictly newer than it was, whatever clock this store was given:
+      // a re-stamp that ties again settles nothing.
+      if (row !== undefined) await repo.put({ ...row, updatedAt: Math.max(this.clock.now(), row.updatedAt + 1) });
     }
   }
 

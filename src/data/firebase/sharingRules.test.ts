@@ -345,6 +345,71 @@ describeWithEmulator('sharing a car (#66)', () => {
     });
   });
 
+  describe('more hostile cases', () => {
+    it('an address too short or too long cannot be invited', async () => {
+      await assertFails(setDoc(doc(owner(), `invites/${inviteId(SHARED, 'a@')}`), invite(SHARED, 'a@')));
+      const long = `${'a'.repeat(310)}@example.com`;
+      await assertFails(setDoc(doc(owner(), `invites/${inviteId(SHARED, long)}`), invite(SHARED, long)));
+    });
+
+    it('an invitation must say which car and who sent it, with nothing missing', async () => {
+      const id = inviteId(SHARED, PARTNER_EMAIL);
+      const { ownerName: _name, ...missing } = invite();
+      await assertFails(setDoc(doc(owner(), `invites/${id}`), missing));
+      await assertFails(setDoc(doc(owner(), `invites/${id}`), { ...invite(), createdAt: 'yesterday' }));
+      await assertFails(setDoc(doc(owner(), `invites/${id}`), { ...invite(), vehicleName: 'x'.repeat(201) }));
+    });
+
+    it('someone not on the allowlist cannot join, even with an invitation to their address', async () => {
+      const strangerEmail = 'stranger@example.com';
+      await assertSucceeds(setDoc(doc(owner(), `invites/${inviteId(SHARED, strangerEmail)}`), invite(SHARED, strangerEmail)));
+      await assertFails(
+        setDoc(doc(stranger(), `users/${OWNER}/vehicles/${SHARED}/members/${STRANGER}`), {
+          ...membership(),
+          uid: STRANGER,
+          email: strangerEmail,
+        }),
+      );
+    });
+
+    it('a member cannot read the invitations the owner has sent', async () => {
+      await join();
+      await setDoc(doc(owner(), `invites/${inviteId(PRIVATE, 'someone@example.com')}`), invite(PRIVATE, 'someone@example.com'));
+      await assertFails(getDocs(query(collection(partner(), 'invites'), where('ownerUid', '==', OWNER))));
+    });
+
+    it('an unverified address cannot decline an invitation either', async () => {
+      const id = inviteId(SHARED, PARTNER_EMAIL);
+      await setDoc(doc(owner(), `invites/${id}`), invite());
+      await assertFails(deleteDoc(doc(as(PARTNER, PARTNER_EMAIL, false), `invites/${id}`)));
+    });
+
+    it('a member cannot edit their own membership document', async () => {
+      await join();
+      await assertFails(
+        setDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}/members/${PARTNER}`), { ...membership(), name: 'Owner' }),
+      );
+    });
+
+    it('a member’s fill-up still obeys the receipt size limit', async () => {
+      await join();
+      const { Bytes } = await import('firebase/firestore');
+      const big = { ...(await fillUpFor('big', SHARED, PARTNER)), receiptImageData: Bytes.fromUint8Array(new Uint8Array(716_801)) };
+      await assertFails(setDoc(doc(partner(), `users/${OWNER}/fillUps/big`), big));
+    });
+
+    it('a member can delete a fill-up — a tombstone that keeps who entered it', async () => {
+      await join();
+      const tombstone = { ...(await fillUpFor('on-shared', SHARED, OWNER)), deletedAt: 9, updatedAt: 9 };
+      await assertSucceeds(setDoc(doc(partner(), `users/${OWNER}/fillUps/on-shared`), tombstone));
+    });
+
+    it('a member cannot erase a fill-up outright', async () => {
+      await join();
+      await assertFails(deleteDoc(doc(partner(), `users/${OWNER}/fillUps/on-shared`)));
+    });
+  });
+
   describe('memberships: the member’s own list of shared cars', () => {
     const entry = (): Record<string, unknown> => ({
       ownerUid: OWNER,

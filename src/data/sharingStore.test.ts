@@ -151,3 +151,105 @@ describe('enteredBy from the account', () => {
     expect(tombstoneFillUp(row, 5).enteredBy ?? null).toBeNull();
   });
 });
+
+// --- Broader cases -------------------------------------------------------------
+
+describe('forgetting, more widely', () => {
+  test('takes the car’s submissions with it, and leaves other cars’ alone', async () => {
+    const store = new FuelTrackerStore(memory(), undefined, 'me');
+    const shared = await store.addVehicle({ name: 'Shared' });
+    const mine = await store.addVehicle({ name: 'Mine' });
+    await store.submitFillUp(draft(), shared.id, 'Neighbour');
+    const kept = await store.submitFillUp(draft(), mine.id, 'Neighbour');
+    await store.forgetVehicle(shared.id);
+    expect((await store.pendingFillUps()).map((p) => p.id)).toEqual([kept.id]);
+  });
+
+  test('a car that was already deleted is forgotten too, tombstone and all', async () => {
+    const store = new FuelTrackerStore(memory(), undefined, 'me');
+    const shared = await store.addVehicle({ name: 'Shared' });
+    await store.addFillUp(draft(), shared.id);
+    await store.removeVehicle(shared.id);
+    await store.forgetVehicle(shared.id);
+    const snapshot = await store.exportSnapshot();
+    expect(snapshot.vehicles).toHaveLength(0);
+    expect(snapshot.fillUps).toHaveLength(0);
+  });
+
+  test('forgetting twice is harmless', async () => {
+    const store = new FuelTrackerStore(memory(), undefined, 'me');
+    const shared = await store.addVehicle({ name: 'Shared' });
+    await store.forgetVehicle(shared.id);
+    await expect(store.forgetVehicle(shared.id)).resolves.toBeUndefined();
+  });
+
+  test('a car with many fill-ups is forgotten completely', async () => {
+    const store = new FuelTrackerStore(memory(), undefined, 'me');
+    const shared = await store.addVehicle({ name: 'Shared' });
+    for (let i = 0; i < 200; i += 1) await store.addFillUp(draft(10_000 + i * 300), shared.id);
+    await store.forgetVehicle(shared.id);
+    expect(await store.fillUpCount()).toBe(0);
+  });
+});
+
+describe('re-stamping a row that won a tie', () => {
+  test('moves only updatedAt, live or deleted', async () => {
+    const store = new FuelTrackerStore(memory(), undefined, 'me');
+    const car = await store.addVehicle({ name: 'Civic' });
+    const live = await store.addFillUp(draft(10_000), car.id);
+    const gone = await store.addFillUp(draft(10_300), car.id);
+    await store.removeFillUp(gone.id);
+    const before = await store.exportSnapshot();
+    await store.restamp('fillUps', [live.id, gone.id]);
+    const after = await store.exportSnapshot();
+    for (const id of [live.id, gone.id]) {
+      const was = before.fillUps.find((f) => f.id === id)!;
+      const now = after.fillUps.find((f) => f.id === id)!;
+      expect(now.updatedAt).toBeGreaterThan(was.updatedAt);
+      expect({ ...now, updatedAt: 0 }).toEqual({ ...was, updatedAt: 0 });
+    }
+  });
+
+  test('an unknown id is ignored', async () => {
+    const store = new FuelTrackerStore(memory());
+    await expect(store.restamp('vehicles', ['nope'])).resolves.toBeUndefined();
+    expect((await store.exportSnapshot()).vehicles).toHaveLength(0);
+  });
+});
+
+describe('who entered it, through a backup', () => {
+  test('a JSON backup keeps it, and restoring brings it back', async () => {
+    const { parseJsonBackup, toJsonBackup } = await import('./backupFormat');
+    const store = new FuelTrackerStore(memory(), undefined, 'partner');
+    const car = await store.addVehicle({ name: 'Civic' });
+    const entry = await store.addFillUp(draft(), car.id);
+    const parsed = parseJsonBackup(toJsonBackup(await store.exportSnapshot()));
+    expect(parsed.value?.fillUps.find((f) => f.id === entry.id)?.enteredBy).toBe('partner');
+
+    const restored = new FuelTrackerStore(memory(), undefined, 'someone-else');
+    await restored.importBackup(parsed.value!);
+    expect((await restored.fillUp(entry.id))?.enteredBy).toBe('partner');
+  });
+
+  test('a backup made before sharing restores with nobody named', async () => {
+    const { parseJsonBackup, toJsonBackup } = await import('./backupFormat');
+    const store = new FuelTrackerStore(memory());
+    const car = await store.addVehicle({ name: 'Civic' });
+    await store.addFillUp(draft(), car.id);
+    const snapshot = await store.exportSnapshot();
+    const old = { ...snapshot, fillUps: snapshot.fillUps.map(({ enteredBy: _who, ...rest }) => rest) };
+    const parsed = parseJsonBackup(toJsonBackup(old as typeof snapshot));
+    expect(parsed.value?.fillUps[0]?.enteredBy).toBeNull();
+  });
+
+  test('a forged enteredBy in a file is bounded like any text from outside', async () => {
+    const { parseJsonBackup, toJsonBackup } = await import('./backupFormat');
+    const store = new FuelTrackerStore(memory(), undefined, 'me');
+    const car = await store.addVehicle({ name: 'Civic' });
+    await store.addFillUp(draft(), car.id);
+    const snapshot = await store.exportSnapshot();
+    const forged = { ...snapshot, fillUps: snapshot.fillUps.map((f) => ({ ...f, enteredBy: 'x'.repeat(10_000) })) };
+    const parsed = parseJsonBackup(toJsonBackup(forged));
+    expect(parsed.value?.fillUps[0]?.enteredBy).toBeNull();
+  });
+});

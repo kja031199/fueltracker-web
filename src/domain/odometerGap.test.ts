@@ -80,3 +80,36 @@ describe('stays quiet when it cannot know', () => {
     expect(GAP_FACTOR).toBe(2);
   });
 });
+
+describe('more edges', () => {
+  test('fractional readings, as a metric entry converted to miles produces', () => {
+    const history = [10_000.4, 10_300.9, 10_601.2, 10_900.7];
+    const jump = unusualOdometerJump(11_600.3, history);
+    expect(jump?.previous).toBe(10_900.7);
+    expect(jump?.distance).toBeCloseTo(699.6, 6);
+  });
+
+  test('an even number of gaps takes the mean of the middle two', () => {
+    // Gaps 200, 300, 400, 500 → median 350; 701 is more than twice that.
+    const history = [10_000, 10_200, 10_500, 10_900, 11_400];
+    expect(unusualOdometerJump(12_101, history)?.usual).toBe(350);
+    expect(unusualOdometerJump(12_100, history)).toBeNull();
+  });
+
+  test('very large readings do not lose the comparison', () => {
+    const base = 9_000_000_000;
+    const history = [base, base + 300, base + 600, base + 900];
+    expect(unusualOdometerJump(base + 1_600, history)?.distance).toBe(700);
+  });
+
+  test('a short car history padded with garbage is still too short', () => {
+    expect(unusualOdometerJump(20_000, [10_000, 10_300, Number.NaN, -5, 0, Number.POSITIVE_INFINITY])).toBeNull();
+  });
+
+  test('a long history is handled quickly', () => {
+    const history = Array.from({ length: 50_000 }, (_, i) => 10_000 + i * 300);
+    const started = Date.now();
+    expect(unusualOdometerJump(10_000 + 50_000 * 300 + 700, history)).not.toBeNull();
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+});

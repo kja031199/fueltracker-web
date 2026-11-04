@@ -247,3 +247,161 @@ describe('ending it', () => {
     expect((await world.remoteFor(KYLE.uid).pull(null)).vehicles).toHaveLength(1);
   });
 });
+
+// --- Broader cases -------------------------------------------------------------
+
+describe('when sharing is not available', () => {
+  test('there is no Share button and no invitations banner', async () => {
+    const world = new InMemorySharingWorld();
+    const kyle = person(world, KYLE);
+    await kylesCivic(world, kyle);
+    render(
+      <App
+        store={kyle.store}
+        auth={new StubAuthProvider({ status: 'signedIn', user: KYLE })}
+        initialTab="vehicles"
+      />,
+    );
+    await screen.findByText('Civic');
+    expect(screen.queryByRole('button', { name: 'Share' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: /invitations/i })).not.toBeInTheDocument();
+    // And deleting does not mention people it cannot be shared with.
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Delete' }));
+    expect(screen.getByRole('button', { name: /delete civic/i })).not.toHaveTextContent(/shared with/i);
+  });
+});
+
+describe('the owner’s side, more widely', () => {
+  test('withdrawing an invitation removes it', async () => {
+    const world = new InMemorySharingWorld();
+    const kyle = person(world, KYLE);
+    const car = await kylesCivic(world, kyle);
+    await kyle.sharing.remote.invite(car, SAM.email);
+    const user = userEvent.setup();
+    open(world, kyle);
+    await user.click(await screen.findByRole('button', { name: 'Share' }));
+    await user.click(await screen.findByRole('button', { name: /withdraw sam@example.com/i }));
+    expect(await screen.findByRole('status')).toHaveTextContent(/withdrew the invitation/i);
+    expect(world.invites.size).toBe(0);
+    expect(screen.queryByText(/waiting for them to accept/i)).not.toBeInTheDocument();
+  });
+
+  test('inviting the same address twice says what to do', async () => {
+    const world = new InMemorySharingWorld();
+    const kyle = person(world, KYLE);
+    const car = await kylesCivic(world, kyle);
+    await kyle.sharing.remote.invite(car, SAM.email);
+    const user = userEvent.setup();
+    open(world, kyle);
+    await user.click(await screen.findByRole('button', { name: 'Share' }));
+    await user.type(screen.getByLabelText(/their google email/i), SAM.email);
+    await user.click(screen.getByRole('button', { name: 'Invite' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/withdraw it to send a new one/i);
+  });
+
+  test('the Invite button waits for an address', async () => {
+    const world = new InMemorySharingWorld();
+    const kyle = person(world, KYLE);
+    await kylesCivic(world, kyle);
+    const user = userEvent.setup();
+    open(world, kyle);
+    await user.click(await screen.findByRole('button', { name: 'Share' }));
+    expect(screen.getByRole('button', { name: 'Invite' })).toBeDisabled();
+    await user.type(screen.getByLabelText(/their google email/i), '   ');
+    expect(screen.getByRole('button', { name: 'Invite' })).toBeDisabled();
+  });
+
+  test('if who it is shared with cannot be loaded, it says so', async () => {
+    const world = new InMemorySharingWorld();
+    const kyle = person(world, KYLE);
+    await kylesCivic(world, kyle);
+    kyle.sharing.remote.members = () => Promise.reject(new Error('offline'));
+    const user = userEvent.setup();
+    open(world, kyle);
+    await user.click(await screen.findByRole('button', { name: 'Share' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/could not be loaded/i);
+  });
+
+  test('deleting a car warns that it goes for everyone it is shared with', async () => {
+    const world = new InMemorySharingWorld();
+    const kyle = person(world, KYLE);
+    await kylesCivic(world, kyle);
+    const user = userEvent.setup();
+    open(world, kyle);
+    await user.click(await screen.findByRole('button', { name: 'Delete' }));
+    expect(screen.getByRole('button', { name: /delete civic/i })).toHaveTextContent(/for everyone it is shared with/i);
+  });
+
+  test('closing the panel hides it', async () => {
+    const world = new InMemorySharingWorld();
+    const kyle = person(world, KYLE);
+    await kylesCivic(world, kyle);
+    const user = userEvent.setup();
+    open(world, kyle);
+    await user.click(await screen.findByRole('button', { name: 'Share' }));
+    expect(screen.getByLabelText(/their google email/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Done sharing' }));
+    expect(screen.queryByLabelText(/their google email/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('the partner’s side, more widely', () => {
+  test('an accept that fails says so, and the invitation stays to try again', async () => {
+    const world = new InMemorySharingWorld();
+    const kyle = person(world, KYLE);
+    const sam = person(world, SAM);
+    const car = await kylesCivic(world, kyle);
+    await kyle.sharing.remote.invite(car, SAM.email);
+    sam.sharing.remote.accept = () => Promise.reject(new Error('offline'));
+    const user = userEvent.setup();
+    open(world, sam);
+    const banner = await screen.findByRole('region', { name: /invitations/i }, WAIT);
+    await user.click(within(banner).getByRole('button', { name: /accept civic/i }));
+    expect(await within(banner).findByRole('alert')).toHaveTextContent(/could not be answered/i);
+    expect(within(banner).getByRole('button', { name: /accept civic/i })).toBeEnabled();
+    expect(world.invites.size).toBe(1);
+  });
+
+  test('two invitations are offered separately', async () => {
+    const world = new InMemorySharingWorld();
+    const kyle = person(world, KYLE);
+    const sam = person(world, SAM);
+    const civic = await kylesCivic(world, kyle);
+    const truck = await kyle.store.addVehicle({ name: 'Truck' });
+    await world.remoteFor(KYLE.uid).push(await kyle.store.exportSnapshot());
+    await kyle.sharing.remote.invite(civic, SAM.email);
+    await kyle.sharing.remote.invite(truck, SAM.email);
+    open(world, sam);
+    const banner = await screen.findByRole('region', { name: /invitations/i }, WAIT);
+    expect(within(banner).getByRole('button', { name: /accept civic/i })).toBeInTheDocument();
+    expect(within(banner).getByRole('button', { name: /accept truck/i })).toBeInTheDocument();
+  });
+
+  test('choosing Stay keeps the car', async () => {
+    const world = new InMemorySharingWorld();
+    const kyle = person(world, KYLE);
+    const sam = person(world, SAM);
+    const car = await kylesCivic(world, kyle);
+    await sam.sharing.remote.accept(await kyle.sharing.remote.invite(car, SAM.email));
+    const user = userEvent.setup();
+    open(world, sam);
+    await user.click(await screen.findByRole('button', { name: 'Leave' }, WAIT));
+    await user.click(screen.getByRole('button', { name: 'Stay' }));
+    expect(screen.getByRole('button', { name: 'Leave' })).toBeInTheDocument();
+    expect(world.isMember(KYLE.uid, car.id, SAM.uid)).toBe(true);
+  });
+
+  test('the partner can still keep a car of their own, with the usual controls', async () => {
+    const world = new InMemorySharingWorld();
+    const kyle = person(world, KYLE);
+    const sam = person(world, SAM);
+    const car = await kylesCivic(world, kyle);
+    await sam.sharing.remote.accept(await kyle.sharing.remote.invite(car, SAM.email));
+    await sam.store.addVehicle({ name: 'Bike' });
+    open(world, sam);
+    await screen.findByText(/shared with you by kyle/i, {}, WAIT);
+    expect(screen.getAllByRole('button', { name: 'Share' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Leave' })).toHaveLength(1);
+  });
+});
