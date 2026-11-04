@@ -141,6 +141,12 @@ Recorded so a regression in the tests themselves is visible:
 | OCR input: detail not shown / detail unbounded / a failed encode of the reading copy ignored | 1 / 1 / 1 |
 | Fuel line: rung removed / labels winning over it / first of two disagreeing lines trusted | 7 / 6 / 1 |
 | Fuel line: two-decimal price / whole-number quantity / range check / lookbehind / lookahead dropped | 1 / 1 / 1 / 1 / 1 |
+| Sharing: email not lowercased / two @ accepted / accept without the address / member writes another car / forges enteredBy / scope keeps submissions | 6 / 2 / 1 / 1 / 2 / 1 |
+| Sharing sync: own sync copies shared cars / share sync pushes everything / removed car kept / left-elsewhere car kept / deleted car kept / ledger saved empty / ledger keeps ended shares | 4 / 4 / 4 / 3 / 1 / 5 / 1 |
+| Ties: edit beats deletion / local winner not re-stamped / no tie-break on merge | 3 / 3 / 3 |
+| Sharing store: forget leaves tombstones / edit loses who entered it / tombstone drops it / enteredBy length unchecked / shared car offered Delete | 3 / 3 / 3 / 2 / 4 |
+| Sharing rules (emulator): any allowlisted account reads any fill-up / joining without an invitation / member changes who entered it | 3 / 2 / 1 |
+| Missed fill-up hint: mean not median / at-least not more-than / two gaps enough / own reading not excluded / kept after ticking / beside the backwards warning | 1 / 2 / 1 / 1 / 1 / 1 |
 | Admin idle timeout: bad text / unset failing open / decimals accepted / no trim / overflow not held to a day / `>` at the boundary | 17 / 8 / 2 / 1 / 1 / 1 |
 | Admin idle timeout: module hard-coding 30 / App ignoring it / armed while signed out / legacy setting kept / legacy "off" honoured | 1 / 1 / 1 / 1 / 1 |
 | Admin idle timeout: Settings showing a fixed 30 / notice saying the reader chose it / deploy not passing the Variable | 1 / 1 / 1 |

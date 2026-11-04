@@ -267,7 +267,9 @@ export function SettingsScreen({
         </h2>
         <p style={{ margin: '0 0 8px' }}>
           Your fuel log is stored in this browser and kept in your Google account. Nobody else can
-          read it — not another signed-in person, and not anyone without your account.
+          read it — not another signed-in person, and not anyone without your account — except a
+          car you choose to share, which the people you share it with can see and log (Vehicles →
+          Share).
         </p>
         <p style={{ margin: '0 0 8px' }}>
           Because there is a copy in your account, clearing your browser data no longer loses your

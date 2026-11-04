@@ -1,10 +1,11 @@
 /**
  * Checking that a record from the account is actually the shape it claims.
  *
- * ## Why this is needed even though nobody else can write there
+ * ## Why this is needed even though the rules guard every write
  *
- * `firestore.rules` already guarantees that only the owner can write to their
- * own tree, so this is not defending against another user. It defends against
+ * `firestore.rules` already guarantees that only the owner — and, for a shared
+ * car's fill-ups, its members (#66) — can write to a tree, and holds every
+ * write to the record's shape. It defends against
  * everything else that can put a wrong-shaped document there: a future build
  * with a different schema, a half-finished write, a hand edit in the Firebase
  * console, or a bug in this app that gets fixed later but leaves bad rows

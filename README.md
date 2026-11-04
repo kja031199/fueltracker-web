@@ -2,14 +2,14 @@
 
 [![CI](https://github.com/kja031199/fueltracker-web/actions/workflows/ci.yml/badge.svg)](https://github.com/kja031199/fueltracker-web/actions/workflows/ci.yml)
 
-Track gas fill-ups and fuel economy in your browser. **Sign in with Google; your fuel log is stored on your device and synced to your own account.** No analytics, no third party, and nobody but you can read it.
+Track gas fill-ups and fuel economy in your browser. **Sign in with Google; your fuel log is stored on your device and synced to your own account.** No analytics, no third party, and nobody but you can read it — unless you [share a car](docs/accounts.md#sharing-a-car-66) with someone.
 
 > **Status: complete, now with an account.** Add vehicles, log and edit
 > fill-ups, search and filter them, see your economy, spending and price trends
 > as KPIs and charts, **export a backup you can restore**, **install it and use
 > it with no network at all**, **photograph a receipt** to fill the form in, and
 > **sign in with Google so your log survives a cleared browser and follows you
-> to your phone**. There is a test file beside nearly every module, plus a suite
+> to your phone**, and **share a car with someone so you both log it**. There is a test file beside nearly every module, plus a suite
 > that runs the security rules against the Firestore emulator. What is *not*
 > here was left out on purpose, not left unfinished — see
 > [what was deliberately not built](docs/port.md#what-was-deliberately-not-built).
@@ -50,7 +50,7 @@ The detail lives in [`docs/`](docs/), one file per subject:
 |---|---|
 | [docs/port.md](docs/port.md) | Why this is a web app, what the rewrite kept, what the platform took away, and what was left out on purpose |
 | [docs/accounts.md](docs/accounts.md) | Signing in, who is allowed to, the idle timeout, and per-account storage |
-| [docs/sync.md](docs/sync.md) | How two devices reconcile, what a deletion deletes, and why nothing from the account is trusted |
+| [docs/sync.md](docs/sync.md) | How two devices reconcile, what a deletion deletes, how a shared car syncs, and why nothing from the account is trusted |
 | [docs/deploying.md](docs/deploying.md) | Your own Firebase project, the deploy on merge, and the supply chain around the one credential |
 | [docs/security.md](docs/security.md) | Security headers, the one third-party request, and the dependency audit |
 | [docs/interface.md](docs/interface.md) | Measured contrast, hand-drawn charts, installing and offline |

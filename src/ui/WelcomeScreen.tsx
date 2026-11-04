@@ -17,7 +17,8 @@ export function WelcomeScreen({ onStart }: { readonly onStart: () => void }): Re
           </p>
           <p>
             Your fuel log is saved on this device and kept in your Google account, so it survives
-            clearing your browser data and follows you to your phone. Only you can read it.
+            clearing your browser data and follows you to your phone. Only you can read it — unless
+            you choose to share a car with someone.
           </p>
           <button className="button" type="button" onClick={onStart}>
             Get started
