@@ -18,6 +18,7 @@ import type { FillUpRecord, FillUpSummary } from '../data/records';
 import { useFuelLog } from './fuelLog';
 import { importReceiptPhoto } from './importReceipt';
 import { TEXT_LIMITS } from '../domain/textLimits';
+import { unusualOdometerJump } from '../domain/odometerGap';
 
 interface Props {
   readonly vehicleId: string;
@@ -169,6 +170,16 @@ export function FillUpForm({
     editing !== null,
   );
   const odometerWarning = odometerLooksWrong(form.odometer, previous);
+  // "Did somebody forget to log a fill-up?" (#66) — measured against the
+  // car's other readings, never this entry's own, and only until the missed
+  // box is ticked: once it is, the hint has done its job.
+  const jump =
+    odometerWarning || form.missedPreviousFillUp
+      ? null
+      : unusualOdometerJump(
+          form.odometer,
+          existing.filter((record) => record.id !== editing?.id).map((record) => record.odometer),
+        );
   const total = formTotalCost(form);
   const canSave = canSaveForm(form) && !saving;
 
@@ -315,7 +326,9 @@ export function FillUpForm({
           inputMode="decimal"
           value={numericText.odometer}
           onChange={(event) => typeNumber('odometer', event.target.value, distanceSpec.toMiles)}
-          aria-describedby={odometerWarning ? 'odometer-warning' : undefined}
+          aria-describedby={
+            odometerWarning ? 'odometer-warning' : jump !== null ? 'odometer-gap-warning' : undefined
+          }
         />
       </div>
 
@@ -325,6 +338,18 @@ export function FillUpForm({
         <p className="warning" id="odometer-warning" role="status">
           That is at or below the last reading (
           {formatDistance(previous, units.distance, true)}). Double-check before saving.
+        </p>
+      )}
+
+      {jump !== null && (
+        // A hint, not a block: a long trip between fill-ups is real. But one
+        // that nobody logged — easy when two people share a car — stretches
+        // the next MPG over two tanks, and this is the box that prevents it.
+        <p className="warning" id="odometer-gap-warning" role="status">
+          That is {formatDistance(jump.distance, units.distance, true)} since the last fill-up — more
+          than twice the usual {formatDistance(jump.usual, units.distance, true)}. If a fill-up was not
+          logged, tick &ldquo;Missed logging a fill before this one&rdquo; so the economy is not
+          stretched across two tanks.
         </p>
       )}
 
