@@ -14,7 +14,9 @@ on:
   push:
     branches: [main]
   # So a deploy can be re-run without inventing a commit — after fixing a
-  # misconfigured variable, for instance.
+  # misconfigured variable, for instance. Safe from any branch: the `deploy`
+  # job runs in the `production` environment, which only `main` can enter and
+  # which holds the key (#76).
   workflow_dispatch:
 
 concurrency:
@@ -26,9 +28,17 @@ concurrency:
 permissions:
   contents: read
 
+# Two jobs, and the split is the point (#76). `build` installs the app's
+# dependencies — several hundred packages, lifecycle scripts included —
+# builds, tests, and hands `dist/` on as an artifact. It holds no secret.
+# `deploy` holds the key and runs no app-tree npm code at all: the CLI is
+# installed with `--ignore-scripts`, the tested artifact is downloaded rather
+# than rebuilt, and firebase.json's `predeploy` hook is stripped so
+# `firebase deploy` cannot run `npm run build` with the key on disk.
+# `src/test/workflows.test.ts` asserts every part of that.
 jobs:
-  deploy:
-    name: Deploy to Firebase Hosting
+  build:
+    name: Build and test
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -65,16 +75,6 @@ jobs:
       - name: Install
         run: npm ci
 
-      # The one dependency in this project that is trusted with a credential,
-      # and until #30 the only one with no version floor, no integrity hash and
-      # no update review: `npx --yes firebase-tools` resolved whatever was
-      # newest at the moment the job ran, then executed it in a process that
-      # can read the key written below. It has its own manifest and lockfile so
-      # `npm ci` verifies all 600-odd packages against recorded hashes, without
-      # putting any of them in the app's own tree.
-      - name: Install the pinned Firebase CLI
-        run: npm ci --prefix .github/firebase-cli
-
       # The trap this workflow exists to not fall into. Vite inlines VITE_* at
       # build time, so with these unset the build succeeds and produces a bundle
       # with no backend — and publishing that gives a live site that loads and
@@ -104,6 +104,78 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Hand the tested build to the deploy job
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy:
+    name: Deploy to Firebase Hosting
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Limited to `main` in Settings → Environments, and the only place the key
+    # is stored. See docs/deploying.md, "The deploy environment".
+    environment: production
+
+    env:
+      # Only what this job uses: where to deploy, and what the smoke test
+      # looks for. The rest of the web config was baked in by `build`.
+      VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+      VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+
+    steps:
+      # For firebase.json, firestore.rules and the CLI's lockfile. The app's
+      # own dependencies are never installed in this job.
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: .github/firebase-cli/package-lock.json
+
+      # The one dependency in this project that is trusted with a credential,
+      # and until #30 the only one with no version floor, no integrity hash and
+      # no update review: `npx --yes firebase-tools` resolved whatever was
+      # newest at the moment the job ran. It has its own manifest and lockfile
+      # so `npm ci` verifies all 600-odd packages against recorded hashes,
+      # without putting any of them in the app's own tree.
+      #
+      # `--ignore-scripts`: nothing in this tree needs an install script to
+      # deploy. Only two packages have one — `protobufjs` (a version check) and
+      # `re2`, an optional native module that superstatic loads in a try/catch
+      # for the local server — and none of them should run in the job that is
+      # about to hold the key.
+      - name: Install the pinned Firebase CLI
+        run: npm ci --prefix .github/firebase-cli --ignore-scripts
+
+      - name: Fetch the tested build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+
+      # firebase.json keeps its `predeploy` hook for deploys from a laptop,
+      # where it is what stops a stale dist/ going live. Here it would rebuild
+      # — running vite and its plugins with the key present — and replace the
+      # artifact that was tested with one that was not.
+      - name: Prepare the deploy config without the build hook
+        run: |
+          jq 'del(.hosting.predeploy)' firebase.json > firebase.ci.json
+          if jq -e '.hosting.predeploy' firebase.ci.json > /dev/null; then
+            echo "::error::firebase.ci.json still has a predeploy hook"
+            exit 1
+          fi
+          test -f dist/index.html
+
       # Hand-rolled rather than google-github-actions/auth: it is three lines,
       # and it keeps a third-party action from ever holding the credential.
       # `printf` rather than `echo` so nothing in the JSON is interpreted.
@@ -125,16 +197,16 @@ jobs:
       - name: Deploy security rules
         run: >
           .github/firebase-cli/node_modules/.bin/firebase deploy
+          --config firebase.ci.json
           --only firestore:rules
           --project "$VITE_FIREBASE_PROJECT_ID"
           --non-interactive
 
-      # The predeploy hook in firebase.json rebuilds here. That is a second
-      # build of a few seconds, accepted rather than removing the hook — the
-      # hook is what stops a *manual* deploy shipping a stale dist/.
+      # Ships the artifact from `build` as it is: the config has no predeploy.
       - name: Deploy hosting
         run: >
           .github/firebase-cli/node_modules/.bin/firebase deploy
+          --config firebase.ci.json
           --only hosting
           --project "$VITE_FIREBASE_PROJECT_ID"
           --non-interactive
