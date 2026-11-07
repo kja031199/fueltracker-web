@@ -139,6 +139,12 @@ export function useSync(
       for (const ended of all.shares.ended) {
         notes.push(`${ended.vehicleName || 'A car'} is no longer shared with you, so it was removed from this device`);
       }
+      // #78: never synced, and said so — it does not go away on its own.
+      for (const clash of all.shares.clashed) {
+        notes.push(
+          `${clash.vehicleName || 'A shared car'} from ${clash.ownerName || 'its owner'} names a car that is already yours, so it was not synced — leave it under Vehicles`,
+        );
+      }
       if (all.shares.failed.length > 0) {
         notes.push(`${all.shares.failed.length} shared car(s) could not be reached and will be retried`);
       }

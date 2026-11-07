@@ -224,12 +224,16 @@ service cloud.firestore {
           // shared car can say who logged each fill-up.
           allow read: if owner() || memberOf(uid, id);
           // Joining: only yourself, only with an invitation addressed to your
-          // own verified email, and never into your own car.
+          // own verified email, and never into your own car — nor into a car
+          // whose id names one of yours, live or deleted (#78). A car's id is
+          // not secret and an owner can file a car under any id; joining such
+          // a car would sync your own fill-ups into the inviter's account.
           allow create: if allowed()
             && request.auth.uid == memberUid
             && request.auth.uid != uid
             && verifiedEmail()
             && exists(/databases/$(database)/documents/invites/$(uid + '__' + id + '__' + request.auth.token.email.lower()))
+            && !exists(/databases/$(database)/documents/users/$(request.auth.uid)/vehicles/$(id))
             && request.resource.data.keys().hasOnly(['uid', 'name', 'email', 'joinedAt'])
             && request.resource.data.keys().hasAll(['uid', 'name', 'email', 'joinedAt'])
             && request.resource.data.uid == memberUid

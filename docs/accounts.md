@@ -194,6 +194,13 @@ so an existing car and its whole history can be shared as it is.
   rules compare the invitation with the address on the sign-in, lowercased,
   and only when Google has verified it. Nobody can add anyone else, and a
   member cannot add a third person.
+- **You can never join a car whose id is one of your own** (#78), live or
+  deleted. A car's id is not secret — request links and CSV exports carry it —
+  and an owner can file a car under any id; joining such a car would sync your
+  own fill-ups into theirs. Checked three times: by the rules, against your
+  account; by Accept, against the device, with the reason said plainly; and by
+  sync, which never syncs a new share naming a car already on the device,
+  reports it, and deletes nothing.
 - **A member's fill-ups carry their own uid** (`enteredBy`), which the rules
   require on a new one and forbid changing on an edit or a deletion. A member
   cannot move a fill-up to another car, write the car itself, or erase a

@@ -144,6 +144,11 @@ npm ci --prefix .github/firebase-cli
    never "nothing is shared"; a share is saved to it *before* its rows are
    pulled and leaves it only *after* they are forgotten. Never add a
    `.catch(() => [])` to `ledger.load()`.
+   **Never join, sync or record a share whose car id is already yours** (#78):
+   the rules refuse the join (`!exists` on your own `vehicles/{id}`), Accept
+   checks `store.hasVehicle` first, and `syncAll` reports a new share naming a
+   car on the device as `clashed` — not synced, not in the ledger, still
+   excluded from the own push. A car id is not secret.
 
 ## Traps
 

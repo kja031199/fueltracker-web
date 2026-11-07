@@ -35,6 +35,7 @@ import type { FuelTrackerStore, NewVehicle } from '../data/store';
 import type { SyncStateStore } from '../data/syncState';
 import type { SharingSync } from '../data/shareSync';
 import type { Invite, Member, Membership } from '../data/sharing';
+import { ShareClash } from '../data/sharing';
 import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
 import type { Submission } from '../data/fillUpLink';
 import type { AppData } from './useAppData';
@@ -151,7 +152,7 @@ export function FuelLogProvider({
 }: FuelLogProviderProps): ReactElement {
   const data = useAppData(store);
   const sync = useSync(store, remote, data.reload, syncState, uid, remote === null ? null : sharing);
-  const sharingView = useSharingView(remote === null ? null : sharing, uid, sync.syncNow, sync.lastSyncedAt);
+  const sharingView = useSharingView(remote === null ? null : sharing, uid, sync.syncNow, sync.lastSyncedAt, store);
   const { reload } = data;
   const { afterWrite } = sync;
   const shared = remote === null ? null : sharing;
@@ -229,6 +230,7 @@ function useSharingView(
   uid: string | null,
   syncNow: () => Promise<void>,
   lastSyncedAt: number | null,
+  store: FuelTrackerStore,
 ): SharingView {
   const [sharedWithMe, setSharedWithMe] = useState<readonly Membership[]>([]);
   const [invitesForMe, setInvitesForMe] = useState<readonly Invite[]>([]);
@@ -268,6 +270,9 @@ function useSharingView(
       membersOf: (vehicleId) => remote.members(membershipFor(vehicleId)?.ownerUid ?? uid, vehicleId),
       removeMember: (vehicleId, memberUid) => remote.removeMember(vehicleId, memberUid),
       accept: async (invite) => {
+        // Checked here, before anything is written, as well as by the rules
+        // (which only see cars already in the account) and by sync (#78).
+        if (await store.hasVehicle(invite.vehicleId)) throw new ShareClash();
         await remote.accept(invite);
         await refresh();
         await syncNow();
@@ -282,5 +287,5 @@ function useSharingView(
         await refresh();
       },
     };
-  }, [sharing, uid, sharedWithMe, invitesForMe, refresh, syncNow]);
+  }, [sharing, uid, sharedWithMe, invitesForMe, refresh, syncNow, store]);
 }

@@ -88,6 +88,16 @@ export class FuelTrackerStore {
     return record;
   }
 
+  /**
+   * Whether this device holds a vehicle with that id in any state — live, or
+   * deleted and kept as a tombstone. A share whose car id is already here
+   * would hand that car to whoever shared it (#78).
+   */
+  async hasVehicle(id: string): Promise<boolean> {
+    if ((await this.repos.vehicles.get(id)) !== undefined) return true;
+    return (await this.repos.vehicles.listDeleted()).some((row) => row.id === id);
+  }
+
   async vehicles(): Promise<VehicleRecord[]> {
     const rows = await this.repos.vehicles.list();
     return rows.sort((a, b) => a.createdAt - b.createdAt);

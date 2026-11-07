@@ -410,7 +410,7 @@ describe('when the account itself has trouble', () => {
     const car = await store.addVehicle({ name: 'Solo' });
     const result = await syncAll(store, world.remoteFor('solo'), null, new MonotonicClock(), new InMemorySyncState());
     expect(result.own.ok).toBe(true);
-    expect(result.shares).toEqual({ synced: [], ended: [], failed: [], unreachable: false });
+    expect(result.shares).toEqual({ synced: [], ended: [], failed: [], unreachable: false, clashed: [] });
     expect((await rowsIn(world, 'solo')).vehicles).toEqual([car.id]);
   });
 });
@@ -613,5 +613,131 @@ describe('over time', () => {
     await owner.sync();
     expect(await rowsIn(world, OWNER.uid)).toEqual(before);
     expect(await owner.store.fillUps(car.id)).toHaveLength(2);
+  });
+});
+
+// --- #78: an invitation to a car that has the id of one of yours -------------
+
+describe('a share whose car id is already one of yours (#78)', () => {
+  /**
+   * The attack in #78. The victim's own car id leaks — request links and CSV
+   * exports carry it. The inviter files a car of their own under that id and
+   * invites the victim. Before the fix, accepting excluded the victim's own car
+   * from their own sync and ran a share sync for it, which pushed the victim's
+   * fill-ups (receipts included) into the inviter's account, and leaving the
+   * share later hard-deleted the victim's own car from their device.
+   */
+  async function clash(): Promise<{
+    world: InMemorySharingWorld;
+    owner: Device;
+    victim: Device;
+    mine: VehicleRecord;
+  }> {
+    const world = new InMemorySharingWorld();
+    const owner = device(world, OWNER);
+    const victim = device(world, PARTNER);
+    const mine = await victim.store.addVehicle({ name: 'My Civic' });
+    await victim.store.addFillUp(draft(20_000), mine.id);
+    await victim.sync();
+    // The inviter files a car under the leaked id, in their own tree.
+    await world.remoteFor(OWNER.uid).push({
+      vehicles: [{ ...mine, name: 'Bait', updatedAt: mine.updatedAt + 1_000_000 }],
+      fillUps: [],
+      pendingFillUps: [],
+    });
+    return { world, owner, victim, mine };
+  }
+
+  function forceMembership(world: InMemorySharingWorld, vehicleId: string): void {
+    // Stands in for a membership that got past every check — accepted on a
+    // device that had not synced the car yet, say.
+    const key = `${OWNER.uid}__${vehicleId}`;
+    world.members.set(key, new Map([[PARTNER.uid, { uid: PARTNER.uid, name: 'Sam', email: 'sam@example.com', joinedAt: 1 }]]));
+    world.memberships.set(PARTNER.uid, new Map([[key, { ownerUid: OWNER.uid, vehicleId, ownerName: 'Kyle', vehicleName: 'Bait' }]]));
+  }
+
+  test('the account refuses the join, as the rules do', async () => {
+    const { world, owner, victim, mine } = await clash();
+    const invite = await owner.sharing.remote.invite({ id: mine.id, name: 'Bait' }, 'sam@example.com');
+    await expect(victim.sharing.remote.accept(invite)).rejects.toBeInstanceOf(Refused);
+    expect(world.isMember(OWNER.uid, mine.id, PARTNER.uid)).toBe(false);
+  });
+
+  test('…including when your car with that id was deleted: its tombstone still names it', async () => {
+    const { owner, victim, mine } = await clash();
+    await victim.store.removeVehicle(mine.id);
+    await victim.sync();
+    const invite = await owner.sharing.remote.invite({ id: mine.id, name: 'Bait' }, 'sam@example.com');
+    await expect(victim.sharing.remote.accept(invite)).rejects.toBeInstanceOf(Refused);
+  });
+
+  test('a clashing membership that exists anyway is never synced: nothing of yours reaches the inviter', async () => {
+    const { world, victim, mine } = await clash();
+    forceMembership(world, mine.id);
+
+    const result = await victim.sync();
+
+    expect(result.shares.clashed.map((m) => m.vehicleId)).toEqual([mine.id]);
+    expect(result.shares.synced).toEqual([]);
+    expect((await rowsIn(world, OWNER.uid)).fillUps).toEqual([]);
+    // Your car is untouched, and not taken over by the inviter's record.
+    expect((await victim.store.vehicles()).map((v) => v.name)).toEqual(['My Civic']);
+    expect(await victim.store.fillUps(mine.id)).toHaveLength(1);
+    // Never recorded as held for someone else.
+    expect(await victim.sharing.ledger.load()).toEqual([]);
+  });
+
+  test('a car of yours deleted on this device still clashes: its tombstone names it', async () => {
+    const { world, victim, mine } = await clash();
+    await victim.store.removeVehicle(mine.id);
+    forceMembership(world, mine.id);
+
+    const result = await victim.sync();
+
+    expect(result.shares.clashed.map((m) => m.vehicleId)).toEqual([mine.id]);
+    expect((await rowsIn(world, OWNER.uid)).fillUps).toEqual([]);
+  });
+
+  test('a clash is never written to the ledger, even by a sync that is interrupted', async () => {
+    // Recorded, it would read as a known share next time — and be synced.
+    const { world, victim, mine } = await clash();
+    forceMembership(world, mine.id);
+    const save = victim.sharing.ledger.save.bind(victim.sharing.ledger);
+    let saves = 0;
+    victim.sharing.ledger.save = async (list) => {
+      saves += 1;
+      await save(list);
+      if (saves === 1) throw new Error('interrupted after the first save');
+    };
+    await victim.sync();
+    victim.sharing.ledger.save = save;
+
+    const result = await victim.sync();
+
+    expect(result.shares.clashed.map((m) => m.vehicleId)).toEqual([mine.id]);
+    expect((await rowsIn(world, OWNER.uid)).fillUps).toEqual([]);
+  });
+
+  test('leaving the clashing share does not delete your own car', async () => {
+    const { world, victim, mine } = await clash();
+    forceMembership(world, mine.id);
+    await victim.sync();
+    const [membership] = await victim.sharing.remote.memberships();
+    if (membership === undefined) throw new Error('no membership');
+    await victim.sharing.remote.leave(membership);
+
+    const result = await victim.sync();
+
+    expect(result.shares.ended).toEqual([]);
+    expect(await victim.store.fillUps(mine.id)).toHaveLength(1);
+    expect((await victim.store.vehicles()).map((v) => v.id)).toEqual([mine.id]);
+  });
+
+  test('a car that arrived through a share is not mistaken for a clash on the next sync', async () => {
+    const { partner, car } = await sharedCar();
+    await partner.sync();
+    const result = await partner.sync();
+    expect(result.shares.clashed).toEqual([]);
+    expect(result.shares.synced.map((m) => m.vehicleId)).toEqual([car.id]);
   });
 });
