@@ -261,6 +261,19 @@ npm ci --prefix .github/firebase-cli
   `refresh`ed into it by id, or that sync pushes a stale row. Don't add a
   `store.exportSnapshot()` inside sync; `syncReads.test.ts` counts the reads.
 
+- **Read-then-write runs in one transaction, through the repositories it is
+  handed** (#85). `atomically(repos, (r) => …)` (`atomically.ts`) wraps every
+  merge, cascade and check-then-write in the store; inside, use **`r`, never
+  `this.repos`**. `dexieRepositories` (`db.ts`, the only place the app builds
+  repositories) binds `r` to the transaction with `tx.table(...)`, because
+  Dexie's ambient "current transaction" is lost after a few `await`s through
+  plain async functions — the writes then commit one by one and Dexie reports
+  `PrematureCommitError`, or nothing at all. Decide against rows read *inside*
+  (the text repair re-reads by id). Deleting a car tombstones its submissions
+  too. In memory there is no transaction and `work` just runs, so atomicity is
+  tested on fake-indexeddb (`atomicWrites.test.ts`), and a test that injects a
+  fault must inject it inside the transaction too (`swapping` there).
+
 - **An edit cannot move or revive a fill-up** (#83). `store.updateFillUp(id,
   draft)` takes no car: it keeps the stored `vehicleId`, and throws
   `StaleEdit` (`data/staleEdit.ts`, importable by screens) if the fill-up or

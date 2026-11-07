@@ -31,6 +31,7 @@ import Dexie from 'dexie';
 import type { Table } from 'dexie';
 import type { FillUpRecord, PendingFillUpRecord, SyncFields, VehicleRecord } from './records';
 import type { Repository } from './repository';
+import type { Repositories } from './store';
 import type { SyncCursor, SyncStateStore } from './syncState';
 import { parseCursor, parseLedger, type ShareLedger } from './syncState';
 import type { Membership } from './sharing';
@@ -129,7 +130,14 @@ export class DexieShareLedger implements ShareLedger {
  * key, the per-vehicle reads the `vehicleId` index (#53, #87).
  */
 export class DexieRepository<T extends SyncFields> implements Repository<T> {
-  constructor(private readonly table: Table<T, string>) {}
+  /**
+   * `inTransaction`: the table is one a transaction handed out
+   * (`transaction.table(...)`), so every call is already part of it.
+   */
+  constructor(
+    private readonly table: Table<T, string>,
+    private readonly inTransaction = false,
+  ) {}
 
   /**
    * One vehicle's live rows, from the `vehicleId` index. Only meaningful on a
@@ -178,10 +186,25 @@ export class DexieRepository<T extends SyncFields> implements Repository<T> {
     await this.table.put(record);
   }
 
+  async putMany(records: readonly T[]): Promise<void> {
+    if (records.length > 0) await this.table.bulkPut([...records]);
+  }
+
+  /**
+   * Read and write in one transaction (#85), so a save that lands between
+   * them cannot be replaced by a tombstone built from the row as it was.
+   * Inside a `transaction` of the whole store, this joins that one.
+   */
   async remove(id: string, toTombstone: (row: T) => T): Promise<void> {
-    const row = await this.table.get(id);
-    if (row === undefined || row.deletedAt !== null) return;
-    await this.table.put(toTombstone(row));
+    const tombstone = async (table: Table<T, string>): Promise<void> => {
+      const row = await table.get(id);
+      if (row === undefined || row.deletedAt !== null) return;
+      await table.put(toTombstone(row));
+    };
+    if (this.inTransaction) return tombstone(this.table);
+    await this.table.db.transaction('rw', this.table, (tx) =>
+      tombstone(tx.table(this.table.name) as Table<T, string>),
+    );
   }
 
   /**
@@ -196,4 +219,33 @@ export class DexieRepository<T extends SyncFields> implements Repository<T> {
   async purge(id: string): Promise<void> {
     await this.table.delete(id);
   }
+}
+
+/**
+ * The store's three tables, with a `transaction` over all of them (#85).
+ *
+ * The one place the app's repositories are built, so the transaction cannot
+ * be left off: without it, every merge and cascade runs as one write per row,
+ * and a save that lands in between is lost or a delete is half done.
+ */
+export function dexieRepositories(db: FuelTrackerDatabase): Repositories {
+  return {
+    vehicles: new DexieRepository(db.vehicles),
+    fillUps: new DexieRepository(db.fillUps),
+    pendingFillUps: new DexieRepository(db.pendingFillUps),
+    transaction: (work) =>
+      db.transaction('rw', db.vehicles, db.fillUps, db.pendingFillUps, (tx) =>
+        // Tables taken from the transaction itself, not `db`: every call on
+        // them is part of it however many `await`s away it is made. See
+        // `Repositories.transaction`.
+        work({
+          vehicles: new DexieRepository(tx.table(db.vehicles.name) as Table<VehicleRecord, string>, true),
+          fillUps: new DexieRepository(tx.table(db.fillUps.name) as Table<FillUpRecord, string>, true),
+          pendingFillUps: new DexieRepository(
+            tx.table(db.pendingFillUps.name) as Table<PendingFillUpRecord, string>,
+            true,
+          ),
+        }),
+      ),
+  };
 }

@@ -10,6 +10,7 @@ import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import type { FillUpRecord, PendingFillUpRecord, SyncFields, VehicleRecord, Snapshot } from './records';
 import type { Repositories } from './store';
 import { isStorableId } from './recordId';
+import { atomically } from './atomically';
 import { boundFillUpText, boundPendingText, boundVehicleText } from './recordText';
 
 /**
@@ -102,75 +103,102 @@ export async function importBackup(
   snapshot: Snapshot,
   tieBreak?: TieBreak,
 ): Promise<ImportSummary> {
+  // One transaction for the whole merge (#85), and every decision is made
+  // against rows read inside it. It used to read what was stored first and
+  // then write a row at a time, so a save made in between was overwritten by
+  // the older row being merged — and, that row's version being the one sync
+  // now "knew", never sent either. Interrupted, it now writes nothing at all.
+  return atomically(repos, (inside) => merge(inside, snapshot, tieBreak));
+}
+
+async function merge(repos: Repositories, snapshot: Snapshot, tieBreak?: TieBreak): Promise<ImportSummary> {
   const rejected: string[] = [];
   let skippedOlder = 0;
-  let vehiclesWritten = 0;
-  let fillUpsWritten = 0;
-  let pendingWritten = 0;
 
-  // Only the rows the snapshot names are looked up (#87): a sync pull is
-  // usually a handful of rows, and used to cost a read of every row stored.
-  const existingVehicles = await existingFor<VehicleRecord>(repos.vehicles, snapshot.vehicles);
+  /**
+   * Decides each row against what is stored — and against a row this same
+   * file named earlier, so a file that names one id twice keeps the newer
+   * rather than whichever came last — and writes the winners in one go.
+   */
+  async function mergeInto<T extends SyncFields>(
+    repo: { getMany(ids: readonly string[]): Promise<T[]>; putMany(rows: readonly T[]): Promise<void> },
+    incoming: readonly T[],
+    checks: {
+      /** Checked first: a row that fails is rejected whatever is stored. */
+      readonly storable?: (row: T) => boolean;
+      /** Checked only for a row that would be written, as it always was. */
+      readonly valid?: (row: T) => boolean;
+    } = {},
+  ): Promise<number> {
+    // Only the rows the snapshot names are looked up (#87): a sync pull is
+    // usually a handful of rows, and used to cost a read of every row stored.
+    const current = await existingFor<T>(repo, incoming);
+    const winners = new Map<string, T>();
+    let written = 0;
+    for (const row of incoming) {
+      if (checks.storable !== undefined && !checks.storable(row)) continue;
+      if (!shouldReplace(row, current.get(row.id), tieBreak)) {
+        skippedOlder += 1;
+        continue;
+      }
+      if (checks.valid !== undefined && !checks.valid(row)) continue;
+      current.set(row.id, row);
+      winners.set(row.id, row);
+      written += 1;
+    }
+    await repo.putMany([...winners.values()]);
+    return written;
+  }
+
   // Text is bounded on the way in (#50). This is the door both a restored file
   // and a sync pull come through, and it used to store rows exactly as found:
   // one long station name in a backup then failed every upload afterwards.
-  for (const incoming of snapshot.vehicles.map(boundVehicleText)) {
-    if (!shouldReplace(incoming, existingVehicles.get(incoming.id), tieBreak)) {
-      skippedOlder += 1;
-      continue;
-    }
-    await repos.vehicles.put(incoming);
-    vehiclesWritten += 1;
-  }
+  const vehiclesWritten = await mergeInto<VehicleRecord>(repos.vehicles, snapshot.vehicles.map(boundVehicleText));
 
-  const existingFillUps = await existingFor<FillUpRecord>(repos.fillUps, snapshot.fillUps);
-  for (const incoming of snapshot.fillUps.map(boundFillUpText)) {
-    // A vehicle id is not text to shorten — a shortened one points at a vehicle
-    // that does not exist — and one the account cannot store fails every push.
-    // A CSV only requires it to be non-empty, so this is where it is checked.
-    if (!isStorableId(incoming.vehicleId)) {
-      rejected.push(`fill-up ${incoming.id}: its vehicle id cannot be stored`);
-      continue;
-    }
-    if (!shouldReplace(incoming, existingFillUps.get(incoming.id), tieBreak)) {
-      skippedOlder += 1;
-      continue;
-    }
-    // A tombstone carries no usable measurements and does not need to: it is a
-    // record that something was deleted, and validating it would reject it.
-    if (incoming.deletedAt === null) {
-      const draft = makeFuelEntryDraft({
-        date: new Date(incoming.date),
-        odometer: incoming.odometer,
-        gallons: incoming.gallons,
-        pricePerGallon: incoming.pricePerGallon,
-      });
-      if (draft === null) {
-        rejected.push(
-          `fill-up ${incoming.id}: odometer, volume and price must all be positive numbers`,
-        );
-        continue;
-      }
-    }
-    await repos.fillUps.put(incoming);
-    fillUpsWritten += 1;
-  }
+  const fillUpsWritten = await mergeInto<FillUpRecord>(
+    repos.fillUps,
+    snapshot.fillUps.map(boundFillUpText),
+    {
+      // A vehicle id is not text to shorten — a shortened one points at a
+      // vehicle that does not exist — and one the account cannot store fails
+      // every push. A CSV only requires it to be non-empty, so it is checked here.
+      storable: (incoming) => {
+        if (isStorableId(incoming.vehicleId)) return true;
+        rejected.push(`fill-up ${incoming.id}: its vehicle id cannot be stored`);
+        return false;
+      },
+      valid: (incoming) => {
+        // A tombstone carries no usable measurements and does not need to: it
+        // is a record that something was deleted, and validating it would reject it.
+        if (incoming.deletedAt !== null) return true;
+        const draft = makeFuelEntryDraft({
+          date: new Date(incoming.date),
+          odometer: incoming.odometer,
+          gallons: incoming.gallons,
+          pricePerGallon: incoming.pricePerGallon,
+        });
+        if (draft === null) {
+          rejected.push(`fill-up ${incoming.id}: odometer, volume and price must all be positive numbers`);
+          return false;
+        }
+        return true;
+      },
+    },
+  );
 
-  const existingPending = await existingFor<PendingFillUpRecord>(repos.pendingFillUps, snapshot.pendingFillUps);
-  for (const incoming of snapshot.pendingFillUps.map(boundPendingText)) {
-    if (!isStorableId(incoming.vehicleId)) {
-      rejected.push(`submission ${incoming.id}: its vehicle id cannot be stored`);
-      continue;
-    }
-    if (!shouldReplace(incoming, existingPending.get(incoming.id), tieBreak)) {
-      skippedOlder += 1;
-      continue;
-    }
-    // Submissions are re-validated when approved, so a questionable one is
-    // allowed to sit in the queue — that is what the queue is for.
-    await repos.pendingFillUps.put(incoming);
-    pendingWritten += 1;
-  }
+  // Submissions are re-validated when approved, so a questionable one is
+  // allowed to sit in the queue — that is what the queue is for.
+  const pendingWritten = await mergeInto<PendingFillUpRecord>(
+    repos.pendingFillUps,
+    snapshot.pendingFillUps.map(boundPendingText),
+    {
+      storable: (incoming) => {
+        if (isStorableId(incoming.vehicleId)) return true;
+        rejected.push(`submission ${incoming.id}: its vehicle id cannot be stored`);
+        return false;
+      },
+    },
+  );
 
   return { vehiclesWritten, fillUpsWritten, pendingWritten, skippedOlder, rejected };
 }

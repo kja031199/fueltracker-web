@@ -194,6 +194,8 @@ Recorded so a regression in the tests themselves is visible:
 | Revoking (#80): join leaving the invitation / joining a deleted car / `memberOf` ignoring deletion (all emulator) / accept in three writes | 1 / 1 / 2 / 5 |
 | Revoking: `removeMember` keeping the invitation / `endSharing` doing nothing / delete not ending sharing / in-memory: deletion ignored / deleted car accepted / invitation kept | 1 / 1 / 1 / 1 / 1 / 1 |
 | Shared-car results (#84): refused upload filed as unreachable / refused upload forgetting the car / outcomes dropped / notice ignoring shared cars / refusal not said | 2 / 2 / 2 / 1 / 1 |
+| Transactions (#85): no transaction from `dexieRepositories` / work on `db` tables rather than the transaction's / account store without it / Dexie `putMany` dropping a single row | 7 / 2 / 1 / 2 |
+| Transactions: car delete leaving submissions / car delete, forget, import, approve, receive, edit each not atomic / duplicate in a file kept by order / repair from the rows sync read | 3 / 1, 1, 3, 1, 1, 1 / 1 / 2 |
 
 Equivalent, and kept for parity: the repair skipping tombstones. A tombstone
 carries no text, so there is nothing for it to shorten.

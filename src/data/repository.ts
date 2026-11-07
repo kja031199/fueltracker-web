@@ -24,6 +24,12 @@ export interface Repository<T extends SyncFields> {
   /** Insert or replace by id. */
   put(record: T): Promise<void>;
   /**
+   * `put` for many rows in one write (#85) — what a merge uses, rather than a
+   * round trip per row. Later rows win over earlier ones with the same id, as
+   * a run of `put`s would.
+   */
+  putMany(records: readonly T[]): Promise<void>;
+  /**
    * Soft-delete: replaces the row with the tombstone `toTombstone` builds, so
    * the deletion is itself a fact that can be synced. A record that is already
    * gone is a no-op, never an error.
@@ -121,6 +127,10 @@ export class InMemoryRepository<T extends SyncFields> implements Repository<T> {
 
   async put(record: T): Promise<void> {
     this.rows.set(record.id, record);
+  }
+
+  async putMany(records: readonly T[]): Promise<void> {
+    for (const record of records) this.rows.set(record.id, record);
   }
 
   async remove(id: string, toTombstone: (row: T) => T): Promise<void> {

@@ -26,7 +26,7 @@
  * the machine.
  */
 
-import { DexieRepository, DexieShareLedger, DexieSyncState, FuelTrackerDatabase } from './db';
+import { DexieShareLedger, DexieSyncState, FuelTrackerDatabase, dexieRepositories } from './db';
 import type { SharingSync } from './shareSync';
 import type { SyncStateStore } from './syncState';
 import { FuelTrackerStore } from './store';
@@ -85,11 +85,8 @@ export interface AccountStore {
  */
 function storeOver(db: FuelTrackerDatabase, uid: string): FuelTrackerStore {
   return new FuelTrackerStore(
-    {
-      vehicles: new DexieRepository(db.vehicles),
-      fillUps: new DexieRepository(db.fillUps),
-      pendingFillUps: new DexieRepository(db.pendingFillUps),
-    },
+    // With the transaction every merge and cascade runs in (#85).
+    dexieRepositories(db),
     sharedSyncClock,
     // Stamped on each new fill-up, so a shared car can say who logged it (#66).
     uid,

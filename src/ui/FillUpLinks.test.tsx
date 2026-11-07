@@ -381,11 +381,27 @@ describe('the owner reviews', () => {
     expect(within(review).getByText('Truck')).toBeInTheDocument();
   });
 
-  test('a submission whose car was deleted can only be rejected', async () => {
+  test('deleting a car withdraws the submissions waiting for it (#85)', async () => {
     const { store, car } = await kyleWithCivic();
     await store.addVehicle({ name: 'Truck' });
     await store.receiveSubmission(submission(car.id));
     await store.removeVehicle(car.id);
+    open({ store, initialTab: 'fillups' });
+    await screen.findByRole('heading', { name: /fill-ups/i }, WAIT);
+    expect(screen.queryByRole('region', { name: /waiting for review/i })).not.toBeInTheDocument();
+  });
+
+  test('a submission whose car was deleted can only be rejected', async () => {
+    const { store, car } = await kyleWithCivic();
+    await store.addVehicle({ name: 'Truck' });
+    await store.receiveSubmission(submission(car.id));
+    // Deleted on a device running a build from before #85, which left the
+    // car's submissions behind: only its tombstone arrives.
+    await store.importBackup({
+      vehicles: [{ ...car, deletedAt: car.updatedAt + 1, updatedAt: car.updatedAt + 1 }],
+      fillUps: [],
+      pendingFillUps: [],
+    });
     const user = userEvent.setup();
     open({ store, initialTab: 'fillups' });
     const review = await screen.findByRole('region', { name: /waiting for review/i }, WAIT);
