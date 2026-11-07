@@ -123,9 +123,10 @@ export class DexieShareLedger implements ShareLedger {
 /**
  * A `Repository` over one Dexie table.
  *
- * `list()` and `listDeleted()` still read the whole table — export and sync
- * need every row, receipts included. Everything the screens ask for goes
- * through the indexed reads below instead.
+ * `list()` and `listAll()` read the whole table — an export and sync's one
+ * snapshot need every row, receipts included. Everything else goes through an
+ * index or the primary key: `listDeleted` the `deletedAt` index, `getMany` the
+ * key, the per-vehicle reads the `vehicleId` index (#53, #87).
  */
 export class DexieRepository<T extends SyncFields> implements Repository<T> {
   constructor(private readonly table: Table<T, string>) {}
@@ -136,8 +137,22 @@ export class DexieRepository<T extends SyncFields> implements Repository<T> {
    * on one that does not, which is the right failure for a programming error.
    */
   async listForVehicle(vehicleId: string): Promise<T[]> {
-    const rows = await this.table.where('vehicleId').equals(vehicleId).toArray();
-    return rows.filter((row) => row.deletedAt === null);
+    return (await this.listForVehicleAll(vehicleId)).filter((row) => row.deletedAt === null);
+  }
+
+  /** One vehicle's rows, tombstones included, from the `vehicleId` index. */
+  async listForVehicleAll(vehicleId: string): Promise<T[]> {
+    return this.table.where('vehicleId').equals(vehicleId).toArray();
+  }
+
+  async listAll(): Promise<T[]> {
+    return this.table.toArray();
+  }
+
+  /** By primary key; ids not stored are left out. */
+  async getMany(ids: readonly string[]): Promise<T[]> {
+    const rows = await this.table.bulkGet([...new Set(ids)]);
+    return rows.filter((row): row is T => row !== undefined);
   }
 
   /** Live rows counted from two indexes, reading none of them. See above. */
@@ -169,9 +184,13 @@ export class DexieRepository<T extends SyncFields> implements Repository<T> {
     await this.table.put(toTombstone(row));
   }
 
+  /**
+   * From the `deletedAt` index, which holds only tombstones: a live row's
+   * `deletedAt` is `null`, which IndexedDB does not index. The same trick
+   * `countLive` uses — and it reads no live row, receipt or otherwise.
+   */
   async listDeleted(): Promise<T[]> {
-    const rows = await this.table.toArray();
-    return rows.filter((row) => row.deletedAt !== null);
+    return this.table.where('deletedAt').aboveOrEqual(Number.NEGATIVE_INFINITY).toArray();
   }
 
   async purge(id: string): Promise<void> {

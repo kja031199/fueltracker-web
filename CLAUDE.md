@@ -242,8 +242,12 @@ npm ci --prefix .github/firebase-cli
   carries no photo bytes. To edit, load the whole row with `store.fillUp(id)`:
   a form started from a summary saves the fill-up back without its photo. Read
   one vehicle with `listForVehicle` and count with `countLive`; **never
-  `list()` + filter** where an index answers it. `list()` is for export and
-  sync, which need every row and every photo.
+  `list()` + filter** where an index answers it. A row in any state is
+  `getMany([id])` — never `listDeleted().find(...)`.
+- **Sync reads the device once** (#87): `syncAll` hands one `LocalView` to
+  every `syncOnce`, and anything sync writes (merge, re-stamp, repair) must be
+  `refresh`ed into it by id, or that sync pushes a stale row. Don't add a
+  `store.exportSnapshot()` inside sync; `syncReads.test.ts` counts the reads.
 
 - **An edit cannot move or revive a fill-up** (#83). `store.updateFillUp(id,
   draft)` takes no car: it keeps the stored `vehicleId`, and throws

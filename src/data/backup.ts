@@ -18,27 +18,28 @@ import { boundFillUpText, boundPendingText, boundVehicleText } from './recordTex
  * This is why it reads the repositories rather than the store's own accessors:
  * `vehicles()` and `fillUps()` return live rows only, and a backup built on
  * those would **resurrect deleted entries** when restored — the row comes back
- * with no record that it was ever deleted. `listDeleted` has had no reader
- * until now; this is the one it was written for.
+ * with no record that it was ever deleted.
+ *
+ * One read per table (#87). It used to be two — every live row, then every
+ * tombstone — each of which read the whole table.
  */
 export async function exportSnapshot(repos: Repositories): Promise<Snapshot> {
-  const [vehicles, deletedVehicles] = await Promise.all([
-    repos.vehicles.list(),
-    repos.vehicles.listDeleted(),
+  const [vehicles, fillUps, pendingFillUps] = await Promise.all([
+    repos.vehicles.listAll(),
+    repos.fillUps.listAll(),
+    repos.pendingFillUps.listAll(),
   ]);
-  const [fillUps, deletedFillUps] = await Promise.all([
-    repos.fillUps.list(),
-    repos.fillUps.listDeleted(),
-  ]);
-  const [pending, deletedPending] = await Promise.all([
-    repos.pendingFillUps.list(),
-    repos.pendingFillUps.listDeleted(),
-  ]);
-  return {
-    vehicles: [...vehicles, ...deletedVehicles],
-    fillUps: [...fillUps, ...deletedFillUps],
-    pendingFillUps: [...pending, ...deletedPending],
-  };
+  return { vehicles, fillUps, pendingFillUps };
+}
+
+/** What storage holds for exactly these rows' ids, by id (#87). */
+async function existingFor<T extends SyncFields>(
+  repo: { getMany(ids: readonly string[]): Promise<T[]> },
+  incoming: readonly SyncFields[],
+): Promise<Map<string, T>> {
+  if (incoming.length === 0) return new Map();
+  const rows = await repo.getMany(incoming.map((row) => row.id));
+  return new Map(rows.map((row) => [row.id, row]));
 }
 
 export interface ImportSummary {
@@ -107,10 +108,9 @@ export async function importBackup(
   let fillUpsWritten = 0;
   let pendingWritten = 0;
 
-  const existingVehicles = new Map<string, VehicleRecord>();
-  for (const row of [...(await repos.vehicles.list()), ...(await repos.vehicles.listDeleted())]) {
-    existingVehicles.set(row.id, row);
-  }
+  // Only the rows the snapshot names are looked up (#87): a sync pull is
+  // usually a handful of rows, and used to cost a read of every row stored.
+  const existingVehicles = await existingFor<VehicleRecord>(repos.vehicles, snapshot.vehicles);
   // Text is bounded on the way in (#50). This is the door both a restored file
   // and a sync pull come through, and it used to store rows exactly as found:
   // one long station name in a backup then failed every upload afterwards.
@@ -123,10 +123,7 @@ export async function importBackup(
     vehiclesWritten += 1;
   }
 
-  const existingFillUps = new Map<string, FillUpRecord>();
-  for (const row of [...(await repos.fillUps.list()), ...(await repos.fillUps.listDeleted())]) {
-    existingFillUps.set(row.id, row);
-  }
+  const existingFillUps = await existingFor<FillUpRecord>(repos.fillUps, snapshot.fillUps);
   for (const incoming of snapshot.fillUps.map(boundFillUpText)) {
     // A vehicle id is not text to shorten — a shortened one points at a vehicle
     // that does not exist — and one the account cannot store fails every push.
@@ -159,13 +156,7 @@ export async function importBackup(
     fillUpsWritten += 1;
   }
 
-  const existingPending = new Map<string, PendingFillUpRecord>();
-  for (const row of [
-    ...(await repos.pendingFillUps.list()),
-    ...(await repos.pendingFillUps.listDeleted()),
-  ]) {
-    existingPending.set(row.id, row);
-  }
+  const existingPending = await existingFor<PendingFillUpRecord>(repos.pendingFillUps, snapshot.pendingFillUps);
   for (const incoming of snapshot.pendingFillUps.map(boundPendingText)) {
     if (!isStorableId(incoming.vehicleId)) {
       rejected.push(`submission ${incoming.id}: its vehicle id cannot be stored`);

@@ -186,6 +186,12 @@ Recorded so a regression in the tests themselves is visible:
 | Id clash: recorded in the ledger / clashed shares synced / store ignoring tombstones / clash not reported | 1 / 3 / 1 / 1 |
 | Stale edit (#83): deleted fill-up not refused / written back / car gone not refused / saved under another car | 4 / 4 / 1 / 2 |
 | Stale edit: no refresh after it / refusal swallowed / generic message / form closes on it | 1 / 2 / 1 / 2 |
+| Local reads (#87): export two reads per table / merge reading every row / push re-reading the device / a view per remote | 8 / 7 / 7 / 5 |
+| Local reads: no refresh after the merge / after a re-stamp / after the repair / repair never run / car lookup stale | 1 / 1 / 2 / 2 / 1 |
+| Local reads: Dexie `listDeleted` returning live rows / `getMany` hiding tombstones (memory / Dexie) / forget missing deleted rows | 3 / 12 / 1 / 4 |
+
+Equivalent, and kept for parity: the repair skipping tombstones. A tombstone
+carries no text, so there is nothing for it to shorten.
 
 Survives, and equivalent: dropping the array check from the link decoder — a
 JSON array cannot carry the version field, so it is refused as damaged either

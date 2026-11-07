@@ -49,6 +49,18 @@ export interface Repository<T extends SyncFields> {
    */
   listDeleted(): Promise<T[]>;
   /**
+   * Every row, live **and** tombstoned, in one read (#87). What a full
+   * snapshot needs — an export, or sync's one look at the device — and half
+   * the cost of `list()` plus `listDeleted()`, which each read the whole table.
+   */
+  listAll(): Promise<T[]>;
+  /**
+   * The rows with these ids, **live or tombstoned**; an id that is not stored
+   * is simply absent from the result (#87). For "have I seen this one?" —
+   * which used to scan every tombstone, because `get` hides them.
+   */
+  getMany(ids: readonly string[]): Promise<T[]>;
+  /**
    * How many live records there are, without reading them (#53). The backup
    * reminder asks after every save, and reading every row — every receipt
    * photo — to return one number was the most wasteful query in the app.
@@ -79,6 +91,8 @@ export interface VehicleScopedRepository<T extends SyncFields & { readonly vehic
   extends Repository<T> {
   /** One vehicle's live records. */
   listForVehicle(vehicleId: string): Promise<T[]>;
+  /** One vehicle's records, tombstones included, from the same index (#87). */
+  listForVehicleAll(vehicleId: string): Promise<T[]>;
 }
 
 /**
@@ -119,6 +133,19 @@ export class InMemoryRepository<T extends SyncFields> implements Repository<T> {
     return [...this.rows.values()].filter((row) => row.deletedAt !== null);
   }
 
+  async listAll(): Promise<T[]> {
+    return [...this.rows.values()];
+  }
+
+  async getMany(ids: readonly string[]): Promise<T[]> {
+    const found: T[] = [];
+    for (const id of new Set(ids)) {
+      const row = this.rows.get(id);
+      if (row !== undefined) found.push(row);
+    }
+    return found;
+  }
+
   async purge(id: string): Promise<void> {
     this.rows.delete(id);
   }
@@ -135,9 +162,12 @@ export class InMemoryRepository<T extends SyncFields> implements Repository<T> {
    * matches nothing.
    */
   async listForVehicle(vehicleId: string): Promise<T[]> {
+    return (await this.listForVehicleAll(vehicleId)).filter((row) => row.deletedAt === null);
+  }
+
+  async listForVehicleAll(vehicleId: string): Promise<T[]> {
     return [...this.rows.values()].filter(
-      (row) =>
-        row.deletedAt === null && (row as { readonly vehicleId?: unknown }).vehicleId === vehicleId,
+      (row) => (row as { readonly vehicleId?: unknown }).vehicleId === vehicleId,
     );
   }
 }
