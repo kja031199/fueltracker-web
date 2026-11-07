@@ -282,7 +282,10 @@ npm ci --prefix .github/firebase-cli
   **closes the app** (`NoAccessScreen`, #41) rather than being a status line —
   so do not widen `refused` to cover ordinary failures, or the app shuts itself
   every time a phone goes through a tunnel. The refusal `reason` is diagnostic
-  now rather than displayed; the screen carries its own copy.
+  now rather than displayed; the screen carries its own copy. **The same
+  three kinds hold for each shared car** (#84): `syncAll` files a `rejected`
+  share under `shares.rejected`, never `failed`, and hands every shared car's
+  `SyncOutcome` back in `shares.outcomes` for the notice to add up.
 - **Every write carries `syncedAt: serverTimestamp()`, and the rules demand
   it** (`== request.time`, #52). It is what incremental sync reads by, so a
   write without it would never reach other devices. Every *positive* rules test

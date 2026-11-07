@@ -58,7 +58,7 @@ import type { FuelTrackerStore } from './store';
 import type { RemoteStore } from './remote';
 import type { Membership, SharingRemote } from './sharing';
 import { membershipKey } from './sharing';
-import type { SyncResult, RowScope } from './sync';
+import type { SyncOutcome, SyncResult, RowScope } from './sync';
 import { syncOnce } from './sync';
 import { LocalView } from './localView';
 import type { MonotonicClock } from './syncClock';
@@ -78,6 +78,18 @@ export interface ShareOutcome {
   readonly ended: readonly Membership[];
   /** Shares that could not be reached this time; nothing was forgotten. */
   readonly failed: readonly Membership[];
+  /**
+   * Shares whose upload the owner's account refused (#84): something about
+   * the data, so trying again will not help, and it is not the network. Used
+   * to be filed under `failed` and reported as "could not be reached".
+   */
+  readonly rejected: readonly Membership[];
+  /**
+   * What each share that synced reported (#84) — rows that were unusable,
+   * photos too large to send, rows that cannot be sent — so they are told
+   * like the account's own, not dropped.
+   */
+  readonly outcomes: readonly SyncOutcome[];
   /** True when the membership list itself could not be read. */
   readonly unreachable: boolean;
   /**
@@ -92,7 +104,15 @@ export interface SyncAllResult {
   readonly shares: ShareOutcome;
 }
 
-const NO_SHARES: ShareOutcome = { synced: [], ended: [], failed: [], unreachable: false, clashed: [] };
+const NO_SHARES: ShareOutcome = {
+  synced: [],
+  ended: [],
+  failed: [],
+  rejected: [],
+  outcomes: [],
+  unreachable: false,
+  clashed: [],
+};
 
 /** Said when the ledger cannot be read: a pause, not a refusal, so retried. */
 export const LEDGER_UNREADABLE =
@@ -163,6 +183,8 @@ export async function syncAll(
   const ended: Membership[] = [];
   const synced: Membership[] = [];
   const failed: Membership[] = [];
+  const rejected: Membership[] = [];
+  const outcomes: SyncOutcome[] = [];
   const currentKeys = new Set(current.map(membershipKey));
 
   // Recorded before anything is pulled, so the ledger is never behind what
@@ -201,9 +223,12 @@ export async function syncAll(
       continue;
     }
     if (!result.ok) {
-      failed.push(membership);
+      // The pull worked and the owner's account refused the upload: about the
+      // data, and said so (#84). Anything else is the network.
+      (result.kind === 'rejected' ? rejected : failed).push(membership);
       continue;
     }
+    outcomes.push(result.outcome);
     const car = await local.vehicle(membership.vehicleId);
     if (car !== undefined && car.deletedAt !== null) {
       // The owner deleted the car. Nothing is left to share.
@@ -219,5 +244,5 @@ export async function syncAll(
     .save(sharable.filter((membership) => !endedKeys.has(membershipKey(membership))))
     .catch(() => {});
 
-  return { own: ownResult, shares: { synced, ended, failed, unreachable: false, clashed } };
+  return { own: ownResult, shares: { ...NO_SHARES, synced, ended, failed, rejected, outcomes, clashed } };
 }

@@ -193,6 +193,7 @@ Recorded so a regression in the tests themselves is visible:
 | Merge stamp: `finite` reduced to `is number` / invite date unchecked / in-memory far-future / backwards / client bound at the adoption cap | 10 / 1 / 1 / 1 / 2 |
 | Revoking (#80): join leaving the invitation / joining a deleted car / `memberOf` ignoring deletion (all emulator) / accept in three writes | 1 / 1 / 2 / 5 |
 | Revoking: `removeMember` keeping the invitation / `endSharing` doing nothing / delete not ending sharing / in-memory: deletion ignored / deleted car accepted / invitation kept | 1 / 1 / 1 / 1 / 1 / 1 |
+| Shared-car results (#84): refused upload filed as unreachable / refused upload forgetting the car / outcomes dropped / notice ignoring shared cars / refusal not said | 2 / 2 / 2 / 1 / 1 |
 
 Equivalent, and kept for parity: the repair skipping tombstones. A tombstone
 carries no text, so there is nothing for it to shorten.

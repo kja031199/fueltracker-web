@@ -452,6 +452,14 @@ The ledger is what keeps step 1 honest when the list cannot say, so it fails
   pulled this time. The owner needs none of
 this: a member's fill-ups simply appear in the owner's own account.
 
+**A shared car's sync is reported like the account's own** (#84). An upload
+the owner's account refuses is `rejected` — about the data, so "will be
+retried" would never come true — and the notice says so by car and owner,
+where it used to say the car "could not be reached". Only the network is
+`failed`. And what each shared car's sync reports — unusable rows, photos too
+large to send, rows that cannot be sent — is added to the account's own
+counts, where it used to be dropped.
+
 A member's incremental read asks for `vehicleId == car` **and** `syncedAt >
 mark`, which needs a composite index (`firestore.indexes.json`). Until it is
 deployed — see [deploying.md](deploying.md#the-shared-car-index-is-deployed-by-hand-66)

@@ -26,6 +26,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RemoteStore } from '../data/remote';
 import type { FuelTrackerStore } from '../data/store';
 import { syncAll, type SharingSync } from '../data/shareSync';
+import type { SyncOutcome } from '../data/sync';
 import { sharedSyncClock } from '../data/syncClock';
 import { InMemorySyncState, type SyncStateStore } from '../data/syncState';
 import { createSyncScheduler } from './syncScheduler';
@@ -94,29 +95,40 @@ export function useSync(
       // A sync that worked is the only thing that can clear a refusal, and it
       // is what makes "ask the owner, then press Try again" recover in place.
       setRefused(false);
-      const { pulled, pushed, skippedNewerSchema, invalid, unbeatable, unsendable, repaired, at } =
-        result.outcome;
+      const { pulled, repaired, at } = result.outcome;
+      // The account's own sync and every shared car's (#84): what one reports,
+      // all report — a photo too large on a shared car is as much a photo
+      // stuck on this device as one on your own.
+      const every: readonly SyncOutcome[] = [result.outcome, ...all.shares.outcomes];
+      const total = (count: (outcome: SyncOutcome) => number): number =>
+        every.reduce((sum, outcome) => sum + count(outcome), 0);
+      const invalid = total((o) => o.invalid.length);
+      const skippedNewerSchema = total((o) => o.skippedNewerSchema);
+      const unbeatable = total((o) => o.unbeatable);
+      const unsendable = total((o) => o.unsendable.length);
+      const receiptsOmitted = total((o) => o.pushed.receiptsOmitted);
+      const pulledRejected = total((o) => o.pulled.rejected.length);
       setLastSyncedAt(at);
 
       const notes: string[] = [];
       // Two different kinds of bad row, counted together because the reader
       // does not care which: `invalid` failed shape validation, `rejected`
       // passed shape and then failed the draft gate on its numbers.
-      const unusable = invalid.length + pulled.rejected.length;
+      const unusable = invalid + pulledRejected;
       if (unusable > 0) {
         notes.push(`${unusable} row(s) from your account were unusable and skipped`);
       }
-      if (pushed.receiptsOmitted > 0) {
+      if (receiptsOmitted > 0) {
         notes.push(
-          `${pushed.receiptsOmitted} receipt photo(s) were too large to sync and stayed on this device`,
+          `${receiptsOmitted} receipt photo(s) were too large to sync and stayed on this device`,
         );
       }
-      if (unsendable.length > 0) {
+      if (unsendable > 0) {
         // Named plainly: this one is not a transient network condition, it will
         // not fix itself, and the rows are only on this device until it is
         // dealt with.
         notes.push(
-          `${unsendable.length} row(s) could not be uploaded and stay on this device only`,
+          `${unsendable} row(s) could not be uploaded and stay on this device only`,
         );
       }
       if (repaired > 0) {
@@ -143,6 +155,13 @@ export function useSync(
       for (const clash of all.shares.clashed) {
         notes.push(
           `${clash.vehicleName || 'A shared car'} from ${clash.ownerName || 'its owner'} names a car that is already yours, so it was not synced — leave it under Vehicles`,
+        );
+      }
+      // #84: refused by the owner's account — the data, not the network, so
+      // "will be retried" would be a promise that never comes true.
+      for (const refused of all.shares.rejected) {
+        notes.push(
+          `changes to ${refused.vehicleName || 'a shared car'} were refused by ${refused.ownerName || 'its owner'}'s account and stay on this device only`,
         );
       }
       if (all.shares.failed.length > 0) {
