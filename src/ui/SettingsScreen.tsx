@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import type { UnitPreferences } from '../domain/units';
 import type { Snapshot } from '../data/records';
 import type { AuthUser } from '../data/auth';
-import { useFuelLog } from './fuelLog';
+import { useFuelLog, useSyncStatus } from './fuelLog';
 import { backupFilename } from '../data/backup';
 import { parseCsv, parseJsonBackup, toCsv } from '../data/backupFormat';
 import { downloadText } from './download';
@@ -65,7 +65,8 @@ export function SettingsScreen({
 }: Props): ReactElement {
   // Backup, restore and sync all go through the fuel log (#56): an import
   // refreshes the screens and schedules a sync without this screen asking.
-  const { sync, saveBackup, exportSnapshot, importBackup } = useFuelLog();
+  const { saveBackup, exportSnapshot, importBackup } = useFuelLog();
+  const sync = useSyncStatus();
   const fileInput = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [problems, setProblems] = useState<readonly string[]>([]);

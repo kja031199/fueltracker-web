@@ -7,7 +7,7 @@
  * on one screen is never stale on another.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FillUpSummary, PendingFillUpRecord, VehicleRecord } from '../data/records';
 import type { FuelTrackerStore } from '../data/store';
 
@@ -40,41 +40,70 @@ export interface AppData {
   reload(): Promise<void>;
 }
 
-export function useAppData(store: FuelTrackerStore): AppData {
-  const [vehicles, setVehicles] = useState<readonly VehicleRecord[]>([]);
-  const [fillUps, setFillUps] = useState<readonly FillUpSummary[]>([]);
-  // Bumped by every reload, so the selected vehicle's fill-ups are re-read
-  // exactly once per change (#53). They used to follow the `vehicles` array's
-  // identity, which is new on every reload — the same effect, but tied to a
-  // value that changes for unrelated reasons.
-  const [revision, setRevision] = useState(0);
-  const [fillUpCount, setFillUpCount] = useState(0);
-  const [pending, setPending] = useState<readonly PendingFillUpRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
+/** Everything a load reads, applied to the screens as **one** update (#88). */
+type Shown = Omit<AppData, 'selectVehicle' | 'reload'>;
 
-  const reload = useCallback(async () => {
-    try {
-      const loaded = await store.vehicles();
-      setVehicles(loaded);
-      setFillUpCount(await store.fillUpCount());
-      setPending(await store.pendingFillUps());
-      setSelectedVehicleId((current) => {
-        // Keep the current selection if it still exists; otherwise fall back to
-        // the first vehicle, so deleting the selected one cannot strand the UI
+const NOTHING_YET: Shown = {
+  vehicles: [],
+  fillUps: [],
+  fillUpCount: 0,
+  pending: [],
+  loading: true,
+  error: null,
+  selectedVehicleId: null,
+};
+
+export function useAppData(store: FuelTrackerStore): AppData {
+  const [shown, setShown] = useState<Shown>(NOTHING_YET);
+  // The car somebody chose, which a load shows if it still exists. A ref, so
+  // a load reads the latest choice without the choice re-creating `reload`.
+  const wanted = useRef<string | null>(null);
+  // Loads overlap — a save's reload and a sync's — and finish in any order. A
+  // load that finishes after a later one has been shown would put older rows
+  // back on screen, so it is dropped.
+  const issued = useRef(0);
+  const applied = useRef(0);
+
+  /**
+   * Reads everything a screen shows **at once and applies it in one update**
+   * (#88). It used to set each part as it arrived — the cars, then the count,
+   * then the queue, and the selected car's fill-ups one effect later — so each
+   * save re-rendered every screen several times, and for a moment the
+   * selection had moved to one car while the fill-ups shown were another's.
+   */
+  const load = useCallback(
+    async (choice: string | null): Promise<void> => {
+      const ticket = (issued.current += 1);
+      try {
+        const [vehicles, fillUpCount, pending] = await Promise.all([
+          store.vehicles(),
+          store.fillUpCount(),
+          store.pendingFillUps(),
+        ]);
+        // Keep the chosen car if it still exists; otherwise fall back to the
+        // first, so deleting the selected one cannot strand the screens
         // pointing at a row that is gone.
-        if (current !== null && loaded.some((v) => v.id === current)) return current;
-        return loaded[0]?.id ?? null;
-      });
-      setError(null);
-      setRevision((value) => value + 1);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not open local storage.');
-    } finally {
-      setLoading(false);
-    }
-  }, [store]);
+        const selectedVehicleId =
+          choice !== null && vehicles.some((vehicle) => vehicle.id === choice) ? choice : (vehicles[0]?.id ?? null);
+        // Fill-ups follow the selected car rather than being loaded wholesale,
+        // since every statistic is computed per car (#53).
+        const fillUps =
+          selectedVehicleId === null ? [] : await store.fillUps(selectedVehicleId).catch(() => []);
+        if (ticket < applied.current) return;
+        applied.current = ticket;
+        if (wanted.current === choice) wanted.current = selectedVehicleId;
+        setShown({ vehicles, fillUps, fillUpCount, pending, selectedVehicleId, loading: false, error: null });
+      } catch (cause) {
+        if (ticket < applied.current) return;
+        applied.current = ticket;
+        const error = cause instanceof Error ? cause.message : 'Could not open local storage.';
+        setShown((current) => ({ ...current, loading: false, error }));
+      }
+    },
+    [store],
+  );
+
+  const reload = useCallback(() => load(wanted.current), [load]);
 
   useEffect(() => {
     void reload();
@@ -92,30 +121,19 @@ export function useAppData(store: FuelTrackerStore): AppData {
     });
   }, [store]);
 
-  // Fill-ups follow the selected vehicle rather than being loaded wholesale,
-  // since every statistic is computed per vehicle.
-  useEffect(() => {
-    let cancelled = false;
-    if (selectedVehicleId === null) {
-      setFillUps([]);
-      return () => {
-        cancelled = true;
-      };
-    }
-    void store
-      .fillUps(selectedVehicleId)
-      .then((rows) => {
-        if (!cancelled) setFillUps(rows);
-      })
-      .catch(() => {
-        if (!cancelled) setFillUps([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [store, selectedVehicleId, revision]);
+  /**
+   * Shown once that car's fill-ups have been read, together with them — never
+   * the new car with the old car's fill-ups (#88).
+   */
+  const selectVehicle = useCallback(
+    (id: string) => {
+      wanted.current = id;
+      void load(id);
+    },
+    [load],
+  );
 
-  const selectVehicle = useCallback((id: string) => setSelectedVehicleId(id), []);
-
-  return { vehicles, fillUps, fillUpCount, pending, loading, error, selectedVehicleId, selectVehicle, reload };
+  // One object per change, not per render (#88): the fuel log's context is
+  // built from it, and a fresh one each render re-rendered every screen.
+  return useMemo(() => ({ ...shown, selectVehicle, reload }), [shown, selectVehicle, reload]);
 }

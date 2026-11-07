@@ -8,7 +8,7 @@ import { InMemoryRemoteStore } from '../data/remote';
 import { FuelTrackerStore } from '../data/store';
 import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
-import { FuelLogProvider, useFuelLog, type FuelLog } from './fuelLog';
+import { FuelLogProvider, useFuelLog, useSyncStatus, type FuelLog } from './fuelLog';
 import { SAVE_SYNC_DELAY_MS } from './syncScheduler';
 import { InMemorySharingWorld } from '../data/sharing';
 import { LEDGER_UNREADABLE, type SharingSync } from '../data/shareSync';
@@ -57,7 +57,7 @@ async function mount(store: FuelTrackerStore = makeStore()): Promise<Harness> {
       {children}
     </FuelLogProvider>
   );
-  const { result } = renderHook(() => useFuelLog(), { wrapper });
+  const { result } = renderHook(() => ({ ...useFuelLog(), sync: useSyncStatus() }), { wrapper });
   await waitFor(() => expect(result.current.loading).toBe(false));
   // The mount sync, so later counts start from a settled remote.
   await waitFor(() => expect(remote.pullLog.length).toBeGreaterThan(0));
@@ -211,7 +211,7 @@ describe('every write reaches the account without anyone remembering to ask', ()
         {children}
       </FuelLogProvider>
     );
-    const { result } = renderHook(() => useFuelLog(), { wrapper });
+    const { result } = renderHook(() => ({ ...useFuelLog(), sync: useSyncStatus() }), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));
     await waitFor(() => expect(remote.pullLog.length).toBeGreaterThan(0));
     await waitFor(() => expect(result.current.sync.syncing).toBe(false));
@@ -246,7 +246,7 @@ describe('a device that cannot read its share ledger (#77)', () => {
         {children}
       </FuelLogProvider>
     );
-    const { result } = renderHook(() => useFuelLog(), { wrapper });
+    const { result } = renderHook(() => ({ ...useFuelLog(), sync: useSyncStatus() }), { wrapper });
     await waitFor(() => expect(result.current.sync.message).toBe(LEDGER_UNREADABLE));
     expect(result.current.sync.refused).toBe(false);
     // Nothing reached the account.

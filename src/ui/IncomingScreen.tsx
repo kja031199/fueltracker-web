@@ -2,7 +2,7 @@ import type { ReactElement } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { decodeSubmission } from '../data/fillUpLink';
 import type { ReceiveResult } from './fuelLog';
-import { useFuelLog } from './fuelLog';
+import { useFuelLog, useSyncStatus } from './fuelLog';
 import { DoneButton, LinkScreen, linkProblemText } from './SubmitScreen';
 
 interface Props {
@@ -27,7 +27,7 @@ interface Props {
 export function IncomingScreen({ payload, onReceived, onDone }: Props): ReactElement {
   const log = useFuelLog();
   const { receiveSubmission, selectVehicle } = log;
-  const { syncNow } = log.sync;
+  const { syncNow } = useSyncStatus();
   const decoded = useMemo(() => decodeSubmission(payload), [payload]);
   const [result, setResult] = useState<ReceiveResult | 'failed' | null>(null);
   // StrictMode mounts effects twice in development; receiving is idempotent,

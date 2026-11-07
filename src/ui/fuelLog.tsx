@@ -89,8 +89,12 @@ const SHARING_OFF: SharingView = {
   leave: async () => {},
 };
 
+/**
+ * The fuel log. Sync status is **not** in here (#88): it changes several
+ * times per sync, and every screen reads this — `useSyncStatus()` is its own
+ * context, read by the few screens that show it.
+ */
 export interface FuelLog extends Omit<AppData, 'reload'> {
-  readonly sync: SyncStatus;
   readonly sharing: SharingView;
   /** The signed-in account's uid, for "entered by you". Null when there is none. */
   readonly me: string | null;
@@ -135,6 +139,7 @@ export interface FuelLog extends Omit<AppData, 'reload'> {
 export type ReceiveResult = 'queued' | 'duplicate' | 'no-such-car' | 'not-yours';
 
 const FuelLogContext = createContext<FuelLog | null>(null);
+const SyncStatusContext = createContext<SyncStatus | null>(null);
 
 export interface FuelLogProviderProps {
   readonly store: FuelTrackerStore;
@@ -190,7 +195,6 @@ export function FuelLogProvider({
     };
     return {
       ...shown,
-      sync,
       sharing: sharingView,
       me: uid,
       addVehicle: written((vehicle: NewVehicle) => store.addVehicle(vehicle)),
@@ -227,9 +231,16 @@ export function FuelLogProvider({
       exportSnapshot: () => store.exportSnapshot(),
       saveBackup: () => saveJsonBackup(store),
     };
-  }, [data, sync, written, store, reload, sharingView, uid, shared]);
+    // Every input here is stable between changes (#88): `data` and
+    // `sharingView` are memoised, and `written` depends only on `reload` and
+    // `afterWrite`, which never change. Sync status is deliberately not one.
+  }, [data, written, store, reload, sharingView, uid, shared]);
 
-  return <FuelLogContext.Provider value={log}>{children}</FuelLogContext.Provider>;
+  return (
+    <SyncStatusContext.Provider value={sync}>
+      <FuelLogContext.Provider value={log}>{children}</FuelLogContext.Provider>
+    </SyncStatusContext.Provider>
+  );
 }
 
 /** The fuel log. Only inside `FuelLogProvider`, which `App` puts around every screen. */
@@ -239,6 +250,19 @@ export function useFuelLog(): FuelLog {
     throw new Error('useFuelLog() was called outside <FuelLogProvider>; App renders the screens inside one.');
   }
   return log;
+}
+
+/**
+ * Whether a sync is running, when one last worked, and what it said — and the
+ * way to start one. Its own context (#88), so a sync re-renders only the
+ * screens that show it.
+ */
+export function useSyncStatus(): SyncStatus {
+  const status = useContext(SyncStatusContext);
+  if (status === null) {
+    throw new Error('useSyncStatus() was called outside <FuelLogProvider>; App renders the screens inside one.');
+  }
+  return status;
 }
 
 /**
@@ -258,14 +282,16 @@ function useSharingView(
 
   const refresh = useCallback(async () => {
     if (sharing === null) return;
+    // Each list is replaced only when it differs (#88): this runs after every
+    // sync, and a new array with the same entries re-rendered every screen.
     const held = await sharing.ledger.load().catch(() => null);
-    if (held !== null) setSharedWithMe(held);
+    if (held !== null) setSharedWithMe((shown) => unlessSame(shown, held));
     const [current, invites] = await Promise.all([
       sharing.remote.memberships().catch(() => null),
       sharing.remote.invitesForMe().catch(() => null),
     ]);
-    if (current !== null) setSharedWithMe(current);
-    if (invites !== null) setInvitesForMe(invites);
+    if (current !== null) setSharedWithMe((shown) => unlessSame(shown, current));
+    if (invites !== null) setInvitesForMe((shown) => unlessSame(shown, invites));
   }, [sharing]);
 
   useEffect(() => {
@@ -309,4 +335,9 @@ function useSharingView(
       },
     };
   }, [sharing, uid, sharedWithMe, invitesForMe, refresh, syncNow, store]);
+}
+
+/** `next`, unless it holds exactly what `shown` does — then `shown`, so nothing re-renders. */
+function unlessSame<T>(shown: readonly T[], next: readonly T[]): readonly T[] {
+  return JSON.stringify(shown) === JSON.stringify(next) ? shown : next;
 }

@@ -22,7 +22,7 @@
  * says so and the local data carries on working.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RemoteStore } from '../data/remote';
 import type { FuelTrackerStore } from '../data/store';
 import { syncAll, type SharingSync } from '../data/shareSync';
@@ -204,5 +204,9 @@ export function useSync(
   const syncNow = useCallback(() => scheduler.runNow(), [scheduler]);
   const afterWrite = useCallback(() => scheduler.afterWrite(), [scheduler]);
 
-  return { syncing, lastSyncedAt, message, refused, syncNow, afterWrite };
+  // One object per change, not per render (#88).
+  return useMemo(
+    () => ({ syncing, lastSyncedAt, message, refused, syncNow, afterWrite }),
+    [syncing, lastSyncedAt, message, refused, syncNow, afterWrite],
+  );
 }

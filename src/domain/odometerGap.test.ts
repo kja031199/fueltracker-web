@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { GAP_FACTOR, MIN_GAPS, unusualOdometerJump } from './odometerGap';
+import { GAP_FACTOR, MIN_GAPS, jumpFrom, odometerHistory, unusualOdometerJump } from './odometerGap';
 
 /**
  * "Did somebody forget to log a fill-up?" (#66). Two people logging one car is
@@ -111,5 +111,61 @@ describe('more edges', () => {
     const started = Date.now();
     expect(unusualOdometerJump(10_000 + 50_000 * 300 + 700, history)).not.toBeNull();
     expect(Date.now() - started).toBeLessThan(1000);
+  });
+});
+
+/**
+ * The check as it was written before #88 split it, kept here verbatim as the
+ * reference: comparing the split version only with itself would prove nothing.
+ */
+function reference(odometer: number | null, history: readonly number[]): { distance: number; usual: number; previous: number } | null {
+  if (odometer === null || !Number.isFinite(odometer) || odometer <= 0) return null;
+  const readings = [...new Set(history.filter((value) => Number.isFinite(value) && value > 0))].sort((a, b) => a - b);
+  const gaps = readings.slice(1).map((value, index) => value - readings[index]!);
+  if (gaps.length < MIN_GAPS) return null;
+  const before = readings.filter((value) => value < odometer);
+  if (before.length === 0) return null;
+  const previous = before[before.length - 1]!;
+  const sorted = [...gaps].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  const usual = sorted.length % 2 === 1 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2;
+  const distance = odometer - previous;
+  return usual > 0 && distance > GAP_FACTOR * usual ? { distance, usual, previous } : null;
+}
+
+describe('the history worked out once (#88)', () => {
+  test('a reading equal to one already logged is measured from the reading below it', () => {
+    expect(unusualOdometerJump(20_000, [10_000, 10_300, 10_600, 10_900, 20_000])).toEqual({
+      distance: 9_100,
+      usual: 300,
+      previous: 10_900,
+    });
+  });
+
+  test('gives exactly the answer the check gave before it was split, for every reading', () => {
+    const histories: number[][] = [
+      [],
+      [10_000],
+      [10_000, 10_300, 10_600],
+      [10_000, 10_300, 10_600, 10_900, 11_200],
+      [11_200, 10_000, 10_900, 10_300, 10_600, 10_600],
+      [10_000, 10_000, 10_000, 10_000],
+      // A reading equal to one already logged, after a long gap: the previous
+      // reading is the one *below* it, not itself.
+      [10_000, 10_300, 10_600, 10_900, 20_000],
+      [Number.NaN, -5, 0, 10_000, 10_250, 10_500, 10_800, Number.POSITIVE_INFINITY],
+    ];
+    const readings = [null, Number.NaN, -1, 0, 9_999, 10_000, 10_150, 11_200, 11_500, 12_500, 20_000, 1e12];
+    for (const history of histories) {
+      const worked = odometerHistory(history);
+      for (const reading of readings) {
+        expect(jumpFrom(worked, reading)).toEqual(reference(reading, history));
+        expect(unusualOdometerJump(reading, history)).toEqual(reference(reading, history));
+      }
+    }
+  });
+
+  test('says nothing until there are enough gaps', () => {
+    expect(odometerHistory([10_000, 10_300]).usual).toBeNull();
   });
 });

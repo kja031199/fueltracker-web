@@ -199,6 +199,8 @@ Recorded so a regression in the tests themselves is visible:
 | Validation (#86): newer backup rows imported / this version counted as newer / skipped silently / "1 rows" | 3 / 12 / 3 / 2 |
 | Validation: ledger ids unchecked / ledger names unbounded / tombstone keeping `date` / new deletion time / submission tombstones refused | 1 / 1 / 3 / 2 / 2 |
 | Validation: invite owner / car name, member name, read-back invite, read-back member unbounded (all emulator) | 1 / 1 / 1 / 1 / 1 |
+| Renders (#88): app data a fresh object / fuel log rebuilt on sync status / same sharing lists replaced / shell reading sync status | 3 / 3 / 1 / 1 |
+| Renders: a stale load shown over a newer one / a selection shown before its fill-ups / formatter cache off / cache key ignoring options / odometer check measuring from an equal reading | 1 / 1 / 2 / 14 / 2 |
 
 Equivalent, and kept for parity: the repair skipping tombstones. A tombstone
 carries no text, so there is nothing for it to shorten.

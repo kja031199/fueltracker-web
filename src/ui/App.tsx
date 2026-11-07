@@ -15,7 +15,7 @@ import { loadUnitPreferences, saveUnitPreferences } from './unitSettings';
 import { HAS_ONBOARDED } from './onboarding';
 import { useAccountPreference } from './preferences';
 import { useAuth } from './useAuth';
-import { FuelLogProvider, useFuelLog } from './fuelLog';
+import { FuelLogProvider, useFuelLog, useSyncStatus } from './fuelLog';
 import type { Tab } from './useTabRoute';
 import { useRoute } from './useTabRoute';
 import { useServiceWorker } from './useServiceWorker';
@@ -248,49 +248,36 @@ function AppShell({
 
   if (log.error !== null) return <StorageErrorScreen detail={log.error} />;
 
-  // Signed in, and the account said no (#41). Shown instead of the app rather
-  // than beside it: the first-run flow promises that a fuel log is kept in the
-  // reader's Google account, and for this reader that is false — they would be
-  // logging fill-ups that can never leave the device. A refusal does not clear
-  // on its own, so this is not a flash during a slow network; `refused` is only
-  // set for `permission-denied` and a successful sync clears it.
-  if (log.sync.refused) {
-    const hasLocalData = log.vehicles.length > 0 || log.fillUpCount > 0;
-    return (
-      <NoAccessScreen
-        account={account}
-        onRetry={() => void log.sync.syncNow()}
-        retrying={log.sync.syncing}
-        onSignOut={onSignOut}
-        // Offered only when there is something to lose. Somebody who had
-        // access, logged fill-ups and then lost it would otherwise have their
-        // own data stranded behind a Settings screen they cannot reach.
-        onExport={hasLocalData ? () => void log.saveBackup() : undefined}
-      />
-    );
-  }
-
   // Fill-up links (#3) come before the first-run screen: somebody asked to
   // log a fill-up may have no cars of their own, and would otherwise be walked
   // through setting up a log they do not want before seeing what they came for.
+  // Every screen goes through the refusal gate, which is the only part of the
+  // shell that reads sync status (#88): a sync re-renders the gate, and the
+  // screens it is handed come through unchanged.
+  const gated = (screen: ReactElement): ReactElement => (
+    <RefusalGate account={account} onSignOut={onSignOut}>
+      {screen}
+    </RefusalGate>
+  );
+
   if (route.kind === 'submit') {
-    return (
+    return gated(
       <SubmitScreen
         payload={route.payload}
         accountName={account.displayName}
         units={units}
         onDone={leaveLink}
-      />
+      />,
     );
   }
   if (route.kind === 'incoming') {
-    return <IncomingScreen payload={route.payload} onReceived={showReceived} onDone={leaveLink} />;
+    return gated(<IncomingScreen payload={route.payload} onReceived={showReceived} onDone={leaveLink} />);
   }
   const { tab } = route;
 
-  if (onboarding) return <WelcomeScreen onStart={() => setHasOnboarded(true)} />;
+  if (onboarding) return gated(<WelcomeScreen onStart={() => setHasOnboarded(true)} />);
 
-  return (
+  return gated(
     <div className="app">
       <UpdateBanner state={serviceWorker} />
       <BackupBanner reason={backup.reason} onBackUp={backUp} onDismiss={backup.snooze} />
@@ -326,6 +313,45 @@ function AppShell({
           </button>
         ))}
       </nav>
-    </div>
+    </div>,
+  );
+}
+
+/**
+ * The app, or — signed in, and the account said no (#41) — the no-access
+ * screen instead. Shown instead of the app rather than beside it: the
+ * first-run flow promises that a fuel log is kept in the reader's Google
+ * account, and for this reader that is false — they would be logging
+ * fill-ups that can never leave the device. A refusal does not clear on its
+ * own, so this is not a flash during a slow network; `refused` is only set
+ * for `permission-denied` and a successful sync clears it.
+ *
+ * Its own component (#88) so that sync status, which changes several times
+ * per sync, re-renders only this: `children` are the same elements each time.
+ */
+function RefusalGate({
+  account,
+  onSignOut,
+  children,
+}: {
+  readonly account: AppShellProps['account'];
+  readonly onSignOut: AppShellProps['onSignOut'];
+  readonly children: ReactElement;
+}): ReactElement {
+  const sync = useSyncStatus();
+  const log = useFuelLog();
+  if (!sync.refused) return children;
+  const hasLocalData = log.vehicles.length > 0 || log.fillUpCount > 0;
+  return (
+    <NoAccessScreen
+      account={account}
+      onRetry={() => void sync.syncNow()}
+      retrying={sync.syncing}
+      onSignOut={onSignOut}
+      // Offered only when there is something to lose. Somebody who had
+      // access, logged fill-ups and then lost it would otherwise have their
+      // own data stranded behind a Settings screen they cannot reach.
+      onExport={hasLocalData ? () => void log.saveBackup() : undefined}
+    />
   );
 }
