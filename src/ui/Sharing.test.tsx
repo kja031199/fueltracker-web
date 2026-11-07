@@ -468,3 +468,58 @@ describe('deleting a car you share (#80)', () => {
     expect(world.invites.size).toBe(0);
   });
 });
+
+describe('what a shared car’s sync says (#84)', () => {
+  async function samWithKylesCivic(world: InMemorySharingWorld) {
+    const kyle = person(world, KYLE);
+    const sam = person(world, SAM);
+    const car = await kylesCivic(world, kyle);
+    const invite = await world.sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true }).invite(car, SAM.email);
+    await world.sharingFor({ uid: SAM.uid, name: 'Sam', email: SAM.email, emailVerified: true }).accept(invite);
+    // Sam's first sync brings the car.
+    open(world, sam);
+    await screen.findByText(/shared with you by kyle/i, {}, WAIT);
+    cleanup();
+    // The tab is in the address (#56): clear it, or the next mount opens here.
+    window.history.replaceState(null, '', '/');
+    return { sam, car };
+  }
+
+  test('an upload the owner’s account refuses says so — by car — and not that it could not be reached', async () => {
+    const world = new InMemorySharingWorld();
+    const { sam, car } = await samWithKylesCivic(world);
+    const [theirs] = await sam.store.fillUps(car.id);
+    const whole = theirs === undefined ? undefined : await sam.store.fillUp(theirs.id);
+    if (whole === undefined) throw new Error('no fill-up');
+    await sam.store.importBackup({
+      vehicles: [],
+      fillUps: [{ ...whole, id: 'planted', enteredBy: 'someone-else', updatedAt: Date.now() }],
+      pendingFillUps: [],
+    });
+
+    open(world, sam, 'settings');
+
+    const notice = await screen.findByText(/were refused by kyle/i, {}, WAIT);
+    expect(notice.textContent).toMatch(/civic/i);
+    expect(notice.textContent).not.toMatch(/could not be reached/i);
+  }, 15_000);
+
+  test('a photo too large to send on a shared car is reported like one on your own', async () => {
+    const world = new InMemorySharingWorld();
+    const { sam, car } = await samWithKylesCivic(world);
+    world.remoteFor(KYLE.uid).receiptByteLimit = 10;
+    const made = makeFuelEntryDraft({
+      date: new Date(2026, 0, 3),
+      odometer: 10_400,
+      gallons: 10,
+      pricePerGallon: 3.5,
+      receiptImageData: new Uint8Array(500),
+    });
+    if (made === null) throw new Error('fixture draft failed validation');
+    await sam.store.addFillUp(made, car.id);
+
+    open(world, sam, 'settings');
+
+    expect(await screen.findByText(/receipt photo\(s\) were too large to sync/i, {}, WAIT)).toBeInTheDocument();
+  }, 15_000);
+});

@@ -410,7 +410,7 @@ describe('when the account itself has trouble', () => {
     const car = await store.addVehicle({ name: 'Solo' });
     const result = await syncAll(store, world.remoteFor('solo'), null, new MonotonicClock(), new InMemorySyncState());
     expect(result.own.ok).toBe(true);
-    expect(result.shares).toEqual({ synced: [], ended: [], failed: [], unreachable: false, clashed: [] });
+    expect(result.shares).toEqual({ synced: [], ended: [], failed: [], rejected: [], outcomes: [], unreachable: false, clashed: [] });
     expect((await rowsIn(world, 'solo')).vehicles).toEqual([car.id]);
   });
 });
@@ -839,5 +839,67 @@ describe('ending a share holds on the account side (#80)', () => {
     await owner.sharing.remote.endSharing(car.id);
     expect(world.isMember(OWNER.uid, car.id, PARTNER.uid)).toBe(false);
     expect([...world.invites.values()].map((i) => i.vehicleId)).toEqual([other.id]);
+  });
+});
+
+// --- #84: what a shared car's sync reports ---------------------------------------
+
+describe('a shared car’s sync is reported, not thrown away (#84)', () => {
+  /** A fill-up on the shared car the owner's account will refuse: entered by someone else. */
+  async function plantRefusable(partner: Device, carId: string): Promise<string> {
+    const [theirs] = await partner.store.fillUps(carId);
+    const whole = theirs === undefined ? undefined : await partner.store.fillUp(theirs.id);
+    if (whole === undefined) throw new Error('no fill-up');
+    await partner.store.importBackup({
+      vehicles: [],
+      fillUps: [{ ...whole, id: 'planted', enteredBy: 'someone-else', updatedAt: Date.now() }],
+      pendingFillUps: [],
+    });
+    return 'planted';
+  }
+
+  test('an upload the owner’s account refuses is "rejected" — about the data — not "could not be reached"', async () => {
+    const { partner, car } = await sharedCar();
+    await partner.sync();
+    await plantRefusable(partner, car.id);
+
+    const result = await partner.sync();
+
+    expect(result.shares.rejected.map((m) => m.vehicleId)).toEqual([car.id]);
+    expect(result.shares.failed).toEqual([]);
+    // Not forgotten: a refused upload is not the share ending.
+    expect(result.shares.ended).toEqual([]);
+    expect(await partner.store.vehicles()).toHaveLength(1);
+  });
+
+  test('a share that cannot be reached is still "failed", and only that', async () => {
+    const { world, partner, car } = await sharedCar();
+    await partner.sync();
+    world.remoteFor(OWNER.uid).failPull = true;
+
+    const result = await partner.sync();
+
+    expect(result.shares.failed.map((m) => m.vehicleId)).toEqual([car.id]);
+    expect(result.shares.rejected).toEqual([]);
+  });
+
+  test('what each shared car’s sync reported is kept — a photo too large to send, say', async () => {
+    const { world, partner, car } = await sharedCar();
+    await partner.sync();
+    world.remoteFor(OWNER.uid).receiptByteLimit = 10;
+    const made = makeFuelEntryDraft({
+      date: new Date(2026, 0, 3),
+      odometer: 10_400,
+      gallons: 10,
+      pricePerGallon: 3.5,
+      receiptImageData: new Uint8Array(500),
+    });
+    if (made === null) throw new Error('fixture draft failed validation');
+    await partner.store.addFillUp(made, car.id);
+
+    const result = await partner.sync();
+
+    expect(result.shares.synced.map((m) => m.vehicleId)).toEqual([car.id]);
+    expect(result.shares.outcomes.map((o) => o.pushed.receiptsOmitted)).toEqual([1]);
   });
 });
