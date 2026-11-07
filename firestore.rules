@@ -90,6 +90,26 @@ service cloud.firestore {
         && request.auth.token.email is string;
     }
 
+    // A number that is a number (#79): not NaN — the one value not equal to
+    // itself — and not either infinity. Firestore stores both as doubles, and
+    // `is number` accepts them. Plain comparisons rather than `math.isNaN`,
+    // which takes floats only, so an integer field would fail the check.
+    // Bounded by JavaScript's largest safe integer (2^53 - 1; the rules have
+    // no exponent notation): far above any honest value — a timestamp is
+    // about 1.8e12 — and below where `+ 1` stops being exact.
+    function finite(field) {
+      return field is number && field == field
+        && field <= 9007199254740991 && field >= -9007199254740991;
+    }
+
+    // How far ahead of the server's clock a merge stamp (`updatedAt`) may be
+    // (#79): 31 days. The client adopts another device's stamp up to 30 days
+    // ahead of its own clock (`MAX_ADOPTED_SKEW_MS`), so an honest device can
+    // reach that; one more day is slack for a device whose own clock runs a
+    // little fast. Must equal `MAX_ACCEPTED_AHEAD_MS` in `syncClock.ts` —
+    // `rulesLimits.test.ts` reads this number out of this file.
+    function maxAheadMs() { return 2678400000; }
+
     // An invitation (#66): `invites/{ownerUid}__{vehicleId}__{email}`. The id
     // is deterministic so a member rule can find it with one `exists()`, and
     // so one car cannot hold two invitations for the same address.
@@ -112,7 +132,7 @@ service cloud.firestore {
         && request.resource.data.ownerName.size() <= 200
         && request.resource.data.vehicleName is string
         && request.resource.data.vehicleName.size() <= 200
-        && request.resource.data.createdAt is number
+        && finite(request.resource.data.createdAt)
         && inviteId == request.auth.uid + '__' + request.resource.data.vehicleId + '__' + request.resource.data.email
         // Only for a live car of your own.
         && exists(/databases/$(database)/documents/users/$(request.auth.uid)/vehicles/$(request.resource.data.vehicleId))
@@ -144,9 +164,16 @@ service cloud.firestore {
           && request.resource.data.id == id
           && request.resource.data.id.size() > 0
           && request.resource.data.id.size() <= 200
-          && request.resource.data.updatedAt is number
+          // The merge stamp (#79). Last-write-wins means a stamp nobody can
+          // beat locks a row for good — one a year ahead made a fill-up
+          // impossible for anyone else to edit or delete. So: no further ahead
+          // than an honest device can be, and never backwards. Equal is fine:
+          // that is the same version sent again.
+          && finite(request.resource.data.updatedAt)
+          && request.resource.data.updatedAt <= request.time.toMillis() + maxAheadMs()
+          && (resource == null || request.resource.data.updatedAt >= resource.data.updatedAt)
           && (request.resource.data.deletedAt == null
-              || request.resource.data.deletedAt is number)
+              || finite(request.resource.data.deletedAt))
           && request.resource.data.schemaVersion is number
           // The server's commit time, and only that (#52). Incremental sync
           // reads "everything stamped after my cursor", so a write without a
@@ -161,11 +188,11 @@ service cloud.firestore {
       }
 
       function number(field) {
-        return field is number;
+        return finite(field);
       }
 
       function optionalNumber(field) {
-        return field == null || field is number;
+        return field == null || finite(field);
       }
 
       // Bounded well under the 1 MiB document cap, matching

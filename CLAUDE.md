@@ -158,6 +158,12 @@ npm ci --prefix .github/firebase-cli
   deploy too.** Uids, not emails. `rules.test.ts` parses the list out of the
   rules file rather than copying it, and fails if the list is empty or still
   holds a placeholder. Steps: [docs/accounts.md](docs/accounts.md).
+- **The merge stamp is bounded in the rules** (#79): `updatedAt` at most
+  `maxAheadMs()` ahead of `request.time`, never below the stored document's,
+  and every number `finite()` (`is number` accepts NaN and the infinities).
+  `maxAheadMs()` must equal `MAX_ACCEPTED_AHEAD_MS` (`syncClock.ts`), which
+  must stay above `MAX_ADOPTED_SKEW_MS` or honest devices are refused;
+  `rulesLimits.test.ts` checks both. The rules have no exponent notation.
 - **`hasOnly` makes adding a field a two-part change**: an unknown field is
   refused, so the rules must deploy *before* a build that writes it. Same pull
   request, and **rules deploy before hosting** in `deploy.yml` for that reason.

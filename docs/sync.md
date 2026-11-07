@@ -276,6 +276,21 @@ larger number and every later write ties — and under a `>` comparison a tie
 means the newer write loses. Beyond the bound the timestamp is refused, which
 means that row keeps winning, so sync says so rather than losing to it quietly.
 
+**The account refuses such a stamp in the first place** (#79). One a year
+ahead, written by anyone with access to a shared car, made a fill-up impossible
+for anybody else to edit or delete. So `firestore.rules` accepts `updatedAt` at
+most 31 days ahead of the server's clock — what a device can adopt plus a day of
+slack, pinned to `MAX_ACCEPTED_AHEAD_MS` — and never takes a document's stamp
+backwards (the same stamp again is fine: that is a re-send). Every number must
+also be finite: Firestore stores `NaN` and the infinities, and `is number`
+accepted them.
+
+The no-going-backwards rule has one honest cost. If another device writes a row
+between this device's pull and its push, this device's older version is
+refused, and with it the batch it was in, so that one sync reports a rejected
+upload. The next sync pulls the newer row, takes it, and has nothing older to
+send. Before the rule, the older version silently overwrote the newer one.
+
 ### Nothing from the account is trusted
 
 Two independent checks, because they fail in different ways.

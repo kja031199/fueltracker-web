@@ -25,6 +25,7 @@
 import type { FillUpRecord, Snapshot, VehicleRecord } from './records';
 import type { PullCursor, PushSummary, RawSnapshot, RemoteStore } from './remote';
 import { InMemoryRemoteStore } from './remote';
+import { MAX_ACCEPTED_AHEAD_MS } from './syncClock';
 
 /** An open invitation to one car, addressed to one email. */
 export interface Invite {
@@ -315,6 +316,12 @@ class InMemoryScopedRemote implements RemoteStore {
       if (before !== undefined && (row.enteredBy ?? null) !== (before.enteredBy ?? null)) {
         throw new Refused('changing who entered a fill-up');
       }
+      // As firestore.rules (#79): no stamp further ahead than an honest
+      // device can be, and none taking a document backwards.
+      if (!Number.isFinite(row.updatedAt) || row.updatedAt > Date.now() + MAX_ACCEPTED_AHEAD_MS) {
+        throw new Refused('a stamp too far ahead');
+      }
+      if (before !== undefined && row.updatedAt < before.updatedAt) throw new Refused('a stamp taken backwards');
     }
     return owner.push(snapshot);
   }
