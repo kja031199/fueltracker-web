@@ -251,3 +251,125 @@ describe('checkout does not leave the token behind', () => {
     expect(commands(text)).toMatch(/^\s+persist-credentials:\s*false\s*$/m);
   });
 });
+
+/**
+ * One entry per job, split on the 2-space job ids under `jobs:`. Line-based,
+ * like `steps()`; the counts below catch it if it stops finding jobs.
+ */
+function jobs(): { workflow: string; id: string; text: string }[] {
+  return workflows().flatMap(({ name, text }) => {
+    const lines = text.split('\n');
+    const start = lines.findIndex((line) => /^jobs:\s*$/.test(line));
+    if (start === -1) return [];
+    const found: { workflow: string; id: string; text: string }[] = [];
+    let current: { id: string; lines: string[] } | null = null;
+    for (const line of lines.slice(start + 1)) {
+      const id = /^ {2}([A-Za-z0-9_-]+):\s*$/.exec(line)?.[1];
+      if (id !== undefined) {
+        if (current !== null) found.push({ workflow: name, id: current.id, text: current.lines.join('\n') });
+        current = { id, lines: [] };
+      } else if (/^\S/.test(line)) {
+        break;
+      } else if (current !== null) {
+        current.lines.push(line);
+      }
+    }
+    if (current !== null) found.push({ workflow: name, id: current.id, text: current.lines.join('\n') });
+    return found;
+  });
+}
+
+/** The steps of one job's text, in order, as `steps()` splits them. */
+function stepsOf(jobText: string): string[] {
+  const chunks: string[] = [];
+  let current: string[] | null = null;
+  for (const line of jobText.split('\n')) {
+    if (/^\s+- (name|uses|run):/.test(line)) {
+      if (current !== null) chunks.push(current.join('\n'));
+      current = [line];
+    } else if (/^ {4}[a-z-]+:/.test(line)) {
+      if (current !== null) chunks.push(current.join('\n'));
+      current = null;
+    } else if (current !== null) {
+      current.push(line);
+    }
+  }
+  if (current !== null) chunks.push(current.join('\n'));
+  return chunks;
+}
+
+describe('the deploy key never meets the build toolchain (#76)', () => {
+  // The key used to be written in the same job that had already run `npm ci`
+  // — several hundred packages' lifecycle scripts — and before
+  // `firebase deploy --only hosting`, whose `predeploy` hook ran
+  // `npm run build`: vite and every plugin, with the key on disk and named in
+  // GOOGLE_APPLICATION_CREDENTIALS. One compromised build dependency could
+  // then deploy wide-open rules or its own JavaScript.
+  const all = jobs();
+  const keyJobs = all.filter(({ text }) => /secrets\.FIREBASE_SERVICE_ACCOUNT/.test(text));
+  const keyJob = keyJobs[0];
+  const keySteps = keyJob === undefined ? [] : stepsOf(keyJob.text);
+  const index = (pattern: RegExp): number => keySteps.findIndex((step) => pattern.test(commands(step)));
+  const writesKey = index(/firebase-key\.json/);
+
+  test('there are jobs to check, and exactly one holds the key', () => {
+    expect(all.length).toBeGreaterThanOrEqual(4);
+    expect(keyJobs.map(({ workflow, id }) => `${workflow}:${id}`)).toEqual(['deploy.yml:deploy']);
+  });
+
+  test('no other job anywhere reads a secret', () => {
+    const others = all.filter((job) => job !== keyJob && /secrets\./.test(commands(job.text)));
+    expect(others.map(({ workflow, id }) => `${workflow}:${id}`)).toEqual([]);
+  });
+
+  test('the key job is reachable only through the production environment, after the build', () => {
+    // The environment is limited to `main` in the repository settings, and the
+    // key is an environment secret: a branch that edits this file, or a manual
+    // run from another branch, cannot reach it.
+    expect(keyJob?.text).toMatch(/^ {4}environment:\s*production\s*$/m);
+    expect(keyJob?.text).toMatch(/^ {4}needs:\s*build\s*$/m);
+  });
+
+  test('the key job installs nothing with lifecycle scripts', () => {
+    const installs = keySteps.filter((step) => /\bnpm (ci|install|i)\b/.test(commands(step)));
+    expect(installs.length).toBeGreaterThan(0);
+    for (const step of installs) expect(commands(step)).toMatch(/--ignore-scripts/);
+  });
+
+  test('the key job runs no app-tree tooling: no build, no tests, no tsc', () => {
+    const run = commands(keyJob?.text ?? '');
+    expect(run).not.toMatch(/\bnpm (run|test|install|i)\b/);
+    expect(run).not.toMatch(/\bnpx\b/);
+    expect(run).not.toMatch(/\bvite\b/);
+    expect(run).not.toMatch(/\btsc\b/);
+  });
+
+  test('it deploys with a config that has no predeploy hook', () => {
+    const deploys = keySteps.filter((step) => /firebase deploy/.test(commands(step)));
+    expect(deploys.length).toBe(2);
+    for (const step of deploys) expect(commands(step)).toMatch(/--config firebase\.ci\.json/);
+    expect(commands(keyJob?.text ?? '')).toMatch(/jq[^\n]*del\(\.hosting\.predeploy\)[^\n]*firebase\.ci\.json/);
+  });
+
+  test('it ships the artifact the build job tested', () => {
+    const build = all.find(({ workflow, id }) => workflow === 'deploy.yml' && id === 'build');
+    expect(build?.text).toMatch(/uses:\s*actions\/upload-artifact@/);
+    expect(build?.text).toMatch(/path:\s*dist\/?\s*$/m);
+    expect(build?.text).toMatch(/\bnpm test\b/);
+    expect(keyJob?.text).toMatch(/uses:\s*actions\/download-artifact@/);
+  });
+
+  test('the key is written last: after every install, the download and the config', () => {
+    expect(writesKey).toBeGreaterThan(-1);
+    const download = keySteps.findIndex((step) => /actions\/download-artifact@/.test(step));
+    const lastInstall = Math.max(
+      ...keySteps.map((step, i) => (/\bnpm ci\b/.test(commands(step)) ? i : -1)),
+    );
+    const config = index(/firebase\.ci\.json/);
+    expect(download).toBeGreaterThan(-1);
+    expect(download).toBeLessThan(writesKey);
+    expect(lastInstall).toBeGreaterThan(-1);
+    expect(lastInstall).toBeLessThan(writesKey);
+    expect(config).toBeLessThan(writesKey);
+  });
+});

@@ -152,6 +152,12 @@ npm ci --prefix .github/firebase-cli
 - **`hasOnly` makes adding a field a two-part change**: an unknown field is
   refused, so the rules must deploy *before* a build that writes it. Same pull
   request, and **rules deploy before hosting** in `deploy.yml` for that reason.
+- **The deploy key lives only in `deploy.yml`'s `deploy` job** (#76):
+  environment `production`, limited to `main`. That job runs **no app-tree npm
+  code** — CLI installed with `--ignore-scripts`, the `build` job's tested
+  `dist/` downloaded, `predeploy` stripped into `firebase.ci.json` — and the key
+  is written last. `workflows.test.ts` enforces each part. Don't add a build,
+  test or plain `npm ci` step to that job.
 - **The deploy toolchain is pinned** in `.github/firebase-cli/` with its own
   lockfile, and `src/test/workflows.test.ts` enforces that plus SHA-pinned
   actions. In *that* directory npm offers `firebase-tools@13.11.2` as the "fix"

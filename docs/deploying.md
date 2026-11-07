@@ -112,8 +112,9 @@ in it are load-bearing:
 - **The four `VITE_FIREBASE_*` values are repository Variables, not Secrets.**
   They are public by design and ship inside the bundle, so storing them as
   secrets would imply a confidentiality the deployed site does not have. The
-  service account key is a real secret and lives in Secrets as
-  `FIREBASE_SERVICE_ACCOUNT`.
+  service account key is a real secret, `FIREBASE_SERVICE_ACCOUNT`, and lives
+  only in the `production` **environment** — see
+  [The deploy environment](#the-deploy-environment-76).
 - **The workflow refuses to deploy if any of them is missing.** Vite inlines
   `VITE_*` at build time, so without them the build *succeeds* and produces a
   bundle with no backend — a live site that loads and then says it has no
@@ -134,13 +135,57 @@ Rules are deployed in a step of their own, **before** hosting, for the `hasOnly`
 reason below. It is not a required check: it runs after merge, and a failed
 deploy should not retroactively block the commit that caused it.
 
+### The deploy key never meets the build (#76)
+
+The workflow is two jobs, and the split is what protects the key:
+
+- **`build`** installs the app's dependencies — several hundred packages,
+  lifecycle scripts included — checks the Variables, builds, runs the tests,
+  and uploads `dist/` as an artifact. It holds **no secret**.
+- **`deploy`** (`needs: build`, environment `production`) is the only job that
+  can read the key, and it runs **no app-tree npm code**:
+  - the Firebase CLI is installed with `npm ci --ignore-scripts` from its own
+    lockfile — nothing in it needs an install script to deploy;
+  - the tested `dist/` is downloaded, not rebuilt;
+  - `firebase.json`'s `predeploy` hook is stripped into a generated
+    `firebase.ci.json` (gitignored), and both deploys pass `--config` it;
+  - the key is written only after all of that.
+
+It used to be one job: `npm ci`'s lifecycle scripts ran first, and the hosting
+deploy's `predeploy` hook ran `npm run build` — vite and every plugin — with the
+key on disk. One compromised build dependency could have deployed wide-open
+rules or its own JavaScript. `src/test/workflows.test.ts` asserts each part of
+the split, and that no other job anywhere reads a secret.
+
+### The deploy environment (#76)
+
+The key is an **environment secret**, not a repository secret. A repository
+secret is readable by any workflow on any branch — a branch that edits
+`deploy.yml`, or a manual run of it from another branch, could read it.
+One-time setup, on this repository or a fork:
+
+1. **Settings → Environments → New environment**, named `production`.
+2. **Deployment branches and tags → Selected branches and tags** → add `main`.
+   No required reviewers: merges to `main` already need the four checks.
+3. In that environment, **add secret** `FIREBASE_SERVICE_ACCOUNT` with the key
+   JSON.
+4. Once a deploy through the environment has succeeded, **delete** any
+   repository-level `FIREBASE_SERVICE_ACCOUNT` (Settings → Secrets and variables
+   → Actions). Until it is gone, the branch restriction can be walked around.
+
+If the workflow runs before step 1, GitHub creates `production` itself, with no
+branch restriction; deploys still work, but the gate is not there until steps
+2–4 are done.
+
 To set it up on a fork: generate a private key under Firebase console → Project
 settings → Service accounts, paste the whole JSON into the
-`FIREBASE_SERVICE_ACCOUNT` secret, add the four variables, and delete the
-downloaded file — it is a long-lived credential with deploy rights.
+`FIREBASE_SERVICE_ACCOUNT` secret of the `production` environment (set up as in
+[The deploy environment](#the-deploy-environment-76)), add the four variables,
+and delete the downloaded file — it is a long-lived credential with deploy rights.
 
 Hosting carries a **`predeploy` hook** that runs `npm run build`, so a deploy
-cannot ship a `dist/` that does not match the source. That guard is there for
+from a laptop cannot ship a `dist/` that does not match the source. (CI strips
+it and ships the artifact its own tests ran against — see above.) That guard is there for
 the quiet failure rather than the loud one: a missing `dist/` stops the deploy
 with an obvious error, but a *stale* one deploys perfectly happily and serves
 last week's code with no sign that anything is wrong. The hook is scoped to the
@@ -263,5 +308,6 @@ with `curl` to keep that property.
 Until then the key is mitigated rather than removed: the `github-deploy`
 account holds only Hosting Admin, Rules Admin and Service Usage Consumer; it is
 written with `printf` so nothing in the JSON is interpreted; `rm -f` runs under
-`if: always()`; and the tests run **before** the key is written, so a compromised
-test dependency never sees it.
+`if: always()`; and since #76 the key lives in a job that runs no app-tree npm
+code at all, reachable only from `main` — see
+[The deploy key never meets the build](#the-deploy-key-never-meets-the-build-76).
