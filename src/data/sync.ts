@@ -34,6 +34,7 @@ import { validateSnapshot } from './recordValidation';
 import type { Collection, PullCursor, PushSummary, RawSnapshot, RemoteStore } from './remote';
 import { sendableRows } from './remote';
 import type { FuelTrackerStore } from './store';
+import { LocalView } from './localView';
 import type { MonotonicClock } from './syncClock';
 import { sharedSyncClock } from './syncClock';
 import {
@@ -227,6 +228,16 @@ export type RowScope = (
 
 export interface SyncOptions {
   readonly scope?: RowScope;
+  /**
+   * This device's rows, read once and shared by every remote of one `syncAll`
+   * (#87). Omitted, `syncOnce` makes its own — still one read per table.
+   */
+  readonly local?: LocalView;
+  /**
+   * Whether to repair over-long text first (#50). `syncAll` repairs once, in
+   * the account's own sync, over every row; the shared cars' syncs then skip it.
+   */
+  readonly repair?: boolean;
 }
 
 export async function syncOnce(
@@ -237,6 +248,9 @@ export async function syncOnce(
   options: SyncOptions = {},
 ): Promise<SyncResult> {
   const inScope: RowScope = options.scope ?? ((): boolean => true);
+  // Read the first time it is needed — after the pull, so a sync that cannot
+  // reach the account reads nothing — and only by id after that (#87).
+  const local = options.local ?? new LocalView(store);
   // Where the last sync left off (#52). No usable cursor — a first sync, a
   // different build, a damaged record, or a week since the last full read —
   // means reading everything, which is what every sync did before.
@@ -306,7 +320,7 @@ export async function syncOnce(
   const skippedNewerSchema =
     vehicles.tooNew.length + fillUps.tooNew.length + pending.tooNew.length;
 
-  const localBefore = await store.exportSnapshot();
+  const localBefore = await local.snapshot();
   // Ties: this device and the account hold different versions of a row with
   // the same `updatedAt` — two devices wrote it in the same millisecond. Both
   // sides pick the same winner (`tieWinner`). Where the account's wins, the
@@ -325,15 +339,28 @@ export async function syncOnce(
     },
     (incoming, existing) => tieWinner(incoming, existing) === 'first',
   );
+  // What the merge may have written, re-read by id.
+  await local.refresh('vehicles', vehicles.readable.map((row) => row.id));
+  await local.refresh('fillUps', fillUps.readable.map((row) => row.id));
+  await local.refresh('pendingFillUps', pending.readable.map((row) => row.id));
   for (const [collection, ids] of Object.entries(localWins) as [Collection, string[]][]) {
-    if (ids.length > 0) await store.restamp(collection, ids);
+    if (ids.length === 0) continue;
+    await store.restamp(collection, ids);
+    await local.refresh(collection, ids);
   }
 
   // Rows an older build stored with text longer than the account accepts are
   // shortened before the push is built, or each one fails the whole batch on
   // every sync (#50). After the clock has observed the account, so the repair
   // is stamped newer than anything there.
-  const repaired = await store.repairOversizedText();
+  let repaired = 0;
+  if (options.repair !== false) {
+    const rewritten = await store.repairOversizedTextIn(await local.snapshot());
+    for (const [collection, ids] of Object.entries(rewritten) as [Collection, string[]][]) {
+      repaired += ids.length;
+      await local.refresh(collection, ids);
+    }
+  }
 
   // The pull is in: remember how far it got, even if the push below fails.
   // Only versions the account confirmed are recorded, so an unsent change
@@ -342,7 +369,7 @@ export async function syncOnce(
   const fullPulledAt = cursor === null ? clock.wall() : cursor.fullPulledAt;
   await persist(state, { highWater, known, fullPulledAt });
 
-  const localAfter = await store.exportSnapshot();
+  const localAfter = await local.snapshot();
   // Anything with an id the account cannot address is held back here, by name,
   // rather than being handed to a batch it would abort.
   const unsendable: string[] = [];
