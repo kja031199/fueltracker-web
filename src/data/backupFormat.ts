@@ -213,22 +213,44 @@ export function parseJsonBackup(text: string): ParseResult<Snapshot> {
     };
   }
 
+  // A row a newer build wrote may carry fields this one does not know (#86).
+  // Imported, the next push would send it back without them: the downgrade
+  // sync already refuses (`partitionBySchema`). Set aside **before** it is
+  // validated, so a newer shape is counted as newer rather than as damaged.
+  let tooNew = 0;
+  const thisVersion = (rows: unknown): unknown[] => {
+    if (!Array.isArray(rows)) return [];
+    const readable = rows.filter((row) => !fromNewerBuild(row));
+    tooNew += rows.length - readable.length;
+    return readable;
+  };
+
   // The same decoders the account is read with: one policy for both doors.
-  const vehicles = decodeAll(file['vehicles'], validateVehicle, skipped);
+  const vehicles = decodeAll(thisVersion(file['vehicles']), validateVehicle, skipped);
   const fillUps = decodeAll(
-    Array.isArray(file['fillUps']) ? file['fillUps'].map((row) => withReceiptBytes(row, skipped)) : [],
+    thisVersion(file['fillUps']).map((row) => withReceiptBytes(row, skipped)),
     validateFillUp,
     skipped,
   );
   const pendingFillUps = decodeAll(
-    Array.isArray(file['pendingFillUps'])
-      ? file['pendingFillUps'].map((row) => withReceiptBytes(row, skipped))
-      : [],
+    thisVersion(file['pendingFillUps']).map((row) => withReceiptBytes(row, skipped)),
     validatePending,
     skipped,
   );
+  if (tooNew > 0) {
+    skipped.push(
+      `${tooNew === 1 ? '1 row was' : `${tooNew} rows were`} written by a newer version of FuelTracker and ` +
+        'skipped. Update the app, then import this file again.',
+    );
+  }
 
   return { value: { vehicles, fillUps, pendingFillUps }, error: null, skipped };
+}
+
+/** A row stamped with a schema this build does not know (#86). */
+function fromNewerBuild(row: unknown): boolean {
+  const version = asRecord(row)?.['schemaVersion'];
+  return typeof version === 'number' && version > SCHEMA_VERSION;
 }
 
 // MARK: - CSV

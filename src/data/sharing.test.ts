@@ -178,6 +178,26 @@ describe('parseLedger', () => {
       { ownerUid: 'o', vehicleId: 'v', ownerName: '', vehicleName: '' },
     ]);
   });
+
+  test('bounds the names it reads (#86)', () => {
+    const [entry] = parseLedger([{ ownerUid: 'o', vehicleId: 'v', ownerName: 'K'.repeat(900), vehicleName: 'C'.repeat(900) }]);
+    expect(entry?.ownerName).toHaveLength(200);
+    expect(entry?.vehicleName).toHaveLength(200);
+  });
+
+  test('drops an entry whose ids could not name a document (#86)', () => {
+    const good = { ownerUid: 'o', vehicleId: 'v', ownerName: 'Ann', vehicleName: 'Civic' };
+    expect(
+      parseLedger([
+        { ...good, vehicleId: '../x' },
+        { ...good, vehicleId: '..' },
+        { ...good, vehicleId: '__reserved__' },
+        { ...good, ownerUid: 'a/b' },
+        { ...good, vehicleId: 'x'.repeat(2_000) },
+        good,
+      ]),
+    ).toEqual([good]);
+  });
 });
 
 describe('the in-memory world refuses what the rules refuse', () => {

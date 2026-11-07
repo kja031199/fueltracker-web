@@ -313,7 +313,11 @@ npm ci --prefix .github/firebase-cli
 - **Text limits live in `TEXT_LIMITS` and must equal the rules'** (#50).
   `rulesLimits.test.ts` reads `firestore.rules` to enforce it. Text is bounded
   at the draft gate, in `addVehicle`/`submitFillUp`, and in `importBackup`
-  (file *and* pull). A new text field needs a `label()` in the rules, an entry in
+  (file *and* pull) — and in `FirestoreSharingRemote` both ways (#86): a
+  display name, which Google does not limit, is cut on invite and accept, and
+  names read back from invitations, members and the ledger are cut too.
+  `parseLedger` also drops a share whose ids fail `isStorableId`, because they
+  become document paths. A new text field needs a `label()` in the rules, an entry in
   `TEXT_LIMITS`, a place in `recordText.ts`, and a `maxLength` on its input.
   Length is in UTF-16 units, which is what both `.length` and the rules count;
   this was measured, not assumed.
@@ -322,7 +326,9 @@ npm ci --prefix .github/firebase-cli
   paths; `sendableRows` keeps an already-stored bad row from aborting the push
   batch, declining to *send* and never to keep (#26).
 - **A tombstone is empty, and three things depend on it together**:
-  `tombstone.ts` builds it, `preserveLocalReceipts` has an exception for it, and
+  `tombstone.ts` builds it — validation too, for a pulled or imported
+  tombstone (`asTombstone`, #86), keeping the row's own `updatedAt` and
+  `deletedAt` — `preserveLocalReceipts` has an exception for it, and
   `store.scrubTombstones()` cleans up older builds' rows once per store from
   `useAppData`. Keep the scrub idempotent — `isScrubbed` ignores `updatedAt` for
   exactly that reason — and never move `deletedAt`.
@@ -369,7 +375,11 @@ npm ci --prefix .github/firebase-cli
   of the two rows only — never of which is local — or devices disagree.
 - **`enteredBy` is optional on `FillUpRecord`** and `SCHEMA_VERSION` was not
   bumped for it: an older build would skip a newer-schema row entirely, which
-  is worse than dropping a name. Validation reads anything implausible as
+  is worse than dropping a name. **Bump `SCHEMA_VERSION` only for a breaking
+  change** (the policy is on the constant). Newer rows are skipped from the
+  account *and* from a backup file (#86); the file's are set aside **before**
+  validation, so a shape this build cannot read is reported as newer, not as
+  damaged. Validation reads anything implausible as
   `null`; the tombstone keeps it, because the rules compare it on a member's
   deletion.
 - **Fill-up links (#3) are untrusted input, decoded in `data/fillUpLink.ts`.**

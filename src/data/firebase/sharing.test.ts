@@ -236,6 +236,75 @@ describeWithEmulator('sharing through the real rules', () => {
     expect(await partner.store.vehicles()).toHaveLength(0);
   });
 
+  test('a display name longer than the rules allow can still invite and accept, stored cut to fit (#86)', async () => {
+    // A Google display name has no length limit; the rules allow 200.
+    const owner = device({ ...OWNER, name: 'K'.repeat(300) });
+    const partner = device({ ...PARTNER, name: 'S'.repeat(300) });
+    const car = await owner.store.addVehicle({ name: 'Civic' });
+    await owner.sync();
+
+    // A car name from anywhere at all, not only from this device's form.
+    await owner.sharing.remote.invite({ id: car.id, name: 'C'.repeat(300) }, 'sam@example.com');
+    const [invitation] = await partner.sharing.remote.invitesForMe();
+    expect(invitation?.ownerName).toBe('K'.repeat(200));
+    expect(invitation?.vehicleName).toBe('C'.repeat(200));
+
+    await partner.sharing.remote.accept(invitation!);
+    expect((await owner.sharing.remote.members(OWNER.uid, car.id)).map((m) => m.name)).toEqual(['S'.repeat(200)]);
+    const [membership] = await partner.sharing.remote.memberships();
+    expect(membership?.ownerName).toBe('K'.repeat(200));
+  });
+
+  test('names read back from the account are bounded too, whoever wrote them (#86)', async () => {
+    const owner = device(OWNER);
+    const partner = device(PARTNER);
+    const car = await owner.store.addVehicle({ name: 'Civic' });
+    await owner.sync();
+    // Written around the rules: an older build, or the console.
+    await env.withSecurityRulesDisabled(async (admin) => {
+      const db = admin.firestore() as unknown as Firestore;
+      await setDoc(doc(db, 'invites', `${OWNER.uid}__${car.id}__sam@example.com`), {
+        ownerUid: OWNER.uid,
+        vehicleId: car.id,
+        email: 'sam@example.com',
+        ownerName: 'K'.repeat(5_000),
+        vehicleName: 'C'.repeat(5_000),
+        createdAt: 1,
+      });
+      await setDoc(doc(db, 'users', OWNER.uid, 'vehicles', car.id, 'members', 'someone'), {
+        uid: 'someone',
+        name: 'N'.repeat(5_000),
+        email: 'n@example.com',
+        joinedAt: 1,
+      });
+    });
+
+    const [invitation] = await partner.sharing.remote.invitesForMe();
+    expect(invitation?.ownerName).toHaveLength(200);
+    expect(invitation?.vehicleName).toHaveLength(200);
+    const [member] = await owner.sharing.remote.members(OWNER.uid, car.id);
+    expect(member?.name).toHaveLength(200);
+  });
+
+  test('a membership whose car id could not name a document is ignored (#86)', async () => {
+    const partner = device(PARTNER);
+    await env.withSecurityRulesDisabled(async (admin) => {
+      const db = admin.firestore() as unknown as Firestore;
+      await setDoc(doc(db, 'users', PARTNER.uid, 'memberships', `${OWNER.uid}__..`), {
+        ownerUid: OWNER.uid,
+        vehicleId: '..',
+        ownerName: 'Kyle',
+        vehicleName: 'Nowhere',
+      });
+    });
+
+    expect(await partner.sharing.remote.memberships()).toEqual([]);
+    const result = await partner.sync();
+    expect(result.own.ok).toBe(true);
+    expect(result.shares.synced).toHaveLength(0);
+    expect(result.shares.failed).toHaveLength(0);
+  });
+
   test('declining uses up the invitation without joining', async () => {
     const owner = device(OWNER);
     const partner = device(PARTNER);

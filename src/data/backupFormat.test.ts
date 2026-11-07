@@ -128,6 +128,68 @@ describe('reading a hostile backup file', () => {
     expect(parseJsonBackup(future).error).toMatch(/newer version/i);
   });
 
+  test('skips rows from a newer schema and says so, rather than importing them (#86)', () => {
+    // A newer build's rows may carry fields this one does not know; imported,
+    // the next push would send them back without those fields.
+    const newer = SCHEMA_VERSION + 1;
+    const file = JSON.stringify({
+      format: 'fueltracker-backup',
+      formatVersion: BACKUP_FORMAT_VERSION,
+      schemaVersion: newer,
+      vehicles: [vehicle('v1'), vehicle('v2', { schemaVersion: newer })],
+      fillUps: [fillUp('f1'), fillUp('f2', { schemaVersion: newer, futureField: 'kept elsewhere' } as never)],
+      pendingFillUps: [
+        {
+          id: 'p1',
+          updatedAt: 1,
+          deletedAt: null,
+          schemaVersion: newer,
+          vehicleId: 'v1',
+          submittedAt: 1,
+          submitterName: 'Sam',
+          date: 1,
+          odometer: 1,
+          gallons: 1,
+          pricePerGallon: 1,
+        },
+      ],
+    });
+
+    const result = parseJsonBackup(file);
+
+    expect(result.value?.vehicles.map((row) => row.id)).toEqual(['v1']);
+    expect(result.value?.fillUps.map((row) => row.id)).toEqual(['f1']);
+    expect(result.value?.pendingFillUps).toEqual([]);
+    expect(result.skipped).toEqual([
+      expect.stringMatching(/3 rows .*newer version.*skipped/i),
+    ]);
+  });
+
+  test('a newer row this build could not even read is counted as newer, not as damaged', () => {
+    const file = JSON.stringify({
+      format: 'fueltracker-backup',
+      formatVersion: BACKUP_FORMAT_VERSION,
+      fillUps: [{ ...fillUp('f9'), schemaVersion: SCHEMA_VERSION + 1, gallons: { litres: 38 } }],
+    });
+    const result = parseJsonBackup(file);
+    expect(result.value?.fillUps).toEqual([]);
+    expect(result.skipped).toEqual([expect.stringMatching(/^1 row was written by a newer version/)]);
+  });
+
+  test('a file whose rows are all this version says nothing about versions', () => {
+    const result = parseJsonBackup(toJsonBackup(snapshot));
+    expect(result.skipped).toEqual([]);
+  });
+
+  test('one newer row is "1 row", not "1 rows"', () => {
+    const file = JSON.stringify({
+      format: 'fueltracker-backup',
+      formatVersion: BACKUP_FORMAT_VERSION,
+      vehicles: [vehicle('v2', { schemaVersion: SCHEMA_VERSION + 1 })],
+    });
+    expect(parseJsonBackup(file).skipped).toEqual([expect.stringMatching(/^1 row was /)]);
+  });
+
   test('skips rows it cannot read and says which, rather than failing wholesale', () => {
     // One bad row should not cost someone the other nine hundred.
     const file = JSON.stringify({

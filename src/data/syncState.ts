@@ -31,6 +31,8 @@
 import type { PullCursor } from './remote';
 import { SCHEMA_VERSION } from './records';
 import type { Membership } from './sharing';
+import { isStorableId } from './recordId';
+import { TEXT_LIMITS, boundText } from '../domain/textLimits';
 
 export const SYNC_CURSOR_VERSION = 1;
 
@@ -139,17 +141,19 @@ export class InMemoryShareLedger implements ShareLedger {
 /** A stored ledger, keeping only well-formed entries. Junk reads as none. */
 export function parseLedger(value: unknown): Membership[] {
   if (!Array.isArray(value)) return [];
-  const text = (field: unknown): field is string => typeof field === 'string' && field !== '';
   return value.flatMap((entry: unknown) => {
     if (typeof entry !== 'object' || entry === null) return [];
     const raw = entry as Record<string, unknown>;
-    if (!text(raw.ownerUid) || !text(raw.vehicleId)) return [];
+    // Both become document paths and scope keys, and the account's copy is
+    // read from the network (#86): an id that could not name a document is
+    // not a share, whatever else the entry says.
+    if (!isStorableId(raw.ownerUid) || !isStorableId(raw.vehicleId)) return [];
     return [
       {
         ownerUid: raw.ownerUid,
         vehicleId: raw.vehicleId,
-        ownerName: typeof raw.ownerName === 'string' ? raw.ownerName : '',
-        vehicleName: typeof raw.vehicleName === 'string' ? raw.vehicleName : '',
+        ownerName: typeof raw.ownerName === 'string' ? boundText(raw.ownerName, TEXT_LIMITS.ownerName) : '',
+        vehicleName: typeof raw.vehicleName === 'string' ? boundText(raw.vehicleName, TEXT_LIMITS.vehicleName) : '',
       },
     ];
   });

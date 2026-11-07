@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { isScrubbed, tombstoneFillUp, tombstonePending } from './tombstone';
 import { MAX_RECEIPT_BYTES } from '../domain/fuelEntryDraft';
 import {
   MAX_NAME_LENGTH,
@@ -269,6 +270,75 @@ describe('tombstones', () => {
 
   it('still needs an id and a vehicle', () => {
     expect(typeof validateFillUp({ updatedAt: 1, deletedAt: 1, schemaVersion: 1 })).toBe('string');
+  });
+
+  it('is stored exactly as tombstone.ts builds one: an older fat one loses its date and contents (#86)', () => {
+    // What a build before #25 pushed: the whole row, plus a deletion date.
+    const result = validateFillUp({ ...FILL_UP, deletedAt: 300, updatedAt: 300, enteredBy: 'uid-a' });
+    if (typeof result === 'string') throw new Error(result);
+
+    expect(result.date).toBe(0);
+    expect(result.station).toBe('');
+    expect(result).toEqual({
+      ...tombstoneFillUp({ ...result, enteredBy: 'uid-a' }, 300),
+      updatedAt: 300,
+      deletedAt: 300,
+    });
+    // So the one-time scrub has nothing left to rewrite (and re-push).
+    expect(isScrubbed(result, tombstoneFillUp)).toBe(true);
+    // Its deletion time and stamp are the row's own, not rebuilt.
+    expect(result.deletedAt).toBe(300);
+    expect(result.vehicleId).toBe(FILL_UP.vehicleId);
+    expect(result.enteredBy).toBe('uid-a');
+  });
+
+  it('accepts a deleted submission with no measurements (#86)', () => {
+    const result = validatePending({
+      id: 'p1',
+      updatedAt: 400,
+      deletedAt: 350,
+      schemaVersion: 1,
+      vehicleId: 'v1',
+      submittedAt: null,
+      submitterName: null,
+      date: null,
+      odometer: null,
+      gallons: null,
+      pricePerGallon: null,
+    });
+    if (typeof result === 'string') throw new Error(result);
+
+    expect(result.deletedAt).toBe(350);
+    expect(result.updatedAt).toBe(400);
+    expect(isScrubbed(result, tombstonePending)).toBe(true);
+  });
+
+  it('empties a deleted submission that still carries the submitter’s name and note (#86)', () => {
+    const result = validatePending({
+      id: 'p1',
+      updatedAt: 400,
+      deletedAt: 400,
+      schemaVersion: 1,
+      vehicleId: 'v1',
+      submittedAt: 100,
+      submitterName: 'Sam',
+      date: 100,
+      odometer: 10,
+      gallons: 1,
+      pricePerGallon: 1,
+      notes: 'call me',
+    });
+    if (typeof result === 'string') throw new Error(result);
+
+    expect(result.submitterName).toBe('');
+    expect(result.notes).toBe('');
+    expect(isScrubbed(result, tombstonePending)).toBe(true);
+  });
+
+  it('a deleted submission still needs its vehicle', () => {
+    expect(
+      typeof validatePending({ id: 'p1', updatedAt: 1, deletedAt: 1, schemaVersion: 1 }),
+    ).toBe('string');
   });
 });
 
