@@ -21,6 +21,24 @@
  * If the membership list cannot be read — offline, say — the account's own
  * sync still runs, shared rows are kept and still excluded, and nothing is
  * forgotten on the strength of a failed read.
+ *
+ * ## The ledger fails closed (#77)
+ *
+ * The ledger — the cars this device holds for someone else — is what keeps
+ * those cars out of step 1 when the membership list cannot say. So:
+ *
+ * - **A ledger that cannot be read stops the sync.** It used to read as
+ *   "nothing is shared", and if the membership list was unreachable too, the
+ *   account's own sync pushed the shared car — other people's fill-ups,
+ *   receipts and notes — into this account. Even with the list readable it is
+ *   not enough: a car left on another device is no longer in the list but is
+ *   still on this one. Nothing is synced, nothing is forgotten, and the next
+ *   sync tries again.
+ * - **A share is recorded before any of its rows arrive.** The ledger is
+ *   saved with every current share *before* step 2 pulls anything, so a
+ *   failed save at the end — or a tab closed in between — cannot leave shared
+ *   rows on this device that the ledger does not know about. If that first
+ *   save fails, no share is pulled this time.
  */
 
 import type { FuelTrackerStore } from './store';
@@ -57,6 +75,10 @@ export interface SyncAllResult {
 
 const NO_SHARES: ShareOutcome = { synced: [], ended: [], failed: [], unreachable: false };
 
+/** Said when the ledger cannot be read: a pause, not a refusal, so retried. */
+export const LEDGER_UNREADABLE =
+  'Could not read which cars are shared with you on this device, so nothing was synced. It will be tried again.';
+
 export function shareStateKey(membership: Pick<Membership, 'ownerUid' | 'vehicleId'>): string {
   return `share:${membershipKey(membership)}`;
 }
@@ -83,7 +105,12 @@ export async function syncAll(
     return { own: await syncOnce(store, own, clock, ownState), shares: NO_SHARES };
   }
 
-  const held = await sharing.ledger.load().catch(() => [] as Membership[]);
+  let held: Membership[];
+  try {
+    held = await sharing.ledger.load();
+  } catch {
+    return { own: { ok: false, kind: 'unreachable', reason: LEDGER_UNREADABLE }, shares: NO_SHARES };
+  }
   let current: Membership[] | null;
   try {
     current = await sharing.remote.memberships();
@@ -104,6 +131,16 @@ export async function syncAll(
   const synced: Membership[] = [];
   const failed: Membership[] = [];
   const currentKeys = new Set(current.map(membershipKey));
+
+  // Recorded before anything is pulled, so the ledger is never behind what
+  // this device holds. Ended shares stay in it until they are forgotten below.
+  const heldKeys = new Set(held.map(membershipKey));
+  const recorded = [...held, ...current.filter((membership) => !heldKeys.has(membershipKey(membership)))];
+  try {
+    await sharing.ledger.save(recorded);
+  } catch {
+    return { own: ownResult, shares: { ...NO_SHARES, failed: [...current] } };
+  }
 
   async function forget(membership: Membership): Promise<void> {
     await store.forgetVehicle(membership.vehicleId);

@@ -11,7 +11,7 @@ import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { FuelLogProvider, useFuelLog, type FuelLog } from './fuelLog';
 import { SAVE_SYNC_DELAY_MS } from './syncScheduler';
 import { InMemorySharingWorld } from '../data/sharing';
-import type { SharingSync } from '../data/shareSync';
+import { LEDGER_UNREADABLE, type SharingSync } from '../data/shareSync';
 import { InMemoryShareLedger, InMemorySyncState } from '../data/syncState';
 
 /**
@@ -225,6 +225,32 @@ describe('every write reaches the account without anyone remembering to ask', ()
     });
     expect(outcome).toBe('not-yours');
     expect(await store.pendingFillUps()).toHaveLength(0);
+  });
+});
+
+describe('a device that cannot read its share ledger (#77)', () => {
+  test('says so, as a pause to retry — not as the account refusing it', async () => {
+    const store = makeStore();
+    const world = new InMemorySharingWorld();
+    const ledger = new InMemoryShareLedger();
+    ledger.load = () => Promise.reject(new Error('storage blocked'));
+    const sharing: SharingSync = {
+      remote: world.sharingFor({ uid: 'u1', name: 'Me', email: 'me@example.com', emailVerified: true }),
+      stateFor: () => new InMemorySyncState(),
+      forgetState: async () => {},
+      ledger,
+    };
+    const remote = new InMemoryRemoteStore();
+    const wrapper = ({ children }: { children: ReactNode }): ReactNode => (
+      <FuelLogProvider store={store} remote={remote} uid="u1" sharing={sharing}>
+        {children}
+      </FuelLogProvider>
+    );
+    const { result } = renderHook(() => useFuelLog(), { wrapper });
+    await waitFor(() => expect(result.current.sync.message).toBe(LEDGER_UNREADABLE));
+    expect(result.current.sync.refused).toBe(false);
+    // Nothing reached the account.
+    expect(remote.pullLog).toHaveLength(0);
   });
 });
 

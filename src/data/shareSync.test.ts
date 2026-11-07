@@ -425,12 +425,114 @@ describe('the ledger', () => {
     expect(await partner.sharing.ledger.load()).toEqual([]);
   });
 
-  test('a ledger that cannot be read is treated as empty, not as a failure', async () => {
-    const { partner, car } = await sharedCar();
+  // #77. The ledger is what keeps a shared car out of the account's own push
+  // when the membership list cannot say. Reading a failure as "nothing is
+  // shared" copied the owner's car — other people's fill-ups, receipts and
+  // notes — into the member's own account.
+  test('a ledger that cannot be read stops the sync, rather than reading as "nothing is shared"', async () => {
+    const { world, partner, car } = await sharedCar();
+    await partner.sync();
     partner.sharing.ledger.load = () => Promise.reject(new Error('storage blocked'));
+    partner.sharing.remote.memberships = async () => {
+      throw new Error('offline');
+    };
+    await partner.store.addFillUp(draft(10_400), car.id);
+
     const result = await partner.sync();
+
+    expect(result.own.ok).toBe(false);
+    expect(!result.own.ok && result.own.kind).toBe('unreachable');
+    expect(await rowsIn(world, PARTNER.uid)).toEqual({ vehicles: [], fillUps: [] });
+    // Nothing was forgotten on the strength of a failed read either.
+    expect(await partner.store.fillUps(car.id)).toHaveLength(2);
+  });
+
+  test('…even when the membership list can be read: a car left elsewhere is still on this device', async () => {
+    const { world, partner, car } = await sharedCar();
+    await partner.sync();
+    // Left on another device: no longer in the list, still in this store.
+    const [membership] = await partner.sharing.remote.memberships();
+    if (membership === undefined) throw new Error('no membership');
+    await world.sharingFor(PARTNER).leave(membership);
+    partner.sharing.ledger.load = () => Promise.reject(new Error('storage blocked'));
+
+    const result = await partner.sync();
+
+    expect(result.own.ok).toBe(false);
+    expect(await rowsIn(world, PARTNER.uid)).toEqual({ vehicles: [], fillUps: [] });
+    expect(await partner.store.fillUps(car.id)).toHaveLength(1);
+  });
+
+  test('once the ledger can be read again, the next sync carries on as normal', async () => {
+    const { world, partner, car } = await sharedCar();
+    await partner.sync();
+    const load = partner.sharing.ledger.load.bind(partner.sharing.ledger);
+    partner.sharing.ledger.load = () => Promise.reject(new Error('storage blocked'));
+    expect((await partner.sync()).own.ok).toBe(false);
+    partner.sharing.ledger.load = load;
+
+    const result = await partner.sync();
+
     expect(result.own.ok).toBe(true);
     expect(result.shares.synced.map((m) => m.vehicleId)).toEqual([car.id]);
+    expect(await rowsIn(world, PARTNER.uid)).toEqual({ vehicles: [], fillUps: [] });
+  });
+
+  test('a share is recorded before any of its rows arrive, so a failed final save leaves nothing unrecorded', async () => {
+    const { world, partner, car } = await sharedCar();
+    // The save after the shared rows are pulled fails — or the tab closes
+    // there. Without the earlier save, those rows would be on this device
+    // with no record that they are someone else's.
+    const save = partner.sharing.ledger.save.bind(partner.sharing.ledger);
+    partner.sharing.ledger.save = async (list) => {
+      if ((await partner.store.fillUps(car.id)).length > 0) throw new Error('storage blocked');
+      await save(list);
+    };
+    await partner.sync();
+    expect(await partner.store.fillUps(car.id)).toHaveLength(1);
+    expect((await partner.sharing.ledger.load()).map((m) => m.vehicleId)).toEqual([car.id]);
+
+    // Next time the list cannot be read: the ledger alone must keep the car out.
+    partner.sharing.ledger.save = save;
+    partner.sharing.remote.memberships = async () => {
+      throw new Error('offline');
+    };
+    await partner.store.addFillUp(draft(10_400), car.id);
+    await partner.sync();
+    expect(await rowsIn(world, PARTNER.uid)).toEqual({ vehicles: [], fillUps: [] });
+  });
+
+  test('a share that ended stays in the ledger until its rows are actually gone', async () => {
+    const { world, partner, car } = await sharedCar();
+    await partner.sync();
+    const [membership] = await partner.sharing.remote.memberships();
+    if (membership === undefined) throw new Error('no membership');
+    await world.sharingFor(PARTNER).leave(membership);
+    // Interrupted between recording and forgetting: the tab closes, storage fails.
+    const forget = partner.store.forgetVehicle.bind(partner.store);
+    partner.store.forgetVehicle = () => Promise.reject(new Error('interrupted'));
+    await expect(partner.sync()).rejects.toThrow('interrupted');
+    expect(await partner.store.fillUps(car.id)).toHaveLength(1);
+
+    // Its rows are still here, so the ledger must still keep them out.
+    partner.store.forgetVehicle = forget;
+    partner.sharing.remote.memberships = async () => {
+      throw new Error('offline');
+    };
+    await partner.sync();
+    expect(await rowsIn(world, PARTNER.uid)).toEqual({ vehicles: [], fillUps: [] });
+  });
+
+  test('a share that cannot be recorded is not pulled: nothing arrives that the ledger does not know about', async () => {
+    const { partner, car } = await sharedCar();
+    partner.sharing.ledger.save = () => Promise.reject(new Error('storage blocked'));
+
+    const result = await partner.sync();
+
+    expect(result.shares.synced).toEqual([]);
+    expect(result.shares.failed.map((m) => m.vehicleId)).toEqual([car.id]);
+    expect(await partner.store.vehicles()).toHaveLength(0);
+    expect(await partner.store.fillUps(car.id)).toHaveLength(0);
   });
 });
 
