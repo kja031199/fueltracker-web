@@ -231,6 +231,35 @@ describeWithEmulator('sharing a car (#66)', () => {
       await assertFails(setDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}/members/${STRANGER}`), { ...membership(), uid: STRANGER }));
     });
 
+    // #78: a car's id is not secret, and an owner can file a car under any
+    // id. Joining a car whose id names one of your own would make your own
+    // fill-ups sync into the inviter's account.
+    it('is refused when your own account already has a car with that id', async () => {
+      const { vehicle } = await records();
+      await env.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), `users/${PARTNER}/vehicles/${SHARED}`), { ...vehicle, id: SHARED });
+      });
+      await setDoc(doc(owner(), `invites/${inviteId(SHARED, PARTNER_EMAIL)}`), invite());
+      await assertFails(setDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}/members/${PARTNER}`), membership()));
+    });
+
+    it('…including one you deleted, whose tombstone still names it', async () => {
+      const { vehicle } = await records();
+      await env.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), `users/${PARTNER}/vehicles/${SHARED}`), { ...vehicle, id: SHARED, deletedAt: 5 });
+      });
+      await setDoc(doc(owner(), `invites/${inviteId(SHARED, PARTNER_EMAIL)}`), invite());
+      await assertFails(setDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}/members/${PARTNER}`), membership()));
+    });
+
+    it('a car of yours with a different id does not get in the way', async () => {
+      const { vehicle } = await records();
+      await env.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), `users/${PARTNER}/vehicles/my-own`), { ...vehicle, id: 'my-own' });
+      });
+      await join();
+    });
+
     it('cannot claim another address in the membership', async () => {
       await setDoc(doc(owner(), `invites/${inviteId(SHARED, PARTNER_EMAIL)}`), invite());
       await assertFails(

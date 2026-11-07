@@ -39,6 +39,19 @@
  *   failed save at the end — or a tab closed in between — cannot leave shared
  *   rows on this device that the ledger does not know about. If that first
  *   save fails, no share is pulled this time.
+ *
+ * ## A share whose car id is already here is never synced (#78)
+ *
+ * A car's id is not secret — request links and CSV exports carry it — and an
+ * owner can file their car under any id. Shared under the id of one of *this*
+ * account's cars, step 2 would push this account's own fill-ups and receipts
+ * into the inviter's, and leaving would later delete the car here. The rules
+ * refuse such a join and accepting checks first; this is the last guard, for a
+ * membership that got past both (accepted on a device that had not synced the
+ * car yet). A **new** share — not in the ledger — whose car is already on this
+ * device is reported as `clashed`: never synced, never recorded as held, and
+ * still kept out of the account's own push until it is left, so it fails
+ * closed. Nothing is deleted.
  */
 
 import type { FuelTrackerStore } from './store';
@@ -66,6 +79,11 @@ export interface ShareOutcome {
   readonly failed: readonly Membership[];
   /** True when the membership list itself could not be read. */
   readonly unreachable: boolean;
+  /**
+   * New shares whose car id is already a car on this device (#78): not synced,
+   * not recorded, nothing deleted. Leaving them resolves it.
+   */
+  readonly clashed: readonly Membership[];
 }
 
 export interface SyncAllResult {
@@ -73,7 +91,7 @@ export interface SyncAllResult {
   readonly shares: ShareOutcome;
 }
 
-const NO_SHARES: ShareOutcome = { synced: [], ended: [], failed: [], unreachable: false };
+const NO_SHARES: ShareOutcome = { synced: [], ended: [], failed: [], unreachable: false, clashed: [] };
 
 /** Said when the ledger cannot be read: a pause, not a refusal, so retried. */
 export const LEDGER_UNREADABLE =
@@ -118,6 +136,17 @@ export async function syncAll(
     current = null;
   }
 
+  // A new share naming a car already on this device (#78). Checked before the
+  // own sync, which must still leave that car out: whose it is, is unclear.
+  const heldKeys = new Set(held.map(membershipKey));
+  const clashed: Membership[] = [];
+  const sharable: Membership[] = [];
+  for (const membership of current ?? []) {
+    const isNew = !heldKeys.has(membershipKey(membership));
+    if (isNew && (await store.hasVehicle(membership.vehicleId))) clashed.push(membership);
+    else sharable.push(membership);
+  }
+
   // Excluded from the account's own push: every car held or currently shared.
   const sharedCars = new Set([...held, ...(current ?? [])].map((m) => m.vehicleId));
   const ownResult = await syncOnce(store, own, clock, ownState, { scope: excluding(sharedCars) });
@@ -134,12 +163,11 @@ export async function syncAll(
 
   // Recorded before anything is pulled, so the ledger is never behind what
   // this device holds. Ended shares stay in it until they are forgotten below.
-  const heldKeys = new Set(held.map(membershipKey));
-  const recorded = [...held, ...current.filter((membership) => !heldKeys.has(membershipKey(membership)))];
+  const recorded = [...held, ...sharable.filter((membership) => !heldKeys.has(membershipKey(membership)))];
   try {
     await sharing.ledger.save(recorded);
   } catch {
-    return { own: ownResult, shares: { ...NO_SHARES, failed: [...current] } };
+    return { own: ownResult, shares: { ...NO_SHARES, clashed, failed: [...sharable] } };
   }
 
   async function forget(membership: Membership): Promise<void> {
@@ -153,7 +181,7 @@ export async function syncAll(
     if (!currentKeys.has(membershipKey(membership))) await forget(membership);
   }
 
-  for (const membership of current) {
+  for (const membership of sharable) {
     const result = await syncOnce(
       store,
       sharing.remote.scoped(membership),
@@ -183,8 +211,8 @@ export async function syncAll(
 
   const endedKeys = new Set(ended.map(membershipKey));
   await sharing.ledger
-    .save(current.filter((membership) => !endedKeys.has(membershipKey(membership))))
+    .save(sharable.filter((membership) => !endedKeys.has(membershipKey(membership))))
     .catch(() => {});
 
-  return { own: ownResult, shares: { synced, ended, failed, unreachable: false } };
+  return { own: ownResult, shares: { synced, ended, failed, unreachable: false, clashed } };
 }

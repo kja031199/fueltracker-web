@@ -107,6 +107,11 @@ export class InMemoryRemoteStore implements RemoteStore {
     for (const row of seed.pendingFillUps) this.pendingFillUps.set(row.id, row);
   }
 
+  /** Whether this tree holds a vehicle document with that id, live or a tombstone. */
+  hasVehicle(id: string): boolean {
+    return this.vehicles.has(id);
+  }
+
   async pull(since: PullCursor | null = null): Promise<RawSnapshot> {
     if (this.failPull) throw new Error('offline');
     const vehicles = this.read('vehicles', this.vehicles, since);

@@ -391,6 +391,12 @@ If the list of shares cannot be read, the account's own sync still runs —
 excluding every car in the device's **ledger** — and nothing is forgotten on
 the strength of a failed read.
 
+A **new** share — not yet in the ledger — whose car id is already a car on this
+device is never synced (#78): it is reported as `clashed`, never recorded in
+the ledger, and still kept out of step 1, so it fails closed until it is left.
+The rules and Accept refuse such a join first; this guard is for one that got
+past both, such as an Accept on a device that had not yet synced the car.
+
 The ledger is what keeps step 1 honest when the list cannot say, so it fails
 **closed** (#77):
 

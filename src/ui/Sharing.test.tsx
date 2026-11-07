@@ -62,7 +62,7 @@ function person(world: InMemorySharingWorld, user: AuthUser): Person {
   return { user, store: makeStore(user.uid), sharing: sharingFor(world, user) };
 }
 
-function open(world: InMemorySharingWorld, who: Person, initialTab: 'vehicles' | 'fillups' | 'dashboard' = 'vehicles'): void {
+function open(world: InMemorySharingWorld, who: Person, initialTab: 'vehicles' | 'fillups' | 'dashboard' | 'settings' = 'vehicles'): void {
   render(
     <App
       store={who.store}
@@ -403,5 +403,48 @@ describe('the partner’s side, more widely', () => {
     expect(screen.getAllByRole('button', { name: 'Share' })).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: 'Leave' })).toHaveLength(1);
+  });
+});
+
+describe('an invitation to a car whose id is one of yours (#78)', () => {
+  /** Sam's own car, synced; Kyle files a car under the same id and invites Sam. */
+  async function clashing(world: InMemorySharingWorld, sam: Person): Promise<VehicleRecord> {
+    const mine = await sam.store.addVehicle({ name: 'My Civic' });
+    const draft = makeFuelEntryDraft({ date: new Date(2026, 0, 1), odometer: 20_000, gallons: 10, pricePerGallon: 3.5 });
+    if (draft === null) throw new Error('fixture draft failed validation');
+    await sam.store.addFillUp(draft, mine.id);
+    await world.remoteFor(KYLE.uid).push({ vehicles: [{ ...mine, name: 'Bait' }], fillUps: [], pendingFillUps: [] });
+    await world.sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true }).invite({ id: mine.id, name: 'Bait' }, SAM.email);
+    return mine;
+  }
+
+  test('accepting is refused before anything is written, and says why', async () => {
+    const world = new InMemorySharingWorld();
+    const sam = person(world, SAM);
+    const mine = await clashing(world, sam);
+    const user = userEvent.setup();
+    open(world, sam);
+
+    const banner = await screen.findByRole('region', { name: /invitations/i }, WAIT);
+    await user.click(within(banner).getByRole('button', { name: /accept bait/i }));
+
+    expect(await within(banner).findByRole('alert')).toHaveTextContent(/already one of your cars/i);
+    expect(world.isMember(KYLE.uid, mine.id, SAM.uid)).toBe(false);
+    expect(await sam.store.fillUps(mine.id)).toHaveLength(1);
+    expect((await world.remoteFor(KYLE.uid).pull(null)).fillUps).toHaveLength(0);
+  });
+
+  test('a clashing share that exists anyway is reported, never synced', async () => {
+    const world = new InMemorySharingWorld();
+    const sam = person(world, SAM);
+    const mine = await clashing(world, sam);
+    const key = `${KYLE.uid}__${mine.id}`;
+    world.members.set(key, new Map([[SAM.uid, { uid: SAM.uid, name: 'Sam', email: SAM.email, joinedAt: 1 }]]));
+    world.memberships.set(SAM.uid, new Map([[key, { ownerUid: KYLE.uid, vehicleId: mine.id, ownerName: 'Kyle', vehicleName: 'Bait' }]]));
+    open(world, sam, 'settings');
+
+    expect(await screen.findByText(/bait from kyle names a car that is already yours/i, {}, WAIT)).toBeInTheDocument();
+    expect((await world.remoteFor(KYLE.uid).pull(null)).fillUps).toHaveLength(0);
+    expect(await sam.store.fillUps(mine.id)).toHaveLength(1);
   });
 });

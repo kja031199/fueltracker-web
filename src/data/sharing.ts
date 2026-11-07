@@ -116,6 +116,17 @@ export function membershipKey(membership: Pick<Membership, 'ownerUid' | 'vehicle
 }
 
 /** What Firestore throws when the rules say no, so `isRefusal` sees the same. */
+/**
+ * An invitation to a car whose id is already one of this account's cars
+ * (#78). Accepting would hand that car to the inviter, so it is refused
+ * before anything is written.
+ */
+export class ShareClash extends Error {
+  constructor() {
+    super('That invitation names a car that is already one of yours.');
+  }
+}
+
 export class Refused extends Error {
   readonly code = 'permission-denied';
   constructor(what: string) {
@@ -225,6 +236,10 @@ class InMemorySharing implements SharingRemote {
       throw new Refused('join without an invitation');
     }
     if (invite.ownerUid === this.me.uid) throw new Refused('join your own car');
+    // As firestore.rules: never a car whose id names one of your own (#78).
+    if (this.world.remoteFor(this.me.uid).hasVehicle(invite.vehicleId)) {
+      throw new Refused('join a car with the id of one of your own');
+    }
     const room = `${invite.ownerUid}__${invite.vehicleId}`;
     const members = this.world.members.get(room) ?? new Map<string, Member>();
     members.set(this.me.uid, { uid: this.me.uid, name: this.me.name, email, joinedAt: Date.now() });

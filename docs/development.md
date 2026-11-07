@@ -182,6 +182,8 @@ Recorded so a regression in the tests themselves is visible:
 | Deploy key: secret read in the build job / key written before `npm ci` / before the download | 8 / 1 / 1 |
 | Share ledger (#77): unreadable read as empty / failing closed only with the list unreachable too / reported as a refusal | 4 / 3 / 2 |
 | Share ledger: no save before pulling / that save's failure ignored / ended shares dropped before they are forgotten | 2 / 1 / 1 |
+| Id clash (#78): rules (emulator) / in-memory world / Accept unchecked / shown as a network error / no clash detection / held shares flagged too | 2 / 2 / 1 / 1 / 4 / 15 |
+| Id clash: recorded in the ledger / clashed shares synced / store ignoring tombstones / clash not reported | 1 / 3 / 1 / 1 |
 
 Survives, and equivalent: dropping the array check from the link decoder — a
 JSON array cannot carry the version field, so it is refused as damaged either

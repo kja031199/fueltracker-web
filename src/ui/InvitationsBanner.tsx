@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
 import { useState } from 'react';
 import type { Invite } from '../data/sharing';
+import { ShareClash } from '../data/sharing';
 import { useFuelLog } from './fuelLog';
 
 /**
@@ -26,8 +27,14 @@ export function InvitationsBanner(): ReactElement | null {
     try {
       if (accept) await sharing.accept(invite);
       else await sharing.decline(invite);
-    } catch {
-      setProblem('That could not be answered just now. Check your connection and try again.');
+    } catch (cause) {
+      setProblem(
+        cause instanceof ShareClash
+          ? // #78: not a network blip, and retrying will not help.
+            `Not accepted: ${invite.vehicleName || 'that car'} has the identity of a car that is already one of your cars, ` +
+              'and accepting would hand yours over. Decline it.'
+          : 'That could not be answered just now. Check your connection and try again.',
+      );
     } finally {
       setBusy(null);
     }
