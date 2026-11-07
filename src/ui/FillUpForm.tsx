@@ -20,6 +20,7 @@ import { importReceiptPhoto } from './importReceipt';
 import { TEXT_LIMITS } from '../domain/textLimits';
 import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
 import { LINK_TEXT_LIMITS } from '../data/fillUpLink';
+import { StaleEdit } from '../data/staleEdit';
 import { unusualOdometerJump } from '../domain/odometerGap';
 
 interface Props {
@@ -124,6 +125,8 @@ export function FillUpForm({
     editing === null ? emptyFillUpForm() : formFrom(editing),
   );
   const [saving, setSaving] = useState(false);
+  // Why the last save did not go through, kept on screen with what was typed.
+  const [saveProblem, setSaveProblem] = useState<string | null>(null);
   const [touchedDate, setTouchedDate] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [scanNote, setScanNote] = useState<string | null>(null);
@@ -251,11 +254,19 @@ export function FillUpForm({
     const draft = draftFromForm(form);
     if (draft === null) return;
     setSaving(true);
+    setSaveProblem(null);
     try {
       if (forLink !== undefined) await forLink.onDraft(draft);
       else if (editing === null) await addFillUp(draft, vehicleId);
-      else await updateFillUp(editing.id, draft, vehicleId);
+      // On the fill-up's own car, never the selected one (#83).
+      else await updateFillUp(editing.id, draft);
       await onSaved();
+    } catch (cause) {
+      // The form stays open with what was typed: a refusal is said, not
+      // swallowed, and the reader decides what to do with their changes.
+      setSaveProblem(
+        cause instanceof StaleEdit ? cause.message : 'That could not be saved. Your changes are still here; try again.',
+      );
     } finally {
       setSaving(false);
     }
@@ -482,6 +493,12 @@ export function FillUpForm({
           onChange={(event) => update('notes', event.target.value)}
         />
       </div>
+
+      {saveProblem !== null && (
+        <p className="warning" role="alert">
+          {saveProblem}
+        </p>
+      )}
 
       <div className="row-actions">
         <button className="button" type="submit" disabled={!canSave}>

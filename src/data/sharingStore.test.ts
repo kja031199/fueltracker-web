@@ -56,7 +56,7 @@ describe.each([
       const entry = await owner.addFillUp(draft(), vehicle.id);
 
       const partner = new FuelTrackerStore(shared, undefined, 'partner');
-      const edited = await partner.updateFillUp(entry.id, draft(12_000), vehicle.id);
+      const edited = await partner.updateFillUp(entry.id, draft(12_000));
       expect(edited.odometer).toBe(12_000);
       expect(edited.enteredBy).toBe('owner');
     });

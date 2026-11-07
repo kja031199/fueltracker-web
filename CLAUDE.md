@@ -245,6 +245,12 @@ npm ci --prefix .github/firebase-cli
   `list()` + filter** where an index answers it. `list()` is for export and
   sync, which need every row and every photo.
 
+- **An edit cannot move or revive a fill-up** (#83). `store.updateFillUp(id,
+  draft)` takes no car: it keeps the stored `vehicleId`, and throws
+  `StaleEdit` (`data/staleEdit.ts`, importable by screens) if the fill-up or
+  its car has gone. It used to take the *selected* car, which a sync can change
+  under an open form. Don't add a car parameter back.
+
 - **`updatedAt` is a logical clock**, `max(wallClock, highestSeen + 1)`, which
   is what makes last-write-wins mean *last edit* rather than *furthest-ahead
   clock*. Adoption is bounded at 30 days, or a row claiming `MAX_SAFE_INTEGER`

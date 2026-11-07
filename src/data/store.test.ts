@@ -8,6 +8,7 @@ import { SCHEMA_VERSION } from './records';
 import type { StoreClock } from './store';
 import { FuelTrackerStore, toStats } from './store';
 import { TEXT_LIMITS } from '../domain/textLimits';
+import { StaleEdit } from './staleEdit';
 
 /** A clock that advances by a millisecond per read, so ids and times differ. */
 function testClock(start = 1_000): StoreClock {
@@ -135,14 +136,54 @@ describe('fill-ups go through the draft, and only through the draft', () => {
   test('editing keeps the id and replaces the row', async () => {
     const vehicle = await store.addVehicle({ name: 'Car' });
     const created = await store.addFillUp(draft(), vehicle.id);
-    const edited = await store.updateFillUp(
-      created.id,
-      draft({ gallons: 12, station: 'Costco' }),
-      vehicle.id,
-    );
+    const edited = await store.updateFillUp(created.id, draft({ gallons: 12, station: 'Costco' }));
     expect(edited.id).toBe(created.id);
     expect(await store.fillUps(vehicle.id)).toHaveLength(1);
     expect((await store.fillUps(vehicle.id))[0]?.gallons).toBe(12);
+  });
+
+  // #83: an edit never moves a fill-up, and never revives one.
+  test('an edit stays on the fill-up’s own car — the store does not take a car to move it to', async () => {
+    const a = await store.addVehicle({ name: 'A' });
+    const b = await store.addVehicle({ name: 'B' });
+    const created = await store.addFillUp(draft(), a.id);
+    const edited = await store.updateFillUp(created.id, draft({ gallons: 12 }));
+    expect(edited.vehicleId).toBe(a.id);
+    expect(await store.fillUps(a.id)).toHaveLength(1);
+    expect(await store.fillUps(b.id)).toHaveLength(0);
+  });
+
+  test('an edit to a fill-up deleted meanwhile is refused, and does not bring it back', async () => {
+    const vehicle = await store.addVehicle({ name: 'Car' });
+    const created = await store.addFillUp(draft(), vehicle.id);
+    await store.removeFillUp(created.id);
+    await expect(store.updateFillUp(created.id, draft({ gallons: 12 }))).rejects.toMatchObject({
+      reason: 'fill-up-gone',
+    });
+    await expect(store.updateFillUp(created.id, draft())).rejects.toBeInstanceOf(StaleEdit);
+    expect(await store.fillUps(vehicle.id)).toHaveLength(0);
+    expect(await store.fillUpCount()).toBe(0);
+  });
+
+  test('an edit to a fill-up nobody ever saved is refused, not created', async () => {
+    const vehicle = await store.addVehicle({ name: 'Car' });
+    await expect(store.updateFillUp('never-was', draft())).rejects.toMatchObject({ reason: 'fill-up-gone' });
+    expect(await store.fillUps(vehicle.id)).toHaveLength(0);
+  });
+
+  test('an edit whose car has gone — its deletion synced before the fill-up’s — is refused', async () => {
+    const vehicle = await store.addVehicle({ name: 'Car' });
+    const created = await store.addFillUp(draft(), vehicle.id);
+    // The car's tombstone arrives on its own, as a partial sync can deliver it.
+    const [car] = (await store.exportSnapshot()).vehicles;
+    if (car === undefined) throw new Error('no car');
+    await store.importBackup({
+      vehicles: [{ ...car, deletedAt: car.updatedAt + 1, updatedAt: car.updatedAt + 1 }],
+      fillUps: [],
+      pendingFillUps: [],
+    });
+    await expect(store.updateFillUp(created.id, draft({ gallons: 12 }))).rejects.toMatchObject({ reason: 'car-gone' });
+    expect((await store.fillUp(created.id))?.gallons).toBe(10);
   });
 
   test('an oversized receipt is dropped while the fill-up still saves', async () => {

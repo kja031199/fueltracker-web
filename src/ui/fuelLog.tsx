@@ -36,6 +36,7 @@ import type { SyncStateStore } from '../data/syncState';
 import type { SharingSync } from '../data/shareSync';
 import type { Invite, Member, Membership } from '../data/sharing';
 import { ShareClash } from '../data/sharing';
+import { StaleEdit } from '../data/staleEdit';
 import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
 import type { Submission } from '../data/fillUpLink';
 import type { AppData } from './useAppData';
@@ -98,7 +99,12 @@ export interface FuelLog extends Omit<AppData, 'reload'> {
   addVehicle(vehicle: NewVehicle): Promise<VehicleRecord>;
   removeVehicle(id: string): Promise<void>;
   addFillUp(draft: FuelEntryDraft, vehicleId: string): Promise<FillUpRecord>;
-  updateFillUp(id: string, draft: FuelEntryDraft, vehicleId: string): Promise<FillUpRecord>;
+  /**
+   * Edits a fill-up on the car it is already on (#83). Rejects with
+   * `StaleEdit` when it, or its car, has gone since the form opened — and then
+   * refreshes, since what the screen shows is out of date.
+   */
+  updateFillUp(id: string, draft: FuelEntryDraft): Promise<FillUpRecord>;
   removeFillUp(id: string): Promise<void>;
   importBackup(snapshot: Snapshot): Promise<ImportSummary>;
   /**
@@ -172,6 +178,7 @@ export function FuelLogProvider({
   const log = useMemo<FuelLog>(() => {
     const { reload: _reload, ...shown } = data;
     const receive = written((submission: Submission) => store.receiveSubmission(submission));
+    const update = written((id: string, draft: FuelEntryDraft) => store.updateFillUp(id, draft));
     // The device's ledger is read as well as the lists in state, which are
     // filled asynchronously: a link opened as the app starts is checked
     // against what this device knows, not against lists still loading.
@@ -189,9 +196,14 @@ export function FuelLogProvider({
       addVehicle: written((vehicle: NewVehicle) => store.addVehicle(vehicle)),
       removeVehicle: written((id: string) => store.removeVehicle(id)),
       addFillUp: written((draft: FuelEntryDraft, vehicleId: string) => store.addFillUp(draft, vehicleId)),
-      updateFillUp: written((id: string, draft: FuelEntryDraft, vehicleId: string) =>
-        store.updateFillUp(id, draft, vehicleId),
-      ),
+      updateFillUp: async (id: string, draft: FuelEntryDraft) => {
+        try {
+          return await update(id, draft);
+        } catch (cause) {
+          if (cause instanceof StaleEdit) await reload();
+          throw cause;
+        }
+      },
       removeFillUp: written((id: string) => store.removeFillUp(id)),
       importBackup: written((snapshot: Snapshot) => store.importBackup(snapshot)),
       receiveSubmission: async (submission: Submission): Promise<ReceiveResult> =>

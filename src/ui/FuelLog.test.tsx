@@ -119,7 +119,7 @@ describe('every write reaches the account without anyone remembering to ask', ()
     const vehicle = await store.addVehicle({ name: 'Civic' });
     const entry = await store.addFillUp(draft(1000), vehicle.id);
     await act(async () => {
-      await log().updateFillUp(entry.id, draft(1234), vehicle.id);
+      await log().updateFillUp(entry.id, draft(1234));
     });
     await waitFor(
       async () => expect((await remoteRow(remote, entry.id))?.['odometer']).toBe(1234),

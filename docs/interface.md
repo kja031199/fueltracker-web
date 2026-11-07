@@ -32,6 +32,13 @@ and schedules a sync a moment later (#52), in one place — so a screen added
 next year gets both without anyone remembering to ask. Screens cannot reach
 the store directly; a test enforces it.
 
+**An edit never moves a fill-up** (#83). Editing saves onto the car the
+fill-up is already on — the store takes no car for an edit — because the form
+can stay open while a sync changes which car is selected. If the fill-up, or
+its car, was deleted while it was being edited, the save is refused, the form
+says so and keeps what was typed, and the list underneath is refreshed;
+nothing is written back.
+
 ## Sharing a car, and the missed fill-up hint (#66)
 
 Vehicles → **Share** on your own car invites someone by their Google address,
