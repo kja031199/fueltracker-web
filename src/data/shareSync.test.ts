@@ -785,3 +785,59 @@ describe('a member cannot lock the owner’s fill-up with a far-future stamp (#7
     ).rejects.toBeInstanceOf(Refused);
   });
 });
+
+// --- #80: ending access holds ------------------------------------------------------
+
+describe('ending a share holds on the account side (#80)', () => {
+  test('removing a member withdraws an invitation left behind, so they cannot join again', async () => {
+    const { world, owner, partner, car } = await sharedCar();
+    // As an older build could leave it: joined, and the invitation still there.
+    const leftover = await owner.sharing.remote.invite(car, 'sam@example.com');
+    await owner.sharing.remote.removeMember(car.id, PARTNER.uid);
+    expect(world.invites.size).toBe(0);
+    await expect(partner.sharing.remote.accept(leftover)).rejects.toBeInstanceOf(Refused);
+    expect(world.isMember(OWNER.uid, car.id, PARTNER.uid)).toBe(false);
+  });
+
+  test('once the owner deletes the car, the member can neither read nor write it, and forgets it', async () => {
+    const { owner, partner, car } = await sharedCar();
+    await partner.sync();
+    const [membership] = await partner.sharing.remote.memberships();
+    if (membership === undefined) throw new Error('no membership');
+    await owner.store.removeVehicle(car.id);
+    await owner.sync();
+
+    await expect(partner.sharing.remote.scoped(membership).pull(null)).rejects.toBeInstanceOf(Refused);
+    await expect(
+      partner.sharing.remote.scoped(membership).push({ vehicles: [], fillUps: [], pendingFillUps: [] }),
+    ).rejects.toBeInstanceOf(Refused);
+    await expect(partner.sharing.remote.members(OWNER.uid, car.id)).rejects.toBeInstanceOf(Refused);
+
+    const result = await partner.sync();
+    expect(result.shares.ended.map((m) => m.vehicleId)).toEqual([car.id]);
+    expect(await partner.store.vehicles()).toHaveLength(0);
+  });
+
+  test('an invitation to a car deleted since it was sent cannot be accepted', async () => {
+    const world = new InMemorySharingWorld();
+    const owner = device(world, OWNER);
+    const partner = device(world, PARTNER);
+    const car = await owner.store.addVehicle({ name: 'Civic' });
+    await owner.sync();
+    const invite = await owner.sharing.remote.invite(car, 'sam@example.com');
+    await owner.store.removeVehicle(car.id);
+    await owner.sync();
+    await expect(partner.sharing.remote.accept(invite)).rejects.toBeInstanceOf(Refused);
+  });
+
+  test('ending sharing of a car removes its members and invitations, and leaves other cars alone', async () => {
+    const { world, owner, car } = await sharedCar();
+    const other = await owner.store.addVehicle({ name: 'Truck' });
+    await owner.sync();
+    await owner.sharing.remote.invite(car, 'alex@example.com');
+    await owner.sharing.remote.invite(other, 'alex@example.com');
+    await owner.sharing.remote.endSharing(car.id);
+    expect(world.isMember(OWNER.uid, car.id, PARTNER.uid)).toBe(false);
+    expect([...world.invites.values()].map((i) => i.vehicleId)).toEqual([other.id]);
+  });
+});

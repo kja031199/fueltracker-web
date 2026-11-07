@@ -194,7 +194,16 @@ export function FuelLogProvider({
       sharing: sharingView,
       me: uid,
       addVehicle: written((vehicle: NewVehicle) => store.addVehicle(vehicle)),
-      removeVehicle: written((id: string) => store.removeVehicle(id)),
+      removeVehicle: written(async (id: string) => {
+        await store.removeVehicle(id);
+        // One of yours, shared: its members and invitations go too (#80). The
+        // rules already refuse a deleted car to everyone else; this clears
+        // what would otherwise still list them. Best effort — offline, or
+        // refused, it changes nothing a reader would lose.
+        if (shared !== null && sharingView.membershipFor(id) === undefined) {
+          await shared.remote.endSharing(id).catch(() => {});
+        }
+      }),
       addFillUp: written((draft: FuelEntryDraft, vehicleId: string) => store.addFillUp(draft, vehicleId)),
       updateFillUp: async (id: string, draft: FuelEntryDraft) => {
         try {

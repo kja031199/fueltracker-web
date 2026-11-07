@@ -191,6 +191,8 @@ Recorded so a regression in the tests themselves is visible:
 | Local reads: Dexie `listDeleted` returning live rows / `getMany` hiding tombstones (memory / Dexie) / forget missing deleted rows | 3 / 12 / 1 / 4 |
 | Merge stamp (#79): future bound removed / set to a day / no-going-backwards removed / equal stamp refused | 3 / 2 / 3 / 3 |
 | Merge stamp: `finite` reduced to `is number` / invite date unchecked / in-memory far-future / backwards / client bound at the adoption cap | 10 / 1 / 1 / 1 / 2 |
+| Revoking (#80): join leaving the invitation / joining a deleted car / `memberOf` ignoring deletion (all emulator) / accept in three writes | 1 / 1 / 2 / 5 |
+| Revoking: `removeMember` keeping the invitation / `endSharing` doing nothing / delete not ending sharing / in-memory: deletion ignored / deleted car accepted / invitation kept | 1 / 1 / 1 / 1 / 1 / 1 |
 
 Equivalent, and kept for parity: the repair skipping tombstones. A tombstone
 carries no text, so there is nothing for it to shorten.

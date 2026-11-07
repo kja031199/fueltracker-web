@@ -448,3 +448,23 @@ describe('an invitation to a car whose id is one of yours (#78)', () => {
     expect(await sam.store.fillUps(mine.id)).toHaveLength(1);
   });
 });
+
+describe('deleting a car you share (#80)', () => {
+  test('removes its members and withdraws its invitations', async () => {
+    const world = new InMemorySharingWorld();
+    const kyle = person(world, KYLE);
+    const car = await kylesCivic(world, kyle);
+    const kyleSharing = world.sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true });
+    const invite = await kyleSharing.invite(car, SAM.email);
+    await world.sharingFor({ uid: SAM.uid, name: 'Sam', email: SAM.email, emailVerified: true }).accept(invite);
+    await kyleSharing.invite(car, 'alex@example.com');
+    const user = userEvent.setup();
+    open(world, kyle);
+
+    await user.click(await screen.findByRole('button', { name: 'Delete' }, WAIT));
+    await user.click(screen.getByRole('button', { name: /delete civic/i }));
+
+    await waitFor(() => expect(world.isMember(KYLE.uid, car.id, SAM.uid)).toBe(false), WAIT);
+    expect(world.invites.size).toBe(0);
+  });
+});
