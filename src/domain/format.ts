@@ -40,6 +40,27 @@ const REGION_CURRENCY: Record<string, string> = {
 export const DEFAULT_CURRENCY = 'USD';
 
 /** The currency code to use for a locale. */
+const formatters = new Map<string, Intl.NumberFormat>();
+const MAX_FORMATTERS = 64;
+
+/**
+ * One `Intl.NumberFormat` per locale and options, made once (#88). Building
+ * one is far dearer than using one, and every row of every list called this
+ * several times per render. An invalid locale or currency still throws, as
+ * the constructor would: nothing is cached for it.
+ */
+export function numberFormat(locale: string, options: Intl.NumberFormatOptions): Intl.NumberFormat {
+  const key = `${locale}|${JSON.stringify(options)}`;
+  let formatter = formatters.get(key);
+  if (formatter === undefined) {
+    formatter = new Intl.NumberFormat(locale, options);
+    // A handful of shapes in practice; capped so no input can grow it for ever.
+    if (formatters.size >= MAX_FORMATTERS) formatters.clear();
+    formatters.set(key, formatter);
+  }
+  return formatter;
+}
+
 export function currencyForLocale(locale: string): string {
   const region = regionForLocale(locale);
   return (region !== undefined ? REGION_CURRENCY[region] : undefined) ?? DEFAULT_CURRENCY;
@@ -70,7 +91,7 @@ export interface CurrencyOptions {
 export function plainCurrency(value: number, options: CurrencyOptions = {}): string {
   const locale = options.locale ?? 'en-US';
   const currency = options.currency ?? currencyForLocale(locale);
-  return new Intl.NumberFormat(locale, {
+  return numberFormat(locale, {
     style: 'currency',
     currency,
     minimumFractionDigits: 2,
@@ -85,7 +106,7 @@ export function plainCurrency(value: number, options: CurrencyOptions = {}): str
  */
 export function currency(value: number, options: CurrencyOptions = {}): string {
   const locale = options.locale ?? 'en-US';
-  return new Intl.NumberFormat(locale, {
+  return numberFormat(locale, {
     style: 'currency',
     currency: options.currency ?? currencyForLocale(locale),
     // No explicit fraction digits: the locale decides.
@@ -103,7 +124,7 @@ export function currency(value: number, options: CurrencyOptions = {}): string {
 export function economy(mpg: number, unit: EconomyUnit): string | null {
   const converted = economyUnits[unit].fromMPG(mpg);
   if (converted === null) return null;
-  return new Intl.NumberFormat('en-US', {
+  return numberFormat('en-US', {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   }).format(converted);
@@ -125,7 +146,7 @@ export function fuelPrice(
 ): string {
   const locale = options.locale ?? 'en-US';
   const perUnit = pricePerGallon / volumeUnits[unit].fromGallons(1);
-  return new Intl.NumberFormat(locale, {
+  return numberFormat(locale, {
     style: 'currency',
     currency: options.currency ?? currencyForLocale(locale),
     minimumFractionDigits: 3,
@@ -141,7 +162,7 @@ export function costPerDistance(
 ): string {
   const locale = options.locale ?? 'en-US';
   const perUnit = costPerMile / distanceUnits[unit].fromMiles(1);
-  return new Intl.NumberFormat(locale, {
+  return numberFormat(locale, {
     style: 'currency',
     currency: options.currency ?? currencyForLocale(locale),
     minimumFractionDigits: 2,
@@ -157,7 +178,7 @@ export function costPerDistance(
  */
 export function volume(gallons: number, unit: VolumeUnit, withUnit = false): string {
   const spec = volumeUnits[unit];
-  const number = new Intl.NumberFormat('en-US', {
+  const number = numberFormat('en-US', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 3,
   }).format(spec.fromGallons(gallons));
@@ -167,7 +188,7 @@ export function volume(gallons: number, unit: VolumeUnit, withUnit = false): str
 /** A canonical **miles** value in the given distance unit, optionally suffixed. */
 export function distance(miles: number, unit: DistanceUnit, withUnit = false): string {
   const spec = distanceUnits[unit];
-  const number = new Intl.NumberFormat('en-US', {
+  const number = numberFormat('en-US', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 1,
   }).format(spec.fromMiles(miles));

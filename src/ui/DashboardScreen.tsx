@@ -58,13 +58,11 @@ export function DashboardScreen({ units }: Props): ReactElement {
     [fillUps, cutoff],
   );
   const kpis = useMemo(() => dashboardKPIs(stats, units), [stats, units]);
-  const insight = useMemo(
-    () => weekdayPriceInsight(toStats(inRange), { units }),
-    [inRange, units],
-  );
-
-  const weekdays = useMemo(() => weekdayPrices(toStats(inRange)), [inRange]);
-  const cheapest = useMemo(() => cheapestWeekday(toStats(inRange)), [inRange]);
+  // Mapped once, not once per use (#88).
+  const inRangeStats = useMemo(() => toStats(inRange), [inRange]);
+  const insight = useMemo(() => weekdayPriceInsight(inRangeStats, { units }), [inRangeStats, units]);
+  const weekdays = useMemo(() => weekdayPrices(inRangeStats), [inRangeStats]);
+  const cheapest = useMemo(() => cheapestWeekday(inRangeStats), [inRangeStats]);
 
   const economySpec = economyUnits[units.economy];
   const distanceSpec = distanceUnits[units.distance];

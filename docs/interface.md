@@ -32,6 +32,14 @@ and schedules a sync a moment later (#52), in one place — so a screen added
 next year gets both without anyone remembering to ask. Screens cannot reach
 the store directly; a test enforces it.
 
+**A save re-renders a screen once** (#88). What a screen shows (the cars, the
+selected car and its fill-ups, the count, the queue) is read in one go and
+applied as one update, so the selected car and the fill-ups shown are always
+the same car's. Sync status is a separate context, `useSyncStatus()`, read only
+by Settings, the incoming-link screen and the no-access gate, so a sync that
+brings nothing re-renders no screen. `FuelLogRenders.test.tsx` and
+`SyncRenders.test.tsx` count.
+
 **An edit never moves a fill-up** (#83). Editing saves onto the car the
 fill-up is already on — the store takes no car for an edit — because the form
 can stay open while a sync changes which car is selected. If the fill-up, or

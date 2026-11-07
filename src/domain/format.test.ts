@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import {
   DEFAULT_CURRENCY,
   volume,
@@ -8,6 +8,7 @@ import {
   distance,
   economy,
   fuelPrice,
+  numberFormat,
   plainCurrency,
 } from './format';
 
@@ -178,5 +179,43 @@ describe('volume', () => {
 
   test('does not throw on a non-finite volume', () => {
     expect(() => volume(Number.NaN, 'gallons')).not.toThrow();
+  });
+});
+
+describe('formatters are made once per shape (#88)', () => {
+  test('the same locale and options give the same formatter; different ones do not', () => {
+    const a = numberFormat('en-US', { maximumFractionDigits: 1 });
+    expect(numberFormat('en-US', { maximumFractionDigits: 1 })).toBe(a);
+    expect(numberFormat('en-US', { maximumFractionDigits: 2 })).not.toBe(a);
+    expect(numberFormat('de-DE', { maximumFractionDigits: 1 })).not.toBe(a);
+  });
+
+  test('formatting a list does not build a formatter per value', () => {
+    const made = vi.spyOn(Intl, 'NumberFormat');
+    try {
+      for (let i = 0; i < 50; i += 1) {
+        volume(i + 0.123, 'gallons');
+        currency(i, { locale: 'en-GB' });
+      }
+      // At most one each: the shapes may already be cached from other tests.
+      expect(made.mock.calls.length).toBeLessThanOrEqual(2);
+    } finally {
+      made.mockRestore();
+    }
+  });
+
+  test('an invalid currency still throws, every time — nothing is cached for it', () => {
+    expect(() => currency(1, { currency: 'NOT-A-CODE' })).toThrow(RangeError);
+    expect(() => currency(1, { currency: 'NOT-A-CODE' })).toThrow(RangeError);
+  });
+
+  test('many shapes stay correct past the cache’s cap', () => {
+    for (let digits = 0; digits <= 20; digits += 1) {
+      for (const locale of ['en-US', 'en-GB', 'de-DE', 'fr-FR']) {
+        expect(numberFormat(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(1)).toBe(
+          new Intl.NumberFormat(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(1),
+        );
+      }
+    }
   });
 });

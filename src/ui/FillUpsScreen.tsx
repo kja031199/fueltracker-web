@@ -56,6 +56,12 @@ export function FillUpsScreen({ units }: Props): ReactElement {
     [filter, filterable],
   );
 
+  // Worked out once per list, not per render (#88).
+  const stations = useMemo(
+    () => [...new Set(fillUps.map((r) => r.station).filter((s) => s !== ''))].sort(),
+    [fillUps],
+  );
+
   if (vehicleId === null) {
     return (
       <div>
@@ -96,7 +102,6 @@ export function FillUpsScreen({ units }: Props): ReactElement {
     setConfirmingId(null);
   }
 
-  const stations = [...new Set(fillUps.map((r) => r.station).filter((s) => s !== ''))].sort();
 
   return (
     <div>

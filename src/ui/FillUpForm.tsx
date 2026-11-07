@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { FillUpFormState } from '../domain/fillUpForm';
 import {
   canSaveForm,
@@ -21,7 +21,7 @@ import { TEXT_LIMITS } from '../domain/textLimits';
 import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
 import { LINK_TEXT_LIMITS } from '../data/fillUpLink';
 import { StaleEdit } from '../data/staleEdit';
-import { unusualOdometerJump } from '../domain/odometerGap';
+import { jumpFrom, odometerHistory } from '../domain/odometerGap';
 
 interface Props {
   readonly vehicleId: string;
@@ -183,6 +183,13 @@ export function FillUpForm({
     else update('pricePerGallon', canonical);
   }
 
+  // The car's other readings, sorted once per history rather than on every
+  // keystroke (#88): only the typed reading changes as somebody types.
+  const editingId = editing?.id;
+  const history = useMemo(
+    () => odometerHistory(existing.filter((record) => record.id !== editingId).map((record) => record.odometer)),
+    [existing, editingId],
+  );
   const previous = previousOdometer(
     existing.map((record) => record.odometer),
     editing !== null,
@@ -191,13 +198,7 @@ export function FillUpForm({
   // "Did somebody forget to log a fill-up?" (#66) — measured against the
   // car's other readings, never this entry's own, and only until the missed
   // box is ticked: once it is, the hint has done its job.
-  const jump =
-    odometerWarning || form.missedPreviousFillUp
-      ? null
-      : unusualOdometerJump(
-          form.odometer,
-          existing.filter((record) => record.id !== editing?.id).map((record) => record.odometer),
-        );
+  const jump = odometerWarning || form.missedPreviousFillUp ? null : jumpFrom(history, form.odometer);
   const total = formTotalCost(form);
   const canSave = canSaveForm(form) && !saving;
 

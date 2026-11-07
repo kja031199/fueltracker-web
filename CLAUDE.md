@@ -34,7 +34,8 @@ Hosting at `fueltracker-899eb.web.app`.
 - `src/data/firebase/` — the **only** place the Firebase SDK is imported.
 - `src/ui/` — React: screens, hooks, hand-drawn SVG charts (`charts/`).
   `App.tsx` gates on auth and holds per-browser preferences; `fuelLog.tsx`
-  (`FuelLogProvider` / `useFuelLog`) owns the data, sync and **every write**;
+  (`FuelLogProvider` / `useFuelLog`, and `useSyncStatus` for sync status)
+  owns the data, sync and **every write**;
   `AppShell` (in `App.tsx`) is the signed-in app (#56).
 
 No file or test counts here: the first version carried them and they were wrong
@@ -411,6 +412,21 @@ npm ci --prefix .github/firebase-cli
   end-to-end two-person flow (`sharing.test.ts`). Run the spike-style checks
   from the repo with an **absolute** rules path — a relative one silently
   loaded the app's own rules once and "proved" the wrong file.
+
+### Rendering
+
+- **Keep the fuel log's context value stable** (#88). Every screen reads
+  `useFuelLog()`, so a value rebuilt each render re-renders all of them: it
+  once cost about ten commits per save. `useAppData` and `useSync` return
+  memoised objects; `useAppData` reads everything in parallel and applies it
+  in **one** `setShown`, dropping a load that finishes after a later one was
+  shown. A selection is shown together with its fill-ups, never before them.
+  **Sync status is not in `useFuelLog()`**: read it with `useSyncStatus()`.
+  `AppShell` must not read it either. `RefusalGate` does, and passes the
+  screens through as `children`, so a status change re-renders only the gate.
+  A list re-read after every sync (the sharing lists) is replaced only when it
+  differs. Number formatting goes through `numberFormat` (`domain/format.ts`),
+  which caches one `Intl.NumberFormat` per locale and options.
 
 ### Tests
 
