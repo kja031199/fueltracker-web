@@ -387,8 +387,23 @@ that car in its owner's account. `syncAll` (`shareSync.ts`) runs them in turn:
    shared, one whose sync is refused, and one the owner deleted are removed
    with `forgetVehicle` — a hard delete with no tombstone.
 
-If the list of shares cannot be read, the account's own sync still runs and
-nothing is forgotten on the strength of a failed read. The owner needs none of
+If the list of shares cannot be read, the account's own sync still runs —
+excluding every car in the device's **ledger** — and nothing is forgotten on
+the strength of a failed read.
+
+The ledger is what keeps step 1 honest when the list cannot say, so it fails
+**closed** (#77):
+
+- **A ledger that cannot be read stops the whole sync** this time, reported as
+  a pause to retry. It used to read as "nothing is shared", which with the list
+  also unreachable pushed the shared car — someone else's fill-ups, receipts
+  and notes — into the member's own account. A readable list is not enough on
+  its own: a car left on another device is no longer in it, but is still here.
+- **Every current share is written to the ledger before any of its rows are
+  pulled**, and an ended share leaves the ledger only after its rows are
+  forgotten. So no failure or closed tab can leave shared rows on the device
+  that the ledger does not know about. If that first save fails, no share is
+  pulled this time. The owner needs none of
 this: a member's fill-ups simply appear in the owner's own account.
 
 A member's incremental read asks for `vehicleId == car` **and** `syncedAt >

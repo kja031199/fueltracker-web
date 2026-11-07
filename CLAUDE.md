@@ -140,6 +140,10 @@ npm ci --prefix .github/firebase-cli
    fill-ups — the `scope` on `syncOnce`; get either wrong and a car is copied
    into the wrong account. An ended share is `forgetVehicle`d: a hard delete,
    **no tombstone**, because those rows were never the member's to delete.
+   **The share ledger fails closed** (#77): unreadable means no sync at all,
+   never "nothing is shared"; a share is saved to it *before* its rows are
+   pulled and leaves it only *after* they are forgotten. Never add a
+   `.catch(() => [])` to `ledger.load()`.
 
 ## Traps
 

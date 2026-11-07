@@ -180,6 +180,8 @@ Recorded so a regression in the tests themselves is visible:
 | Page and manifest descriptions claiming "no account, no server" again | 1 / 1 |
 | Deploy key (#76): no environment / no `needs` / CLI without `--ignore-scripts` / `npm run build` in the key job / `--config` dropped / predeploy kept | 1 / 1 / 1 / 1 / 1 / 1 |
 | Deploy key: secret read in the build job / key written before `npm ci` / before the download | 8 / 1 / 1 |
+| Share ledger (#77): unreadable read as empty / failing closed only with the list unreachable too / reported as a refusal | 4 / 3 / 2 |
+| Share ledger: no save before pulling / that save's failure ignored / ended shares dropped before they are forgotten | 2 / 1 / 1 |
 
 Survives, and equivalent: dropping the array check from the link decoder — a
 JSON array cannot carry the version field, so it is refused as damaged either
