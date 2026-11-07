@@ -16,6 +16,7 @@ import {
   serverTimestamp,
   setDoc,
   where,
+  writeBatch,
 } from 'firebase/firestore';
 import { InMemoryRepository } from '../repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../records';
@@ -98,9 +99,25 @@ describeWithEmulator('sharing a car (#66)', () => {
     joinedAt: 1,
   });
 
+  /**
+   * Joining as the app does it (#80): the member document and the invitation
+   * it uses up, in one batch — the rules refuse a join that leaves the
+   * invitation behind, so it cannot be used again after a removal.
+   */
+  function joining(
+    db: ReturnType<typeof partner>,
+    options: { car?: string; uid?: string; data?: Record<string, unknown>; inviteCar?: string } = {},
+  ): Promise<void> {
+    const { car = SHARED, uid = PARTNER, data = membership(), inviteCar = SHARED } = options;
+    const batch = writeBatch(db);
+    batch.set(doc(db, `users/${OWNER}/vehicles/${car}/members/${uid}`), data);
+    batch.delete(doc(db, `invites/${inviteId(inviteCar, PARTNER_EMAIL)}`));
+    return batch.commit();
+  }
+
   async function join(): Promise<void> {
     await assertSucceeds(setDoc(doc(owner(), `invites/${inviteId(SHARED, PARTNER_EMAIL)}`), invite()));
-    await assertSucceeds(setDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}/members/${PARTNER}`), membership()));
+    await assertSucceeds(joining(partner()));
   }
 
   beforeAll(async () => {
@@ -213,20 +230,20 @@ describeWithEmulator('sharing a car (#66)', () => {
     it('is refused when the address on the sign-in is not verified', async () => {
       await setDoc(doc(owner(), `invites/${inviteId(SHARED, PARTNER_EMAIL)}`), invite());
       const unverified = as(PARTNER, PARTNER_EMAIL, false);
-      await assertFails(setDoc(doc(unverified, `users/${OWNER}/vehicles/${SHARED}/members/${PARTNER}`), membership()));
+      await assertFails(joining(unverified));
     });
 
     it('an invitation to one car does not open another', async () => {
       await setDoc(doc(owner(), `invites/${inviteId(SHARED, PARTNER_EMAIL)}`), invite());
-      await assertFails(setDoc(doc(partner(), `users/${OWNER}/vehicles/${PRIVATE}/members/${PARTNER}`), membership()));
+      await assertFails(joining(partner(), { car: PRIVATE }));
     });
 
     it('someone else cannot use your invitation, or add you, or add anyone', async () => {
       await setDoc(doc(owner(), `invites/${inviteId(SHARED, PARTNER_EMAIL)}`), invite());
       // A stranger presenting the partner's address but a different account.
       const impostor = as(STRANGER, PARTNER_EMAIL);
-      await assertFails(setDoc(doc(impostor, `users/${OWNER}/vehicles/${SHARED}/members/${STRANGER}`), { ...membership(), uid: STRANGER }));
-      await assertSucceeds(setDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}/members/${PARTNER}`), membership()));
+      await assertFails(joining(impostor, { uid: STRANGER, data: { ...membership(), uid: STRANGER } }));
+      await assertSucceeds(joining(partner()));
       // A member cannot add a third person.
       await assertFails(setDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}/members/${STRANGER}`), { ...membership(), uid: STRANGER }));
     });
@@ -240,7 +257,7 @@ describeWithEmulator('sharing a car (#66)', () => {
         await setDoc(doc(context.firestore(), `users/${PARTNER}/vehicles/${SHARED}`), { ...vehicle, id: SHARED });
       });
       await setDoc(doc(owner(), `invites/${inviteId(SHARED, PARTNER_EMAIL)}`), invite());
-      await assertFails(setDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}/members/${PARTNER}`), membership()));
+      await assertFails(joining(partner()));
     });
 
     it('…including one you deleted, whose tombstone still names it', async () => {
@@ -249,7 +266,7 @@ describeWithEmulator('sharing a car (#66)', () => {
         await setDoc(doc(context.firestore(), `users/${PARTNER}/vehicles/${SHARED}`), { ...vehicle, id: SHARED, deletedAt: 5 });
       });
       await setDoc(doc(owner(), `invites/${inviteId(SHARED, PARTNER_EMAIL)}`), invite());
-      await assertFails(setDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}/members/${PARTNER}`), membership()));
+      await assertFails(joining(partner()));
     });
 
     it('a car of yours with a different id does not get in the way', async () => {
@@ -260,11 +277,41 @@ describeWithEmulator('sharing a car (#66)', () => {
       await join();
     });
 
+    // #80: an invitation is single-use, enforced here rather than trusted to
+    // the client that is joining.
+    it('is refused when the join leaves the invitation behind', async () => {
+      await setDoc(doc(owner(), `invites/${inviteId(SHARED, PARTNER_EMAIL)}`), invite());
+      await assertFails(setDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}/members/${PARTNER}`), membership()));
+    });
+
+    it('uses the invitation up: it is gone once joined', async () => {
+      await join();
+      let left = true;
+      await env.withSecurityRulesDisabled(async (context) => {
+        left = (await getDoc(doc(context.firestore(), `invites/${inviteId(SHARED, PARTNER_EMAIL)}`))).exists();
+      });
+      expect(left).toBe(false);
+    });
+
+    it('cannot be repeated after the owner removes you: there is nothing left to join with', async () => {
+      await join();
+      await assertSucceeds(deleteDoc(doc(owner(), `users/${OWNER}/vehicles/${SHARED}/members/${PARTNER}`)));
+      await assertFails(joining(partner()));
+      await assertFails(setDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}/members/${PARTNER}`), membership()));
+    });
+
+    it('is refused for a car deleted since the invitation was sent', async () => {
+      await setDoc(doc(owner(), `invites/${inviteId(SHARED, PARTNER_EMAIL)}`), invite());
+      const { vehicle } = await records();
+      await env.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), `users/${OWNER}/vehicles/${SHARED}`), { ...vehicle, id: SHARED, deletedAt: 5 });
+      });
+      await assertFails(joining(partner()));
+    });
+
     it('cannot claim another address in the membership', async () => {
       await setDoc(doc(owner(), `invites/${inviteId(SHARED, PARTNER_EMAIL)}`), invite());
-      await assertFails(
-        setDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}/members/${PARTNER}`), { ...membership(), email: 'boss@example.com' }),
-      );
+      await assertFails(joining(partner(), { data: { ...membership(), email: 'boss@example.com' } }));
     });
   });
 
@@ -375,15 +422,8 @@ describeWithEmulator('sharing a car (#66)', () => {
 
     it('refuses a membership whose join time is not a finite number', async () => {
       await setDoc(doc(owner(), `invites/${inviteId(SHARED, PARTNER_EMAIL)}`), invite());
-      await assertFails(
-        setDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}/members/${PARTNER}`), { ...membership(), joinedAt: Number.NaN }),
-      );
-      await assertFails(
-        setDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}/members/${PARTNER}`), {
-          ...membership(),
-          joinedAt: Number.POSITIVE_INFINITY,
-        }),
-      );
+      await assertFails(joining(partner(), { data: { ...membership(), joinedAt: Number.NaN } }));
+      await assertFails(joining(partner(), { data: { ...membership(), joinedAt: Number.POSITIVE_INFINITY } }));
     });
 
     it('refuses an invitation dated infinity', async () => {
@@ -416,6 +456,39 @@ describeWithEmulator('sharing a car (#66)', () => {
       await join();
       await assertSucceeds(deleteDoc(doc(owner(), `users/${OWNER}/vehicles/${SHARED}/members/${PARTNER}`)));
       await assertFails(getDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}`)));
+    });
+
+    // #80: deleting the car ends access on the server, whatever is left over.
+    describe('the owner deletes the car', () => {
+      async function deleteTheCar(): Promise<void> {
+        const { vehicle } = await records();
+        await env.withSecurityRulesDisabled(async (context) => {
+          await setDoc(doc(context.firestore(), `users/${OWNER}/vehicles/${SHARED}`), { ...vehicle, id: SHARED, deletedAt: 5 });
+        });
+      }
+
+      it('a member left behind reads nothing of it', async () => {
+        await join();
+        await deleteTheCar();
+        await assertFails(getDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}`)));
+        await assertFails(getDocs(query(collection(partner(), `users/${OWNER}/fillUps`), where('vehicleId', '==', SHARED))));
+      });
+
+      it('…and writes nothing to it', async () => {
+        await join();
+        await deleteTheCar();
+        await assertFails(setDoc(doc(partner(), `users/${OWNER}/fillUps/new`), await fillUpFor('new', SHARED, PARTNER)));
+        const theirs = await fillUpFor('on-shared', SHARED, OWNER);
+        await assertFails(setDoc(doc(partner(), `users/${OWNER}/fillUps/on-shared`), { ...theirs, odometer: 10_050, updatedAt: Date.now() }));
+      });
+
+      it('the owner can still clear its members and invitations', async () => {
+        await join();
+        await setDoc(doc(owner(), `invites/${inviteId(SHARED, 'third@example.com')}`), invite(SHARED, 'third@example.com'));
+        await deleteTheCar();
+        await assertSucceeds(deleteDoc(doc(owner(), `users/${OWNER}/vehicles/${SHARED}/members/${PARTNER}`)));
+        await assertSucceeds(deleteDoc(doc(owner(), `invites/${inviteId(SHARED, 'third@example.com')}`)));
+      });
     });
 
     it('nobody else can remove a member', async () => {

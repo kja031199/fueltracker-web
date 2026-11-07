@@ -72,12 +72,20 @@ export interface SharingRemote {
   invitesSent(): Promise<Invite[]>;
   /** Who a car is shared with. Readable by its owner and its members. */
   members(ownerUid: string, vehicleId: string): Promise<Member[]>;
+  /** Removes a member, and withdraws any invitation of theirs still there (#80). */
   removeMember(vehicleId: string, memberUid: string): Promise<void>;
+  /**
+   * Removes every member of one of this account's cars and withdraws every
+   * invitation to it (#80): what deleting the car means for sharing. The
+   * rules already refuse a deleted car to its members; this clears what is
+   * left over, so nobody is still listed, or invited, to a car that is gone.
+   */
+  endSharing(vehicleId: string): Promise<void>;
 
   // The invitee's side.
   /** Invitations addressed to this account's verified email. */
   invitesForMe(): Promise<Invite[]>;
-  /** Joins, records the membership, and uses up the invitation. */
+  /** Joins, records the membership, and uses up the invitation — atomically (#80). */
   accept(invite: Invite): Promise<Membership>;
   decline(invite: Invite): Promise<void>;
   /** Cars shared with this account, from its own `memberships`. */
@@ -167,6 +175,11 @@ export class InMemorySharingWorld {
     return this.members.get(`${ownerUid}__${vehicleId}`)?.has(uid) ?? false;
   }
 
+  /** As the rules' `memberOf` (#80): a member of a car that still exists. */
+  async isLiveMember(ownerUid: string, vehicleId: string, uid: string): Promise<boolean> {
+    return this.isMember(ownerUid, vehicleId, uid) && (await this.liveVehicle(ownerUid, vehicleId)) !== undefined;
+  }
+
   /** The owner's live, non-deleted car, or undefined. */
   async liveVehicle(ownerUid: string, vehicleId: string): Promise<VehicleRecord | undefined> {
     const raw = await this.remoteFor(ownerUid).pull(null);
@@ -214,14 +227,24 @@ class InMemorySharing implements SharingRemote {
   }
 
   async members(ownerUid: string, vehicleId: string): Promise<Member[]> {
-    if (ownerUid !== this.me.uid && !this.world.isMember(ownerUid, vehicleId, this.me.uid)) {
+    if (ownerUid !== this.me.uid && !(await this.world.isLiveMember(ownerUid, vehicleId, this.me.uid))) {
       throw new Refused('members of a car you are not in');
     }
     return [...(this.world.members.get(`${ownerUid}__${vehicleId}`)?.values() ?? [])];
   }
 
   async removeMember(vehicleId: string, memberUid: string): Promise<void> {
-    this.world.members.get(`${this.me.uid}__${vehicleId}`)?.delete(memberUid);
+    const room = this.world.members.get(`${this.me.uid}__${vehicleId}`);
+    const email = room?.get(memberUid)?.email;
+    room?.delete(memberUid);
+    if (email !== undefined) this.world.invites.delete(inviteKey(this.me.uid, vehicleId, email));
+  }
+
+  async endSharing(vehicleId: string): Promise<void> {
+    this.world.members.delete(`${this.me.uid}__${vehicleId}`);
+    for (const [key, invite] of this.world.invites) {
+      if (invite.ownerUid === this.me.uid && invite.vehicleId === vehicleId) this.world.invites.delete(key);
+    }
   }
 
   async invitesForMe(): Promise<Invite[]> {
@@ -237,6 +260,10 @@ class InMemorySharing implements SharingRemote {
       throw new Refused('join without an invitation');
     }
     if (invite.ownerUid === this.me.uid) throw new Refused('join your own car');
+    // As firestore.rules: only a car that still exists (#80).
+    if ((await this.world.liveVehicle(invite.ownerUid, invite.vehicleId)) === undefined) {
+      throw new Refused('join a car that has been deleted');
+    }
     // As firestore.rules: never a car whose id names one of your own (#78).
     if (this.world.remoteFor(this.me.uid).hasVehicle(invite.vehicleId)) {
       throw new Refused('join a car with the id of one of your own');
@@ -289,18 +316,18 @@ class InMemoryScopedRemote implements RemoteStore {
     private readonly uid: string,
   ) {}
 
-  private check(what: string): void {
-    if (!this.world.isMember(this.share.ownerUid, this.share.vehicleId, this.uid)) throw new Refused(what);
+  private async check(what: string): Promise<void> {
+    if (!(await this.world.isLiveMember(this.share.ownerUid, this.share.vehicleId, this.uid))) throw new Refused(what);
   }
 
   async pull(since: PullCursor | null = null): Promise<RawSnapshot> {
-    this.check('read a car you are not in');
+    await this.check('read a car you are not in');
     const raw = await this.world.remoteFor(this.share.ownerUid).pull(since);
     return scopeSnapshot(raw, this.share.vehicleId);
   }
 
   async push(snapshot: Snapshot): Promise<PushSummary> {
-    this.check('write to a car you are not in');
+    await this.check('write to a car you are not in');
     if (snapshot.vehicles.length > 0 || snapshot.pendingFillUps.length > 0) {
       throw new Refused('a member writes fill-ups only');
     }

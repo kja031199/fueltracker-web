@@ -194,6 +194,10 @@ so an existing car and its whole history can be shared as it is.
   rules compare the invitation with the address on the sign-in, lowercased,
   and only when Google has verified it. Nobody can add anyone else, and a
   member cannot add a third person.
+- **An invitation is single-use** (#80). Joining and using the invitation up
+  happen in one batch, and the rules refuse a join that leaves it behind — so
+  someone you remove cannot simply join again. Removing someone also withdraws
+  any invitation of theirs an older build left in place.
 - **You can never join a car whose id is one of your own** (#78), live or
   deleted. A car's id is not secret — request links and CSV exports carry it —
   and an owner can file a car under any id; joining such a car would sync your
@@ -217,7 +221,12 @@ so an existing car and its whole history can be shared as it is.
 
 **When it ends** — removed, left, or the owner deleted the car — the car is
 removed from the member's devices with no trace pushed anywhere: those rows
-were never the member's to delete. Fill-ups the member logged **and synced**
+were never the member's to delete. **A deleted car grants nothing**, on the
+server (#80): the rules' `memberOf` requires the car to exist, so a member
+left behind can neither read it nor write to it, and an invitation to it can
+no longer be accepted. Deleting your car also removes its members and
+withdraws its invitations, so nobody is still listed against a car that is
+gone. Fill-ups the member logged **and synced**
 stay with the owner. One logged but not yet synced when access ends goes with
 the car, because there is nowhere left it may be sent.
 

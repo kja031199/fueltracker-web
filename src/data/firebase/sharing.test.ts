@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import { initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
-import type { Firestore } from 'firebase/firestore';
+import { doc, setDoc, type Firestore } from 'firebase/firestore';
 import { InMemoryRepository } from '../repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../records';
 import { FuelTrackerStore } from '../store';
@@ -175,6 +175,65 @@ describeWithEmulator('sharing through the real rules', () => {
     expect(await partner.store.vehicles()).toHaveLength(0);
     await owner.sync();
     expect(await owner.store.fillUps(car.id)).toHaveLength(1);
+  });
+
+  // #80: removing someone, or deleting the car, ends access on the server.
+  test('removing a member also withdraws an invitation an older build left behind', async () => {
+    const owner = device(OWNER);
+    const partner = device(PARTNER);
+    const car = await owner.store.addVehicle({ name: 'Civic' });
+    await owner.sync();
+    await owner.sharing.remote.invite(car, 'sam@example.com');
+    const [invitation] = await partner.sharing.remote.invitesForMe();
+    await partner.sharing.remote.accept(invitation!);
+    // An older build joined without using the invitation up.
+    await env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `invites/${OWNER.uid}__${car.id}__sam@example.com`), { ...invitation! });
+    });
+
+    await owner.sharing.remote.removeMember(car.id, PARTNER.uid);
+
+    expect(await owner.sharing.remote.invitesSent()).toHaveLength(0);
+    expect(await owner.sharing.remote.members(OWNER.uid, car.id)).toHaveLength(0);
+  });
+
+  test('ending sharing of a car removes its members and its invitations, and only its', async () => {
+    const owner = device(OWNER);
+    const partner = device(PARTNER);
+    const car = await owner.store.addVehicle({ name: 'Civic' });
+    const other = await owner.store.addVehicle({ name: 'Truck' });
+    await owner.sync();
+    await owner.sharing.remote.invite(car, 'sam@example.com');
+    const [invitation] = await partner.sharing.remote.invitesForMe();
+    await partner.sharing.remote.accept(invitation!);
+    await owner.sharing.remote.invite(car, 'alex@example.com');
+    await owner.sharing.remote.invite(other, 'alex@example.com');
+
+    await owner.sharing.remote.endSharing(car.id);
+
+    expect(await owner.sharing.remote.members(OWNER.uid, car.id)).toHaveLength(0);
+    expect((await owner.sharing.remote.invitesSent()).map((i) => i.vehicleId)).toEqual([other.id]);
+  });
+
+  test('the owner deletes the car: the member is refused, and their next sync forgets it', async () => {
+    const owner = device(OWNER);
+    const partner = device(PARTNER);
+    const car = await owner.store.addVehicle({ name: 'Civic' });
+    await owner.store.addFillUp(draft(10_000), car.id);
+    await owner.sync();
+    await owner.sharing.remote.invite(car, 'sam@example.com');
+    const [invitation] = await partner.sharing.remote.invitesForMe();
+    await partner.sharing.remote.accept(invitation!);
+    await partner.sync();
+    expect(await partner.store.vehicles()).toHaveLength(1);
+
+    // Deleted, and synced — but nobody cleaned up the membership.
+    await owner.store.removeVehicle(car.id);
+    await owner.sync();
+
+    const after = await partner.sync();
+    expect(after.shares.ended).toHaveLength(1);
+    expect(await partner.store.vehicles()).toHaveLength(0);
   });
 
   test('declining uses up the invitation without joining', async () => {

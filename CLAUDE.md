@@ -144,6 +144,12 @@ npm ci --prefix .github/firebase-cli
    never "nothing is shared"; a share is saved to it *before* its rows are
    pulled and leaves it only *after* they are forgotten. Never add a
    `.catch(() => [])` to `ledger.load()`.
+   **Revoking holds on the server** (#80): accept is **one batch** (member doc,
+   membership, invitation deleted) and the rules refuse a join that leaves the
+   invitation (`!existsAfter`); `memberOf` and joining require a live car;
+   `removeMember` also withdraws a leftover invitation, looked up rather than
+   deleted blind (deleting a missing invitation is refused, and fails the
+   batch); deleting a car calls `endSharing`.
    **Never join, sync or record a share whose car id is already yours** (#78):
    the rules refuse the join (`!exists` on your own `vehicles/{id}`), Accept
    checks `store.hasVehicle` first, and `syncAll` reports a new share naming a

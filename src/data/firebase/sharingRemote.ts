@@ -114,7 +114,28 @@ export class FirestoreSharingRemote implements SharingRemote {
   }
 
   async removeMember(vehicleId: string, memberUid: string): Promise<void> {
-    await deleteDoc(doc(this.db, 'users', this.me.uid, 'vehicles', vehicleId, 'members', memberUid));
+    // Their invitation goes too, if an older build joined without using it up
+    // (#80): left behind, it let them join again. Looked up rather than
+    // deleted blind, because the rules refuse deleting one that is not there.
+    const member = (await this.members(this.me.uid, vehicleId)).find((m) => m.uid === memberUid);
+    const leftover =
+      member === undefined
+        ? []
+        : (await this.invitesSent()).filter((i) => i.vehicleId === vehicleId && i.email === member.email);
+    const batch = writeBatch(this.db);
+    batch.delete(doc(this.db, 'users', this.me.uid, 'vehicles', vehicleId, 'members', memberUid));
+    for (const invite of leftover) batch.delete(doc(this.db, 'invites', inviteKey(invite.ownerUid, invite.vehicleId, invite.email)));
+    await batch.commit();
+  }
+
+  async endSharing(vehicleId: string): Promise<void> {
+    const [members, invites] = await Promise.all([this.members(this.me.uid, vehicleId), this.invitesSent()]);
+    const ofCar = invites.filter((invite) => invite.vehicleId === vehicleId);
+    if (members.length === 0 && ofCar.length === 0) return;
+    const batch = writeBatch(this.db);
+    for (const member of members) batch.delete(doc(this.db, 'users', this.me.uid, 'vehicles', vehicleId, 'members', member.uid));
+    for (const invite of ofCar) batch.delete(doc(this.db, 'invites', inviteKey(invite.ownerUid, invite.vehicleId, invite.email)));
+    await batch.commit();
   }
 
   async invitesForMe(): Promise<Invite[]> {
@@ -130,22 +151,26 @@ export class FirestoreSharingRemote implements SharingRemote {
   async accept(invite: Invite): Promise<Membership> {
     const email = this.verifiedEmail();
     if (email === null || email !== invite.email) throw new Refused('accept someone else’s invitation');
-    // Order matters: joining needs the invitation to exist, so it is used up
-    // last. A failure part-way leaves something a retry can finish.
-    await setDoc(doc(this.db, 'users', invite.ownerUid, 'vehicles', invite.vehicleId, 'members', this.me.uid), {
-      uid: this.me.uid,
-      name: this.me.name,
-      email,
-      joinedAt: Date.now(),
-    });
     const membership: Membership = {
       ownerUid: invite.ownerUid,
       vehicleId: invite.vehicleId,
       ownerName: invite.ownerName,
       vehicleName: invite.vehicleName,
     };
-    await setDoc(doc(this.db, 'users', this.me.uid, 'memberships', membershipKey(membership)), { ...membership });
-    await deleteDoc(doc(this.db, 'invites', inviteKey(invite.ownerUid, invite.vehicleId, invite.email)));
+    // One batch (#80): the join, this account's record of it, and the
+    // invitation used up. The rules refuse a join that leaves the invitation
+    // behind — it let a removed member join again — and a batch also means a
+    // failure part-way leaves nothing half-done.
+    const batch = writeBatch(this.db);
+    batch.set(doc(this.db, 'users', invite.ownerUid, 'vehicles', invite.vehicleId, 'members', this.me.uid), {
+      uid: this.me.uid,
+      name: this.me.name,
+      email,
+      joinedAt: Date.now(),
+    });
+    batch.set(doc(this.db, 'users', this.me.uid, 'memberships', membershipKey(membership)), { ...membership });
+    batch.delete(doc(this.db, 'invites', inviteKey(invite.ownerUid, invite.vehicleId, invite.email)));
+    await batch.commit();
     return membership;
   }
 

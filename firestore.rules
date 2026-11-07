@@ -75,12 +75,23 @@ service cloud.firestore {
     }
 
     // A member of `owner`'s car `vehicleId` (#66): an allowlisted account with
-    // a document under that car's `members`. One billed `exists()` per check —
-    // only ever spent on a request that is not the owner's own.
+    // a document under that car's `members` — **of a car that still exists**
+    // (#80). Deleting a car used to leave its members able to read it and to
+    // keep writing fill-ups under a car the owner no longer saw. Two billed
+    // reads per check, only ever spent on a request that is not the owner's
+    // own; every fill-up in a member's batch names the same car, and a
+    // document read twice in one request is read once.
     function memberOf(owner, vehicleId) {
       return allowed()
         && vehicleId is string
-        && exists(/databases/$(database)/documents/users/$(owner)/vehicles/$(vehicleId)/members/$(request.auth.uid));
+        && exists(/databases/$(database)/documents/users/$(owner)/vehicles/$(vehicleId)/members/$(request.auth.uid))
+        && liveCar(owner, vehicleId);
+    }
+
+    // `owner`'s car exists and is not a tombstone.
+    function liveCar(owner, vehicleId) {
+      return exists(/databases/$(database)/documents/users/$(owner)/vehicles/$(vehicleId))
+        && get(/databases/$(database)/documents/users/$(owner)/vehicles/$(vehicleId)).data.deletedAt == null;
     }
 
     // The signed-in account's Google email, lowercased — only when Google has
@@ -260,6 +271,12 @@ service cloud.firestore {
             && request.auth.uid != uid
             && verifiedEmail()
             && exists(/databases/$(database)/documents/invites/$(uid + '__' + id + '__' + request.auth.token.email.lower()))
+            // Single-use (#80): the invitation is deleted in the same batch
+            // as the join. Left behind, it let a member the owner removed
+            // simply join again.
+            && !existsAfter(/databases/$(database)/documents/invites/$(uid + '__' + id + '__' + request.auth.token.email.lower()))
+            // Only a car that still exists (#80).
+            && liveCar(uid, id)
             && !exists(/databases/$(database)/documents/users/$(request.auth.uid)/vehicles/$(id))
             && request.resource.data.keys().hasOnly(['uid', 'name', 'email', 'joinedAt'])
             && request.resource.data.keys().hasAll(['uid', 'name', 'email', 'joinedAt'])
