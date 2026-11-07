@@ -343,6 +343,56 @@ describeWithEmulator('sharing a car (#66)', () => {
     });
   });
 
+  // #79: a member stamping the owner's fill-up a year ahead made it
+  // impossible for the owner to edit or delete again.
+  describe('a member cannot lock a fill-up with a far-future stamp (#79)', () => {
+    const DAY = 24 * 60 * 60 * 1000;
+
+    it('refuses the owner\u2019s fill-up restamped a year ahead, as an edit or as a deletion', async () => {
+      await join();
+      const ref = doc(partner(), `users/${OWNER}/fillUps/on-shared`);
+      const theirs = await fillUpFor('on-shared', SHARED, OWNER);
+      await assertFails(setDoc(ref, { ...theirs, odometer: 99_999, updatedAt: Date.now() + 365 * DAY }));
+      await assertFails(setDoc(ref, { ...theirs, deletedAt: Date.now(), updatedAt: Date.now() + 365 * DAY }));
+    });
+
+    it('still lets them edit it with an honest stamp', async () => {
+      await join();
+      const theirs = await fillUpFor('on-shared', SHARED, OWNER);
+      await assertSucceeds(setDoc(doc(partner(), `users/${OWNER}/fillUps/on-shared`), { ...theirs, odometer: 10_050, updatedAt: Date.now() }));
+    });
+
+    it('refuses taking the owner\u2019s stamp backwards, and allows the same stamp again', async () => {
+      await join();
+      const theirs = { ...(await fillUpFor('on-shared', SHARED, OWNER)), updatedAt: 5_000 };
+      await env.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), `users/${OWNER}/fillUps/on-shared`), theirs);
+      });
+      const ref = doc(partner(), `users/${OWNER}/fillUps/on-shared`);
+      await assertFails(setDoc(ref, { ...theirs, odometer: 10_050, updatedAt: 4_999 }));
+      await assertSucceeds(setDoc(ref, { ...theirs, updatedAt: 5_000 }));
+    });
+
+    it('refuses a membership whose join time is not a finite number', async () => {
+      await setDoc(doc(owner(), `invites/${inviteId(SHARED, PARTNER_EMAIL)}`), invite());
+      await assertFails(
+        setDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}/members/${PARTNER}`), { ...membership(), joinedAt: Number.NaN }),
+      );
+      await assertFails(
+        setDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}/members/${PARTNER}`), {
+          ...membership(),
+          joinedAt: Number.POSITIVE_INFINITY,
+        }),
+      );
+    });
+
+    it('refuses an invitation dated infinity', async () => {
+      await assertFails(
+        setDoc(doc(owner(), `invites/${inviteId(SHARED, PARTNER_EMAIL)}`), { ...invite(), createdAt: Number.POSITIVE_INFINITY }),
+      );
+    });
+  });
+
   describe('the owner', () => {
     it('can still write their own fill-ups, with or without a name on them', async () => {
       await assertSucceeds(setDoc(doc(owner(), `users/${OWNER}/fillUps/mine`), await fillUpFor('mine', SHARED, OWNER)));
@@ -429,7 +479,11 @@ describeWithEmulator('sharing a car (#66)', () => {
 
     it('a member can delete a fill-up — a tombstone that keeps who entered it', async () => {
       await join();
-      const tombstone = { ...(await fillUpFor('on-shared', SHARED, OWNER)), deletedAt: 9, updatedAt: 9 };
+      // Stamped now, as the app stamps a deletion — newer than the version it
+      // deletes. (This fixture used to say 9; since #79 a stamp may not go
+      // backwards, and a real tombstone never did.)
+      const now = Date.now();
+      const tombstone = { ...(await fillUpFor('on-shared', SHARED, OWNER)), deletedAt: now, updatedAt: now };
       await assertSucceeds(setDoc(doc(partner(), `users/${OWNER}/fillUps/on-shared`), tombstone));
     });
 

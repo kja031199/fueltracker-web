@@ -42,6 +42,16 @@ import type { StoreClock } from './store';
 /** Thirty days. A real clock error is hours or days; this is not a race. */
 export const MAX_ADOPTED_SKEW_MS = 30 * 24 * 60 * 60 * 1000;
 
+/**
+ * How far ahead of the server's clock `firestore.rules` accepts a merge stamp
+ * (#79): what this device can adopt, plus a day of slack for a device whose
+ * own clock is a little fast. Anything further ahead could only be meant to
+ * win every merge for good — one stamp a year ahead locked a fill-up against
+ * every other edit. `maxAheadMs()` in the rules must be this number;
+ * `rulesLimits.test.ts` checks.
+ */
+export const MAX_ACCEPTED_AHEAD_MS = MAX_ADOPTED_SKEW_MS + 24 * 60 * 60 * 1000;
+
 export class MonotonicClock implements StoreClock {
   private lastIssued = 0;
   private refused = 0;

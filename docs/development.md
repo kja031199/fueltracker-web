@@ -189,6 +189,8 @@ Recorded so a regression in the tests themselves is visible:
 | Local reads (#87): export two reads per table / merge reading every row / push re-reading the device / a view per remote | 8 / 7 / 7 / 5 |
 | Local reads: no refresh after the merge / after a re-stamp / after the repair / repair never run / car lookup stale | 1 / 1 / 2 / 2 / 1 |
 | Local reads: Dexie `listDeleted` returning live rows / `getMany` hiding tombstones (memory / Dexie) / forget missing deleted rows | 3 / 12 / 1 / 4 |
+| Merge stamp (#79): future bound removed / set to a day / no-going-backwards removed / equal stamp refused | 3 / 2 / 3 / 3 |
+| Merge stamp: `finite` reduced to `is number` / invite date unchecked / in-memory far-future / backwards / client bound at the adoption cap | 10 / 1 / 1 / 1 / 2 |
 
 Equivalent, and kept for parity: the repair skipping tombstones. A tombstone
 carries no text, so there is nothing for it to shorten.

@@ -741,3 +741,47 @@ describe('a share whose car id is already one of yours (#78)', () => {
     expect(result.shares.synced.map((m) => m.vehicleId)).toEqual([car.id]);
   });
 });
+
+// --- #79: a far-future stamp ------------------------------------------------------
+
+describe('a member cannot lock the owner’s fill-up with a far-future stamp (#79)', () => {
+  test('the account refuses it, and the owner’s edits and deletions still win', async () => {
+    const { world, owner, partner, car } = await sharedCar();
+    await partner.sync();
+    const [theirs] = await partner.store.fillUps(car.id);
+    if (theirs === undefined) throw new Error('no fill-up');
+    const whole = await partner.store.fillUp(theirs.id);
+    if (whole === undefined) throw new Error('no fill-up');
+    const [membership] = await partner.sharing.remote.memberships();
+    if (membership === undefined) throw new Error('no membership');
+
+    // Written straight to the account, as a modified client could.
+    const locked = { ...whole, odometer: 99_999, updatedAt: Date.now() + 365 * 24 * 60 * 60 * 1000 };
+    await expect(
+      partner.sharing.remote.scoped(membership).push({ vehicles: [], fillUps: [locked], pendingFillUps: [] }),
+    ).rejects.toBeInstanceOf(Refused);
+
+    // The owner can still change it, and the change reaches the partner.
+    await owner.sync();
+    await owner.store.updateFillUp(theirs.id, draft(10_123));
+    await owner.sync();
+    await partner.sync();
+    expect((await partner.store.fillUp(theirs.id))?.odometer).toBe(10_123);
+    expect(((await world.remoteFor(OWNER.uid).pull(null)).fillUps as FillUpRecord[]).find((f) => f.id === theirs.id)?.odometer).toBe(10_123);
+  });
+
+  test('nor take its stamp backwards', async () => {
+    const { partner, car } = await sharedCar();
+    await partner.sync();
+    const [theirs] = await partner.store.fillUps(car.id);
+    const whole = theirs === undefined ? undefined : await partner.store.fillUp(theirs.id);
+    if (whole === undefined) throw new Error('no fill-up');
+    const [membership] = await partner.sharing.remote.memberships();
+    if (membership === undefined) throw new Error('no membership');
+    await expect(
+      partner.sharing.remote
+        .scoped(membership)
+        .push({ vehicles: [], fillUps: [{ ...whole, odometer: 99_999, updatedAt: whole.updatedAt - 1 }], pendingFillUps: [] }),
+    ).rejects.toBeInstanceOf(Refused);
+  });
+});

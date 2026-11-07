@@ -201,6 +201,10 @@ so an existing car and its whole history can be shared as it is.
   account; by Accept, against the device, with the reason said plainly; and by
   sync, which never syncs a new share naming a car already on the device,
   reports it, and deletes nothing.
+- **Nobody can make a fill-up uneditable** (#79). Every change carries a
+  merge stamp, and the newest wins; the rules refuse one more than 31 days
+  ahead of the server's clock, or older than what the document already has, so
+  a member cannot stamp the owner's fill-up a year ahead to win every merge.
 - **A member's fill-ups carry their own uid** (`enteredBy`), which the rules
   require on a new one and forbid changing on an edit or a deletion. A member
   cannot move a fill-up to another car, write the car itself, or erase a

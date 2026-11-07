@@ -611,4 +611,77 @@ describeWithEmulator('firestore.rules', () => {
       expect(third.outcome.pulled.vehiclesWritten + third.outcome.pulled.skippedOlder).toBe(0);
     });
   });
+  // #79. Last-write-wins on `updatedAt` only works if nobody can claim a time
+  // no honest device could have: one far-future stamp made a fill-up
+  // impossible for anyone else to edit or delete, for good.
+  describe('the merge stamp is bounded (#79)', () => {
+    const DAY = 24 * 60 * 60 * 1000;
+
+    async function aFillUp(): Promise<FillUpRecord> {
+      const store = new FuelTrackerStore({
+        vehicles: new InMemoryRepository<VehicleRecord>(),
+        fillUps: new InMemoryRepository<FillUpRecord>(),
+        pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
+      });
+      const vehicle = await store.addVehicle({ name: 'Car' });
+      return store.addFillUp(
+        makeFuelEntryDraft({ date: new Date(2026, 0, 1), odometer: 1000, gallons: 10, pricePerGallon: 3 })!,
+        vehicle.id,
+      );
+    }
+
+    function wire(row: FillUpRecord, patch: Record<string, unknown> = {}): Record<string, unknown> {
+      return { ...row, receiptImageData: null, syncedAt: serverTimestamp(), ...patch };
+    }
+
+    function ownDb() {
+      return env.authenticatedContext(OWNER).firestore();
+    }
+
+    it('refuses a stamp a year ahead — the lock in #79', async () => {
+      const row = await aFillUp();
+      await assertFails(setDoc(doc(ownDb(), `users/${OWNER}/fillUps/${row.id}`), wire(row, { updatedAt: Date.now() + 365 * DAY })));
+    });
+
+    it('accepts one 29 days ahead: a fast clock, within what the app itself adopts', async () => {
+      const row = await aFillUp();
+      await assertSucceeds(setDoc(doc(ownDb(), `users/${OWNER}/fillUps/${row.id}`), wire(row, { updatedAt: Date.now() + 29 * DAY })));
+    });
+
+    it('refuses taking a document’s stamp backwards', async () => {
+      const row = await aFillUp();
+      const ref = doc(ownDb(), `users/${OWNER}/fillUps/${row.id}`);
+      await assertSucceeds(setDoc(ref, wire(row, { updatedAt: 5_000 })));
+      await assertFails(setDoc(ref, wire(row, { updatedAt: 4_999, odometer: 1001 })));
+    });
+
+    it('accepts the same stamp again — a re-send — and a newer one', async () => {
+      const row = await aFillUp();
+      const ref = doc(ownDb(), `users/${OWNER}/fillUps/${row.id}`);
+      await assertSucceeds(setDoc(ref, wire(row, { updatedAt: 5_000 })));
+      await assertSucceeds(setDoc(ref, wire(row, { updatedAt: 5_000 })));
+      await assertSucceeds(setDoc(ref, wire(row, { updatedAt: 5_001, odometer: 1001 })));
+    });
+
+    it('a new document has no lower bound', async () => {
+      const row = await aFillUp();
+      await assertSucceeds(setDoc(doc(ownDb(), `users/${OWNER}/fillUps/${row.id}`), wire(row, { updatedAt: 1 })));
+    });
+
+    it.each([
+      ['updatedAt', Number.NaN],
+      ['updatedAt', Number.POSITIVE_INFINITY],
+      ['deletedAt', Number.NaN],
+      ['deletedAt', Number.POSITIVE_INFINITY],
+      ['date', Number.NaN],
+      ['odometer', Number.POSITIVE_INFINITY],
+      ['gallons', Number.NaN],
+      ['pricePerGallon', Number.NEGATIVE_INFINITY],
+      ['latitude', Number.NaN],
+      ['longitude', Number.POSITIVE_INFINITY],
+    ])('refuses %s = %s: every number is finite', async (field, value) => {
+      const row = await aFillUp();
+      await assertFails(setDoc(doc(ownDb(), `users/${OWNER}/fillUps/${row.id}`), wire(row, { [field]: value })));
+    });
+  });
 });
