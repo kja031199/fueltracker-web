@@ -534,7 +534,7 @@ cost nothing now and cannot be retrofitted later without migrating real data:
 | `id` | A **client-generated UUID**. A server-assigned id cannot be reconciled with a row created offline. |
 | `updatedAt` | Epoch ms, stamped on every write — the basis for last-write-wins. |
 | `deletedAt` | A **tombstone, not a row deletion**. A hard delete leaves nothing to propagate, so a row deleted on one device reappears from another. The tombstone keeps only the sync fields — see [what deleting actually deletes](#what-deleting-actually-deletes). |
-| `schemaVersion` | Stamped at write time so a future migration knows what shape it is reading. |
+| `schemaVersion` | Stamped at write time so a future migration knows what shape it is reading. A row with a higher one than this build knows is never read: sync leaves it in the account (`partitionBySchema`), and a backup file's is set aside and counted (#86). **Bump it only for a breaking change**; an added field is optional, its absence means the old behaviour, and the rules accept it before any client writes it — how `enteredBy` was added. |
 
 `remove` takes the tombstone *builder* rather than building one itself: the
 layer is generic over the record type and cannot know which of a row's fields

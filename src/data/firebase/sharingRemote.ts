@@ -31,6 +31,7 @@ import { getFirestore } from 'firebase/firestore';
 import type { Account, Invite, Member, Membership, SharingRemote } from '../sharing';
 import { Refused, inviteKey, membershipKey, normalizeEmail } from '../sharing';
 import { parseLedger } from '../syncState';
+import { TEXT_LIMITS, boundText } from '../../domain/textLimits';
 import { decode, encodeReceipt, fromMicros, toMicros } from './remoteStore';
 import { firebaseApp, type FirebaseSettings } from './config';
 
@@ -53,8 +54,9 @@ function asInvite(data: DocumentData): Invite | null {
     ownerUid,
     vehicleId,
     email,
-    ownerName: text(data['ownerName']),
-    vehicleName: text(data['vehicleName']),
+    // Read from the network, so bounded like every other text that is (#86).
+    ownerName: boundText(text(data['ownerName']), TEXT_LIMITS.ownerName),
+    vehicleName: boundText(text(data['vehicleName']), TEXT_LIMITS.vehicleName),
     createdAt: finite(data['createdAt']),
   };
 }
@@ -62,7 +64,12 @@ function asInvite(data: DocumentData): Invite | null {
 function asMember(data: DocumentData): Member | null {
   const uid = text(data['uid']);
   if (uid === '') return null;
-  return { uid, name: text(data['name']), email: text(data['email']), joinedAt: finite(data['joinedAt']) };
+  return {
+    uid,
+    name: boundText(text(data['name']), TEXT_LIMITS.name),
+    email: text(data['email']),
+    joinedAt: finite(data['joinedAt']),
+  };
 }
 
 export class FirestoreSharingRemote implements SharingRemote {
@@ -87,8 +94,11 @@ export class FirestoreSharingRemote implements SharingRemote {
       ownerUid: this.me.uid,
       vehicleId: vehicle.id,
       email,
-      ownerName: this.me.name,
-      vehicleName: vehicle.name,
+      // Cut to what the rules accept (#86). A Google display name has no
+      // limit of its own, and one over 200 characters used to fail the
+      // invitation with nothing to say why.
+      ownerName: boundText(this.me.name, TEXT_LIMITS.ownerName),
+      vehicleName: boundText(vehicle.name, TEXT_LIMITS.vehicleName),
       createdAt: Date.now(),
     };
     await setDoc(doc(this.db, 'invites', inviteKey(this.me.uid, vehicle.id, email)), { ...invite });
@@ -154,8 +164,9 @@ export class FirestoreSharingRemote implements SharingRemote {
     const membership: Membership = {
       ownerUid: invite.ownerUid,
       vehicleId: invite.vehicleId,
-      ownerName: invite.ownerName,
-      vehicleName: invite.vehicleName,
+      // Read from the account, so bounded again rather than trusted (#86).
+      ownerName: boundText(invite.ownerName, TEXT_LIMITS.ownerName),
+      vehicleName: boundText(invite.vehicleName, TEXT_LIMITS.vehicleName),
     };
     // One batch (#80): the join, this account's record of it, and the
     // invitation used up. The rules refuse a join that leaves the invitation
@@ -164,7 +175,8 @@ export class FirestoreSharingRemote implements SharingRemote {
     const batch = writeBatch(this.db);
     batch.set(doc(this.db, 'users', invite.ownerUid, 'vehicles', invite.vehicleId, 'members', this.me.uid), {
       uid: this.me.uid,
-      name: this.me.name,
+      // The rules' `label(name, 200)`, the limit `TEXT_LIMITS.name` mirrors.
+      name: boundText(this.me.name, TEXT_LIMITS.name),
       email,
       joinedAt: Date.now(),
     });

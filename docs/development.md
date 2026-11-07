@@ -196,6 +196,9 @@ Recorded so a regression in the tests themselves is visible:
 | Shared-car results (#84): refused upload filed as unreachable / refused upload forgetting the car / outcomes dropped / notice ignoring shared cars / refusal not said | 2 / 2 / 2 / 1 / 1 |
 | Transactions (#85): no transaction from `dexieRepositories` / work on `db` tables rather than the transaction's / account store without it / Dexie `putMany` dropping a single row | 7 / 2 / 1 / 2 |
 | Transactions: car delete leaving submissions / car delete, forget, import, approve, receive, edit each not atomic / duplicate in a file kept by order / repair from the rows sync read | 3 / 1, 1, 3, 1, 1, 1 / 1 / 2 |
+| Validation (#86): newer backup rows imported / this version counted as newer / skipped silently / "1 rows" | 3 / 12 / 3 / 2 |
+| Validation: ledger ids unchecked / ledger names unbounded / tombstone keeping `date` / new deletion time / submission tombstones refused | 1 / 1 / 3 / 2 / 2 |
+| Validation: invite owner / car name, member name, read-back invite, read-back member unbounded (all emulator) | 1 / 1 / 1 / 1 / 1 |
 
 Equivalent, and kept for parity: the repair skipping tombstones. A tombstone
 carries no text, so there is nothing for it to shorten.

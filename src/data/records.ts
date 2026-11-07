@@ -27,7 +27,18 @@
 import type { FuelGrade } from '../domain/fuelGrade';
 import type { FuelEntryStats } from '../domain/models';
 
-/** Bump when a stored shape changes in a way a reader must know about. */
+/**
+ * The version of the stored shape. A row stamped with a higher one is never
+ * read by this build — not from the account, not from a backup file (#86).
+ *
+ * **Bump it only for a breaking change**: a field removed, renamed, or given
+ * a new meaning, where an older build reading the row would get it wrong. An
+ * *added* field does not bump it. It is optional on the record, validation
+ * reads its absence as the old behaviour, and the rules accept it **before**
+ * any client writes it (deploy the rules first). `enteredBy` (#66) was added
+ * that way. Bumping for it would have made every older build skip every row
+ * a newer build had touched, which is far worse than dropping a name.
+ */
 export const SCHEMA_VERSION = 1;
 
 export interface SyncFields {

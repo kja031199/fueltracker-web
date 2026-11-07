@@ -41,6 +41,7 @@ import { TEXT_LIMITS, boundText } from '../domain/textLimits';
 import { MAX_RECEIPT_BYTES } from '../domain/fuelEntryDraft';
 import { idProblem } from './recordId';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord, Snapshot } from './records';
+import { tombstoneFillUp, tombstonePending } from './tombstone';
 
 /**
  * Text bounds, set well beyond plausible human input rather than tightly.
@@ -176,25 +177,14 @@ export function validateFillUp(value: unknown): FillUpRecord | string {
 
   // A tombstone is a record that something was deleted. It carries no usable
   // measurements and does not need to — the same reasoning `importBackup`
-  // applies when it skips the draft gate for one.
+  // applies when it skips the draft gate for one. It is built by
+  // `tombstone.ts`, the one owner of the shape (#86): this used to build its
+  // own, which kept `date`, so an older build's fat tombstone stayed half fat.
   if (common.deletedAt !== null) {
-    return {
-      ...common,
+    return asTombstone(tombstoneFillUp, common, {
       vehicleId: value.vehicleId,
-      date: finite(value.date) ? value.date : 0,
-      odometer: 0,
-      gallons: 0,
-      pricePerGallon: 0,
-      isFullTank: false,
-      missedPreviousFillUp: false,
-      fuelGrade: 'Other',
-      station: '',
-      notes: '',
-      latitude: null,
-      longitude: null,
-      receiptImageData: null,
       enteredBy: enteredBy(value.enteredBy),
-    };
+    } as Partial<FillUpRecord>);
   }
 
   const numbers = measurements(value, common.id);
@@ -237,6 +227,11 @@ export function validatePending(value: unknown): PendingFillUpRecord | string {
   if (typeof value.vehicleId !== 'string' || value.vehicleId === '') {
     return `submission ${common.id}: missing vehicleId`;
   }
+  // A deleted submission has nothing to check either (#86): it used to need
+  // measurements, so one written with none was refused on every pull.
+  if (common.deletedAt !== null) {
+    return asTombstone(tombstonePending, common, { vehicleId: value.vehicleId } as Partial<PendingFillUpRecord>);
+  }
   if (!finite(value.submittedAt)) return `submission ${common.id}: submittedAt is not a number`;
 
   const numbers = measurements(value, common.id);
@@ -256,6 +251,21 @@ export function validatePending(value: unknown): PendingFillUpRecord | string {
     longitude: coordinate(value.longitude),
     receiptImageData: receipt(value.receiptImageData),
   };
+}
+
+/**
+ * The tombstone `build` makes from what a tombstone keeps — its sync fields,
+ * and `kept` — with the row's own stamp and deletion time rather than new ones.
+ */
+function asTombstone<T extends { readonly updatedAt: number; readonly deletedAt: number | null }>(
+  build: (row: T, at: number) => T,
+  common: { readonly id: string; readonly updatedAt: number; readonly deletedAt: number | null; readonly schemaVersion: number },
+  kept: Partial<T>,
+): T {
+  // The builders read only the fields a tombstone keeps, so the rest of `T`
+  // need not exist here.
+  const built = build({ ...common, ...kept } as unknown as T, common.updatedAt);
+  return { ...built, updatedAt: common.updatedAt, deletedAt: common.deletedAt };
 }
 
 function partition<T>(
