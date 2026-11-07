@@ -27,6 +27,7 @@ import { isScrubbed, tombstoneFillUp, tombstonePending, tombstoneVehicle } from 
 import type { ImportSummary, TieBreak } from './backup';
 import type { Submission } from './fillUpLink';
 import { exportSnapshot, importBackup } from './backup';
+import { atomically } from './atomically';
 import { TEXT_LIMITS, boundText } from '../domain/textLimits';
 import { boundFillUpText, boundPendingText, boundVehicleText } from './recordText';
 import { StaleEdit } from './staleEdit';
@@ -50,6 +51,23 @@ export interface Repositories {
   readonly vehicles: Repository<VehicleRecord>;
   readonly fillUps: VehicleScopedRepository<FillUpRecord>;
   readonly pendingFillUps: VehicleScopedRepository<PendingFillUpRecord>;
+  /**
+   * Runs `work` as one transaction over all three tables (#85): every write
+   * in it lands or none does, and no other write lands in the middle of it.
+   * The store runs each merge and each cascade in one, and decides inside it,
+   * against rows read inside it.
+   *
+   * `work` is handed repositories **bound to the transaction**, and must use
+   * those: Dexie's tracking of "the current transaction" does not survive a
+   * few `await`s through ordinary async functions, and a write that loses it
+   * quietly becomes a write of its own. Those have no `transaction`, so a
+   * nested `atomically` just runs.
+   *
+   * Optional, because only the device's database has transactions:
+   * `dexieRepositories` (`db.ts`) always supplies one. Without it — the
+   * in-memory repositories of the tests and the demo — `work` simply runs.
+   */
+  readonly transaction?: <R>(work: (repos: Repositories) => Promise<R>) => Promise<R>;
 }
 
 export interface NewVehicle {
@@ -117,20 +135,28 @@ export class FuelTrackerStore {
   }
 
   /**
-   * Tombstones the vehicle **and its fill-ups**, mirroring the cascade delete
-   * upstream. Done explicitly because a tombstone cannot cascade on its own:
-   * orphaned rows would otherwise stay live, invisible in the UI but present in
-   * storage and ready to sync back as a vehicle with no owner.
+   * Tombstones the vehicle, **its fill-ups and its waiting submissions**,
+   * mirroring the cascade delete upstream. Done explicitly because a tombstone
+   * cannot cascade on its own: orphaned rows would otherwise stay live,
+   * invisible in the UI but present in storage and ready to sync back as a
+   * vehicle with no owner — and a submission keeps someone else's name and
+   * note (#85).
+   *
+   * All of it or none (#85): it used to write a row at a time, so a closed tab
+   * part way left a live car with some of its fill-ups deleted.
    */
   async removeVehicle(vehicleId: string): Promise<void> {
-    // That vehicle's rows only, from the index (#53) — not every fill-up.
-    const entries = await this.repos.fillUps.listForVehicle(vehicleId);
-    for (const entry of entries) {
+    await atomically(this.repos, async (r) => {
+      // That vehicle's rows only, from the index (#53) — not every fill-up.
+      const [entries, submissions] = await Promise.all([
+        r.fillUps.listForVehicle(vehicleId),
+        r.pendingFillUps.listForVehicle(vehicleId),
+      ]);
+      await r.fillUps.putMany(entries.map((row) => tombstoneFillUp(row, this.clock.now())));
+      await r.pendingFillUps.putMany(submissions.map((row) => tombstonePending(row, this.clock.now())));
       const at = this.clock.now();
-      await this.repos.fillUps.remove(entry.id, (row) => tombstoneFillUp(row, at));
-    }
-    const at = this.clock.now();
-    await this.repos.vehicles.remove(vehicleId, (row) => tombstoneVehicle(row, at));
+      await r.vehicles.remove(vehicleId, (row) => tombstoneVehicle(row, at));
+    });
   }
 
   // MARK: Fill-ups — the only write path
@@ -142,8 +168,12 @@ export class FuelTrackerStore {
    * code review, is what stops an unvalidated entry reaching storage.
    */
   async addFillUp(draft: FuelEntryDraft, vehicleId: string): Promise<FillUpRecord> {
+    return this.writeFillUp(this.repos, draft, vehicleId);
+  }
+
+  private async writeFillUp(repos: Repositories, draft: FuelEntryDraft, vehicleId: string): Promise<FillUpRecord> {
     const record = { ...this.recordFromDraft(draft, vehicleId, this.clock.newId()), enteredBy: this.author };
-    await this.repos.fillUps.put(record);
+    await repos.fillUps.put(record);
     return record;
   }
 
@@ -164,14 +194,18 @@ export class FuelTrackerStore {
    * to write it back as a new row), or its car has.
    */
   async updateFillUp(id: string, draft: FuelEntryDraft): Promise<FillUpRecord> {
-    const existing = await this.repos.fillUps.get(id);
-    if (existing === undefined) throw new StaleEdit('fill-up-gone');
-    if ((await this.repos.vehicles.get(existing.vehicleId)) === undefined) throw new StaleEdit('car-gone');
-    // Who entered it does not change because someone else corrected it — and
-    // on a shared car the rules refuse an edit that tries.
-    const record = { ...this.recordFromDraft(draft, existing.vehicleId, id), enteredBy: existing.enteredBy ?? null };
-    await this.repos.fillUps.put(record);
-    return record;
+    // Checked and written in one transaction (#85), so a deletion synced in
+    // between cannot be undone by the save.
+    return atomically(this.repos, async (r) => {
+      const existing = await r.fillUps.get(id);
+      if (existing === undefined) throw new StaleEdit('fill-up-gone');
+      if ((await r.vehicles.get(existing.vehicleId)) === undefined) throw new StaleEdit('car-gone');
+      // Who entered it does not change because someone else corrected it — and
+      // on a shared car the rules refuse an edit that tries.
+      const record = { ...this.recordFromDraft(draft, existing.vehicleId, id), enteredBy: existing.enteredBy ?? null };
+      await r.fillUps.put(record);
+      return record;
+    });
   }
 
   /**
@@ -197,11 +231,14 @@ export class FuelTrackerStore {
    * is the deletion that syncs.
    */
   async forgetVehicle(vehicleId: string): Promise<void> {
-    for (const repo of [this.repos.fillUps, this.repos.pendingFillUps]) {
-      // That car's rows, tombstones included, from its index (#87).
-      for (const row of await repo.listForVehicleAll(vehicleId)) await repo.purge(row.id);
-    }
-    await this.repos.vehicles.purge(vehicleId);
+    // All of it or none (#85), like `removeVehicle`.
+    await atomically(this.repos, async (r) => {
+      for (const repo of [r.fillUps, r.pendingFillUps]) {
+        // That car's rows, tombstones included, from its index (#87).
+        for (const row of await repo.listForVehicleAll(vehicleId)) await repo.purge(row.id);
+      }
+      await r.vehicles.purge(vehicleId);
+    });
   }
 
   /**
@@ -279,11 +316,17 @@ export class FuelTrackerStore {
    * decoded, and is validated again on approval.
    */
   async receiveSubmission(submission: Submission): Promise<'queued' | 'duplicate' | 'no-such-car'> {
-    if ((await this.repos.vehicles.get(submission.vehicleId)) === undefined) return 'no-such-car';
+    // Checked and queued in one transaction (#85): the same link opened twice
+    // at once queues it once.
+    return atomically(this.repos, (r) => this.queueSubmission(r, submission));
+  }
+
+  private async queueSubmission(r: Repositories, submission: Submission): Promise<'queued' | 'duplicate' | 'no-such-car'> {
+    if ((await r.vehicles.get(submission.vehicleId)) === undefined) return 'no-such-car';
     // Queued, approved or rejected: any row with this id, by key (#87).
-    if ((await this.repos.pendingFillUps.getMany([submission.id])).length > 0) return 'duplicate';
+    if ((await r.pendingFillUps.getMany([submission.id])).length > 0) return 'duplicate';
     const { draft } = submission;
-    await this.repos.pendingFillUps.put({
+    await r.pendingFillUps.put({
       id: submission.id,
       updatedAt: this.clock.now(),
       deletedAt: null,
@@ -322,11 +365,17 @@ export class FuelTrackerStore {
    * queue a way around the write gate.
    */
   async approvePendingFillUp(id: string): Promise<FillUpRecord | null> {
-    const pending = await this.repos.pendingFillUps.get(id);
+    // The fill-up and the cleared queue entry land together or not at all
+    // (#85): one without the other let the same submission be approved twice.
+    return atomically(this.repos, (r) => this.promote(r, id));
+  }
+
+  private async promote(r: Repositories, id: string): Promise<FillUpRecord | null> {
+    const pending = await r.pendingFillUps.get(id);
     if (pending === undefined) return null;
     // The car may have been deleted while the submission waited; a fill-up
     // for a car that is gone would be invisible and uncountable (#3).
-    if ((await this.repos.vehicles.get(pending.vehicleId)) === undefined) return null;
+    if ((await r.vehicles.get(pending.vehicleId)) === undefined) return null;
 
     const draft = makeFuelEntryDraft({
       date: new Date(pending.date),
@@ -343,13 +392,13 @@ export class FuelTrackerStore {
     });
     if (draft === null) return null;
 
-    const record = await this.addFillUp(draft, pending.vehicleId);
-    await this.clearSubmission(id);
+    const record = await this.writeFillUp(r, draft, pending.vehicleId);
+    await this.clearSubmission(r, id);
     return record;
   }
 
   async rejectPendingFillUp(id: string): Promise<void> {
-    await this.clearSubmission(id);
+    await this.clearSubmission(this.repos, id);
   }
 
   /**
@@ -360,9 +409,9 @@ export class FuelTrackerStore {
    * the queue entry has done its job and the content belongs to the fill-up it
    * became, if it became one.
    */
-  private async clearSubmission(id: string): Promise<void> {
+  private async clearSubmission(repos: Repositories, id: string): Promise<void> {
     const at = this.clock.now();
-    await this.repos.pendingFillUps.remove(id, (row) => tombstonePending(row, at));
+    await repos.pendingFillUps.remove(id, (row) => tombstonePending(row, at));
   }
 
   // MARK: Cleaning up older tombstones
@@ -381,10 +430,13 @@ export class FuelTrackerStore {
    * rewriting and re-pushing the same rows forever.
    */
   async scrubTombstones(): Promise<number> {
-    return (
-      (await this.scrub(this.repos.vehicles, tombstoneVehicle)) +
-      (await this.scrub(this.repos.fillUps, tombstoneFillUp)) +
-      (await this.scrub(this.repos.pendingFillUps, tombstonePending))
+    // Read and rewritten in one transaction (#85).
+    return atomically(
+      this.repos,
+      async (r) =>
+        (await this.scrub(r.vehicles, tombstoneVehicle)) +
+        (await this.scrub(r.fillUps, tombstoneFillUp)) +
+        (await this.scrub(r.pendingFillUps, tombstonePending)),
     );
   }
 
@@ -427,28 +479,32 @@ export class FuelTrackerStore {
    * here was one of the reads it repeated for every remote.
    */
   async repairOversizedTextIn(rows: Snapshot): Promise<Record<Collection, string[]>> {
-    return {
-      vehicles: await this.repair(this.repos.vehicles, rows.vehicles, boundVehicleText),
-      fillUps: await this.repair(this.repos.fillUps, rows.fillUps, boundFillUpText),
-      pendingFillUps: await this.repair(this.repos.pendingFillUps, rows.pendingFillUps, boundPendingText),
-    };
+    return atomically(this.repos, async (r) => ({
+      vehicles: await this.repair(r.vehicles, rows.vehicles, boundVehicleText),
+      fillUps: await this.repair(r.fillUps, rows.fillUps, boundFillUpText),
+      pendingFillUps: await this.repair(r.pendingFillUps, rows.pendingFillUps, boundPendingText),
+    }));
   }
 
+  /**
+   * The rows held only say **which** need repairing. Each is re-read, inside
+   * the transaction, and repaired as it is now (#85): sync read them before
+   * it pulled, and repairing that copy wrote it back over any edit saved since.
+   */
   private async repair<T extends SyncFields>(
     repo: Repository<T>,
     rows: readonly T[],
     bound: (row: T) => T,
   ): Promise<string[]> {
-    const repaired: string[] = [];
-    for (const row of rows) {
-      // Live rows only, as before: a tombstone carries no text to shorten.
-      if (row.deletedAt !== null) continue;
-      const bounded = bound(row);
-      if (bounded === row) continue;
-      await repo.put({ ...bounded, updatedAt: this.clock.now() });
-      repaired.push(row.id);
-    }
-    return repaired;
+    // Live rows only, as before: a tombstone carries no text to shorten.
+    const tooLong = (row: T): boolean => row.deletedAt === null && bound(row) !== row;
+    const candidates = rows.filter(tooLong).map((row) => row.id);
+    if (candidates.length === 0) return [];
+    const repaired = (await repo.getMany(candidates))
+      .filter(tooLong)
+      .map((row) => ({ ...bound(row), updatedAt: this.clock.now() }));
+    await repo.putMany(repaired);
+    return repaired.map((row) => row.id);
   }
 
   // MARK: Backup
@@ -476,14 +532,16 @@ export class FuelTrackerStore {
    * and what makes every other device take it.
    */
   async restamp(collection: 'vehicles' | 'fillUps' | 'pendingFillUps', ids: readonly string[]): Promise<void> {
-    const repo = this.repos[collection] as Repository<SyncFields>;
-    // By id, deleted rows included, in one read (#87) — it used to scan every
-    // tombstone once per id.
-    for (const row of await repo.getMany(ids)) {
+    // Read and re-stamped in one transaction (#85).
+    await atomically(this.repos, async (r) => {
+      const repo = r[collection] as Repository<SyncFields>;
+      // By id, deleted rows included, in one read (#87) — it used to scan
+      // every tombstone once per id.
+      const rows = await repo.getMany(ids);
       // Strictly newer than it was, whatever clock this store was given:
       // a re-stamp that ties again settles nothing.
-      await repo.put({ ...row, updatedAt: Math.max(this.clock.now(), row.updatedAt + 1) });
-    }
+      await repo.putMany(rows.map((row) => ({ ...row, updatedAt: Math.max(this.clock.now(), row.updatedAt + 1) })));
+    });
   }
 
   private recordFromDraft(

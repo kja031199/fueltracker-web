@@ -62,6 +62,21 @@ describe.each(implementations)('%s', (_name, make) => {
     expect(await repo.list()).toHaveLength(1);
   });
 
+  test('putMany writes every row in one call, the later of two with one id winning (#85)', async () => {
+    const repo = await make();
+    await repo.put(vehicle('a', { name: 'Before' }));
+    await repo.putMany([vehicle('a', { name: 'First' }), vehicle('b'), vehicle('a', { name: 'Last' })]);
+    expect((await repo.list()).map((row) => row.id).sort()).toEqual(['a', 'b']);
+    expect((await repo.get('a'))?.name).toBe('Last');
+  });
+
+  test('putMany of nothing changes nothing', async () => {
+    const repo = await make();
+    await repo.put(vehicle('a'));
+    await repo.putMany([]);
+    expect(await repo.list()).toHaveLength(1);
+  });
+
   test('put replaces by id rather than duplicating', async () => {
     const repo = await make();
     await repo.put(vehicle('a', { name: 'First' }));

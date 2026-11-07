@@ -78,6 +78,35 @@ What the view does not see is a write the *app* makes while a sync is
 running: that row goes with the next sync, which every save already schedules.
 `syncReads.test.ts` counts the reads.
 
+### A merge is one transaction (#85)
+
+The merge, and every other write that reads before it decides — deleting or
+forgetting a car, approving or receiving a submission, an edit, the text
+repair, re-stamping a tie, scrubbing old tombstones — runs in **one IndexedDB
+transaction over the three tables** (`atomically`, `atomically.ts`). Two
+things follow:
+
+- **Nothing lands in the middle.** The merge used to read what was stored,
+  then write a row at a time. A save made in between was overwritten by the
+  older row being merged, and because that row's version was now the one sync
+  "knew", the edit was never sent either: it was simply lost. Now the save
+  waits for the merge (or the merge sees it), and it is sent.
+- **All of it or none.** A tab closed half way through deleting a car used to
+  leave a live car with some of its fill-ups deleted. Deleting a car now also
+  deletes **its waiting submissions**, which kept the submitter's name and
+  note before.
+
+The text repair is handed rows sync read before it pulled, so it uses them only
+to choose **which** rows to repair, and repairs each as it is stored now. An
+import that names one row twice keeps the newer of the two, not the later.
+
+Dexie is told which transaction a call belongs to, rather than left to work it
+out: its tracking of "the current transaction" does not survive a few `await`s
+through ordinary async functions, and a write that loses it becomes a write of
+its own. So a transaction hands its work repositories bound to it, and the
+work must use those. The in-memory repositories have no transactions; there
+the work simply runs.
+
 One cost was knowingly left: IndexedDB still deserialises the selected
 vehicle's photos once per refresh before they are dropped, because a row
 cannot be read without its fields. Moving photos into their own table would
