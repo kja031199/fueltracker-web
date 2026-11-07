@@ -184,6 +184,8 @@ Recorded so a regression in the tests themselves is visible:
 | Share ledger: no save before pulling / that save's failure ignored / ended shares dropped before they are forgotten | 2 / 1 / 1 |
 | Id clash (#78): rules (emulator) / in-memory world / Accept unchecked / shown as a network error / no clash detection / held shares flagged too | 2 / 2 / 1 / 1 / 4 / 15 |
 | Id clash: recorded in the ledger / clashed shares synced / store ignoring tombstones / clash not reported | 1 / 3 / 1 / 1 |
+| Stale edit (#83): deleted fill-up not refused / written back / car gone not refused / saved under another car | 4 / 4 / 1 / 2 |
+| Stale edit: no refresh after it / refusal swallowed / generic message / form closes on it | 1 / 2 / 1 / 2 |
 
 Survives, and equivalent: dropping the array check from the link decoder — a
 JSON array cannot carry the version field, so it is refused as damaged either

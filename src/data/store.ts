@@ -29,6 +29,7 @@ import type { Submission } from './fillUpLink';
 import { exportSnapshot, importBackup } from './backup';
 import { TEXT_LIMITS, boundText } from '../domain/textLimits';
 import { boundFillUpText, boundPendingText, boundVehicleText } from './recordText';
+import { StaleEdit } from './staleEdit';
 
 /**
  * Injected rather than read from globals, so tests are deterministic and a
@@ -141,11 +142,22 @@ export class FuelTrackerStore {
    * zero the gallons has to fail exactly as a creation would, which it does by
    * never producing a draft in the first place.
    */
-  async updateFillUp(id: string, draft: FuelEntryDraft, vehicleId: string): Promise<FillUpRecord> {
+  /**
+   * Replaces a fill-up's contents, **on the car it is already on** (#83).
+   *
+   * There is no car parameter, so an edit cannot move a fill-up: it used to
+   * take the *selected* car, and a sync that changed the selection while the
+   * form was open moved the fill-up silently. Refused with `StaleEdit` —
+   * nothing written — when the fill-up has been deleted meanwhile (saving used
+   * to write it back as a new row), or its car has.
+   */
+  async updateFillUp(id: string, draft: FuelEntryDraft): Promise<FillUpRecord> {
+    const existing = await this.repos.fillUps.get(id);
+    if (existing === undefined) throw new StaleEdit('fill-up-gone');
+    if ((await this.repos.vehicles.get(existing.vehicleId)) === undefined) throw new StaleEdit('car-gone');
     // Who entered it does not change because someone else corrected it — and
     // on a shared car the rules refuse an edit that tries.
-    const existing = await this.repos.fillUps.get(id);
-    const record = { ...this.recordFromDraft(draft, vehicleId, id), enteredBy: existing?.enteredBy ?? null };
+    const record = { ...this.recordFromDraft(draft, existing.vehicleId, id), enteredBy: existing.enteredBy ?? null };
     await this.repos.fillUps.put(record);
     return record;
   }

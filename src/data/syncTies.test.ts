@@ -75,14 +75,14 @@ const view = async (d: Device, id: string) => {
 describe('a tie between two devices', () => {
   test('the timestamps really do tie in this set-up', async () => {
     const { a, b, car, id } = await twoDevicesOneFillUp();
-    const edited = await a.store.updateFillUp(id, draft(10_111), car);
-    const other = await b.store.updateFillUp(id, draft(10_222), car);
+    const edited = await a.store.updateFillUp(id, draft(10_111));
+    const other = await b.store.updateFillUp(id, draft(10_222));
     expect(edited.updatedAt).toBe(other.updatedAt);
   });
 
   test('a deletion and an edit at the same moment: both devices agree, and the deletion wins', async () => {
     const { a, b, car, id } = await twoDevicesOneFillUp();
-    await a.store.updateFillUp(id, draft(10_111), car);
+    await a.store.updateFillUp(id, draft(10_111));
     await b.store.removeFillUp(id);
     await settle(a, b);
     expect(await view(a, id)).toEqual(await view(b, id));
@@ -92,7 +92,7 @@ describe('a tie between two devices', () => {
   test('the same, the other way round', async () => {
     const { a, b, car, id } = await twoDevicesOneFillUp();
     await a.store.removeFillUp(id);
-    await b.store.updateFillUp(id, draft(10_111), car);
+    await b.store.updateFillUp(id, draft(10_111));
     await settle(a, b);
     expect(await view(a, id)).toEqual(await view(b, id));
     expect((await view(a, id))?.deletedAt).toBe(true);
@@ -100,8 +100,8 @@ describe('a tie between two devices', () => {
 
   test('two different edits at the same moment: both devices end with the same one', async () => {
     const { a, b, car, id } = await twoDevicesOneFillUp();
-    await a.store.updateFillUp(id, draft(10_111), car);
-    await b.store.updateFillUp(id, draft(10_222), car);
+    await a.store.updateFillUp(id, draft(10_111));
+    await b.store.updateFillUp(id, draft(10_222));
     await settle(a, b);
     expect(await view(a, id)).toEqual(await view(b, id));
     // And the account holds that same version.
@@ -109,13 +109,13 @@ describe('a tie between two devices', () => {
 
   test('whichever device syncs first, the winner is the same', async () => {
     const first = await twoDevicesOneFillUp();
-    await first.a.store.updateFillUp(first.id, draft(10_111), first.car);
-    await first.b.store.updateFillUp(first.id, draft(10_222), first.car);
+    await first.a.store.updateFillUp(first.id, draft(10_111));
+    await first.b.store.updateFillUp(first.id, draft(10_222));
     await settle(first.a, first.b);
 
     const second = await twoDevicesOneFillUp();
-    await second.a.store.updateFillUp(second.id, draft(10_111), second.car);
-    await second.b.store.updateFillUp(second.id, draft(10_222), second.car);
+    await second.a.store.updateFillUp(second.id, draft(10_111));
+    await second.b.store.updateFillUp(second.id, draft(10_222));
     await settle(second.b, second.a);
 
     expect((await view(first.a, first.id))?.odometer).toBe((await view(second.a, second.id))?.odometer);

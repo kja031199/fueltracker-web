@@ -141,7 +141,7 @@ describe('both logging the same car', () => {
     const { owner, partner, car } = await sharedCar();
     await partner.sync();
     const [first] = await owner.store.fillUps(car.id);
-    await owner.store.updateFillUp(first!.id, draft(10_050), car.id);
+    await owner.store.updateFillUp(first!.id, draft(10_050));
     const extra = await owner.store.addFillUp(draft(10_400), car.id);
     await owner.sync();
     await partner.sync();
@@ -156,7 +156,7 @@ describe('both logging the same car', () => {
     const { owner, partner, car } = await sharedCar();
     await partner.sync();
     const [first] = await partner.store.fillUps(car.id);
-    await partner.store.updateFillUp(first!.id, draft(10_010), car.id);
+    await partner.store.updateFillUp(first!.id, draft(10_010));
     await partner.sync();
     await owner.sync();
     expect((await owner.store.fillUp(first!.id))?.odometer).toBe(10_010);
@@ -577,7 +577,7 @@ describe('over time', () => {
     const { owner, partner, car } = await sharedCar();
     await partner.sync();
     const [entry] = await owner.store.fillUps(car.id);
-    await partner.store.updateFillUp(entry!.id, draft(10_020), car.id);
+    await partner.store.updateFillUp(entry!.id, draft(10_020));
     await owner.store.removeFillUp(entry!.id);
     await owner.sync();
     await partner.sync();
