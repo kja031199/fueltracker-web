@@ -30,6 +30,7 @@ import { exportSnapshot, importBackup } from './backup';
 import { TEXT_LIMITS, boundText } from '../domain/textLimits';
 import { boundFillUpText, boundPendingText, boundVehicleText } from './recordText';
 import { StaleEdit } from './staleEdit';
+import type { Collection } from './remote';
 
 /**
  * Injected rather than read from globals, so tests are deterministic and a
@@ -95,8 +96,19 @@ export class FuelTrackerStore {
    * would hand that car to whoever shared it (#78).
    */
   async hasVehicle(id: string): Promise<boolean> {
-    if ((await this.repos.vehicles.get(id)) !== undefined) return true;
-    return (await this.repos.vehicles.listDeleted()).some((row) => row.id === id);
+    return (await this.repos.vehicles.getMany([id])).length > 0;
+  }
+
+  /**
+   * Rows by id, live **or** tombstoned, for sync (#87): what it merged,
+   * re-stamped or repaired, re-read without reading the whole table.
+   */
+  async rowsById(collection: 'vehicles', ids: readonly string[]): Promise<VehicleRecord[]>;
+  async rowsById(collection: 'fillUps', ids: readonly string[]): Promise<FillUpRecord[]>;
+  async rowsById(collection: 'pendingFillUps', ids: readonly string[]): Promise<PendingFillUpRecord[]>;
+  async rowsById(collection: Collection, ids: readonly string[]): Promise<SyncFields[]> {
+    if (ids.length === 0) return [];
+    return (this.repos[collection] as Repository<SyncFields>).getMany(ids);
   }
 
   async vehicles(): Promise<VehicleRecord[]> {
@@ -186,11 +198,8 @@ export class FuelTrackerStore {
    */
   async forgetVehicle(vehicleId: string): Promise<void> {
     for (const repo of [this.repos.fillUps, this.repos.pendingFillUps]) {
-      const rows = [
-        ...(await repo.listForVehicle(vehicleId)),
-        ...(await repo.listDeleted()).filter((row) => row.vehicleId === vehicleId),
-      ];
-      for (const row of rows) await repo.purge(row.id);
+      // That car's rows, tombstones included, from its index (#87).
+      for (const row of await repo.listForVehicleAll(vehicleId)) await repo.purge(row.id);
     }
     await this.repos.vehicles.purge(vehicleId);
   }
@@ -271,10 +280,8 @@ export class FuelTrackerStore {
    */
   async receiveSubmission(submission: Submission): Promise<'queued' | 'duplicate' | 'no-such-car'> {
     if ((await this.repos.vehicles.get(submission.vehicleId)) === undefined) return 'no-such-car';
-    const seen =
-      (await this.repos.pendingFillUps.get(submission.id)) ??
-      (await this.repos.pendingFillUps.listDeleted()).find((row) => row.id === submission.id);
-    if (seen !== undefined) return 'duplicate';
+    // Queued, approved or rejected: any row with this id, by key (#87).
+    if ((await this.repos.pendingFillUps.getMany([submission.id])).length > 0) return 'duplicate';
     const { draft } = submission;
     await this.repos.pendingFillUps.put({
       id: submission.id,
@@ -410,23 +417,36 @@ export class FuelTrackerStore {
    * left alone, so after the first repair this rewrites nothing.
    */
   async repairOversizedText(): Promise<number> {
-    return (
-      (await this.repair(this.repos.vehicles, boundVehicleText)) +
-      (await this.repair(this.repos.fillUps, boundFillUpText)) +
-      (await this.repair(this.repos.pendingFillUps, boundPendingText))
-    );
+    const ids = await this.repairOversizedTextIn(await this.exportSnapshot());
+    return ids.vehicles.length + ids.fillUps.length + ids.pendingFillUps.length;
+  }
+
+  /**
+   * The same repair over rows the caller already holds, returning the ids it
+   * rewrote (#87): sync has just read every row once, and re-reading them all
+   * here was one of the reads it repeated for every remote.
+   */
+  async repairOversizedTextIn(rows: Snapshot): Promise<Record<Collection, string[]>> {
+    return {
+      vehicles: await this.repair(this.repos.vehicles, rows.vehicles, boundVehicleText),
+      fillUps: await this.repair(this.repos.fillUps, rows.fillUps, boundFillUpText),
+      pendingFillUps: await this.repair(this.repos.pendingFillUps, rows.pendingFillUps, boundPendingText),
+    };
   }
 
   private async repair<T extends SyncFields>(
     repo: Repository<T>,
+    rows: readonly T[],
     bound: (row: T) => T,
-  ): Promise<number> {
-    let repaired = 0;
-    for (const row of await repo.list()) {
+  ): Promise<string[]> {
+    const repaired: string[] = [];
+    for (const row of rows) {
+      // Live rows only, as before: a tombstone carries no text to shorten.
+      if (row.deletedAt !== null) continue;
       const bounded = bound(row);
       if (bounded === row) continue;
       await repo.put({ ...bounded, updatedAt: this.clock.now() });
-      repaired += 1;
+      repaired.push(row.id);
     }
     return repaired;
   }
@@ -457,11 +477,12 @@ export class FuelTrackerStore {
    */
   async restamp(collection: 'vehicles' | 'fillUps' | 'pendingFillUps', ids: readonly string[]): Promise<void> {
     const repo = this.repos[collection] as Repository<SyncFields>;
-    for (const id of ids) {
-      const row = (await repo.get(id)) ?? (await repo.listDeleted()).find((r) => r.id === id);
+    // By id, deleted rows included, in one read (#87) — it used to scan every
+    // tombstone once per id.
+    for (const row of await repo.getMany(ids)) {
       // Strictly newer than it was, whatever clock this store was given:
       // a re-stamp that ties again settles nothing.
-      if (row !== undefined) await repo.put({ ...row, updatedAt: Math.max(this.clock.now(), row.updatedAt + 1) });
+      await repo.put({ ...row, updatedAt: Math.max(this.clock.now(), row.updatedAt + 1) });
     }
   }
 

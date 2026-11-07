@@ -166,3 +166,23 @@ describe('tieWinner', () => {
     expect(tieWinner({ ...base, deletedAt: 5 }, renamed)).toBe('same');
   });
 });
+
+describe('a tie won here is sent by the same sync (#87)', () => {
+  // Sync now reads the device once and re-reads by id what it writes; a
+  // re-stamped winner must be re-read, or it waits a whole sync to be sent.
+  // Both orders, so one of them is certainly won by the second device.
+  test.each([
+    [10_111, 10_222],
+    [10_222, 10_111],
+  ])('first device writes %i, second %i', async (first, second) => {
+    const { remote, a, b, id } = await twoDevicesOneFillUp();
+    await a.store.updateFillUp(id, draft(first));
+    await b.store.updateFillUp(id, draft(second));
+    await a.sync();
+
+    await b.sync();
+
+    const inAccount = ((await remote.pull(null)).fillUps as FillUpRecord[]).find((row) => row.id === id);
+    expect(inAccount?.odometer).toBe((await view(b, id))?.odometer);
+  });
+});

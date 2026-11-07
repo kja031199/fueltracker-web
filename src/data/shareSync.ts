@@ -60,6 +60,7 @@ import type { Membership, SharingRemote } from './sharing';
 import { membershipKey } from './sharing';
 import type { SyncResult, RowScope } from './sync';
 import { syncOnce } from './sync';
+import { LocalView } from './localView';
 import type { MonotonicClock } from './syncClock';
 import type { ShareLedger, SyncStateStore } from './syncState';
 
@@ -149,7 +150,10 @@ export async function syncAll(
 
   // Excluded from the account's own push: every car held or currently shared.
   const sharedCars = new Set([...held, ...(current ?? [])].map((m) => m.vehicleId));
-  const ownResult = await syncOnce(store, own, clock, ownState, { scope: excluding(sharedCars) });
+  // One look at this device for the whole sync (#87), shared by every remote.
+  // The text repair runs once, here, over every row — shared cars' included.
+  const local = new LocalView(store);
+  const ownResult = await syncOnce(store, own, clock, ownState, { scope: excluding(sharedCars), local });
 
   if (current === null) return { own: ownResult, shares: { ...NO_SHARES, unreachable: true } };
   // Not on the allowlist: the shared cars will refuse too, and saying so
@@ -172,6 +176,7 @@ export async function syncAll(
 
   async function forget(membership: Membership): Promise<void> {
     await store.forgetVehicle(membership.vehicleId);
+    await local.forgetVehicle(membership.vehicleId);
     await sharing!.forgetState(shareStateKey(membership));
     ended.push(membership);
   }
@@ -187,7 +192,7 @@ export async function syncAll(
       sharing.remote.scoped(membership),
       clock,
       sharing.stateFor(shareStateKey(membership)),
-      { scope: onlyFillUpsOf(membership.vehicleId) },
+      { scope: onlyFillUpsOf(membership.vehicleId), local, repair: false },
     );
     if (!result.ok && result.kind === 'refused') {
       // Removed by the owner: the rules say no. Tidy our own list too.
@@ -199,7 +204,7 @@ export async function syncAll(
       failed.push(membership);
       continue;
     }
-    const car = (await store.exportSnapshot()).vehicles.find((v) => v.id === membership.vehicleId);
+    const car = await local.vehicle(membership.vehicleId);
     if (car !== undefined && car.deletedAt !== null) {
       // The owner deleted the car. Nothing is left to share.
       await sharing.remote.leave(membership).catch(() => {});

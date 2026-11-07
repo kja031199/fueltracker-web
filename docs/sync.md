@@ -52,8 +52,33 @@ photo each time. Now:
 - **One save means one read** of the selected vehicle's rows. They are re-read
   on a reload counter, not on the identity of the vehicles array.
 
-Export and sync still read whole tables, because they need every row and every
-photo. One cost was knowingly left: IndexedDB still deserialises the selected
+### Sync reads the device once (#87)
+
+Export and sync need every row and every photo, but they now read each table
+**once**. Sync used to read the whole device about seven times per remote — a
+snapshot before the merge and another before the push, the merge's own
+lookups, the text repair, and for a member one more snapshot per shared car
+just to find that car — so a member with three shared cars read the fill-ups
+table 34 times per sync. Now:
+
+- **`syncAll` shares one `LocalView`** (`localView.ts`) with every remote. It
+  reads every table once, the first time it is needed (a sync that cannot
+  reach the account reads nothing), and afterwards only **by id**: the rows a
+  merge wrote, the rows a tie re-stamped, the rows the text repair shortened.
+  A forgotten car's rows are dropped from it.
+- **The merge looks up only the rows it was given** (`getMany`), not every row.
+- **The text repair runs once per sync**, in the account's own sync, over every
+  row — shared cars' included — instead of once per remote.
+- **Single-row questions read single rows:** a duplicate submission,
+  "is this car here?", re-stamping a tie and forgetting a shared car go by id
+  or by the `vehicleId` index, tombstones included. `listDeleted` reads the
+  `deletedAt` index, so it reads no live row at all.
+
+What the view does not see is a write the *app* makes while a sync is
+running: that row goes with the next sync, which every save already schedules.
+`syncReads.test.ts` counts the reads.
+
+One cost was knowingly left: IndexedDB still deserialises the selected
 vehicle's photos once per refresh before they are dropped, because a row
 cannot be read without its fields. Moving photos into their own table would
 remove that; it would also migrate everyone's local data, so it was deferred.
