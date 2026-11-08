@@ -11,7 +11,8 @@ import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { FuelLogProvider, useFuelLog, useSyncStatus, type FuelLog } from './fuelLog';
 import { SAVE_SYNC_DELAY_MS } from './syncScheduler';
 import { InMemorySharingWorld } from '../data/sharing';
-import { LEDGER_UNREADABLE, type SharingSync } from '../data/shareSync';
+import type { SharingSync } from '../data/shareSync';
+import { LEDGER_UNREADABLE } from './syncMessages';
 import { InMemorySyncState } from '../data/syncState';
 import { InMemoryShareLedger } from '../data/shareLedger';
 
