@@ -26,7 +26,9 @@
  * the machine.
  */
 
-import { DexieShareLedger, DexieSyncState, FuelTrackerDatabase, dexieRepositories } from './db';
+import { FuelTrackerDatabase } from './db';
+import { dexieRepositories } from './dexieRepository';
+import { DexieShareLedger, DexieSyncState } from './dexieState';
 import type { SharingSync } from './shareSync';
 import type { SyncStateStore } from './syncState';
 import { FuelTrackerStore } from './store';

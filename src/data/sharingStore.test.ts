@@ -1,9 +1,11 @@
 import 'fake-indexeddb/auto';
 import { describe, expect, test } from 'vitest';
 import { InMemoryRepository } from './repository';
-import { DexieRepository, FuelTrackerDatabase } from './db';
+import { FuelTrackerDatabase } from './db';
+import { DexieRepository } from './dexieRepository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records';
-import { FuelTrackerStore, type Repositories } from './store';
+import { FuelTrackerStore } from './store';
+import { type Repositories } from './repository';
 import { validateFillUp } from './recordValidation';
 import { tombstoneFillUp } from './tombstone';
 import { makeFuelEntryDraft, type FuelEntryDraft } from '../domain/fuelEntryDraft';

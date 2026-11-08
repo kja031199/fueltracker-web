@@ -250,6 +250,7 @@ Recorded so a regression in the tests themselves is visible:
 | Rules upkeep (#92): any one of the 26 bounds in `label()`/`sized()` raised by one / receipt bound / stamp bound / an inline `.size()` back / a fill-up key dropped / a junk vehicle key / `enteredBy` made required / `exists()` before `get()` | 1 each / 1 / 1 / 2 / 1 / 1 / 1 / 1 |
 | Rules upkeep, emulator: the users document readable / `liveCar` ignoring deletion | 1 / 4 |
 | Record mappings (#91): a measurement dropped / "missed previous" lost going in / coming back / the sender's name unbounded / `enteredBy` not kept / a link's place and photo kept / the import validating nothing / approval skipping the gate | 10 / 2 / 1 / 4 / 16 / 1 / 4 / 1 |
+| Dependencies (#91): `Repositories` back in `store.ts` (the store↔import cycle) / the clock type back in `store.ts` / the database or cursor naming a membership from `sharing.ts` | 1 / 1 / 1 each |
 
 Equivalent, and kept as a backstop: `shape()` without its `hasAll`. Every
 required field is also read by a clause of its own, and reading a missing field

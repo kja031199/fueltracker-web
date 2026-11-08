@@ -18,7 +18,9 @@
 import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
 import type { FillUpRecord, PendingFillUpRecord, SyncFields, VehicleRecord, Snapshot } from './records';
 import { SCHEMA_VERSION } from './records';
-import type { Repository, VehicleScopedRepository } from './repository';
+import type { Repositories, Repository } from './repository';
+import type { StoreClock } from './syncClock';
+import { systemClock } from './syncClock';
 import type { FillUpSummary } from './records';
 import { toSummary } from './records';
 import type { Tombstoner } from './tombstone';
@@ -33,42 +35,7 @@ import { boundFillUpText, boundPendingText, boundVehicleText } from './recordTex
 import { StaleEdit } from './staleEdit';
 import type { Collection } from './remote';
 
-/**
- * Injected rather than read from globals, so tests are deterministic and a
- * future import path can stamp a record's real creation time instead of "now".
- */
-export interface StoreClock {
-  now(): number;
-  newId(): string;
-}
 
-export const systemClock: StoreClock = {
-  now: () => Date.now(),
-  newId: () => crypto.randomUUID(),
-};
-
-export interface Repositories {
-  readonly vehicles: Repository<VehicleRecord>;
-  readonly fillUps: VehicleScopedRepository<FillUpRecord>;
-  readonly pendingFillUps: VehicleScopedRepository<PendingFillUpRecord>;
-  /**
-   * Runs `work` as one transaction over all three tables (#85): every write
-   * in it lands or none does, and no other write lands in the middle of it.
-   * The store runs each merge and each cascade in one, and decides inside it,
-   * against rows read inside it.
-   *
-   * `work` is handed repositories **bound to the transaction**, and must use
-   * those: Dexie's tracking of "the current transaction" does not survive a
-   * few `await`s through ordinary async functions, and a write that loses it
-   * quietly becomes a write of its own. Those have no `transaction`, so a
-   * nested `atomically` just runs.
-   *
-   * Optional, because only the device's database has transactions:
-   * `dexieRepositories` (`db.ts`) always supplies one. Without it — the
-   * in-memory repositories of the tests and the demo — `work` simply runs.
-   */
-  readonly transaction?: <R>(work: (repos: Repositories) => Promise<R>) => Promise<R>;
-}
 
 export interface NewVehicle {
   readonly name: string;

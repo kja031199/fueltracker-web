@@ -10,7 +10,8 @@ import { makeFuelEntryDraft, type FuelEntryDraft } from '../domain/fuelEntryDraf
 import { FuelLogProvider, useFuelLog, type FuelLog } from './fuelLog';
 import { InMemorySharingWorld } from '../data/sharing';
 import type { SharingSync } from '../data/shareSync';
-import { InMemoryShareLedger, InMemorySyncState } from '../data/syncState';
+import { InMemorySyncState } from '../data/syncState';
+import { InMemoryShareLedger } from '../data/shareLedger';
 import type { FillUpSummary } from '../data/records';
 
 /**

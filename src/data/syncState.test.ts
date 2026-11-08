@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, test } from 'vitest';
 import 'fake-indexeddb/auto';
 import Dexie from 'dexie';
-import { DexieSyncState, FuelTrackerDatabase } from './db';
+import { FuelTrackerDatabase } from './db';
+import { DexieSyncState } from './dexieState';
 import { openAccountStore } from './accountStore';
 import { SCHEMA_VERSION } from './records';
 import { SYNC_CURSOR_VERSION, parseCursor, type SyncCursor } from './syncState';

@@ -37,7 +37,21 @@
  * losing to it silently is worse.
  */
 
-import type { StoreClock } from './store';
+
+/**
+ * How the store stamps and names what it writes (#91: here, with the clocks
+ * that implement it, rather than in `store.ts`). Injected rather than read from globals, so tests are deterministic and a
+ * future import path can stamp a record's real creation time instead of "now".
+ */
+export interface StoreClock {
+  now(): number;
+  newId(): string;
+}
+
+export const systemClock: StoreClock = {
+  now: () => Date.now(),
+  newId: () => crypto.randomUUID(),
+};
 
 /** Thirty days. A real clock error is hours or days; this is not a race. */
 export const MAX_ADOPTED_SKEW_MS = 30 * 24 * 60 * 60 * 1000;

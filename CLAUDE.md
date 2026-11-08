@@ -24,13 +24,19 @@ Hosting at `fueltracker-899eb.web.app`.
   parsers (`scanning/`). **It imports nothing from `data/` or `ui/`**, and
   `src/test/layering.test.ts` enforces that (#54).
 - `src/data/` — records and persistence. `store.ts` is the write surface,
-  `repository.ts` the storage abstraction, `db.ts` the Dexie binding,
-  `sync.ts` the reconciliation, `records.ts` the record types and `Snapshot`,
+  `repository.ts` the storage abstraction (and `Repositories`), `db.ts` the
+  Dexie schema with its adapters beside it (`dexieRepository.ts`,
+  `dexieState.ts`), `sync.ts` the reconciliation, `syncState.ts` its cursor and
+  `shareLedger.ts` the shared cars held, `records.ts` the record types and
+  `Snapshot`, `recordMapping.ts` draft ↔ record,
   `recordValidation.ts` **the one decoder** for a row from anywhere (account,
   JSON backup or CSV), `backupFormat.ts` the file envelopes around it,
   `recordId.ts` which ids can be stored at all,
   `tombstone.ts` what a deletion leaves, `accountStore.ts` the per-account
-  database.
+  database. **No import cycles, and the storage modules never import the
+  store, sync or sharing modules above them** (#91; `importCycles.test.ts`,
+  type-only imports included). Sharing's plain shapes are `sharingTypes.ts`;
+  the store's clock type is in `syncClock.ts`.
 - `src/data/firebase/` — the **only** place the Firebase SDK is imported.
 - `src/ui/` — React: screens, hooks, hand-drawn SVG charts (`charts/`).
   `App.tsx` gates on auth and holds per-browser preferences; `fuelLog.tsx`
@@ -288,7 +294,7 @@ npm ci --prefix .github/firebase-cli
 - **Read-then-write runs in one transaction, through the repositories it is
   handed** (#85). `atomically(repos, (r) => …)` (`atomically.ts`) wraps every
   merge, cascade and check-then-write in the store; inside, use **`r`, never
-  `this.repos`**. `dexieRepositories` (`db.ts`, the only place the app builds
+  `this.repos`**. `dexieRepositories` (`dexieRepository.ts`, the only place the app builds
   repositories) binds `r` to the transaction with `tx.table(...)`, because
   Dexie's ambient "current transaction" is lost after a few `await`s through
   plain async functions — the writes then commit one by one and Dexie reports
@@ -329,7 +335,7 @@ npm ci --prefix .github/firebase-cli
   must include it (`forWire` does), or the test passes for the wrong reason.
   Records never carry it: `remoteStore.decode` drops it.
 - **The sync cursor is exact integer microseconds, per collection, kept in the
-  account's IndexedDB** (`syncState.ts`, `DexieSyncState`). Not float ms with a
+  account's IndexedDB** (`syncState.ts`; `DexieSyncState` in `dexieState.ts`). Not float ms with a
   margin, which re-downloaded a document on every sync. Not one cursor for all
   three collections, which can skip a write. Not `localStorage`, which can
   outlive the rows. **Elapsed time uses `clock.wall()`**, never the merge

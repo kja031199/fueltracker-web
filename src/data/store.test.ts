@@ -5,7 +5,7 @@ import { computeFuelStatistics } from '../domain/fuelStatistics';
 import { InMemoryRepository } from './repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records';
 import { SCHEMA_VERSION } from './records';
-import type { StoreClock } from './store';
+import type { StoreClock } from './syncClock';
 import { FuelTrackerStore, toStats } from './store';
 import { TEXT_LIMITS } from '../domain/textLimits';
 import { StaleEdit } from './staleEdit';

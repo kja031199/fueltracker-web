@@ -5,7 +5,7 @@ import { backupFilename, exportSnapshot, importBackup } from './backup';
 import { InMemoryRepository } from './repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records';
 import { FuelTrackerStore, toStats } from './store';
-import type { Repositories } from './store';
+import type { Repositories } from './repository';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { seedDemoData } from './demoData';
 import { TEXT_LIMITS } from '../domain/textLimits';

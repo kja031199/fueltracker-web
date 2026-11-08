@@ -30,9 +30,6 @@
 
 import type { PullCursor } from './remote';
 import { SCHEMA_VERSION } from './records';
-import type { Membership } from './sharing';
-import { isStorableId } from './recordId';
-import { TEXT_LIMITS, boundText } from '../domain/textLimits';
 
 export const SYNC_CURSOR_VERSION = 1;
 
@@ -116,45 +113,4 @@ export function usableCursor(cursor: SyncCursor | null, now: number): cursor is 
     cursor.fullPulledAt <= now &&
     now - cursor.fullPulledAt < FULL_RECONCILE_MS
   );
-}
-
-// --- Cars shared with this account (#66) -----------------------------------
-
-/** The shared cars this device holds rows for. See `DexieShareLedger`. */
-export interface ShareLedger {
-  load(): Promise<Membership[]>;
-  save(list: readonly Membership[]): Promise<void>;
-}
-
-export class InMemoryShareLedger implements ShareLedger {
-  private list: Membership[] = [];
-
-  async load(): Promise<Membership[]> {
-    return [...this.list];
-  }
-
-  async save(list: readonly Membership[]): Promise<void> {
-    this.list = [...list];
-  }
-}
-
-/** A stored ledger, keeping only well-formed entries. Junk reads as none. */
-export function parseLedger(value: unknown): Membership[] {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((entry: unknown) => {
-    if (typeof entry !== 'object' || entry === null) return [];
-    const raw = entry as Record<string, unknown>;
-    // Both become document paths and scope keys, and the account's copy is
-    // read from the network (#86): an id that could not name a document is
-    // not a share, whatever else the entry says.
-    if (!isStorableId(raw.ownerUid) || !isStorableId(raw.vehicleId)) return [];
-    return [
-      {
-        ownerUid: raw.ownerUid,
-        vehicleId: raw.vehicleId,
-        ownerName: typeof raw.ownerName === 'string' ? boundText(raw.ownerName, TEXT_LIMITS.ownerName) : '',
-        vehicleName: typeof raw.vehicleName === 'string' ? boundText(raw.vehicleName, TEXT_LIMITS.vehicleName) : '',
-      },
-    ];
-  });
 }

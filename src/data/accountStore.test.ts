@@ -9,7 +9,8 @@ import {
   openAccountStore,
   openSignedInAccount,
 } from './accountStore';
-import { DexieRepository, FuelTrackerDatabase } from './db';
+import { FuelTrackerDatabase } from './db';
+import { DexieRepository } from './dexieRepository';
 import { FuelTrackerStore } from './store';
 
 /**

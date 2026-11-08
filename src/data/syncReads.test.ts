@@ -6,7 +6,8 @@ import { FuelTrackerStore } from './store';
 import { InMemorySharingWorld, type Account } from './sharing';
 import { syncAll, type SharingSync } from './shareSync';
 import { syncOnce } from './sync';
-import { InMemoryShareLedger, InMemorySyncState } from './syncState';
+import { InMemorySyncState } from './syncState';
+import { InMemoryShareLedger } from './shareLedger';
 import { MonotonicClock } from './syncClock';
 import { LocalView } from './localView';
 

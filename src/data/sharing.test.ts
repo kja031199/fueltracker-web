@@ -10,7 +10,7 @@ import {
   type Account,
 } from './sharing';
 import { isRefusal } from './sync';
-import { parseLedger } from './syncState';
+import { parseLedger } from './shareLedger';
 import type { FillUpRecord, VehicleRecord } from './records';
 import { SCHEMA_VERSION } from './records';
 
