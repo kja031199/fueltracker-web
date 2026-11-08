@@ -55,6 +55,13 @@ before opening the pull request, because only then is it clear what actually
 changed. Receipts were bounded at two different sizes for a week while the docs
 mentioned one of them — the gap in the docs was the gap in the code.
 
+**Every pull request that closes an issue adds a release note.** One entry in
+[`RELEASE_NOTES.md`](RELEASE_NOTES.md) under today's `## YYYY-MM-DD` (UTC): a
+bold sentence for someone using the app, a `*Technical:*` line, and the issue
+link; add the `PR #n` link once the pull request exists. The "Release notes"
+check refuses a pull request whose `Closes #N` (or title `(#N)`) has no added
+line naming `#N` ([docs/development.md](docs/development.md#release-notes)).
+
 **Mutation-test anything whose silent failure is expensive.** Break it on
 purpose, watch the suite go red, put it back. Required for `firestore.rules`,
 account separation, and anything guarding the data boundary: a test that cannot
@@ -463,6 +470,11 @@ goes through a pull request.
 | Secret scan (gitleaks) | a credential in any commit |
 | Docs links (lychee) | a broken relative link or heading anchor |
 
+Plus **Release notes** (`release-notes.yml`): a pull request closing an issue
+without adding a note for it. Required only once added in branch settings.
+Never put `${{ github.event.pull_request.* }}` inside a `run:` — pass it
+through `env:` (`workflows.test.ts` enforces it).
+
 **The lint is oxlint, hooks rules only** (#57): `react-hooks/rules-of-hooks` and
 `react-hooks/exhaustive-deps`, as errors, in `.oxlintrc.json` with every
 category switched off — an allowlist, so an oxlint bump cannot add rules and
@@ -487,6 +499,8 @@ intended ([docs/development.md](docs/development.md)).
       codes read directly, not through a pipe.
 - [ ] Rules touched? Emulator suite run, and `hasOnly` remembered.
 - [ ] No secrets and no Firebase config in the diff.
+- [ ] Closes an issue? A note in `RELEASE_NOTES.md`, with the PR link once
+      the pull request exists.
 - [ ] `README.md`, `docs/` and this file re-read against the diff — a claim
       that is now false teaches the next reader to distrust the load-bearing
       ones. If nothing needed changing, say so in the PR.

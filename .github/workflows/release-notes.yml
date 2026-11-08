@@ -1,0 +1,48 @@
+name: Release notes
+
+# A pull request that closes an issue must add a note for it to
+# RELEASE_NOTES.md. Cheap, and it always reports a status — a pull request
+# that closes nothing passes — so it is safe to require.
+#
+# Its own workflow, not a job in checks.yml, so that editing a pull request's
+# title or description (`edited`) re-runs this alone.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+concurrency:
+  group: release-notes-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  notes:
+    name: Release notes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # The merge commit and its first parent: the diff between them is what
+      # this pull request changes.
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          # Nothing after checkout needs git auth (#46).
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      # The title and description are written by whoever opened the pull
+      # request. They reach the script as environment variables and are never
+      # written into this command, where they could become part of it.
+      - name: Check every closed issue has a note
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: node --experimental-strip-types scripts/release-notes/check.ts

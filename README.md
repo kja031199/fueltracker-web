@@ -56,6 +56,7 @@ The detail lives in [`docs/`](docs/), one file per subject:
 | [docs/security.md](docs/security.md) | Security headers, the one third-party request, and the dependency audit |
 | [docs/interface.md](docs/interface.md) | Measured contrast, hand-drawn charts, installing and offline |
 | [docs/development.md](docs/development.md) | Local commands and the checks every pull request goes through |
+| [RELEASE_NOTES.md](RELEASE_NOTES.md) | What each update changed, newest first |
 
 [`CLAUDE.md`](CLAUDE.md) is the operating manual for an AI assistant working
 here: the invariants, and the traps already fallen into.

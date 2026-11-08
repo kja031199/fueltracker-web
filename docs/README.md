@@ -23,8 +23,10 @@ how to run it; everything here is the detail behind it.
   helpers that make its answer exact.
 - **[interface.md](interface.md)** — contrast that is measured rather than
   asserted, charts drawn by hand, and installing it for offline use.
-- **[development.md](development.md)** — local commands, and the four checks
-  every pull request goes through.
+- **[development.md](development.md)** — local commands, the four checks
+  every pull request goes through, and how release notes are kept.
+
+What each update changed is in [`RELEASE_NOTES.md`](../RELEASE_NOTES.md).
 
 For an AI assistant working in this repository, [`CLAUDE.md`](../CLAUDE.md)
 holds the invariants and the traps.
