@@ -30,6 +30,7 @@
 
 import type { PullCursor } from './remote';
 import { SCHEMA_VERSION } from './records';
+import { isFiniteNumber } from './guards';
 
 export const SYNC_CURSOR_VERSION = 1;
 
@@ -64,9 +65,6 @@ export class InMemorySyncState implements SyncStateStore {
 
 const COLLECTIONS = ['vehicles', 'fillUps', 'pendingFillUps'] as const;
 
-function finite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
-}
 
 /**
  * A stored cursor, checked, or `null`. A damaged cursor costs one full read;
@@ -75,7 +73,7 @@ function finite(value: unknown): value is number {
 export function parseCursor(value: unknown): SyncCursor | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
   const raw = value as Record<string, unknown>;
-  if (!finite(raw.version) || !finite(raw.schemaVersion) || !finite(raw.fullPulledAt)) return null;
+  if (!isFiniteNumber(raw.version) || !isFiniteNumber(raw.schemaVersion) || !isFiniteNumber(raw.fullPulledAt)) return null;
 
   const marks = raw.highWater;
   if (typeof marks !== 'object' || marks === null || Array.isArray(marks)) return null;
@@ -83,7 +81,7 @@ export function parseCursor(value: unknown): SyncCursor | null {
   for (const name of COLLECTIONS) {
     const mark = (marks as Record<string, unknown>)[name];
     if (mark === null) highWater[name] = null;
-    else if (finite(mark)) highWater[name] = mark;
+    else if (isFiniteNumber(mark)) highWater[name] = mark;
     else return null;
   }
 
@@ -91,7 +89,7 @@ export function parseCursor(value: unknown): SyncCursor | null {
   if (typeof knownRaw !== 'object' || knownRaw === null || Array.isArray(knownRaw)) return null;
   const known: Record<string, number> = {};
   for (const [key, at] of Object.entries(knownRaw)) {
-    if (!finite(at)) return null;
+    if (!isFiniteNumber(at)) return null;
     known[key] = at;
   }
 

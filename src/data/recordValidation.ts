@@ -37,11 +37,12 @@
  */
 
 import { fuelGradeFromRaw } from '../domain/fuelGrade';
-import { TEXT_LIMITS, boundText } from '../domain/textLimits';
+import { TEXT_LIMITS } from '../domain/textLimits';
 import { MAX_RECEIPT_BYTES } from '../domain/fuelEntryDraft';
 import { idProblem } from './recordId';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord, Snapshot } from './records';
 import { tombstoneFillUp, tombstonePending } from './tombstone';
+import { isFiniteNumber, isRecord, textOr } from './guards';
 
 /**
  * Text bounds, set well beyond plausible human input rather than tightly.
@@ -73,22 +74,6 @@ export interface Validated<T> {
 
 type Raw = Record<string, unknown>;
 
-function isRaw(value: unknown): value is Raw {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** A finite number, so `NaN` and `±Infinity` are both excluded. */
-function finite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
-}
-
-function text(value: unknown, max: number): string {
-  // A non-string becomes empty rather than rejecting the row: these fields are
-  // labels, and `String(value)` on an object would store "[object Object]",
-  // which looks like real data and is worse than nothing.
-  if (typeof value !== 'string') return '';
-  return boundText(value, max);
-}
 
 function flag(value: unknown): boolean {
   // Strictly boolean. A truthy string would make `isFullTank: "no"` mean true,
@@ -97,7 +82,7 @@ function flag(value: unknown): boolean {
 }
 
 function coordinate(value: unknown): number | null {
-  return finite(value) ? value : null;
+  return isFiniteNumber(value) ? value : null;
 }
 
 /**
@@ -125,24 +110,24 @@ function syncFields(raw: Raw): { id: string; updatedAt: number; deletedAt: numbe
   // name of a document, and a row carrying one stops every later push (#26).
   const badId = idProblem(id);
   if (badId !== null || typeof id !== 'string') return badId ?? 'no id';
-  if (!finite(updatedAt)) return 'updatedAt is not a number';
-  if (deletedAt !== null && !finite(deletedAt)) return 'deletedAt is neither null nor a number';
-  if (!finite(schemaVersion)) return 'schemaVersion is not a number';
+  if (!isFiniteNumber(updatedAt)) return 'updatedAt is not a number';
+  if (deletedAt !== null && !isFiniteNumber(deletedAt)) return 'deletedAt is neither null nor a number';
+  if (!isFiniteNumber(schemaVersion)) return 'schemaVersion is not a number';
   return { id, updatedAt, deletedAt: deletedAt === null ? null : deletedAt, schemaVersion };
 }
 
 export function validateVehicle(value: unknown): VehicleRecord | string {
-  if (!isRaw(value)) return 'vehicle: not an object';
+  if (!isRecord(value)) return 'vehicle: not an object';
   const common = syncFields(value);
   if (typeof common === 'string') return `vehicle: ${common}`;
-  if (!finite(value.createdAt)) return `vehicle ${common.id}: createdAt is not a number`;
+  if (!isFiniteNumber(value.createdAt)) return `vehicle ${common.id}: createdAt is not a number`;
 
-  const year = finite(value.year) ? Math.trunc(value.year) : 0;
+  const year = isFiniteNumber(value.year) ? Math.trunc(value.year) : 0;
   return {
     ...common,
-    name: text(value.name, TEXT_LIMITS.name),
-    make: text(value.make, TEXT_LIMITS.make),
-    model: text(value.model, TEXT_LIMITS.model),
+    name: textOr(value.name, TEXT_LIMITS.name),
+    make: textOr(value.make, TEXT_LIMITS.make),
+    model: textOr(value.model, TEXT_LIMITS.model),
     // Out-of-range becomes 0, which the UI already renders as "no year given"
     // rather than a date nobody drove in.
     year: year >= MIN_YEAR && year <= MAX_YEAR ? year : 0,
@@ -155,10 +140,10 @@ function measurements(
   value: Raw,
   id: string,
 ): { date: number; odometer: number; gallons: number; pricePerGallon: number } | string {
-  if (!finite(value.date)) return `fill-up ${id}: date is not a number`;
-  if (!finite(value.odometer)) return `fill-up ${id}: odometer is not a number`;
-  if (!finite(value.gallons)) return `fill-up ${id}: gallons is not a number`;
-  if (!finite(value.pricePerGallon)) return `fill-up ${id}: price is not a number`;
+  if (!isFiniteNumber(value.date)) return `fill-up ${id}: date is not a number`;
+  if (!isFiniteNumber(value.odometer)) return `fill-up ${id}: odometer is not a number`;
+  if (!isFiniteNumber(value.gallons)) return `fill-up ${id}: gallons is not a number`;
+  if (!isFiniteNumber(value.pricePerGallon)) return `fill-up ${id}: price is not a number`;
   return {
     date: value.date,
     odometer: value.odometer,
@@ -168,7 +153,7 @@ function measurements(
 }
 
 export function validateFillUp(value: unknown): FillUpRecord | string {
-  if (!isRaw(value)) return 'fill-up: not an object';
+  if (!isRecord(value)) return 'fill-up: not an object';
   const common = syncFields(value);
   if (typeof common === 'string') return `fill-up: ${common}`;
   if (typeof value.vehicleId !== 'string' || value.vehicleId === '') {
@@ -199,8 +184,8 @@ export function validateFillUp(value: unknown): FillUpRecord | string {
     // Reuses the ported fallback rather than deciding again here: an
     // unrecognised grade has always become `Other`, on iOS and on the web.
     fuelGrade: fuelGradeFromRaw(typeof value.fuelGrade === 'string' ? value.fuelGrade : ''),
-    station: text(value.station, TEXT_LIMITS.station),
-    notes: text(value.notes, TEXT_LIMITS.notes),
+    station: textOr(value.station, TEXT_LIMITS.station),
+    notes: textOr(value.notes, TEXT_LIMITS.notes),
     latitude: coordinate(value.latitude),
     longitude: coordinate(value.longitude),
     receiptImageData: receipt(value.receiptImageData),
@@ -221,7 +206,7 @@ function enteredBy(value: unknown): string | null {
 }
 
 export function validatePending(value: unknown): PendingFillUpRecord | string {
-  if (!isRaw(value)) return 'submission: not an object';
+  if (!isRecord(value)) return 'submission: not an object';
   const common = syncFields(value);
   if (typeof common === 'string') return `submission: ${common}`;
   if (typeof value.vehicleId !== 'string' || value.vehicleId === '') {
@@ -232,7 +217,7 @@ export function validatePending(value: unknown): PendingFillUpRecord | string {
   if (common.deletedAt !== null) {
     return asTombstone(tombstonePending, common, { vehicleId: value.vehicleId } as Partial<PendingFillUpRecord>);
   }
-  if (!finite(value.submittedAt)) return `submission ${common.id}: submittedAt is not a number`;
+  if (!isFiniteNumber(value.submittedAt)) return `submission ${common.id}: submittedAt is not a number`;
 
   const numbers = measurements(value, common.id);
   if (typeof numbers === 'string') return numbers.replace('fill-up', 'submission');
@@ -241,12 +226,12 @@ export function validatePending(value: unknown): PendingFillUpRecord | string {
     ...common,
     vehicleId: value.vehicleId,
     submittedAt: value.submittedAt,
-    submitterName: text(value.submitterName, TEXT_LIMITS.submitterName),
+    submitterName: textOr(value.submitterName, TEXT_LIMITS.submitterName),
     ...numbers,
     isFullTank: flag(value.isFullTank),
     fuelGrade: fuelGradeFromRaw(typeof value.fuelGrade === 'string' ? value.fuelGrade : ''),
-    station: text(value.station, TEXT_LIMITS.station),
-    notes: text(value.notes, TEXT_LIMITS.notes),
+    station: textOr(value.station, TEXT_LIMITS.station),
+    notes: textOr(value.notes, TEXT_LIMITS.notes),
     latitude: coordinate(value.latitude),
     longitude: coordinate(value.longitude),
     receiptImageData: receipt(value.receiptImageData),

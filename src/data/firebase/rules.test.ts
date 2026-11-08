@@ -490,6 +490,29 @@ describeWithEmulator('firestore.rules', () => {
       expect(fillUps.map((row) => (row['station'] as string).length).sort()).toEqual([0, 200]);
     });
 
+    it('uploads more rows than one batch holds, every batch of them (#91)', async () => {
+      // Firestore takes at most 500 writes a batch; a long history is several.
+      await env.clearFirestore();
+      const store = new FuelTrackerStore({
+        vehicles: new InMemoryRepository<VehicleRecord>(),
+        fillUps: new InMemoryRepository<FillUpRecord>(),
+        pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
+      });
+      const vehicle = await store.addVehicle({ name: 'Car' });
+      for (let i = 0; i < 520; i += 1) {
+        await store.addFillUp(
+          makeFuelEntryDraft({ odometer: 1000 + i, gallons: 10, pricePerGallon: 3, date: new Date(2026, 0, 1) })!,
+          vehicle.id,
+        );
+      }
+
+      const result = await syncOnce(store, emulatorRemote(), new InMemorySyncState());
+
+      expect(result.ok && result.outcome.pushed.written).toBe(521);
+      const db = env.authenticatedContext(OWNER).firestore();
+      expect((await getDocs(collection(db, 'users', OWNER, 'fillUps'))).size).toBe(520);
+    }, 30_000);
+
     it('repairs a row stored too long by an older build, then uploads it', async () => {
       await env.clearFirestore();
       const vehicle: VehicleRecord = {
