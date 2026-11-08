@@ -37,6 +37,22 @@ describe('receiving a submission', () => {
     expect(await store.fillUpCount()).toBe(0);
   });
 
+  test('keeps no photo or place, whatever the draft it was handed carries (#91)', async () => {
+    // A link carries text only. The decoder makes such a draft, and the store
+    // does not take that on trust.
+    const store = makeStore();
+    const car = await store.addVehicle({ name: 'Civic' });
+    const placed = makeFuelEntryDraft({
+      date: new Date(2026, 0, 1), odometer: 10_000, gallons: 10, pricePerGallon: 3.5,
+      latitude: 51.5, longitude: -0.12, receiptImageData: new Uint8Array([1, 2, 3]),
+    });
+    if (placed === null) throw new Error('fixture draft failed validation');
+    await store.receiveSubmission({ id: 'sub-1', vehicleId: car.id, submitterName: 'S'.repeat(500), submittedAt: 1, draft: placed });
+    const [pending] = await store.pendingFillUps();
+    expect(pending).toMatchObject({ latitude: null, longitude: null, receiptImageData: null });
+    expect(pending?.submitterName).toHaveLength(200);
+  });
+
   test('the same link twice queues it once', async () => {
     const store = makeStore();
     const car = await store.addVehicle({ name: 'Civic' });

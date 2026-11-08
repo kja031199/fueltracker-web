@@ -16,7 +16,6 @@
  */
 
 import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
-import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import type { FillUpRecord, PendingFillUpRecord, SyncFields, VehicleRecord, Snapshot } from './records';
 import { SCHEMA_VERSION } from './records';
 import type { Repository, VehicleScopedRepository } from './repository';
@@ -27,6 +26,7 @@ import { isScrubbed, tombstoneFillUp, tombstonePending, tombstoneVehicle } from 
 import type { ImportSummary, TieBreak } from './backup';
 import type { Submission } from './fillUpLink';
 import { exportSnapshot, importBackup } from './backup';
+import { draftFromRecord, fillUpFromDraft, pendingFromDraft } from './recordMapping';
 import { atomically } from './atomically';
 import { TEXT_LIMITS, boundText } from '../domain/textLimits';
 import { boundFillUpText, boundPendingText, boundVehicleText } from './recordText';
@@ -172,20 +172,20 @@ export class FuelTrackerStore {
   }
 
   private async writeFillUp(repos: Repositories, draft: FuelEntryDraft, vehicleId: string): Promise<FillUpRecord> {
-    const record = { ...this.recordFromDraft(draft, vehicleId, this.clock.newId()), enteredBy: this.author };
+    const record = fillUpFromDraft(draft, {
+      id: this.clock.newId(),
+      vehicleId,
+      updatedAt: this.clock.now(),
+      enteredBy: this.author,
+    });
     await repos.fillUps.put(record);
     return record;
   }
 
   /**
-   * Replaces an existing fill-up from a draft, keeping its id.
-   *
-   * Editing runs through the same validation as creating — an edit that would
-   * zero the gallons has to fail exactly as a creation would, which it does by
-   * never producing a draft in the first place.
-   */
-  /**
-   * Replaces a fill-up's contents, **on the car it is already on** (#83).
+   * Replaces a fill-up's contents, **on the car it is already on** (#83),
+   * keeping its id. Editing runs through the same validation as creating: an
+   * edit that would zero the gallons never produces a draft in the first place.
    *
    * There is no car parameter, so an edit cannot move a fill-up: it used to
    * take the *selected* car, and a sync that changed the selection while the
@@ -202,7 +202,12 @@ export class FuelTrackerStore {
       if ((await r.vehicles.get(existing.vehicleId)) === undefined) throw new StaleEdit('car-gone');
       // Who entered it does not change because someone else corrected it — and
       // on a shared car the rules refuse an edit that tries.
-      const record = { ...this.recordFromDraft(draft, existing.vehicleId, id), enteredBy: existing.enteredBy ?? null };
+      const record = fillUpFromDraft(draft, {
+        id,
+        vehicleId: existing.vehicleId,
+        updatedAt: this.clock.now(),
+        enteredBy: existing.enteredBy ?? null,
+      });
       await r.fillUps.put(record);
       return record;
     });
@@ -284,26 +289,13 @@ export class FuelTrackerStore {
     submitterName: string,
   ): Promise<PendingFillUpRecord> {
     const now = this.clock.now();
-    const record: PendingFillUpRecord = {
+    const record = pendingFromDraft(draft, {
       id: this.clock.newId(),
-      updatedAt: now,
-      deletedAt: null,
-      schemaVersion: SCHEMA_VERSION,
       vehicleId,
+      updatedAt: now,
       submittedAt: now,
-      submitterName: boundText(submitterName, TEXT_LIMITS.submitterName),
-      date: draft.date.getTime(),
-      odometer: draft.odometer,
-      gallons: draft.gallons,
-      pricePerGallon: draft.pricePerGallon,
-      isFullTank: draft.isFullTank,
-      fuelGrade: draft.fuelGrade,
-      station: draft.station,
-      notes: draft.notes,
-      latitude: draft.latitude,
-      longitude: draft.longitude,
-      receiptImageData: draft.receiptImageData,
-    };
+      submitterName,
+    });
     await this.repos.pendingFillUps.put(record);
     return record;
   }
@@ -325,27 +317,20 @@ export class FuelTrackerStore {
     if ((await r.vehicles.get(submission.vehicleId)) === undefined) return 'no-such-car';
     // Queued, approved or rejected: any row with this id, by key (#87).
     if ((await r.pendingFillUps.getMany([submission.id])).length > 0) return 'duplicate';
-    const { draft } = submission;
-    await r.pendingFillUps.put({
-      id: submission.id,
-      updatedAt: this.clock.now(),
-      deletedAt: null,
-      schemaVersion: SCHEMA_VERSION,
-      vehicleId: submission.vehicleId,
-      submittedAt: submission.submittedAt,
-      submitterName: boundText(submission.submitterName, TEXT_LIMITS.submitterName),
-      date: draft.date.getTime(),
-      odometer: draft.odometer,
-      gallons: draft.gallons,
-      pricePerGallon: draft.pricePerGallon,
-      isFullTank: draft.isFullTank,
-      fuelGrade: draft.fuelGrade,
-      station: boundText(draft.station, TEXT_LIMITS.station),
-      notes: boundText(draft.notes, TEXT_LIMITS.notes),
-      latitude: null,
-      longitude: null,
-      receiptImageData: null,
-    });
+    await r.pendingFillUps.put(
+      pendingFromDraft(
+        // Text only: a link never carries a photo or a place, whatever the
+        // draft it decoded to says.
+        { ...submission.draft, latitude: null, longitude: null, receiptImageData: null },
+        {
+          id: submission.id,
+          vehicleId: submission.vehicleId,
+          updatedAt: this.clock.now(),
+          submittedAt: submission.submittedAt,
+          submitterName: submission.submitterName,
+        },
+      ),
+    );
     return 'queued';
   }
 
@@ -377,19 +362,7 @@ export class FuelTrackerStore {
     // for a car that is gone would be invisible and uncountable (#3).
     if ((await r.vehicles.get(pending.vehicleId)) === undefined) return null;
 
-    const draft = makeFuelEntryDraft({
-      date: new Date(pending.date),
-      odometer: pending.odometer,
-      gallons: pending.gallons,
-      pricePerGallon: pending.pricePerGallon,
-      isFullTank: pending.isFullTank,
-      fuelGrade: pending.fuelGrade,
-      station: pending.station,
-      notes: pending.notes,
-      latitude: pending.latitude,
-      longitude: pending.longitude,
-      receiptImageData: pending.receiptImageData,
-    });
+    const draft = draftFromRecord(pending);
     if (draft === null) return null;
 
     const record = await this.writeFillUp(r, draft, pending.vehicleId);
@@ -544,31 +517,6 @@ export class FuelTrackerStore {
     });
   }
 
-  private recordFromDraft(
-    draft: FuelEntryDraft,
-    vehicleId: string,
-    id: string,
-  ): FillUpRecord {
-    return {
-      id,
-      updatedAt: this.clock.now(),
-      deletedAt: null,
-      schemaVersion: SCHEMA_VERSION,
-      vehicleId,
-      date: draft.date.getTime(),
-      odometer: draft.odometer,
-      gallons: draft.gallons,
-      pricePerGallon: draft.pricePerGallon,
-      isFullTank: draft.isFullTank,
-      missedPreviousFillUp: draft.missedPreviousFillUp,
-      fuelGrade: draft.fuelGrade,
-      station: draft.station,
-      notes: draft.notes,
-      latitude: draft.latitude,
-      longitude: draft.longitude,
-      receiptImageData: draft.receiptImageData,
-    };
-  }
 }
 
 // `toStats` lives beside the records it maps (#56), so a screen can use it

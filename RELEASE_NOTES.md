@@ -11,6 +11,12 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-08
 
+- **No change you'll see: how a fill-up is copied into storage is now written
+  once.** The first step of tidying the app's data layer.
+  *Technical:* `recordMapping.ts` (`fillUpFromDraft`, `pendingFromDraft`,
+  `draftFromRecord`) replaces five hand-written copies in the store and the
+  import, with a round-trip test.
+  [#91](https://github.com/kja031199/fueltracker-web/issues/91) · [PR #116](https://github.com/kja031199/fueltracker-web/pull/116)
 - **No change you'll see: the account's security rules are easier to keep
   right.** Every limit they enforce is now checked against the app's own by
   the tests, and each kind of document's fields are written down once.
