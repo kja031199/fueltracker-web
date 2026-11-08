@@ -11,6 +11,14 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-08
 
+- **Each sync saves less on your device.** After this update, the first sync
+  reads your account in full once; from then on a sync records only what
+  changed, instead of rewriting its record of every row each time.
+  *Technical:* the known versions leave the sync cursor for their own Dexie
+  table (`knownVersions`, schema version 4), written per sync by
+  `saveKnown({ replace, set })`; `SYNC_CURSOR_VERSION` 2. The last part of
+  tidying the data layer.
+  [#91](https://github.com/kja031199/fueltracker-web/issues/91) · [PR #122](https://github.com/kja031199/fueltracker-web/pull/122)
 - **No change you'll see: what a failed sync says is now worded by the screens,
   not the data layer.** The sixth step of tidying it.
   *Technical:* sync reports a `problem` code and the cause's `detail`;

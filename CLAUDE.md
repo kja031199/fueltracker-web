@@ -361,7 +361,12 @@ npm ci --prefix .github/firebase-cli
   margin, which re-downloaded a document on every sync. Not one cursor for all
   three collections, which can skip a write. Not `localStorage`, which can
   outlive the rows. **Elapsed time uses `clock.wall()`**, never the merge
-  clock, which jumps ahead.
+  clock, which jumps ahead. **The known versions are not in the cursor** (#91):
+  `SyncStateStore.loadKnown`/`saveKnown({ replace, set })`, one row each in
+  Dexie's `knownVersions` (schema version 4), keyed by the cursor's key and a
+  NUL — a printable separator could be the start of another cursor's key,
+  because a car id may contain it. A sync saves only what it read, the
+  versions before the cursor; unreadable versions mean a full read.
 - **Text limits live in `TEXT_LIMITS` and must equal the rules'** (#50).
   `rulesLimits.test.ts` reads `firestore.rules` to enforce it. Text is bounded
   at the draft gate, in `addVehicle`/`submitFillUp`, and in `importBackup`

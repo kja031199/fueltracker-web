@@ -244,8 +244,15 @@ a month. Now:
   cursor claims "everything up to here has been seen", and a cached result
   cannot back that claim.
 - **What to upload** comes from the versions this device knows the account
-  holds (`known`, kept with the cursor), since the whole remote snapshot is no
-  longer in hand. Nothing is recorded about a push itself. The next pull
+  holds, since the whole remote snapshot is no longer in hand. They are kept
+  **beside** the cursor, one row each in the `knownVersions` table (#91), and
+  a sync writes only the versions its pull returned — a collection read in
+  full replaces that collection's. They used to be a field of the cursor,
+  rewritten whole on every sync, for the account's own cursor and every
+  shared car's. The cursor is saved only after them, and a sync that cannot
+  read them reads the account in full instead of trusting a cursor it cannot
+  back. Moving them bumped `SYNC_CURSOR_VERSION` to 2, so the first sync after
+  that update was one full read. Nothing is recorded about a push itself. The next pull
   returns the server's echo of it, and that is when its version becomes known,
   so a half-failed push is never mistaken for one that landed.
 - **The merge clock's floor is rebuilt from everything known**, not only from

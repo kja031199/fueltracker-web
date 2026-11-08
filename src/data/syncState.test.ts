@@ -5,7 +5,7 @@ import { FuelTrackerDatabase } from './db';
 import { DexieSyncState } from './dexieState';
 import { openAccountStore } from './accountStore';
 import { SCHEMA_VERSION } from './records';
-import { SYNC_CURSOR_VERSION, parseCursor, type SyncCursor } from './syncState';
+import { SYNC_CURSOR_VERSION, parseCursor, usableCursor, type SyncCursor } from './syncState';
 
 /**
  * Where incremental sync keeps its place (#52).
@@ -20,7 +20,6 @@ const CURSOR: SyncCursor = {
   version: SYNC_CURSOR_VERSION,
   schemaVersion: SCHEMA_VERSION,
   highWater: { vehicles: 10, fillUps: 20, pendingFillUps: null },
-  known: { 'vehicles/v1': 100, 'fillUps/f1': 200 },
   fullPulledAt: 1_000,
 };
 
@@ -82,6 +81,17 @@ describe('parseCursor', () => {
     expect(parseCursor(CURSOR)).toEqual(CURSOR);
   });
 
+  test('a cursor from before #91 — known versions inside it — is read but never used (#91)', () => {
+    // Version 1 carried every known version; the full read its discarding
+    // causes is what fills the versions' own table.
+    const old = { ...CURSOR, version: 1, known: { 'vehicles/v1': 100 } };
+    const parsed = parseCursor(old);
+    expect(parsed).not.toBeNull();
+    expect(parsed).not.toHaveProperty('known');
+    expect(usableCursor(parsed, CURSOR.fullPulledAt + 1)).toBe(false);
+    expect(SYNC_CURSOR_VERSION).toBeGreaterThan(1);
+  });
+
   test.each([
     ['nothing', undefined],
     ['null', null],
@@ -89,8 +99,6 @@ describe('parseCursor', () => {
     ['no version', { ...CURSOR, version: undefined }],
     ['a non-finite high-water mark', { ...CURSOR, highWater: { ...CURSOR.highWater, fillUps: Number.NaN } }],
     ['a missing collection', { ...CURSOR, highWater: { vehicles: 1, fillUps: 2 } }],
-    ['a non-number known version', { ...CURSOR, known: { 'vehicles/v1': '100' } }],
-    ['known as an array', { ...CURSOR, known: [1, 2] }],
     ['a non-finite fullPulledAt', { ...CURSOR, fullPulledAt: Number.POSITIVE_INFINITY }],
   ])('treats %s as no cursor, which means a full read', (_label, value) => {
     // A damaged cursor costs one full read. Trusting it could cost rows.

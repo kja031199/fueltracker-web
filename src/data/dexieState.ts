@@ -4,7 +4,8 @@
  */
 
 import type { FuelTrackerDatabase } from './db';
-import type { SyncCursor, SyncStateStore } from './syncState';
+import type { Table } from 'dexie';
+import type { KnownUpdate, SyncCursor, SyncStateStore } from './syncState';
 import { parseCursor } from './syncState';
 import { parseLedger, type ShareLedger } from './shareLedger';
 import type { Membership } from './sharingTypes';
@@ -33,7 +34,40 @@ export class DexieSyncState implements SyncStateStore {
   }
 
   async clear(): Promise<void> {
-    await this.db.syncState.delete(this.key);
+    await this.db.transaction('rw', this.db.syncState, this.db.knownVersions, async (tx) => {
+      await tx.table('syncState').delete(this.key);
+      await this.known(tx.table('knownVersions') as Table<{ key: string; at: number }, string>).delete();
+    });
+  }
+
+  /**
+   * This cursor's own known versions: its key, then a NUL. Not `|` or any
+   * printable character: a shared car's id is in the key, an id may hold
+   * those, and `share:u__X|` would then be the start of `share:u__X|Y`'s
+   * versions too. An id that can be stored never holds a control character.
+   */
+  private get prefix(): string {
+    return `${this.key}\u0000`;
+  }
+
+  private known(table: Table<{ key: string; at: number }, string>, collection = '') {
+    return table.where('key').startsWith(`${this.prefix}${collection}`);
+  }
+
+  async loadKnown(): Promise<Record<string, number>> {
+    const rows = await this.known(this.db.knownVersions).toArray();
+    const known: Record<string, number> = {};
+    for (const row of rows) if (Number.isFinite(row.at)) known[row.key.slice(this.prefix.length)] = row.at;
+    return known;
+  }
+
+  /** Clears the collections read in full and writes the versions read, together. */
+  async saveKnown(update: KnownUpdate): Promise<void> {
+    await this.db.transaction('rw', this.db.knownVersions, async (tx) => {
+      const table = tx.table('knownVersions') as Table<{ key: string; at: number }, string>;
+      for (const collection of update.replace) await this.known(table, `${collection}/`).delete();
+      await table.bulkPut(Object.entries(update.set).map(([key, at]) => ({ key: `${this.prefix}${key}`, at })));
+    });
   }
 }
 

@@ -112,7 +112,10 @@ describe('the version 3 upgrade', () => {
 
     expect(await db.fillUps.count()).toBe(2);
     expect(await repo.countLive()).toBe(1);
-    expect(await new DexieSyncState(db).load()).toEqual(cursor);
+    // The cursor survives the upgrade; only its old `known` field is not
+    // read back (#91), and a version-1 cursor is discarded by sync anyway.
+    const { known: _known, ...withoutKnown } = cursor;
+    expect(await new DexieSyncState(db).load()).toEqual(withoutKnown);
     db.close();
   });
 });
