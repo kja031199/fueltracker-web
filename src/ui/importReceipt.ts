@@ -6,8 +6,8 @@
  * decides what, if anything, is worth suggesting.
  */
 
-import { prepareImage, describeFailure } from '../data/receiptImage';
-import { photoCaptureDate } from '../data/photoMetadata';
+import { prepareImage, describeFailure } from './receiptImage';
+import { photoCaptureDate } from './photoMetadata';
 import { parseReceipt } from '../domain/scanning/receiptScanParser';
 import { isCorroborated, numbersIn } from '../domain/scanning/corroboration';
 import { describeOcrFailure, recognise } from './ocr';

@@ -103,7 +103,20 @@ export type SyncFailureKind = 'unreachable' | 'refused' | 'rejected';
 
 export type SyncResult =
   | { readonly ok: true; readonly outcome: SyncOutcome }
-  | { readonly ok: false; readonly kind: SyncFailureKind; readonly reason: string };
+  | {
+      readonly ok: false;
+      readonly kind: SyncFailureKind;
+      /** What went wrong, as a code: the words are the screens' (`ui/syncMessages.ts`, #91). */
+      readonly problem: SyncProblem;
+      /** The cause's own message, where there was one. Never shown for a refusal. */
+      readonly detail?: string;
+    };
+
+/**
+ * What went wrong with a sync (#91). `kind` says whether to retry; this says
+ * which step failed, so the screens can say it in their own words.
+ */
+export type SyncProblem = 'refused' | 'rejected' | 'pull-failed' | 'push-failed' | 'ledger-unreadable';
 
 /**
  * Drops rows this build cannot read.
@@ -189,28 +202,10 @@ export function isRefusal(cause: unknown): boolean {
   return (cause as { code?: unknown }).code === 'permission-denied';
 }
 
-/**
- * The message a refused reader needs, which is not "check your connection".
- *
- * Names the one actionable fact: the account id, and who to send it to. It
- * serves the owner too — a rules deploy that refuses its own author reads as
- * this rather than as a network fault.
- */
-const REFUSED =
-  'This account does not have access to this FuelTracker, so nothing is syncing. ' +
-  'Send your account id — Settings → Account — to whoever runs this copy.';
-
-/**
- * A refused upload from an account that is allowed (#50). Says that nothing
- * is lost, because nothing is: every change is still in this browser.
- */
-const REJECTED =
-  'Your account would not accept some changes, so they are saved on this device but not ' +
-  'uploaded. Everything else keeps working; exporting a backup keeps a copy safe meanwhile.';
-
-function failure(cause: unknown, fallback: string): SyncResult {
-  if (isRefusal(cause)) return { ok: false, kind: 'refused', reason: REFUSED };
-  return { ok: false, kind: 'unreachable', reason: describe(cause, fallback) };
+function failure(cause: unknown, problem: 'pull-failed' | 'push-failed'): SyncResult {
+  if (isRefusal(cause)) return { ok: false, kind: 'refused', problem: 'refused' };
+  const detail = cause instanceof Error && cause.message !== '' ? cause.message : undefined;
+  return { ok: false, kind: 'unreachable', problem, ...(detail === undefined ? {} : { detail }) };
 }
 
 /**
@@ -277,7 +272,7 @@ export async function syncOnce(
   try {
     raw = await remote.pull(cursor === null ? null : cursor.highWater);
   } catch (cause) {
-    return failure(cause, 'Could not reach your account.');
+    return failure(cause, 'pull-failed');
   }
 
   // **Shape first, before anything else looks at it.** The account's contents
@@ -403,8 +398,8 @@ export async function syncOnce(
     pushed = await remote.push(outgoing);
   } catch (cause) {
     // The pull worked, so a refusal here is about the data, not the account.
-    if (isRefusal(cause)) return { ok: false, kind: 'rejected', reason: REJECTED };
-    return failure(cause, 'Changes are saved here but not uploaded yet.');
+    if (isRefusal(cause)) return { ok: false, kind: 'rejected', problem: 'rejected' };
+    return failure(cause, 'push-failed');
   }
 
   // Nothing is recorded about what was just sent: the server stamped it, so
@@ -426,10 +421,6 @@ export async function syncOnce(
       at: clock.now(),
     },
   };
-}
-
-function describe(cause: unknown, fallback: string): string {
-  return cause instanceof Error && cause.message !== '' ? `${fallback} (${cause.message})` : fallback;
 }
 
 function keyOf(collection: Collection, id: string): string {

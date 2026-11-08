@@ -93,3 +93,13 @@ describe('the storage modules depend on nothing above them (#91)', () => {
     expect(reaching).toEqual([]);
   });
 });
+
+describe('src/data draws nothing and speaks to no page (#91)', () => {
+  // Decoding a photo, reading its date, and choosing the words for a message
+  // are the screens' work. They used to sit in `data/`.
+  const BROWSER = /\bdocument\.|HTMLCanvasElement|OffscreenCanvas|createImageBitmap|getContext\(|new Image\(/;
+
+  test.each([...FILES])('%s uses no DOM or canvas', (file) => {
+    expect(readFileSync(file, 'utf8')).not.toMatch(BROWSER);
+  });
+});

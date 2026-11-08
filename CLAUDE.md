@@ -342,8 +342,12 @@ npm ci --prefix .github/firebase-cli
   would pull the SDK into `sync.ts` and break invariant 6 (#40). A refusal
   **closes the app** (`NoAccessScreen`, #41) rather than being a status line —
   so do not widen `refused` to cover ordinary failures, or the app shuts itself
-  every time a phone goes through a tunnel. The refusal `reason` is diagnostic
-  now rather than displayed; the screen carries its own copy. **The same
+  every time a phone goes through a tunnel. **A failure carries a `problem`
+  code and the cause's `detail`, never a sentence** (#91): the words are in
+  `ui/syncMessages.ts` (`syncFailureMessage`), and a refusal never shows the
+  SDK's detail. Nothing in `src/data` touches the DOM or a canvas either —
+  `receiptImage.ts` and `photoMetadata.ts` live in `ui/`, and
+  `importCycles.test.ts` refuses a browser API in `data/`. **The same
   three kinds hold for each shared car** (#84): `syncAll` files a `rejected`
   share under `shares.rejected`, never `failed`, and hands every shared car's
   `SyncOutcome` back in `shares.outcomes` for the notice to add up.

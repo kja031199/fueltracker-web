@@ -102,8 +102,8 @@ export function readStamped(docs: readonly { data(): DocumentData }[]): {
   highWater: number | null;
 } {
   let highWater: number | null = null;
-  const rows = docs.map((document) => {
-    const data = document.data();
+  const rows = docs.map((found) => {
+    const data = found.data();
     const stamp = data['syncedAt'];
     if (stamp instanceof Timestamp) highWater = Math.max(highWater ?? 0, toMicros(stamp));
     return decode(data);

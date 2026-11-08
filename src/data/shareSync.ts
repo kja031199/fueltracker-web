@@ -121,9 +121,6 @@ const NO_SHARES: ShareOutcome = {
   clashed: [],
 };
 
-/** Said when the ledger cannot be read: a pause, not a refusal, so retried. */
-export const LEDGER_UNREADABLE =
-  'Could not read which cars are shared with you on this device, so nothing was synced. It will be tried again.';
 
 export function shareStateKey(membership: Pick<Membership, 'ownerUid' | 'vehicleId'>): string {
   return `share:${membershipKey(membership)}`;
@@ -154,7 +151,8 @@ export async function syncAll(
   try {
     held = await sharing.ledger.load();
   } catch {
-    return { own: { ok: false, kind: 'unreachable', reason: LEDGER_UNREADABLE }, shares: NO_SHARES };
+    // A pause to retry, not a refusal (#77): said in the screens' words (#91).
+    return { own: { ok: false, kind: 'unreachable', problem: 'ledger-unreadable' }, shares: NO_SHARES };
   }
   let current: Membership[] | null;
   try {

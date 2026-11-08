@@ -27,6 +27,7 @@ import type { RemoteStore } from '../data/remote';
 import type { FuelTrackerStore } from '../data/store';
 import { syncAll, type SharingSync } from '../data/shareSync';
 import type { Membership } from '../data/sharing';
+import { syncFailureMessage } from './syncMessages';
 import type { SyncOutcome } from '../data/sync';
 import { InMemorySyncState, type SyncStateStore } from '../data/syncState';
 import { createSyncScheduler } from './syncScheduler';
@@ -97,7 +98,7 @@ export function useSync(
       if (all.shares.memberships !== null) sharesSeen.current(all.shares.memberships);
       const result = all.own;
       if (!result.ok) {
-        setMessage(result.reason);
+        setMessage(syncFailureMessage(result));
         setRefused(result.kind === 'refused');
         return;
       }

@@ -254,6 +254,7 @@ Recorded so a regression in the tests themselves is visible:
 | Sync wiring (#91): sync on a fresh clock / on the old shared default / the state optional again (caught by `tsc`, through `@ts-expect-error`) | 8 / 8 / 2 errors |
 | Store and replica (#91): a sync operation back on the store / the replica on its own clock / a file import given a tie-break | 1 / 9 / 2 |
 | Shared helpers (#91): the mark taken from the oldest stamp / writes unstamped (emulator) / batches after the first never committed (emulator) / `textOr` ignoring its limit / `isRecord` taking arrays / `numberOr` taking NaN / a copy of a helper defined again | 1 / 12 / 1 / 5 / 2 / 1 / 1 |
+| Words and pictures out of `data/` (#91): a refusal showing the SDK's cause / pull and push failures swapped / a refused upload said as a refused account / an unreadable ledger said as unreachable / the cause's detail dropped / canvas code back in `data/` | 1 / 2 / 1 / 1 / 1 / 1 |
 
 Equivalent, and kept as a backstop: `shape()` without its `hasAll`. Every
 required field is also read by a clause of its own, and reading a missing field

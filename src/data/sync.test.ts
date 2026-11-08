@@ -255,8 +255,7 @@ describe('a refusal is not the same as being unreachable', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.kind).toBe('refused');
-    expect(result.reason).not.toMatch(/could not reach/i);
-    expect(result.reason).toMatch(/access/i);
+    expect(result.problem).toBe('refused');
   });
 
   it('reports a refused push as rejected changes, not as a refused account', async () => {
@@ -273,17 +272,19 @@ describe('a refusal is not the same as being unreachable', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.kind).toBe('rejected');
-    expect(result.reason).not.toMatch(/does not have access/i);
-    expect(result.reason).toMatch(/saved on this device/i);
+    expect(result.problem).toBe('rejected');
   });
 
-  it('tells a refused reader where to find the id that fixes it', async () => {
-    // The remedy is specific: send your account id to whoever runs this copy.
-    // A message that does not say that leaves the one actionable fact out.
-    const { store, clock } = storeWith();
-    const result = await syncOnce(store, new RefusingRemote('pull'), new InMemorySyncState());
-    if (result.ok) throw new Error('expected a refusal');
-    expect(result.reason).toMatch(/account id/i);
+  it('reports the cause of a failure as detail, and only words in the UI (#91)', async () => {
+    // The remedy for a refusal — send your account id — is the screens' to
+    // say (`ui/syncMessages.ts`); sync says what happened, as a code.
+    const { store } = storeWith();
+    const remote = new InMemoryRemoteStore();
+    remote.failPull = true;
+    const result = await syncOnce(store, remote, new InMemorySyncState());
+    if (result.ok) throw new Error('expected a failure');
+    expect(result.problem).toBe('pull-failed');
+    expect(result.detail).toBeTypeOf('string');
   });
 
   it('still reports an ordinary network failure as unreachable', async () => {
@@ -297,7 +298,7 @@ describe('a refusal is not the same as being unreachable', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.kind).toBe('unreachable');
-    expect(result.reason).toMatch(/could not reach your account/i);
+    expect(result.problem).toBe('pull-failed');
   });
 
   it('still reports an ordinary failed upload as unreachable', async () => {
@@ -311,7 +312,7 @@ describe('a refusal is not the same as being unreachable', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.kind).toBe('unreachable');
-    expect(result.reason).toMatch(/not uploaded yet/i);
+    expect(result.problem).toBe('push-failed');
   });
 });
 
@@ -400,7 +401,7 @@ describe('a local row the account cannot address', () => {
 
     const result = await syncOnce(store, new StrictRemoteStore(), new InMemorySyncState());
 
-    if (!result.ok) throw new Error(result.reason);
+    if (!result.ok) throw new Error(result.problem);
     expect(result.outcome.unsendable).toEqual(['a/b']);
   });
 
@@ -416,7 +417,7 @@ describe('a local row the account cannot address', () => {
   it('says nothing when every id is fine', async () => {
     const { store, clock } = storeHolding([fillUp({ id: 'good', updatedAt: 900 })]);
     const result = await syncOnce(store, new StrictRemoteStore(), new InMemorySyncState());
-    if (!result.ok) throw new Error(result.reason);
+    if (!result.ok) throw new Error(result.problem);
     expect(result.outcome.unsendable).toEqual([]);
   });
 });
@@ -817,7 +818,7 @@ describe('one over-long field does not stop the upload (#50)', () => {
 
     const result = await syncOnce(store, remote, new InMemorySyncState());
 
-    if (!result.ok) throw new Error(`expected success, got ${result.kind}: ${result.reason}`);
+    if (!result.ok) throw new Error(`expected success, got ${result.kind}: ${result.problem}`);
     expect(result.outcome.repaired).toBe(1);
     const uploaded = (await remote.pull()).fillUps as FillUpRecord[];
     expect(uploaded.map((row) => row.id).sort()).toEqual(['good', 'long']);
@@ -831,7 +832,7 @@ describe('one over-long field does not stop the upload (#50)', () => {
 
     const second = await syncOnce(store, remote, new InMemorySyncState());
 
-    if (!second.ok) throw new Error(second.reason);
+    if (!second.ok) throw new Error(second.problem);
     expect(second.outcome.repaired).toBe(0);
   });
 
@@ -848,7 +849,7 @@ describe('one over-long field does not stop the upload (#50)', () => {
 
     const result = await syncOnce(store, remote, new InMemorySyncState());
 
-    if (!result.ok) throw new Error(`expected success, got ${result.kind}: ${result.reason}`);
+    if (!result.ok) throw new Error(`expected success, got ${result.kind}: ${result.problem}`);
     expect(result.outcome.unsendable).toEqual(['orphan']);
     const uploaded = (await remote.pull()).fillUps as FillUpRecord[];
     expect(uploaded.map((row) => row.id)).toEqual(['good']);
@@ -905,7 +906,7 @@ describe('incremental pull (#52)', () => {
 
     const result = await syncOnce(store, remote, state);
 
-    if (!result.ok) throw new Error(result.reason);
+    if (!result.ok) throw new Error(result.problem);
     expect(remote.pullLog[0]?.since).toBeNull();
     expect((await store.exportSnapshot()).fillUps.map((row) => row.id)).toEqual(['f1']);
   });
@@ -939,7 +940,7 @@ describe('incremental pull (#52)', () => {
 
     const third = await syncOnce(store, remote, state);
 
-    if (!third.ok) throw new Error(third.reason);
+    if (!third.ok) throw new Error(third.problem);
     expect(third.outcome.pushed.written).toBe(0);
   });
 
@@ -1053,7 +1054,7 @@ describe('incremental pull (#52)', () => {
     await store.addVehicle({ name: 'New' });
     const result = await syncOnce(store, remote, state);
 
-    if (!result.ok) throw new Error(result.reason);
+    if (!result.ok) throw new Error(result.problem);
     expect(result.outcome.pushed.written).toBe(1);
   });
 
@@ -1068,7 +1069,7 @@ describe('incremental pull (#52)', () => {
 
     const second = await syncOnce(store, remote, state);
 
-    if (!second.ok) throw new Error(second.reason);
+    if (!second.ok) throw new Error(second.problem);
     expect(second.outcome.pushed.written).toBe(0);
   });
 
@@ -1156,7 +1157,7 @@ describe('incremental pull (#52)', () => {
     remote.failPush = false;
     const retry = await syncOnce(store, remote, state);
 
-    if (!retry.ok) throw new Error(retry.reason);
+    if (!retry.ok) throw new Error(retry.problem);
     expect(retry.outcome.pushed.written).toBe(1);
     expect((await remote.pull()).vehicles).toHaveLength(1);
   });

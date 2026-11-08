@@ -11,6 +11,13 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-08
 
+- **No change you'll see: what a failed sync says is now worded by the screens,
+  not the data layer.** The sixth step of tidying it.
+  *Technical:* sync reports a `problem` code and the cause's `detail`;
+  `ui/syncMessages.ts` holds the sentences. `receiptImage.ts` and
+  `photoMetadata.ts` move to `ui/`, and a test keeps browser APIs out of
+  `src/data`.
+  [#91](https://github.com/kja031199/fueltracker-web/issues/91) · [PR #121](https://github.com/kja031199/fueltracker-web/pull/121)
 - **No change you'll see: the checks every reader of untrusted data makes, and
   the way both connections to the account read and write, are written once.**
   The fifth step of tidying the data layer.
