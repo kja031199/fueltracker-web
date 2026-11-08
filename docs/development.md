@@ -256,6 +256,9 @@ Recorded so a regression in the tests themselves is visible:
 | Shared helpers (#91): the mark taken from the oldest stamp / writes unstamped (emulator) / batches after the first never committed (emulator) / `textOr` ignoring its limit / `isRecord` taking arrays / `numberOr` taking NaN / a copy of a helper defined again | 1 / 12 / 1 / 5 / 2 / 1 / 1 |
 | Words and pictures out of `data/` (#91): a refusal showing the SDK's cause / pull and push failures swapped / a refused upload said as a refused account / an unreadable ledger said as unreachable / the cause's detail dropped / canvas code back in `data/` | 1 / 2 / 1 / 1 / 1 / 1 |
 | Known versions (#91): the whole map written again / a full read replacing nothing / unreadable versions trusted / the cursor saved though the versions were not / Dexie's replace clearing every collection / a separator a key can contain / the cursor version not bumped / clearing a cursor leaving its versions / the in-memory replace ignored | 1 each |
+| Boundary tests (#93): the reader seeing single quotes only / no dynamic `import()` / no side-effect import / comments read as imports / relative paths left unresolved | 3 / 4 / 2 / 2 / 3 |
+| Boundary tests (#93): Firebase allowed in `domain/` / a package or a layer matched by prefix (`reactive`, `src/database`) / the store check on `.tsx` only / a stale allowance kept / the SDK's home matched by substring / `@firebase/*` missed | 1 / 1 each / 2 / 1 / 1 / 1 |
+| Boundary tests (#93), planted files the old tests passed: a double-quoted `data/` import in `domain/` / a dynamic store import from a `ui/` `.ts` helper / `firebase/firestore` in `ui/` / `react` in `domain/` / `data/` importing `ui/` / a dynamic import closing a cycle in `data/` | caught, each |
 
 Equivalent, and kept as a backstop: `shape()` without its `hasAll`. Every
 required field is also read by a clause of its own, and reading a missing field

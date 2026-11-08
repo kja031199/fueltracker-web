@@ -1,6 +1,7 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { dirname, join, normalize, relative } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { describe, expect, test } from 'vitest';
+import { importsOf, sourcesUnder } from './imports';
 
 /**
  * No import cycles in `src/data` (#91) — type-only imports included.
@@ -8,30 +9,21 @@ import { describe, expect, test } from 'vitest';
  * A cycle is two modules that each need the other to be understood, which is
  * how the data layer had drifted: the store imported the import code, which
  * imported its types back from the store. Read as text, the way the other
- * boundary tests read the source, so it needs nothing installed.
+ * boundary tests read the source (`imports.ts`, #93), so it needs nothing
+ * installed.
  */
 
 const ROOT = 'src/data';
 
-function sources(dir: string): string[] {
-  return readdirSync(dir).flatMap((name) => {
-    const path = join(dir, name);
-    if (statSync(path).isDirectory()) return sources(path);
-    return /\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name) ? [path] : [];
-  });
-}
-
-/** Every relative module a file imports or re-exports, as a path under `src/data`. */
-function importsOf(file: string, text: string): string[] {
-  const found = [...text.matchAll(/^\s*(?:import|export)\b[^'"]*?from\s+['"](\.[^'"]+)['"]/gm)].map((m) => m[1]!);
-  return found
-    .map((spec) => normalize(join(dirname(file), spec)))
-    .map((path) => [`${path}.ts`, `${path}.tsx`, join(path, 'index.ts')].find((candidate) => FILES.has(candidate)))
+/** Every module of ours a file imports or re-exports, as a file under `src/data` — through the shared reader. */
+function edges(file: string): string[] {
+  return importsOf(file)
+    .map((path) => [`${path}.ts`, `${path}.tsx`, `${path}/index.ts`].find((candidate) => FILES.has(candidate)))
     .filter((path): path is string => path !== undefined);
 }
 
-const FILES = new Set(sources(ROOT));
-const GRAPH = new Map([...FILES].map((file) => [file, importsOf(file, readFileSync(file, 'utf8'))]));
+const FILES = new Set(sourcesUnder(ROOT, false));
+const GRAPH = new Map([...FILES].map((file) => [file, edges(file)]));
 
 /** Each cycle once, as the path that closes it. */
 function cycles(graph: ReadonlyMap<string, readonly string[]>): string[][] {
