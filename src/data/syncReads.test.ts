@@ -231,7 +231,7 @@ describe('single-row questions read single rows (#87)', () => {
 
   test('re-stamping finds deleted rows by id, without a scan per row', async () => {
     const { store, repos, fillUp, deleted } = await seeded();
-    await store.restamp('fillUps', [fillUp.id, deleted.id, 'never']);
+    await store.replica.restamp('fillUps', [fillUp.id, deleted.id, 'never']);
     expect(repos.fillUps.scans).toBe(0);
     const all = (await store.exportSnapshot()).fillUps;
     expect(all.find((row) => row.id === deleted.id)?.updatedAt).toBeGreaterThan(deleted.updatedAt);
@@ -239,7 +239,7 @@ describe('single-row questions read single rows (#87)', () => {
 
   test('forgetting a shared car reads that car’s rows, tombstones included, and nothing else', async () => {
     const { store, repos, car, fillUp, deleted } = await seeded();
-    await store.forgetVehicle(car.id);
+    await store.replica.forgetVehicle(car.id);
     expect([repos.vehicles.scans, repos.fillUps.scans, repos.pendingFillUps.scans]).toEqual([0, 0, 0]);
     const all = await store.exportSnapshot();
     expect(all.fillUps.map((row) => row.id)).not.toContain(fillUp.id);
@@ -266,7 +266,7 @@ describe('reading once does not change what is sent (#87)', () => {
       saved = await store.addFillUp(draft(10_500), car.id);
       return raw;
     };
-    const local = new LocalView(store);
+    const local = new LocalView(store.replica);
     await local.snapshot(); // the view is read before the save lands
     await syncOnce(store, remote, state, { local });
     remote.pull = pull;

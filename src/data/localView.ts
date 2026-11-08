@@ -24,7 +24,7 @@
 
 import type { FillUpRecord, PendingFillUpRecord, Snapshot, SyncFields, VehicleRecord } from './records';
 import type { Collection } from './remote';
-import type { FuelTrackerStore } from './store';
+import type { Replica } from './replica';
 
 interface Rows {
   readonly vehicles: Map<string, VehicleRecord>;
@@ -35,10 +35,10 @@ interface Rows {
 export class LocalView {
   private loaded: Promise<Rows> | null = null;
 
-  constructor(private readonly store: FuelTrackerStore) {}
+  constructor(private readonly replica: Replica) {}
 
   private rows(): Promise<Rows> {
-    this.loaded ??= this.store.exportSnapshot().then((snapshot) => ({
+    this.loaded ??= this.replica.snapshot().then((snapshot) => ({
       vehicles: byId(snapshot.vehicles),
       fillUps: byId(snapshot.fillUps),
       pendingFillUps: byId(snapshot.pendingFillUps),
@@ -69,7 +69,7 @@ export class LocalView {
   async refresh(collection: Collection, ids: readonly string[]): Promise<void> {
     if (ids.length === 0 || this.loaded === null) return;
     const rows = await this.rows();
-    const fresh = await readById(this.store, collection, ids);
+    const fresh = await readById(this.replica, collection, ids);
     const map = rows[collection] as Map<string, SyncFields>;
     for (const id of ids) map.delete(id);
     for (const row of fresh) map.set(row.id, row);
@@ -91,13 +91,13 @@ function byId<T extends SyncFields>(rows: readonly T[]): Map<string, T> {
   return new Map(rows.map((row) => [row.id, row]));
 }
 
-function readById(store: FuelTrackerStore, collection: Collection, ids: readonly string[]): Promise<SyncFields[]> {
+function readById(replica: Replica, collection: Collection, ids: readonly string[]): Promise<SyncFields[]> {
   switch (collection) {
     case 'vehicles':
-      return store.rowsById('vehicles', ids);
+      return replica.rowsById('vehicles', ids);
     case 'fillUps':
-      return store.rowsById('fillUps', ids);
+      return replica.rowsById('fillUps', ids);
     case 'pendingFillUps':
-      return store.rowsById('pendingFillUps', ids);
+      return replica.rowsById('pendingFillUps', ids);
   }
 }

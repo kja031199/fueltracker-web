@@ -54,7 +54,7 @@
  * closed. Nothing is deleted.
  */
 
-import type { FuelTrackerStore } from './store';
+import type { SyncTarget } from './replica';
 import type { RemoteStore } from './remote';
 import type { Membership, SharingRemote } from './sharing';
 import { membershipKey } from './sharing';
@@ -141,7 +141,7 @@ export function onlyFillUpsOf(vehicleId: string): RowScope {
 }
 
 export async function syncAll(
-  store: FuelTrackerStore,
+  store: SyncTarget,
   own: RemoteStore,
   sharing: SharingSync | null,
   ownState: SyncStateStore,
@@ -170,7 +170,7 @@ export async function syncAll(
   const sharable: Membership[] = [];
   for (const membership of current ?? []) {
     const isNew = !heldKeys.has(membershipKey(membership));
-    if (isNew && (await store.hasVehicle(membership.vehicleId))) clashed.push(membership);
+    if (isNew && (await store.replica.hasVehicle(membership.vehicleId))) clashed.push(membership);
     else sharable.push(membership);
   }
 
@@ -178,7 +178,7 @@ export async function syncAll(
   const sharedCars = new Set([...held, ...(current ?? [])].map((m) => m.vehicleId));
   // One look at this device for the whole sync (#87), shared by every remote.
   // The text repair runs once, here, over every row — shared cars' included.
-  const local = new LocalView(store);
+  const local = new LocalView(store.replica);
   const ownResult = await syncOnce(store, own, ownState, { scope: excluding(sharedCars), local });
 
   if (current === null) return { own: ownResult, shares: { ...NO_SHARES, unreachable: true } };
@@ -203,7 +203,7 @@ export async function syncAll(
   }
 
   async function forget(membership: Membership): Promise<void> {
-    await store.forgetVehicle(membership.vehicleId);
+    await store.replica.forgetVehicle(membership.vehicleId);
     await local.forgetVehicle(membership.vehicleId);
     await sharing!.forgetState(shareStateKey(membership));
     ended.push(membership);
