@@ -6,7 +6,7 @@
  * already there.
  */
 
-import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
+import { draftFromRecord } from './recordMapping';
 import type { FillUpRecord, PendingFillUpRecord, SyncFields, VehicleRecord, Snapshot } from './records';
 import type { Repositories } from './store';
 import { isStorableId } from './recordId';
@@ -171,13 +171,7 @@ async function merge(repos: Repositories, snapshot: Snapshot, tieBreak?: TieBrea
         // A tombstone carries no usable measurements and does not need to: it
         // is a record that something was deleted, and validating it would reject it.
         if (incoming.deletedAt !== null) return true;
-        const draft = makeFuelEntryDraft({
-          date: new Date(incoming.date),
-          odometer: incoming.odometer,
-          gallons: incoming.gallons,
-          pricePerGallon: incoming.pricePerGallon,
-        });
-        if (draft === null) {
+        if (draftFromRecord(incoming) === null) {
           rejected.push(`fill-up ${incoming.id}: odometer, volume and price must all be positive numbers`);
           return false;
         }

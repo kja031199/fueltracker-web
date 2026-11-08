@@ -96,6 +96,10 @@ npm ci --prefix .github/firebase-cli
 1. **Every fill-up is built from a `FuelEntryDraft`.** `addFillUp` takes a
    draft, not loose fields, so no function here *could* write an unvalidated
    entry. Rejects non-positive **and** non-finite; `+Infinity` passes `> 0`.
+   **The copy between a draft and a record is written once** (#91),
+   `recordMapping.ts`: `fillUpFromDraft`, `pendingFromDraft`, and
+   `draftFromRecord`, which goes back through the gate. Never spell the fields
+   out again in a new write path.
 2. **Nothing from the account is trusted.** `syncOnce` puts every pulled
    document through `recordValidation.ts` first. `RemoteStore.pull()` returns
    `RawSnapshot` (`unknown[]`) on purpose — the honest type is what forces the
