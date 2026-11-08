@@ -247,6 +247,13 @@ Recorded so a regression in the tests themselves is visible:
 | Release notes, the file: dates out of order / an impossible date / no *Technical* line / a link to the wrong number / an issue link labelled PR / an "Unreleased" heading / no user sentence | 1 / 1 / 1 / 1 / 1 / 2 / 1 |
 | Sharing reads (#89): memberships not handed to the screens / the view reading them again / reload after every share sync / names never cached / new uids ignored / a nobody's uid re-asked | 1 / 1 / 1 / 1 / 1 / 1 |
 | Sharing reads: index note removed / `indexMissing` not carried / fallback not told / invites not narrowed in memory / in Firestore (emulator) / `syncAll` handing back nothing | 1 / 2 / 1 / 1 / 2 / 2 |
+| Rules upkeep (#92): any one of the 26 bounds in `label()`/`sized()` raised by one / receipt bound / stamp bound / an inline `.size()` back / a fill-up key dropped / a junk vehicle key / `enteredBy` made required / `exists()` before `get()` | 1 each / 1 / 1 / 2 / 1 / 1 / 1 / 1 |
+| Rules upkeep, emulator: the users document readable / `liveCar` ignoring deletion | 1 / 4 |
+
+Equivalent, and kept as a backstop: `shape()` without its `hasAll`. Every
+required field is also read by a clause of its own, and reading a missing field
+is an error, which refuses the write; `hasAll` would start to matter only for a
+field no other clause mentions.
 
 Equivalent, and kept for parity: the repair skipping tombstones. A tombstone
 carries no text, so there is nothing for it to shorten.

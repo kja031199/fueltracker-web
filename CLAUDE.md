@@ -178,9 +178,21 @@ npm ci --prefix .github/firebase-cli
   `maxAheadMs()` must equal `MAX_ACCEPTED_AHEAD_MS` (`syncClock.ts`), which
   must stay above `MAX_ADOPTED_SKEW_MS` or honest devices are refused;
   `rulesLimits.test.ts` checks both. The rules have no exponent notation.
-- **`hasOnly` makes adding a field a two-part change**: an unknown field is
-  refused, so the rules must deploy *before* a build that writes it. Same pull
-  request, and **rules deploy before hosting** in `deploy.yml` for that reason.
+- **An unknown field is refused, so adding a field is a two-part change**: the
+  rules must deploy *before* a build that writes it. Same pull request, and
+  **rules deploy before hosting** in `deploy.yml` for that reason. In the rules
+  the field goes in **one** place, its document's `…Keys()` function (#92;
+  `optional…Keys()` if older builds will not write it), checked by the single
+  `shape()` helper — never a new `hasOnly`/`hasAll` pair.
+  `rulesLimits.test.ts` fails if a key list differs from the record the client
+  writes.
+- **Every size bound in the rules is named** (#92): `label(field, max)`,
+  `sized(field, min, max)` for ids and the invite address, and
+  `maxReceiptBytes()`. No `.size()` anywhere else — a test checks — because an
+  inline bound is one the parity tests cannot see. `maxReceiptBytes()` equals
+  `MAX_SYNCED_RECEIPT_BYTES` (`firebase/rulesShape.test.ts`). A missing car is
+  checked with one `get()` (an error refuses), not `exists()` then `get()`; a
+  test refuses that pair. There is no rule for `users/{uid}` itself.
 - **The deploy key lives only in `deploy.yml`'s `deploy` job** (#76):
   environment `production`, limited to `main`. That job runs **no app-tree npm
   code** — CLI installed with `--ignore-scripts`, the `build` job's tested
@@ -506,7 +518,7 @@ intended ([docs/development.md](docs/development.md)).
 - [ ] Mutation-tested, if it guards data or access.
 - [ ] `npm run build`, `npm test`, `npm run typecheck`, `npm run lint` — exit
       codes read directly, not through a pipe.
-- [ ] Rules touched? Emulator suite run, and `hasOnly` remembered.
+- [ ] Rules touched? Emulator suite run, and the field in its `…Keys()` list.
 - [ ] No secrets and no Firebase config in the diff.
 - [ ] Closes an issue? A note in `RELEASE_NOTES.md`, with the PR link once
       the pull request exists.
