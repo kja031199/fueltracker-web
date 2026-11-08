@@ -21,8 +21,9 @@ Hosting at `fueltracker-899eb.web.app`.
 
 - `src/domain/` — pure logic, no storage and no React: statistics, units, the
   draft gate, the palette, the backup reminder, the idle-timeout rule, the scan
-  parsers (`scanning/`). **It imports nothing from `data/` or `ui/`**, and
-  `src/test/layering.test.ts` enforces that (#54).
+  parsers (`scanning/`). **It imports nothing from `data/` or `ui/`, nor
+  React, Dexie or Firebase**, and `src/test/layering.test.ts` enforces that
+  (#54, #93), along with `data/` never importing `ui/`.
 - `src/data/` — records and persistence. `store.ts` is the write surface,
   `repository.ts` the storage abstraction (and `Repositories`), `db.ts` the
   Dexie schema with its adapters beside it (`dexieRepository.ts`,
@@ -37,7 +38,8 @@ Hosting at `fueltracker-899eb.web.app`.
   store, sync or sharing modules above them** (#91; `importCycles.test.ts`,
   type-only imports included). Sharing's plain shapes are `sharingTypes.ts`;
   the store's clock type is in `syncClock.ts`.
-- `src/data/firebase/` — the **only** place the Firebase SDK is imported.
+- `src/data/firebase/` — the **only** place the Firebase SDK is imported
+  (`sdkBoundary.test.ts`, #93).
 - `src/ui/` — React: screens, hooks, hand-drawn SVG charts (`charts/`).
   `App.tsx` gates on auth and holds per-browser preferences; `fuelLog.tsx`
   (`FuelLogProvider` / `useFuelLog`, and `useSyncStatus` for sync status)
@@ -139,14 +141,17 @@ npm ci --prefix .github/firebase-cli
    A new key: ask whose it is. If it is about a fuel log, it is `account`.
 6. **The Firebase SDK is imported only under `src/data/firebase/`.** Everything
    above talks to `AuthProvider` and `RemoteStore`, and no test imports the SDK
-   — which is what keeps the suite offline and fast.
+   — which is what keeps the suite offline and fast. `sdkBoundary.test.ts`
+   checks every production file (#93).
 7. **The four sync fields are on every record**: client `id`, `updatedAt`,
    `deletedAt`, `schemaVersion`. They cannot be retrofitted over real data.
 8. **Screens write through `useFuelLog()`, never the store** (#56). Every
    write action is built by `written` in `fuelLog.tsx`: store call, then
-   refresh, then `afterWrite()` (sync shortly). A throw skips both. Only
-   `fuelLog.tsx` and `App.tsx` (which just hands it over) may import
-   `data/store`; `storeBoundary.test.ts` fails otherwise, and
+   refresh, then `afterWrite()` (sync shortly). A throw skips both. Only the
+   files in `ALLOWED` in `storeBoundary.test.ts` may import `data/store` —
+   `fuelLog.tsx`, `App.tsx` (which just hands it over) and the fuel log's own
+   hooks and helpers, each with its reason; the test reads `.ts` as well as
+   `.tsx` and fails otherwise, and
    `FuelLog.test.tsx` proves every action reaches the remote. A new write is a
    new action there — not a `store` prop and an `onChanged` callback, which is
    the shape that made "sync after a write" depend on memory.
@@ -494,6 +499,16 @@ npm ci --prefix .github/firebase-cli
   which caches one `Intl.NumberFormat` per locale and options.
 
 ### Tests
+
+- **A boundary test reads imports through `src/test/imports.ts`, never its own
+  pattern** (#93). `layering`, `storeBoundary`, `sdkBoundary` and
+  `importCycles` all do. Each used to match `from '…'` its own way, and the
+  layering one saw single quotes only, so a double-quoted, side-effect or
+  dynamic `import('…')` crossed unseen. `importsOf(file)` returns every
+  specifier, resolved to a repo path (`src/data/store`) or left as a package
+  name; comments are stripped first, so prose that mentions an import is not
+  one. A new rule: write it as a pure function of that list, test it on a
+  planted list, then run it over the files.
 
 - **The tab is in the URL hash** (`#/dashboard`, `#/fillups`, `#/vehicles`,
   `#/settings`; `useTabRoute.ts`, #56). jsdom keeps one URL per test file, so

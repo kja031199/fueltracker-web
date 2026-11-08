@@ -11,6 +11,15 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-08
 
+- **No change you'll see: the tests that keep the app's layers apart now see
+  every way one file can load another.** The first step of tidying the
+  interface code.
+  *Technical:* one import reader (`src/test/imports.ts`) for the layering,
+  store, SDK and cycle tests: double quotes, side-effect and dynamic imports
+  included. `domain/` may not import React, Dexie or Firebase; `data/` may not
+  import `ui/`; the store check covers `.ts` hooks with a reason per allowed
+  file; a new test keeps the Firebase SDK in `src/data/firebase/`.
+  [#93](https://github.com/kja031199/fueltracker-web/issues/93) · [PR #123](https://github.com/kja031199/fueltracker-web/pull/123)
 - **Each sync saves less on your device.** After this update, the first sync
   reads your account in full once; from then on a sync records only what
   changed, instead of rewriting its record of every row each time.
