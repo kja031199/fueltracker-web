@@ -19,8 +19,7 @@ import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
 import type { FillUpRecord, PendingFillUpRecord, SyncFields, VehicleRecord, Snapshot } from './records';
 import { SCHEMA_VERSION } from './records';
 import type { Repositories, Repository } from './repository';
-import type { StoreClock } from './syncClock';
-import { systemClock } from './syncClock';
+import { MonotonicClock } from './syncClock';
 import type { FillUpSummary } from './records';
 import { toSummary } from './records';
 import type { Tombstoner } from './tombstone';
@@ -47,7 +46,14 @@ export interface NewVehicle {
 export class FuelTrackerStore {
   constructor(
     private readonly repos: Repositories,
-    private readonly clock: StoreClock = systemClock,
+    /**
+     * Stamps every write, and is **the** clock sync observes the account's
+     * stamps on (#91): sync takes it from here, so the two can never be
+     * different clocks. It used to be passed to each separately, defaulting
+     * to two different ones, and only the app's wiring made them the same.
+     * Its own by default; the app gives every store `sharedSyncClock`.
+     */
+    readonly clock: MonotonicClock = new MonotonicClock(),
     /**
      * The signed-in account, stamped on each new fill-up as `enteredBy`
      * (#66). `null` where there is no account: tests, the demo, local-only.

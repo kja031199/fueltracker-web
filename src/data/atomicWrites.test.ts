@@ -217,11 +217,11 @@ describe('a save that lands while sync merges (#85)', () => {
       editing = store.updateFillUp(mine.id, draft(30_000));
     });
     const racing = new FuelTrackerStore(swapping(repos, 'fillUps', (repo) => readThen(repo, edit)), clock);
-    await syncOnce(racing, remote, clock, state);
+    await syncOnce(racing, remote, state);
     await editing;
 
     expect((await store.fillUp(mine.id))?.odometer).toBe(30_000);
-    await syncOnce(store, remote, clock, state);
+    await syncOnce(store, remote, state);
     const held = (await remote.pull()).fillUps as readonly FillUpRecord[];
     expect(held.find((row) => row.id === mine.id)?.odometer).toBe(30_000);
   });

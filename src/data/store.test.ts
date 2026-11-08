@@ -5,22 +5,26 @@ import { computeFuelStatistics } from '../domain/fuelStatistics';
 import { InMemoryRepository } from './repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records';
 import { SCHEMA_VERSION } from './records';
-import type { StoreClock } from './syncClock';
+import { MonotonicClock } from './syncClock';
 import { FuelTrackerStore, toStats } from './store';
 import { TEXT_LIMITS } from '../domain/textLimits';
 import { StaleEdit } from './staleEdit';
 
-/** A clock that advances by a millisecond per read, so ids and times differ. */
-function testClock(start = 1_000): StoreClock {
+/**
+ * A clock over a wall clock that advances a millisecond per read, so ids and
+ * times differ. Monotonic, as every store's clock is (#91): on a wall clock
+ * that only moves forward it reads exactly that wall clock.
+ */
+function testClock(start = 1_000): MonotonicClock {
   let time = start;
   let counter = 0;
-  return {
-    now: () => (time += 1),
-    newId: () => `id-${(counter += 1)}`,
-  };
+  return new MonotonicClock(
+    () => (time += 1),
+    () => `id-${(counter += 1)}`,
+  );
 }
 
-function makeStore(clock: StoreClock = testClock()): FuelTrackerStore {
+function makeStore(clock: MonotonicClock = testClock()): FuelTrackerStore {
   return new FuelTrackerStore(
     {
       vehicles: new InMemoryRepository<VehicleRecord>(),

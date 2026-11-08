@@ -116,7 +116,7 @@ describeWithEmulator('sharing through the real rules', () => {
     };
     const ownState = new InMemorySyncState();
     const own = FirestoreRemoteStore.over(db, account.uid);
-    return { store, sharing, sync: () => syncAll(store, own, sharing, clock, ownState) };
+    return { store, sharing, sync: () => syncAll(store, own, sharing, ownState) };
   }
 
   const draft = (odometer: number) => {

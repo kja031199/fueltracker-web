@@ -61,7 +61,6 @@ import { membershipKey } from './sharing';
 import type { SyncOutcome, SyncResult, RowScope } from './sync';
 import { syncOnce } from './sync';
 import { LocalView } from './localView';
-import type { MonotonicClock } from './syncClock';
 import type { SyncStateStore } from './syncState';
 import type { ShareLedger } from './shareLedger';
 
@@ -145,11 +144,10 @@ export async function syncAll(
   store: FuelTrackerStore,
   own: RemoteStore,
   sharing: SharingSync | null,
-  clock: MonotonicClock,
   ownState: SyncStateStore,
 ): Promise<SyncAllResult> {
   if (sharing === null) {
-    return { own: await syncOnce(store, own, clock, ownState), shares: NO_SHARES };
+    return { own: await syncOnce(store, own, ownState), shares: NO_SHARES };
   }
 
   let held: Membership[];
@@ -181,7 +179,7 @@ export async function syncAll(
   // One look at this device for the whole sync (#87), shared by every remote.
   // The text repair runs once, here, over every row — shared cars' included.
   const local = new LocalView(store);
-  const ownResult = await syncOnce(store, own, clock, ownState, { scope: excluding(sharedCars), local });
+  const ownResult = await syncOnce(store, own, ownState, { scope: excluding(sharedCars), local });
 
   if (current === null) return { own: ownResult, shares: { ...NO_SHARES, unreachable: true } };
   // Not on the allowlist: the shared cars will refuse too, and saying so
@@ -220,7 +218,6 @@ export async function syncAll(
     const result = await syncOnce(
       store,
       sharing.remote.scoped(membership),
-      clock,
       sharing.stateFor(shareStateKey(membership)),
       { scope: onlyFillUpsOf(membership.vehicleId), local, repair: false },
     );

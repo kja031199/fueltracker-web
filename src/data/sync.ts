@@ -35,10 +35,7 @@ import type { Collection, PullCursor, PushSummary, RawSnapshot, RemoteStore } fr
 import { sendableRows } from './remote';
 import type { FuelTrackerStore } from './store';
 import { LocalView } from './localView';
-import type { MonotonicClock } from './syncClock';
-import { sharedSyncClock } from './syncClock';
 import {
-  InMemorySyncState,
   SYNC_CURSOR_VERSION,
   usableCursor,
   type SyncCursor,
@@ -245,10 +242,17 @@ export interface SyncOptions {
 export async function syncOnce(
   store: FuelTrackerStore,
   remote: RemoteStore,
-  clock: MonotonicClock = sharedSyncClock,
-  state: SyncStateStore = new InMemorySyncState(),
+  /**
+   * Where this remote's sync left off. Required (#91): defaulted, a caller
+   * that forgot it got a fresh one — and a full read — on every sync.
+   */
+  state: SyncStateStore,
   options: SyncOptions = {},
 ): Promise<SyncResult> {
+  // The store's own clock, never a second one (#91). Merges are last-write-
+  // wins, and only a clock that has observed the account's stamps issues
+  // local ones that beat them.
+  const clock = store.clock;
   const inScope: RowScope = options.scope ?? ((): boolean => true);
   // Read the first time it is needed — after the pull, so a sync that cannot
   // reach the account reads nothing — and only by id after that (#87).

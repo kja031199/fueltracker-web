@@ -28,7 +28,6 @@ import type { FuelTrackerStore } from '../data/store';
 import { syncAll, type SharingSync } from '../data/shareSync';
 import type { Membership } from '../data/sharing';
 import type { SyncOutcome } from '../data/sync';
-import { sharedSyncClock } from '../data/syncClock';
 import { InMemorySyncState, type SyncStateStore } from '../data/syncState';
 import { createSyncScheduler } from './syncScheduler';
 import { accountPreference, numberCodec, useAccountPreference } from './preferences';
@@ -94,7 +93,7 @@ export function useSync(
     if (remote === null) return;
     setSyncing(true);
     try {
-      const all = await syncAll(store, remote, sharing, sharedSyncClock, state);
+      const all = await syncAll(store, remote, sharing, state);
       if (all.shares.memberships !== null) sharesSeen.current(all.shares.memberships);
       const result = all.own;
       if (!result.ok) {
