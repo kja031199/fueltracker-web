@@ -109,10 +109,12 @@ export class FirestoreSharingRemote implements SharingRemote {
     await deleteDoc(doc(this.db, 'invites', inviteKey(this.me.uid, vehicleId, email)));
   }
 
-  async invitesSent(): Promise<Invite[]> {
-    const found = await getDocsFromServer(
-      query(collection(this.db, 'invites'), where('ownerUid', '==', this.me.uid)),
-    );
+  async invitesSent(vehicleId?: string): Promise<Invite[]> {
+    const mine = query(collection(this.db, 'invites'), where('ownerUid', '==', this.me.uid));
+    // One car's alone, when that is all that is wanted (#89): it used to read
+    // every invitation the account had sent and filter here. Two equality
+    // filters need no composite index.
+    const found = await getDocsFromServer(vehicleId === undefined ? mine : query(mine, where('vehicleId', '==', vehicleId)));
     return found.docs.flatMap((d) => asInvite(d.data()) ?? []);
   }
 
@@ -131,7 +133,7 @@ export class FirestoreSharingRemote implements SharingRemote {
     const leftover =
       member === undefined
         ? []
-        : (await this.invitesSent()).filter((i) => i.vehicleId === vehicleId && i.email === member.email);
+        : (await this.invitesSent(vehicleId)).filter((i) => i.email === member.email);
     const batch = writeBatch(this.db);
     batch.delete(doc(this.db, 'users', this.me.uid, 'vehicles', vehicleId, 'members', memberUid));
     for (const invite of leftover) batch.delete(doc(this.db, 'invites', inviteKey(invite.ownerUid, invite.vehicleId, invite.email)));
@@ -139,8 +141,7 @@ export class FirestoreSharingRemote implements SharingRemote {
   }
 
   async endSharing(vehicleId: string): Promise<void> {
-    const [members, invites] = await Promise.all([this.members(this.me.uid, vehicleId), this.invitesSent()]);
-    const ofCar = invites.filter((invite) => invite.vehicleId === vehicleId);
+    const [members, ofCar] = await Promise.all([this.members(this.me.uid, vehicleId), this.invitesSent(vehicleId)]);
     if (members.length === 0 && ofCar.length === 0) return;
     const batch = writeBatch(this.db);
     for (const member of members) batch.delete(doc(this.db, 'users', this.me.uid, 'vehicles', vehicleId, 'members', member.uid));
@@ -223,12 +224,18 @@ export function isMissingIndex(cause: unknown): boolean {
  * and a member's sync should not fail for those minutes — it reads the whole
  * car instead, which is correct, only less economical.
  */
-export async function withIndexFallback<T>(incremental: () => Promise<T>, full: () => Promise<T>): Promise<T> {
+export async function withIndexFallback<T>(
+  incremental: () => Promise<T>,
+  full: () => Promise<T>,
+  /** Told when it falls back (#89): silent, it cost a full read every sync and nobody knew. */
+  onFallback: () => void = () => {},
+): Promise<T> {
   try {
     return await incremental();
   } catch (cause) {
-    if (isMissingIndex(cause)) return full();
-    throw cause;
+    if (!isMissingIndex(cause)) throw cause;
+    onFallback();
+    return full();
   }
 }
 
@@ -245,18 +252,24 @@ export class FirestoreScopedRemote implements RemoteStore {
 
   async pull(since: PullCursor | null = null): Promise<RawSnapshot> {
     const { ownerUid, vehicleId } = this.share;
-    // The car itself is one document, read whole every time.
-    const car = await getDocFromServer(doc(this.db, 'users', ownerUid, 'vehicles', vehicleId));
     const all = query(collection(this.db, 'users', ownerUid, 'fillUps'), where('vehicleId', '==', vehicleId));
     const mark = since?.fillUps ?? null;
     const read = (target: Query) => getDocsFromServer(target);
-    const found =
+    let indexMissing = false;
+    // The car itself is one document, read whole every time — alongside its
+    // fill-ups rather than before them (#89).
+    const [car, found] = await Promise.all([
+      getDocFromServer(doc(this.db, 'users', ownerUid, 'vehicles', vehicleId)),
       mark === null
-        ? await read(all)
-        : await withIndexFallback(
+        ? read(all)
+        : withIndexFallback(
             () => read(query(all, where('syncedAt', '>', fromMicros(mark)))),
             () => read(all),
-          );
+            () => {
+              indexMissing = true;
+            },
+          ),
+    ]);
     let highWater: number | null = null;
     const fillUps = found.docs.map((d) => {
       const data = d.data();
@@ -270,6 +283,7 @@ export class FirestoreScopedRemote implements RemoteStore {
       pendingFillUps: [],
       // The car is read in full each time, so it carries no mark of its own.
       highWater: { vehicles: null, fillUps: highWater, pendingFillUps: null },
+      ...(indexMissing ? { indexMissing: true } : {}),
     };
   }
 

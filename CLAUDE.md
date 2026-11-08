@@ -413,7 +413,16 @@ npm ci --prefix .github/firebase-cli
   it as "already received".
 - **The shared-car index is not deployed by CI** — the deploy account lacks
   the role, deliberately. `firestore.indexes.json` is deployed once by hand
-  (docs/deploying.md); `withIndexFallback` reads the whole car meanwhile.
+  (docs/deploying.md); `withIndexFallback` reads the whole car meanwhile, and
+  says so (`indexMissing` → one line in the sync notice, #89).
+- **Count sharing reads** (#89; `world.reads` in the in-memory world). The
+  memberships are read once per sync, in `syncAll`, and handed to the screens
+  (`shares.memberships`, `useSync`'s `onShares`). Don't add a
+  `remote.memberships()` call to the sharing view; the ledger fills the list
+  only until the first sync has answered, then the sync's list wins. Names for
+  "entered by" go through `sharing.namesFor` (cached per car, re-read for an
+  unseen uid), never a `members()` call in a screen effect. A screen reload
+  after a share sync needs rows written, not just a share synced.
 - **Emulator tests: every file under `src/data/firebase/` runs in CI.** The
   sharing rules have their own file (`sharingRules.test.ts`) and an
   end-to-end two-person flow (`sharing.test.ts`). Run the spike-style checks

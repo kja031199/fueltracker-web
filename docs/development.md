@@ -245,6 +245,8 @@ Recorded so a regression in the tests themselves is visible:
 | Renders: a stale load shown over a newer one / a selection shown before its fill-ups / formatter cache off / cache key ignoring options / odometer check measuring from an equal reading | 1 / 1 / 2 / 14 / 2 |
 | Release notes: keywords only `closes` / title `(#N)` ignored / removed lines counted / `#12` matching `#123` / mentions counted / no word boundary / body interpolated into `run:` / `edited` not a trigger | 1 / 1 / 2 / 3 / 1 / 1 / 2 / 1 |
 | Release notes, the file: dates out of order / an impossible date / no *Technical* line / a link to the wrong number / an issue link labelled PR / an "Unreleased" heading / no user sentence | 1 / 1 / 1 / 1 / 1 / 2 / 1 |
+| Sharing reads (#89): memberships not handed to the screens / the view reading them again / reload after every share sync / names never cached / new uids ignored / a nobody's uid re-asked | 1 / 1 / 1 / 1 / 1 / 1 |
+| Sharing reads: index note removed / `indexMissing` not carried / fallback not told / invites not narrowed in memory / in Firestore (emulator) / `syncAll` handing back nothing | 1 / 2 / 1 / 1 / 2 / 2 |
 
 Equivalent, and kept for parity: the repair skipping tombstones. A tombstone
 carries no text, so there is nothing for it to shorten.

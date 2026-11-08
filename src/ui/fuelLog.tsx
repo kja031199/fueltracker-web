@@ -27,7 +27,7 @@
  */
 
 import type { ReactElement, ReactNode } from 'react';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { FillUpRecord, Snapshot, VehicleRecord } from '../data/records';
 import type { ImportSummary } from '../data/backup';
 import type { RemoteStore } from '../data/remote';
@@ -64,8 +64,15 @@ export interface SharingView {
   withdrawInvite(vehicleId: string, email: string): Promise<void>;
   /** Unanswered invitations this account sent for one car. */
   invitesSentFor(vehicleId: string): Promise<Invite[]>;
-  /** Who a car is shared with — this account's own car, or one shared with it. */
+  /** Who a car is shared with — this account's own car, or one shared with it. Read fresh. */
   membersOf(vehicleId: string): Promise<Member[]>;
+  /**
+   * The names to show for who entered a car's fill-ups — `null` for a car
+   * nobody shares, where "entered by you" on every row would be noise.
+   * `entered` is the uids its fill-ups carry. Remembered per car (#89): read
+   * once, and again only when a fill-up names somebody it has not seen.
+   */
+  namesFor(vehicleId: string, entered: readonly (string | null | undefined)[]): Promise<ReadonlyMap<string, string> | null>;
   removeMember(vehicleId: string, memberUid: string): Promise<void>;
   /** Joins, then syncs so the car arrives at once. */
   accept(invite: Invite): Promise<void>;
@@ -83,6 +90,7 @@ const SHARING_OFF: SharingView = {
   withdrawInvite: async () => {},
   invitesSentFor: async () => [],
   membersOf: async () => [],
+  namesFor: async () => null,
   removeMember: async () => {},
   accept: () => Promise.reject(new Error('Sharing needs an account.')),
   decline: async () => {},
@@ -162,8 +170,20 @@ export function FuelLogProvider({
   children,
 }: FuelLogProviderProps): ReactElement {
   const data = useAppData(store);
-  const sync = useSync(store, remote, data.reload, syncState, uid, remote === null ? null : sharing);
-  const sharingView = useSharingView(remote === null ? null : sharing, uid, sync.syncNow, sync.lastSyncedAt, store);
+  // The sync reads which cars are shared with this account; the sharing view
+  // is handed that list rather than reading it again (#89). A ref, because the
+  // view is built after the sync.
+  const sharesRead = useRef<(memberships: readonly Membership[]) => void>(() => {});
+  const onShares = useCallback((memberships: readonly Membership[]) => sharesRead.current(memberships), []);
+  const sync = useSync(store, remote, data.reload, syncState, uid, remote === null ? null : sharing, onShares);
+  const sharingView = useSharingView(
+    remote === null ? null : sharing,
+    uid,
+    sync.syncNow,
+    sync.lastSyncedAt,
+    store,
+    sharesRead,
+  );
   const { reload } = data;
   const { afterWrite } = sync;
   const shared = remote === null ? null : sharing;
@@ -276,21 +296,41 @@ function useSharingView(
   syncNow: () => Promise<void>,
   lastSyncedAt: number | null,
   store: FuelTrackerStore,
+  /** Where the sync hands over the memberships it read (#89). */
+  sharesRead: { current: (memberships: readonly Membership[]) => void },
 ): SharingView {
   const [sharedWithMe, setSharedWithMe] = useState<readonly Membership[]>([]);
   const [invitesForMe, setInvitesForMe] = useState<readonly Invite[]>([]);
+  // Who each car is shared with, and every uid already asked about for it —
+  // so a uid that is nobody's now (a member since removed) is asked once.
+  const names = useRef(new Map<string, { members: readonly Member[]; asked: ReadonlySet<string> }>());
 
+  // Each list is replaced only when it differs (#88): these run after every
+  // sync, and a new array with the same entries re-rendered every screen.
+  // Once a sync has said which cars are shared, its answer wins over the
+  // ledger's: the ledger leaves out a share it would not record (#78), which
+  // still has to be listed so it can be left.
+  const synced = useRef(false);
+  useEffect(() => {
+    sharesRead.current = (memberships) => {
+      synced.current = true;
+      setSharedWithMe((shown) => unlessSame(shown, memberships));
+    };
+  }, [sharesRead]);
+
+  /**
+   * What only this view reads: the device's ledger, so a shared car is known
+   * as one before the first sync, and the invitations waiting for this account. The
+   * cars shared with it come from the sync, which has just read them (#89) —
+   * this used to read them again after every sync.
+   */
   const refresh = useCallback(async () => {
     if (sharing === null) return;
-    // Each list is replaced only when it differs (#88): this runs after every
-    // sync, and a new array with the same entries re-rendered every screen.
-    const held = await sharing.ledger.load().catch(() => null);
-    if (held !== null) setSharedWithMe((shown) => unlessSame(shown, held));
-    const [current, invites] = await Promise.all([
-      sharing.remote.memberships().catch(() => null),
-      sharing.remote.invitesForMe().catch(() => null),
-    ]);
-    if (current !== null) setSharedWithMe((shown) => unlessSame(shown, current));
+    if (!synced.current) {
+      const held = await sharing.ledger.load().catch(() => null);
+      if (held !== null && !synced.current) setSharedWithMe((shown) => unlessSame(shown, held));
+    }
+    const invites = await sharing.remote.invitesForMe().catch(() => null);
     if (invites !== null) setInvitesForMe((shown) => unlessSame(shown, invites));
   }, [sharing]);
 
@@ -312,15 +352,42 @@ function useSharingView(
         await remote.invite(vehicle, email);
       },
       withdrawInvite: (vehicleId, email) => remote.withdrawInvite(vehicleId, email),
-      invitesSentFor: async (vehicleId) =>
-        (await remote.invitesSent()).filter((invite) => invite.vehicleId === vehicleId),
-      membersOf: (vehicleId) => remote.members(membershipFor(vehicleId)?.ownerUid ?? uid, vehicleId),
+      // That car's alone, not every invitation sent (#89).
+      invitesSentFor: (vehicleId) => remote.invitesSent(vehicleId),
+      membersOf: async (vehicleId) => {
+        const members = await remote.members(membershipFor(vehicleId)?.ownerUid ?? uid, vehicleId);
+        // A fresh read is the best answer the names can have, too.
+        names.current.set(vehicleId, { members, asked: new Set(members.map((member) => member.uid)) });
+        return members;
+      },
+      namesFor: async (vehicleId, entered) => {
+        const membership = membershipFor(vehicleId);
+        const owner = membership?.ownerUid ?? uid;
+        const others = entered.filter(
+          (who): who is string => typeof who === 'string' && who !== '' && who !== uid && who !== owner,
+        );
+        let known = names.current.get(vehicleId);
+        if (known === undefined || others.some((who) => !known!.asked.has(who))) {
+          const members = await remote.members(owner, vehicleId);
+          known = { members, asked: new Set([...(known?.asked ?? []), ...others, ...members.map((m) => m.uid)]) };
+          names.current.set(vehicleId, known);
+        }
+        if (membership === undefined && known.members.length === 0) return null; // not shared
+        const shown = new Map<string, string>();
+        for (const member of known.members) shown.set(member.uid, member.name || member.email);
+        if (membership !== undefined) shown.set(membership.ownerUid, membership.ownerName || 'its owner');
+        shown.set(uid, 'you');
+        return shown;
+      },
+      // The panel re-reads the members after this (`membersOf`), which
+      // refreshes the names too.
       removeMember: (vehicleId, memberUid) => remote.removeMember(vehicleId, memberUid),
       accept: async (invite) => {
         // Checked here, before anything is written, as well as by the rules
         // (which only see cars already in the account) and by sync (#78).
         if (await store.hasVehicle(invite.vehicleId)) throw new ShareClash();
         await remote.accept(invite);
+        names.current.delete(invite.vehicleId);
         await refresh();
         await syncNow();
       },
@@ -330,6 +397,7 @@ function useSharingView(
       },
       leave: async (membership) => {
         await remote.leave(membership);
+        names.current.delete(membership.vehicleId);
         await syncNow();
         await refresh();
       },

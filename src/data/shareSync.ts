@@ -93,6 +93,12 @@ export interface ShareOutcome {
   /** True when the membership list itself could not be read. */
   readonly unreachable: boolean;
   /**
+   * The cars shared with this account, as just read from it — `null` when
+   * they were not (#89). The screens take their list from here rather than
+   * reading it a second time after every sync.
+   */
+  readonly memberships: readonly Membership[] | null;
+  /**
    * New shares whose car id is already a car on this device (#78): not synced,
    * not recorded, nothing deleted. Leaving them resolves it.
    */
@@ -111,6 +117,7 @@ const NO_SHARES: ShareOutcome = {
   rejected: [],
   outcomes: [],
   unreachable: false,
+  memberships: null,
   clashed: [],
 };
 
@@ -193,7 +200,7 @@ export async function syncAll(
   try {
     await sharing.ledger.save(recorded);
   } catch {
-    return { own: ownResult, shares: { ...NO_SHARES, clashed, failed: [...sharable] } };
+    return { own: ownResult, shares: { ...NO_SHARES, clashed, failed: [...sharable], memberships: current } };
   }
 
   async function forget(membership: Membership): Promise<void> {
@@ -244,5 +251,8 @@ export async function syncAll(
     .save(sharable.filter((membership) => !endedKeys.has(membershipKey(membership))))
     .catch(() => {});
 
-  return { own: ownResult, shares: { ...NO_SHARES, synced, ended, failed, rejected, outcomes, clashed } };
+  return {
+    own: ownResult,
+    shares: { ...NO_SHARES, synced, ended, failed, rejected, outcomes, clashed, memberships: current },
+  };
 }

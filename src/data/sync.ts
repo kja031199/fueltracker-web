@@ -72,6 +72,8 @@ export interface SyncOutcome {
    * broken one.
    */
   readonly unsendable: readonly string[];
+  /** The remote read everything because the index an incremental read needs is missing (#89). */
+  readonly indexMissing: boolean;
   /**
    * Local rows whose text was longer than the account accepts, shortened
    * before this push (#50). Saved before text was bounded at every door; each
@@ -415,6 +417,7 @@ export async function syncOnce(
       unbeatable,
       unsendable,
       repaired,
+      indexMissing: raw.indexMissing === true,
       at: clock.now(),
     },
   };

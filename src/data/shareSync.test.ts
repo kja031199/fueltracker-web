@@ -400,6 +400,19 @@ describe('when the account itself has trouble', () => {
     expect(await partner.store.fillUps(car.id)).toHaveLength(1);
   });
 
+  test('hands back the shared cars it read, so nothing reads them again (#89)', async () => {
+    const { partner, car } = await sharedCar();
+    const result = await partner.sync();
+    expect(result.shares.memberships?.map((m) => m.vehicleId)).toEqual([car.id]);
+  });
+
+  test('hands back null, not an empty list, when it could not read them', async () => {
+    const { partner } = await sharedCar();
+    partner.sharing.remote.memberships = () => Promise.reject(new Error('offline'));
+    const result = await partner.sync();
+    expect(result.shares.memberships).toBeNull();
+  });
+
   test('without sharing at all, it is the ordinary sync', async () => {
     const world = new InMemorySharingWorld();
     const store = new FuelTrackerStore({
@@ -410,7 +423,7 @@ describe('when the account itself has trouble', () => {
     const car = await store.addVehicle({ name: 'Solo' });
     const result = await syncAll(store, world.remoteFor('solo'), null, new MonotonicClock(), new InMemorySyncState());
     expect(result.own.ok).toBe(true);
-    expect(result.shares).toEqual({ synced: [], ended: [], failed: [], rejected: [], outcomes: [], unreachable: false, clashed: [] });
+    expect(result.shares).toEqual({ synced: [], ended: [], failed: [], rejected: [], outcomes: [], unreachable: false, memberships: null, clashed: [] });
     expect((await rowsIn(world, 'solo')).vehicles).toEqual([car.id]);
   });
 });

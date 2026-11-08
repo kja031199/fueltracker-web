@@ -35,6 +35,15 @@ describe('falling back while an index builds', () => {
     expect(full).toBe(1);
   });
 
+  test('says so when it falls back, and only then (#89)', async () => {
+    const missing = Object.assign(new Error('needs an index'), { code: 'failed-precondition' });
+    let told = 0;
+    await withIndexFallback(() => Promise.reject(missing), async () => 'all', () => (told += 1));
+    expect(told).toBe(1);
+    await withIndexFallback(async () => 'some', async () => 'all', () => (told += 1));
+    expect(told).toBe(1);
+  });
+
   test('any other failure is not hidden behind a second read', async () => {
     const denied = Object.assign(new Error('no'), { code: 'permission-denied' });
     await expect(withIndexFallback(() => Promise.reject(denied), async () => 'never')).rejects.toBe(denied);
@@ -303,6 +312,21 @@ describeWithEmulator('sharing through the real rules', () => {
     expect(result.own.ok).toBe(true);
     expect(result.shares.synced).toHaveLength(0);
     expect(result.shares.failed).toHaveLength(0);
+  });
+
+  test('the invitations sent for one car are read for that car alone (#89)', async () => {
+    const owner = device(OWNER);
+    const civic = await owner.store.addVehicle({ name: 'Civic' });
+    const jazz = await owner.store.addVehicle({ name: 'Jazz' });
+    await owner.sync();
+    await owner.sharing.remote.invite(civic, 'sam@example.com');
+    await owner.sharing.remote.invite(jazz, 'alex@example.com');
+
+    expect((await owner.sharing.remote.invitesSent(civic.id)).map((i) => i.email)).toEqual(['sam@example.com']);
+    expect((await owner.sharing.remote.invitesSent()).map((i) => i.email).sort()).toEqual([
+      'alex@example.com',
+      'sam@example.com',
+    ]);
   });
 
   test('declining uses up the invitation without joining', async () => {

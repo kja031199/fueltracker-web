@@ -492,7 +492,32 @@ counts, where it used to be dropped.
 A member's incremental read asks for `vehicleId == car` **and** `syncedAt >
 mark`, which needs a composite index (`firestore.indexes.json`). Until it is
 deployed — see [deploying.md](deploying.md#the-shared-car-index-is-deployed-by-hand-66)
-— the read falls back to the whole car: correct, only less economical.
+— the read falls back to the whole car: correct, only less economical. It is
+no longer silent (#89): the pull reports `indexMissing`, and the sync's notice
+says, once however many cars it applies to, that shared cars were read in
+full while the index builds.
+
+**Sharing reads are counted** (#89), because on the free plan reads are what
+runs out:
+
+- **The cars shared with this account are read once per sync**, by `syncAll`,
+  which hands the list back (`shares.memberships`). The screens take it from
+  there; they used to read it again after every sync. Until the first sync has
+  answered, they show the device's ledger, and after that the sync's list wins:
+  the ledger leaves out a share it will not record (#78), which must still be
+  listed so it can be left.
+- **Who entered each fill-up is asked once per car** (`SharingView.namesFor`)
+  and remembered, then asked again only when a fill-up names a uid it has not
+  seen, including one that turns out to be nobody's. A car nobody shares costs
+  one `members()` read per session, not one per sync.
+- **A car's sent invitations are queried for that car**
+  (`invitesSent(vehicleId)`), not read in full and filtered here.
+- **A shared car's document and its fill-ups are read together.**
+- **The screens reload only when a shared car's sync wrote something**, or a
+  share ended. Every shared car's sync used to reload them.
+
+The in-memory sharing world counts its reads (`world.reads`), and
+`SharingReads.test.tsx` pins them.
 
 ## Backups, imports and the shape of a row
 

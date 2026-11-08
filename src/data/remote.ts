@@ -49,6 +49,12 @@ export interface RawSnapshot {
    * at all, which sync then reads in full every time, as before.
    */
   readonly highWater?: PullCursor;
+  /**
+   * True when an incremental read could not be made — its index is not built
+   * yet — and everything was read instead (#89): correct, but every row
+   * costs a read, so it is reported rather than left silent.
+   */
+  readonly indexMissing?: boolean;
 }
 
 export type Collection = 'vehicles' | 'fillUps' | 'pendingFillUps';
