@@ -47,6 +47,48 @@ stand between a correct change and `main`.
 lockfile pins and fails if the lockfile and manifest disagree, instead of
 silently resolving a different tree.
 
+## Release notes
+
+[`RELEASE_NOTES.md`](../RELEASE_NOTES.md) records what each update changed,
+newest first, under the date it went live (every merge to `main` deploys, so
+that is the merge date, UTC). It starts at the fill-up links (#74); nothing
+earlier was back-filled.
+
+**Every pull request that closes an issue adds a note for it.** An entry is a
+list item under the day's `## YYYY-MM-DD` heading:
+
+```md
+- **What changed, as someone using the app would see it.** A sentence or two more.
+  *Technical:* what changed in the code, briefly.
+  [#88](https://github.com/kja031199/fueltracker-web/issues/88) · [PR #112](https://github.com/kja031199/fueltracker-web/pull/112)
+```
+
+A change nobody using the app will notice says so in the first sentence ("No
+change you'll see: …"). A pull request learns its own number only once it is
+opened, so the PR link usually arrives in a second push. One entry may cover
+several issues.
+
+**The "Release notes" check** (`.github/workflows/release-notes.yml`) enforces
+it. It reads which issues the pull request closes — GitHub's closing keywords in
+the description (`Closes #12`, `fixes: #3`), and the `(#N)` this repository puts
+in titles — and fails unless the lines the pull request **adds** to
+`RELEASE_NOTES.md` name each of them. Mentions ("see #4", "part of #101") and
+other repositories' issues (`owner/repo#9`) are not claims. A pull request that
+closes nothing passes, so the check always reports a status and is safe to
+require. It also runs when the title or description is edited.
+
+The title and description are written by whoever opened the pull request, so
+they reach `scripts/release-notes/check.ts` as environment variables and are
+never written into the workflow's command; `workflows.test.ts` fails if any
+workflow puts a pull request's text inside a `run:`. The checker uses Node
+built-ins only (`node --experimental-strip-types`), and `releaseNotes.test.ts`
+tests both it and the shape of `RELEASE_NOTES.md`: real dates, newest first, a
+user sentence, a *Technical* line, and links whose number matches where they
+point.
+
+It is not one of the four required checks until it is added to the branch
+protection rules on `main` (Settings → Branches), which is a manual step.
+
 ## The OCR browser check
 
 Receipt scanning runs WebAssembly in a worker, and **a CSP violation inside a
@@ -201,6 +243,8 @@ Recorded so a regression in the tests themselves is visible:
 | Validation: invite owner / car name, member name, read-back invite, read-back member unbounded (all emulator) | 1 / 1 / 1 / 1 / 1 |
 | Renders (#88): app data a fresh object / fuel log rebuilt on sync status / same sharing lists replaced / shell reading sync status | 3 / 3 / 1 / 1 |
 | Renders: a stale load shown over a newer one / a selection shown before its fill-ups / formatter cache off / cache key ignoring options / odometer check measuring from an equal reading | 1 / 1 / 2 / 14 / 2 |
+| Release notes: keywords only `closes` / title `(#N)` ignored / removed lines counted / `#12` matching `#123` / mentions counted / no word boundary / body interpolated into `run:` / `edited` not a trigger | 1 / 1 / 2 / 3 / 1 / 1 / 2 / 1 |
+| Release notes, the file: dates out of order / an impossible date / no *Technical* line / a link to the wrong number / an issue link labelled PR / an "Unreleased" heading / no user sentence | 1 / 1 / 1 / 1 / 1 / 2 / 1 |
 
 Equivalent, and kept for parity: the repair skipping tombstones. A tombstone
 carries no text, so there is nothing for it to shorten.

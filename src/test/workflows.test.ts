@@ -373,3 +373,57 @@ describe('the deploy key never meets the build toolchain (#76)', () => {
     expect(config).toBeLessThan(writesKey);
   });
 });
+
+/**
+ * The command a step runs: its `run:` line and the lines indented deeper than
+ * the `run` key. The next key at the same depth (`env:` after it, say) ends it.
+ */
+function runBlock(step: string): string {
+  const lines = step.split('\n');
+  const start = lines.findIndex((line) => /^\s*(- )?run:/.test(line));
+  if (start === -1) return '';
+  const column = lines[start]!.indexOf('run:');
+  const block = [lines[start]!];
+  for (const line of lines.slice(start + 1)) {
+    if (line.trim() !== '' && line.search(/\S/) <= column) break;
+    block.push(line);
+  }
+  return block.join('\n');
+}
+
+describe('text a pull request author wrote never becomes a command', () => {
+  // A pull request's title, description and branch name are written by
+  // whoever opened it. `${{ }}` is expanded into the script before the shell
+  // sees it, so one inside `run:` lets that text run as a command. Through
+  // `env:` it is only ever a value.
+  const UNTRUSTED = /\$\{\{\s*github\.(event\.(pull_request|issue|comment|review|head_commit)|head_ref)/;
+  const runs = steps().filter(({ text }) => runBlock(text) !== '');
+
+  test('there are run steps to check, and one reads a pull request’s text', () => {
+    expect(runs.length).toBeGreaterThanOrEqual(10);
+    expect(steps().some(({ text }) => UNTRUSTED.test(text))).toBe(true);
+  });
+
+  test.each(runs)('$workflow: no untrusted expression inside run', ({ text }) => {
+    expect(runBlock(text)).not.toMatch(UNTRUSTED);
+  });
+});
+
+describe('the release-notes check (RELEASE_NOTES.md)', () => {
+  const text = readFileSync(`${WORKFLOW_DIR}/release-notes.yml`, 'utf8');
+
+  test('runs on every pull request, and again when its title or description is edited', () => {
+    expect(text).toMatch(/^on:\s*\n\s+pull_request:\s*\n\s+types:\s*\[opened, synchronize, reopened, edited\]/m);
+  });
+
+  test('is a job named "Release notes" that runs the checker on the merge commit', () => {
+    expect(text).toMatch(/^\s+name: Release notes\s*$/m);
+    expect(text).toMatch(/fetch-depth:\s*2/);
+    expect(text).toMatch(/run: node --experimental-strip-types scripts\/release-notes\/check\.ts\s*$/m);
+  });
+
+  test('hands it the title and description through the environment', () => {
+    expect(text).toMatch(/PR_TITLE:\s*\$\{\{\s*github\.event\.pull_request\.title\s*\}\}/);
+    expect(text).toMatch(/PR_BODY:\s*\$\{\{\s*github\.event\.pull_request\.body\s*\}\}/);
+  });
+});
