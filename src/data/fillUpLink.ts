@@ -41,6 +41,7 @@ import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { fuelGradeFromRaw } from '../domain/fuelGrade';
 import { TEXT_LIMITS, boundText } from '../domain/textLimits';
+import { textOr } from './guards';
 
 /** The current link format. A higher one is from a newer build. */
 export const LINK_VERSION = 1;
@@ -112,9 +113,6 @@ function kindOf(value: Record<string, unknown>, kind: string): LinkProblem | nul
   return value['k'] === kind ? null : 'wrong-kind';
 }
 
-function text(value: unknown, max: number): string {
-  return typeof value === 'string' ? boundText(value, max) : '';
-}
 
 // --- Requests -----------------------------------------------------------------
 
@@ -138,8 +136,8 @@ export function decodeRequest(payload: string): Decoded<FillUpRequest> {
     ok: true,
     value: {
       vehicleId: value['car'],
-      vehicleName: text(value['name'], LINK_TEXT_LIMITS.vehicleName),
-      ownerName: text(value['from'], LINK_TEXT_LIMITS.ownerName),
+      vehicleName: textOr(value['name'], LINK_TEXT_LIMITS.vehicleName),
+      ownerName: textOr(value['from'], LINK_TEXT_LIMITS.ownerName),
     },
   };
 }
@@ -196,8 +194,8 @@ export function decodeSubmission(payload: string, now: number = Date.now()): Dec
     // mark it after approving.
     missedPreviousFillUp: false,
     fuelGrade: fuelGradeFromRaw(typeof value['gr'] === 'string' ? value['gr'] : ''),
-    station: text(value['s'], LINK_TEXT_LIMITS.station),
-    notes: text(value['n'], LINK_TEXT_LIMITS.notes),
+    station: textOr(value['s'], LINK_TEXT_LIMITS.station),
+    notes: textOr(value['n'], LINK_TEXT_LIMITS.notes),
     // Text only: a link never carries a photo or a place.
     latitude: null,
     longitude: null,
@@ -211,7 +209,7 @@ export function decodeSubmission(payload: string, now: number = Date.now()): Dec
     value: {
       id,
       vehicleId: car,
-      submitterName: text(value['by'], LINK_TEXT_LIMITS.submitterName),
+      submitterName: textOr(value['by'], LINK_TEXT_LIMITS.submitterName),
       // When it was sent is a courtesy: junk reads as now, not as a refusal.
       submittedAt: typeof at === 'number' && Number.isFinite(at) && at > 0 && at <= now + FUTURE_SLACK_MS ? at : now,
       draft,

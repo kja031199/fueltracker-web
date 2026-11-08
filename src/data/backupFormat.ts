@@ -26,6 +26,7 @@ import type { FillUpRecord, Snapshot } from './records';
 import { SCHEMA_VERSION } from './records';
 import { MAX_RECEIPT_BYTES } from '../domain/fuelEntryDraft';
 import { validateFillUp, validatePending, validateVehicle } from './recordValidation';
+import { isRecord } from './guards';
 
 /** Bumped only when the *file* shape changes, not when a record shape does. */
 export const BACKUP_FORMAT_VERSION = 1;
@@ -133,11 +134,8 @@ export interface ParseResult<T> {
   readonly skipped: readonly string[];
 }
 
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
+/** The object to read fields from, or `null`. */
+const asObject = (value: unknown): Record<string, unknown> | null => (isRecord(value) ? value : null);
 
 /**
  * A row from a file, with its receipt turned from base64 into bytes — the one
@@ -151,7 +149,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
  * An unreadable or oversized photo is dropped and reported; the row is kept.
  */
 function withReceiptBytes(value: unknown, skipped: string[]): unknown {
-  const row = asRecord(value);
+  const row = asObject(value);
   if (row === null) return value;
   const encoded = row['receiptImageData'];
   if (typeof encoded !== 'string' || encoded === '') return { ...row, receiptImageData: null };
@@ -192,7 +190,7 @@ export function parseJsonBackup(text: string): ParseResult<Snapshot> {
     return { value: null, error: 'That file is not valid JSON.', skipped };
   }
 
-  const file = asRecord(parsed);
+  const file = asObject(parsed);
   if (file === null) {
     return { value: null, error: 'That file is not a FuelTracker backup.', skipped };
   }
@@ -249,7 +247,7 @@ export function parseJsonBackup(text: string): ParseResult<Snapshot> {
 
 /** A row stamped with a schema this build does not know (#86). */
 function fromNewerBuild(row: unknown): boolean {
-  const version = asRecord(row)?.['schemaVersion'];
+  const version = asObject(row)?.['schemaVersion'];
   return typeof version === 'number' && version > SCHEMA_VERSION;
 }
 

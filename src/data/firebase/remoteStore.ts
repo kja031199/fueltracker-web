@@ -52,6 +52,8 @@ import {
   serverTimestamp,
   where,
   writeBatch,
+  type DocumentData,
+  type DocumentReference,
   type Firestore,
 } from 'firebase/firestore';
 import type { FillUpRecord, PendingFillUpRecord, Snapshot } from '../records';
@@ -65,7 +67,49 @@ import { firebaseApp, type FirebaseSettings } from './config';
 export const MAX_SYNCED_RECEIPT_BYTES = 700 * 1024;
 
 /** Firestore's batch limit. Larger histories are written in several batches. */
-const BATCH_LIMIT = 500;
+export const BATCH_LIMIT = 500;
+
+/**
+ * Writes each document stamped with the server's commit time (#52), in batches
+ * of `BATCH_LIMIT`, and says how many it wrote. The one write loop both
+ * remotes use (#91) — the account's own, and a shared car's.
+ *
+ * The stamp is what an incremental read asks for, and the rules refuse a
+ * document without it. A client-chosen time could sit below another device's
+ * cursor and never be read, so it is the server's or nothing.
+ */
+export async function writeStamped(
+  db: Firestore,
+  writes: readonly { readonly ref: DocumentReference; readonly data: object }[],
+): Promise<number> {
+  for (let start = 0; start < writes.length; start += BATCH_LIMIT) {
+    const batch = writeBatch(db);
+    for (const write of writes.slice(start, start + BATCH_LIMIT)) {
+      batch.set(write.ref, { ...write.data, syncedAt: serverTimestamp() });
+    }
+    await batch.commit();
+  }
+  return writes.length;
+}
+
+/**
+ * Documents as raw rows, and the newest server stamp among them — the mark
+ * the next incremental read starts from (#52). The one read loop both remotes
+ * use (#91). A document with no stamp predates #52 and moves no mark.
+ */
+export function readStamped(docs: readonly { data(): DocumentData }[]): {
+  rows: Record<string, unknown>[];
+  highWater: number | null;
+} {
+  let highWater: number | null = null;
+  const rows = docs.map((document) => {
+    const data = document.data();
+    const stamp = data['syncedAt'];
+    if (stamp instanceof Timestamp) highWater = Math.max(highWater ?? 0, toMicros(stamp));
+    return decode(data);
+  });
+  return { rows, highWater };
+}
 
 /**
  * A stamp as an exact integer count of microseconds, and back.
@@ -135,38 +179,22 @@ export class FirestoreRemoteStore implements RemoteStore {
 
   async push(snapshot: Snapshot): Promise<PushSummary> {
     let receiptsOmitted = 0;
-    const writes: { readonly path: Collection; readonly id: string; readonly data: object }[] = [];
+    const writes: { readonly ref: DocumentReference; readonly data: object }[] = [];
+    const at = (path: Collection, id: string): DocumentReference => doc(this.db, 'users', this.uid, path, id);
 
-    for (const row of snapshot.vehicles) {
-      writes.push({ path: 'vehicles', id: row.id, data: { ...row } });
-    }
-    // Every document is stamped with the server's commit time (#52), and the
-    // rules refuse one that is not — that stamp is what an incremental read
-    // asks for. A client-chosen time could sit below another device's cursor
-    // and never be read, so it is the server's or nothing.
+    for (const row of snapshot.vehicles) writes.push({ ref: at('vehicles', row.id), data: { ...row } });
     for (const row of snapshot.fillUps) {
       const { data, omitted } = encodeReceipt(row);
       if (omitted) receiptsOmitted += 1;
-      writes.push({ path: 'fillUps', id: row.id, data });
+      writes.push({ ref: at('fillUps', row.id), data });
     }
     for (const row of snapshot.pendingFillUps) {
       const { data, omitted } = encodeReceipt(row);
       if (omitted) receiptsOmitted += 1;
-      writes.push({ path: 'pendingFillUps', id: row.id, data });
+      writes.push({ ref: at('pendingFillUps', row.id), data });
     }
 
-    for (let start = 0; start < writes.length; start += BATCH_LIMIT) {
-      const batch = writeBatch(this.db);
-      for (const write of writes.slice(start, start + BATCH_LIMIT)) {
-        batch.set(doc(this.db, 'users', this.uid, write.path, write.id), {
-          ...write.data,
-          syncedAt: serverTimestamp(),
-        });
-      }
-      await batch.commit();
-    }
-
-    return { written: writes.length, receiptsOmitted };
+    return { written: await writeStamped(this.db, writes), receiptsOmitted };
   }
 
   /**
@@ -190,15 +218,7 @@ export class FirestoreRemoteStore implements RemoteStore {
       since === null
         ? all
         : query(all, where('syncedAt', '>', fromMicros(since)));
-    const snapshot = await getDocsFromServer(target);
-    let highWater: number | null = null;
-    const rows = snapshot.docs.map((document) => {
-      const data = document.data();
-      const stamp = data['syncedAt'];
-      if (stamp instanceof Timestamp) highWater = Math.max(highWater ?? 0, toMicros(stamp));
-      return decode(data);
-    });
-    return { rows, highWater };
+    return readStamped((await getDocsFromServer(target)).docs);
   }
 }
 

@@ -253,6 +253,7 @@ Recorded so a regression in the tests themselves is visible:
 | Dependencies (#91): `Repositories` back in `store.ts` (the store↔import cycle) / the clock type back in `store.ts` / the database or cursor naming a membership from `sharing.ts` | 1 / 1 / 1 each |
 | Sync wiring (#91): sync on a fresh clock / on the old shared default / the state optional again (caught by `tsc`, through `@ts-expect-error`) | 8 / 8 / 2 errors |
 | Store and replica (#91): a sync operation back on the store / the replica on its own clock / a file import given a tie-break | 1 / 9 / 2 |
+| Shared helpers (#91): the mark taken from the oldest stamp / writes unstamped (emulator) / batches after the first never committed (emulator) / `textOr` ignoring its limit / `isRecord` taking arrays / `numberOr` taking NaN / a copy of a helper defined again | 1 / 12 / 1 / 5 / 2 / 1 / 1 |
 
 Equivalent, and kept as a backstop: `shape()` without its `hasAll`. Every
 required field is also read by a clause of its own, and reading a missing field

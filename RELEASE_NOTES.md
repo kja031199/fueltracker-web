@@ -11,6 +11,14 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-08
 
+- **No change you'll see: the checks every reader of untrusted data makes, and
+  the way both connections to the account read and write, are written once.**
+  The fifth step of tidying the data layer.
+  *Technical:* `guards.ts` replaces five modules' copies of `finite`, `text`,
+  `isRaw` and `asRecord`; `writeStamped`/`readStamped` replace the two
+  remotes' copied loops. A history longer than one 500-write batch is now
+  tested end to end.
+  [#91](https://github.com/kja031199/fueltracker-web/issues/91) · [PR #120](https://github.com/kja031199/fueltracker-web/pull/120)
 - **No change you'll see: what the screens can do to stored data and what
   only sync may do are now separate.** The fourth step of tidying the data
   layer.

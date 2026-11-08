@@ -310,6 +310,11 @@ npm ci --prefix .github/firebase-cli
   its car has gone. It used to take the *selected* car, which a sync can change
   under an open form. Don't add a car parameter back.
 
+- **Decoders share their checks** (#91): `guards.ts` — `isRecord`,
+  `isFiniteNumber`, `textOr(value, max?)`, `numberOr(value, fallback)`. Don't
+  write another `finite`/`text`/`isRaw`/`asRecord`; `guards.test.ts` scans for
+  one. Both Firestore remotes write with `writeStamped` and read with
+  `readStamped` (`firebase/remoteStore.ts`), the one `BATCH_LIMIT` with them.
 - **The store is the screens'; its `replica` is sync's** (#91). Re-stamping,
   repairing text, forgetting a shared car, reading rows by id and the merge
   with a tie-break live on `Replica` (`replica.ts`), built by the store over

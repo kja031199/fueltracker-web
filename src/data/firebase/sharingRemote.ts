@@ -10,14 +10,12 @@
  */
 
 import {
-  Timestamp,
   collection,
   deleteDoc,
   doc,
   getDocFromServer,
   getDocsFromServer,
   query,
-  serverTimestamp,
   setDoc,
   where,
   writeBatch,
@@ -32,43 +30,36 @@ import type { Account, Invite, Member, Membership, SharingRemote } from '../shar
 import { Refused, inviteKey, membershipKey, normalizeEmail } from '../sharing';
 import { parseLedger } from '../shareLedger';
 import { TEXT_LIMITS, boundText } from '../../domain/textLimits';
-import { decode, encodeReceipt, fromMicros, toMicros } from './remoteStore';
+import { decode, encodeReceipt, fromMicros, readStamped, writeStamped } from './remoteStore';
 import { firebaseApp, type FirebaseSettings } from './config';
+import { numberOr, textOr } from '../guards';
 
-const BATCH_LIMIT = 500;
 
-function text(value: unknown): string {
-  return typeof value === 'string' ? value : '';
-}
-
-function finite(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
-}
 
 function asInvite(data: DocumentData): Invite | null {
-  const ownerUid = text(data['ownerUid']);
-  const vehicleId = text(data['vehicleId']);
-  const email = text(data['email']);
+  const ownerUid = textOr(data['ownerUid']);
+  const vehicleId = textOr(data['vehicleId']);
+  const email = textOr(data['email']);
   if (ownerUid === '' || vehicleId === '' || email === '') return null;
   return {
     ownerUid,
     vehicleId,
     email,
     // Read from the network, so bounded like every other text that is (#86).
-    ownerName: boundText(text(data['ownerName']), TEXT_LIMITS.ownerName),
-    vehicleName: boundText(text(data['vehicleName']), TEXT_LIMITS.vehicleName),
-    createdAt: finite(data['createdAt']),
+    ownerName: textOr(data['ownerName'], TEXT_LIMITS.ownerName),
+    vehicleName: textOr(data['vehicleName'], TEXT_LIMITS.vehicleName),
+    createdAt: numberOr(data['createdAt'], 0),
   };
 }
 
 function asMember(data: DocumentData): Member | null {
-  const uid = text(data['uid']);
+  const uid = textOr(data['uid']);
   if (uid === '') return null;
   return {
     uid,
-    name: boundText(text(data['name']), TEXT_LIMITS.name),
-    email: text(data['email']),
-    joinedAt: finite(data['joinedAt']),
+    name: textOr(data['name'], TEXT_LIMITS.name),
+    email: textOr(data['email']),
+    joinedAt: numberOr(data['joinedAt'], 0),
   };
 }
 
@@ -270,13 +261,7 @@ export class FirestoreScopedRemote implements RemoteStore {
             },
           ),
     ]);
-    let highWater: number | null = null;
-    const fillUps = found.docs.map((d) => {
-      const data = d.data();
-      const stamp = data['syncedAt'];
-      if (stamp instanceof Timestamp) highWater = Math.max(highWater ?? 0, toMicros(stamp));
-      return decode(data);
-    });
+    const { rows: fillUps, highWater } = readStamped(found.docs);
     return {
       vehicles: car.exists() ? [decode(car.data())] : [],
       fillUps,
@@ -292,21 +277,11 @@ export class FirestoreScopedRemote implements RemoteStore {
       throw new Refused('a member writes fill-ups only');
     }
     let receiptsOmitted = 0;
-    const rows = snapshot.fillUps.map((row) => {
+    const writes = snapshot.fillUps.map((row) => {
       const { data, omitted } = encodeReceipt(row);
       if (omitted) receiptsOmitted += 1;
-      return { id: row.id, data };
+      return { ref: doc(this.db, 'users', this.share.ownerUid, 'fillUps', row.id), data };
     });
-    for (let start = 0; start < rows.length; start += BATCH_LIMIT) {
-      const batch = writeBatch(this.db);
-      for (const row of rows.slice(start, start + BATCH_LIMIT)) {
-        batch.set(doc(this.db, 'users', this.share.ownerUid, 'fillUps', row.id), {
-          ...row.data,
-          syncedAt: serverTimestamp(),
-        });
-      }
-      await batch.commit();
-    }
-    return { written: rows.length, receiptsOmitted };
+    return { written: await writeStamped(this.db, writes), receiptsOmitted };
   }
 }
