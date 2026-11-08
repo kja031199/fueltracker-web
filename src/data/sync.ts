@@ -33,7 +33,7 @@ import { SCHEMA_VERSION } from './records';
 import { validateSnapshot } from './recordValidation';
 import type { Collection, PullCursor, PushSummary, RawSnapshot, RemoteStore } from './remote';
 import { sendableRows } from './remote';
-import type { FuelTrackerStore } from './store';
+import type { SyncTarget } from './replica';
 import { LocalView } from './localView';
 import {
   SYNC_CURSOR_VERSION,
@@ -240,7 +240,7 @@ export interface SyncOptions {
 }
 
 export async function syncOnce(
-  store: FuelTrackerStore,
+  store: SyncTarget,
   remote: RemoteStore,
   /**
    * Where this remote's sync left off. Required (#91): defaulted, a caller
@@ -252,11 +252,12 @@ export async function syncOnce(
   // The store's own clock, never a second one (#91). Merges are last-write-
   // wins, and only a clock that has observed the account's stamps issues
   // local ones that beat them.
-  const clock = store.clock;
+  const replica = store.replica;
+  const clock = replica.clock;
   const inScope: RowScope = options.scope ?? ((): boolean => true);
   // Read the first time it is needed — after the pull, so a sync that cannot
   // reach the account reads nothing — and only by id after that (#87).
-  const local = options.local ?? new LocalView(store);
+  const local = options.local ?? new LocalView(store.replica);
   // Where the last sync left off (#52). No usable cursor — a first sync, a
   // different build, a damaged record, or a week since the last full read —
   // means reading everything, which is what every sync did before.
@@ -337,7 +338,7 @@ export async function syncOnce(
     { vehicles: vehicles.readable, fillUps: fillUps.readable, pendingFillUps: pending.readable },
     localBefore,
   );
-  const pulled = await store.importBackup(
+  const pulled = await replica.merge(
     {
       vehicles: vehicles.readable,
       fillUps: preserveLocalReceipts(fillUps.readable, localBefore.fillUps),
@@ -351,7 +352,7 @@ export async function syncOnce(
   await local.refresh('pendingFillUps', pending.readable.map((row) => row.id));
   for (const [collection, ids] of Object.entries(localWins) as [Collection, string[]][]) {
     if (ids.length === 0) continue;
-    await store.restamp(collection, ids);
+    await replica.restamp(collection, ids);
     await local.refresh(collection, ids);
   }
 
@@ -361,7 +362,7 @@ export async function syncOnce(
   // is stamped newer than anything there.
   let repaired = 0;
   if (options.repair !== false) {
-    const rewritten = await store.repairOversizedTextIn(await local.snapshot());
+    const rewritten = await replica.repairOversizedTextIn(await local.snapshot());
     for (const [collection, ids] of Object.entries(rewritten) as [Collection, string[]][]) {
       repaired += ids.length;
       await local.refresh(collection, ids);

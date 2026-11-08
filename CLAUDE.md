@@ -310,6 +310,13 @@ npm ci --prefix .github/firebase-cli
   its car has gone. It used to take the *selected* car, which a sync can change
   under an open form. Don't add a car parameter back.
 
+- **The store is the screens'; its `replica` is sync's** (#91). Re-stamping,
+  repairing text, forgetting a shared car, reading rows by id and the merge
+  with a tie-break live on `Replica` (`replica.ts`), built by the store over
+  its own repositories and clock. Sync functions take a `SyncTarget` (anything
+  with a `replica` — the store) and touch storage only through it;
+  `replica.test.ts` fails to compile if one of those reappears on the store.
+  `store.importBackup(snapshot)` is the file import and has **no** tie-break.
 - **The store's clock is sync's clock** (#91): `FuelTrackerStore.clock` is a
   `MonotonicClock`, and `syncOnce(store, remote, state, options)` /
   `syncAll(store, own, sharing, state)` take it from the store — there is no

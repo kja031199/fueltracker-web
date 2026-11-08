@@ -93,7 +93,7 @@ describe.each([
       await store.removeFillUp(a.id); // a tombstone, which must go too
       const kept = await store.addFillUp(draft(5_000), mine.id);
 
-      await store.forgetVehicle(shared.id);
+      await store.replica.forgetVehicle(shared.id);
 
       const snapshot = await store.exportSnapshot();
       expect(snapshot.vehicles.map((v) => v.id)).toEqual([mine.id]);
@@ -106,7 +106,7 @@ describe.each([
       const store = new FuelTrackerStore(repos(), undefined, 'me');
       const shared = await store.addVehicle({ name: 'Shared' });
       await store.addFillUp(draft(), shared.id);
-      await store.forgetVehicle(shared.id);
+      await store.replica.forgetVehicle(shared.id);
       const snapshot = await store.exportSnapshot();
       expect(snapshot.vehicles).toHaveLength(0);
       expect(snapshot.fillUps).toHaveLength(0);
@@ -116,7 +116,7 @@ describe.each([
     test('an unknown car is nothing to forget', async () => {
       const store = new FuelTrackerStore(repos());
       const vehicle = await store.addVehicle({ name: 'Mine' });
-      await expect(store.forgetVehicle('no-such-car')).resolves.toBeUndefined();
+      await expect(store.replica.forgetVehicle('no-such-car')).resolves.toBeUndefined();
       expect((await store.vehicles()).map((v) => v.id)).toEqual([vehicle.id]);
     });
   });
@@ -163,7 +163,7 @@ describe('forgetting, more widely', () => {
     const mine = await store.addVehicle({ name: 'Mine' });
     await store.submitFillUp(draft(), shared.id, 'Neighbour');
     const kept = await store.submitFillUp(draft(), mine.id, 'Neighbour');
-    await store.forgetVehicle(shared.id);
+    await store.replica.forgetVehicle(shared.id);
     expect((await store.pendingFillUps()).map((p) => p.id)).toEqual([kept.id]);
   });
 
@@ -172,7 +172,7 @@ describe('forgetting, more widely', () => {
     const shared = await store.addVehicle({ name: 'Shared' });
     await store.addFillUp(draft(), shared.id);
     await store.removeVehicle(shared.id);
-    await store.forgetVehicle(shared.id);
+    await store.replica.forgetVehicle(shared.id);
     const snapshot = await store.exportSnapshot();
     expect(snapshot.vehicles).toHaveLength(0);
     expect(snapshot.fillUps).toHaveLength(0);
@@ -181,15 +181,15 @@ describe('forgetting, more widely', () => {
   test('forgetting twice is harmless', async () => {
     const store = new FuelTrackerStore(memory(), undefined, 'me');
     const shared = await store.addVehicle({ name: 'Shared' });
-    await store.forgetVehicle(shared.id);
-    await expect(store.forgetVehicle(shared.id)).resolves.toBeUndefined();
+    await store.replica.forgetVehicle(shared.id);
+    await expect(store.replica.forgetVehicle(shared.id)).resolves.toBeUndefined();
   });
 
   test('a car with many fill-ups is forgotten completely', async () => {
     const store = new FuelTrackerStore(memory(), undefined, 'me');
     const shared = await store.addVehicle({ name: 'Shared' });
     for (let i = 0; i < 200; i += 1) await store.addFillUp(draft(10_000 + i * 300), shared.id);
-    await store.forgetVehicle(shared.id);
+    await store.replica.forgetVehicle(shared.id);
     expect(await store.fillUpCount()).toBe(0);
   });
 });
@@ -202,7 +202,7 @@ describe('re-stamping a row that won a tie', () => {
     const gone = await store.addFillUp(draft(10_300), car.id);
     await store.removeFillUp(gone.id);
     const before = await store.exportSnapshot();
-    await store.restamp('fillUps', [live.id, gone.id]);
+    await store.replica.restamp('fillUps', [live.id, gone.id]);
     const after = await store.exportSnapshot();
     for (const id of [live.id, gone.id]) {
       const was = before.fillUps.find((f) => f.id === id)!;
@@ -214,7 +214,7 @@ describe('re-stamping a row that won a tie', () => {
 
   test('an unknown id is ignored', async () => {
     const store = new FuelTrackerStore(memory());
-    await expect(store.restamp('vehicles', ['nope'])).resolves.toBeUndefined();
+    await expect(store.replica.restamp('vehicles', ['nope'])).resolves.toBeUndefined();
     expect((await store.exportSnapshot()).vehicles).toHaveLength(0);
   });
 });

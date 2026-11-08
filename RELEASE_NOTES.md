@@ -11,6 +11,12 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-08
 
+- **No change you'll see: what the screens can do to stored data and what
+  only sync may do are now separate.** The fourth step of tidying the data
+  layer.
+  *Technical:* `Replica` (`replica.ts`) holds sync's operations; the store
+  builds it over its own repositories and clock and has none of them itself.
+  [#91](https://github.com/kja031199/fueltracker-web/issues/91) · [PR #119](https://github.com/kja031199/fueltracker-web/pull/119)
 - **No change you'll see: sync can no longer be wired to the wrong clock.**
   The third step of tidying the data layer.
   *Technical:* sync takes its clock from the store (always a

@@ -324,7 +324,7 @@ describe('forgetting a shared car (#85)', () => {
     await repos.fillUps.putMany([fillUp({ id: 'a', vehicleId: 'theirs' }), fillUp({ id: 'b', vehicleId: 'theirs' })]);
 
     const broken = new FuelTrackerStore(breaking(repos, 'vehicles'));
-    await expect(broken.forgetVehicle('theirs')).rejects.toThrow('disk full');
+    await expect(broken.replica.forgetVehicle('theirs')).rejects.toThrow('disk full');
 
     expect(await setup.hasVehicle('theirs')).toBe(true);
     expect(await setup.fillUps('theirs')).toHaveLength(2);
@@ -386,7 +386,7 @@ describe('repairing oversized text (#85)', () => {
     // Edited since sync took its look: the note now fits, and it is newer.
     await repos.fillUps.put(fillUp({ notes: 'fixed by hand', odometer: 12_345, updatedAt: 200 }));
 
-    const ids = await store.repairOversizedTextIn({ vehicles: [], fillUps: [stale], pendingFillUps: [] });
+    const ids = await store.replica.repairOversizedTextIn({ vehicles: [], fillUps: [stale], pendingFillUps: [] });
 
     expect(ids.fillUps).toEqual([]);
     const now = await repos.fillUps.get('f1');
@@ -399,7 +399,7 @@ describe('repairing oversized text (#85)', () => {
     const long = 'x'.repeat(TEXT_LIMITS.notes + 50);
     await repos.fillUps.put(fillUp({ notes: long, odometer: 12_345, updatedAt: 200 }));
 
-    const ids = await store.repairOversizedTextIn({
+    const ids = await store.replica.repairOversizedTextIn({
       vehicles: [],
       fillUps: [fillUp({ notes: long, updatedAt: 100 })],
       pendingFillUps: [],

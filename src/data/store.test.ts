@@ -545,7 +545,7 @@ describe('repairing text an older build stored unbounded (#50)', () => {
   test('shortens an over-long row and moves its updatedAt so the repair syncs', async () => {
     const { store, fillUps } = holding({ station: 's'.repeat(TEXT_LIMITS.station + 1) });
 
-    expect(await store.repairOversizedText()).toBe(1);
+    expect(await store.replica.repairOversizedText()).toBe(1);
 
     const row = await fillUps.get('old');
     expect(row?.station).toHaveLength(TEXT_LIMITS.station);
@@ -554,13 +554,13 @@ describe('repairing text an older build stored unbounded (#50)', () => {
 
   test('does nothing the second time', async () => {
     const { store } = holding({ notes: 'n'.repeat(TEXT_LIMITS.notes + 10) });
-    await store.repairOversizedText();
-    expect(await store.repairOversizedText()).toBe(0);
+    await store.replica.repairOversizedText();
+    expect(await store.replica.repairOversizedText()).toBe(0);
   });
 
   test('leaves a row within the limits exactly as it was', async () => {
     const { store, fillUps } = holding({});
-    expect(await store.repairOversizedText()).toBe(0);
+    expect(await store.replica.repairOversizedText()).toBe(0);
     expect((await fillUps.get('old'))?.updatedAt).toBe(500);
   });
 });

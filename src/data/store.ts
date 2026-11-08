@@ -24,15 +24,14 @@ import type { FillUpSummary } from './records';
 import { toSummary } from './records';
 import type { Tombstoner } from './tombstone';
 import { isScrubbed, tombstoneFillUp, tombstonePending, tombstoneVehicle } from './tombstone';
-import type { ImportSummary, TieBreak } from './backup';
+import type { ImportSummary } from './backup';
 import type { Submission } from './fillUpLink';
 import { exportSnapshot, importBackup } from './backup';
+import { Replica } from './replica';
 import { draftFromRecord, fillUpFromDraft, pendingFromDraft } from './recordMapping';
 import { atomically } from './atomically';
 import { TEXT_LIMITS, boundText } from '../domain/textLimits';
-import { boundFillUpText, boundPendingText, boundVehicleText } from './recordText';
 import { StaleEdit } from './staleEdit';
-import type { Collection } from './remote';
 
 
 
@@ -59,7 +58,15 @@ export class FuelTrackerStore {
      * (#66). `null` where there is no account: tests, the demo, local-only.
      */
     private readonly author: string | null = null,
-  ) {}
+  ) {
+    this.replica = new Replica(repos, clock);
+  }
+
+  /**
+   * This store's rows as sync sees them (#91): what sync is handed, and the
+   * only way to its operations. Same repositories, same clock.
+   */
+  readonly replica: Replica;
 
   // MARK: Vehicles
 
@@ -87,20 +94,9 @@ export class FuelTrackerStore {
    * would hand that car to whoever shared it (#78).
    */
   async hasVehicle(id: string): Promise<boolean> {
-    return (await this.repos.vehicles.getMany([id])).length > 0;
+    return this.replica.hasVehicle(id);
   }
 
-  /**
-   * Rows by id, live **or** tombstoned, for sync (#87): what it merged,
-   * re-stamped or repaired, re-read without reading the whole table.
-   */
-  async rowsById(collection: 'vehicles', ids: readonly string[]): Promise<VehicleRecord[]>;
-  async rowsById(collection: 'fillUps', ids: readonly string[]): Promise<FillUpRecord[]>;
-  async rowsById(collection: 'pendingFillUps', ids: readonly string[]): Promise<PendingFillUpRecord[]>;
-  async rowsById(collection: Collection, ids: readonly string[]): Promise<SyncFields[]> {
-    if (ids.length === 0) return [];
-    return (this.repos[collection] as Repository<SyncFields>).getMany(ids);
-  }
 
   async vehicles(): Promise<VehicleRecord[]> {
     const rows = await this.repos.vehicles.list();
@@ -196,27 +192,6 @@ export class FuelTrackerStore {
   async removeFillUp(id: string): Promise<void> {
     const at = this.clock.now();
     await this.repos.fillUps.remove(id, (row) => tombstoneFillUp(row, at));
-  }
-
-  /**
-   * Forgets a car this device held only because it was shared with this
-   * account, once that access has ended (#66): the car and every fill-up and
-   * submission of it, live and deleted, are **hard**-deleted.
-   *
-   * No tombstones, on purpose. Those rows are the owner's; this account never
-   * had the right to delete them, and a tombstone would try to sync exactly
-   * that deletion. Never call this for a car that is yours — `removeVehicle`
-   * is the deletion that syncs.
-   */
-  async forgetVehicle(vehicleId: string): Promise<void> {
-    // All of it or none (#85), like `removeVehicle`.
-    await atomically(this.repos, async (r) => {
-      for (const repo of [r.fillUps, r.pendingFillUps]) {
-        // That car's rows, tombstones included, from its index (#87).
-        for (const row of await repo.listForVehicleAll(vehicleId)) await repo.purge(row.id);
-      }
-      await r.vehicles.purge(vehicleId);
-    });
   }
 
   /**
@@ -401,58 +376,6 @@ export class FuelTrackerStore {
     return fixed;
   }
 
-  // MARK: Repairing text stored before it was bounded
-
-  /**
-   * Shortens live rows whose text is longer than the account accepts, and
-   * reports how many it changed (#50).
-   *
-   * Every door bounds text now, but rows saved before that are on disk, and
-   * each one fails the whole upload batch on every sync. Rewriting a row
-   * moves its `updatedAt`, so the repaired version is what gets pushed.
-   *
-   * Called by sync before it builds a push. Idempotent: a row that fits is
-   * left alone, so after the first repair this rewrites nothing.
-   */
-  async repairOversizedText(): Promise<number> {
-    const ids = await this.repairOversizedTextIn(await this.exportSnapshot());
-    return ids.vehicles.length + ids.fillUps.length + ids.pendingFillUps.length;
-  }
-
-  /**
-   * The same repair over rows the caller already holds, returning the ids it
-   * rewrote (#87): sync has just read every row once, and re-reading them all
-   * here was one of the reads it repeated for every remote.
-   */
-  async repairOversizedTextIn(rows: Snapshot): Promise<Record<Collection, string[]>> {
-    return atomically(this.repos, async (r) => ({
-      vehicles: await this.repair(r.vehicles, rows.vehicles, boundVehicleText),
-      fillUps: await this.repair(r.fillUps, rows.fillUps, boundFillUpText),
-      pendingFillUps: await this.repair(r.pendingFillUps, rows.pendingFillUps, boundPendingText),
-    }));
-  }
-
-  /**
-   * The rows held only say **which** need repairing. Each is re-read, inside
-   * the transaction, and repaired as it is now (#85): sync read them before
-   * it pulled, and repairing that copy wrote it back over any edit saved since.
-   */
-  private async repair<T extends SyncFields>(
-    repo: Repository<T>,
-    rows: readonly T[],
-    bound: (row: T) => T,
-  ): Promise<string[]> {
-    // Live rows only, as before: a tombstone carries no text to shorten.
-    const tooLong = (row: T): boolean => row.deletedAt === null && bound(row) !== row;
-    const candidates = rows.filter(tooLong).map((row) => row.id);
-    if (candidates.length === 0) return [];
-    const repaired = (await repo.getMany(candidates))
-      .filter(tooLong)
-      .map((row) => ({ ...bound(row), updatedAt: this.clock.now() }));
-    await repo.putMany(repaired);
-    return repaired.map((row) => row.id);
-  }
-
   // MARK: Backup
 
   /**
@@ -466,28 +389,13 @@ export class FuelTrackerStore {
     return exportSnapshot(this.repos);
   }
 
-  /** Merges a parsed backup in. See `data/backup.ts` for the rules. */
-  async importBackup(snapshot: Snapshot, tieBreak?: TieBreak): Promise<ImportSummary> {
-    return importBackup(this.repos, snapshot, tieBreak);
-  }
-
   /**
-   * Re-stamps rows with the store's clock, unchanged otherwise — deleted rows
-   * included. Sync uses it when this device's version of a row wins a tie
-   * with the account's (see `tieWinner`): a newer stamp is what gets it sent,
-   * and what makes every other device take it.
+   * Merges a backup file in. See `data/backup.ts` for the rules. A file has
+   * no tie-break: an equal stamp keeps what is here, so importing the same
+   * file twice changes nothing. Sync's merge, which has one, is the replica's.
    */
-  async restamp(collection: 'vehicles' | 'fillUps' | 'pendingFillUps', ids: readonly string[]): Promise<void> {
-    // Read and re-stamped in one transaction (#85).
-    await atomically(this.repos, async (r) => {
-      const repo = r[collection] as Repository<SyncFields>;
-      // By id, deleted rows included, in one read (#87) — it used to scan
-      // every tombstone once per id.
-      const rows = await repo.getMany(ids);
-      // Strictly newer than it was, whatever clock this store was given:
-      // a re-stamp that ties again settles nothing.
-      await repo.putMany(rows.map((row) => ({ ...row, updatedAt: Math.max(this.clock.now(), row.updatedAt + 1) })));
-    });
+  async importBackup(snapshot: Snapshot): Promise<ImportSummary> {
+    return importBackup(this.repos, snapshot);
   }
 
 }

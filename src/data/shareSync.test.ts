@@ -523,13 +523,13 @@ describe('the ledger', () => {
     if (membership === undefined) throw new Error('no membership');
     await world.sharingFor(PARTNER).leave(membership);
     // Interrupted between recording and forgetting: the tab closes, storage fails.
-    const forget = partner.store.forgetVehicle.bind(partner.store);
-    partner.store.forgetVehicle = () => Promise.reject(new Error('interrupted'));
+    const forget = partner.store.replica.forgetVehicle.bind(partner.store.replica);
+    partner.store.replica.forgetVehicle = () => Promise.reject(new Error('interrupted'));
     await expect(partner.sync()).rejects.toThrow('interrupted');
     expect(await partner.store.fillUps(car.id)).toHaveLength(1);
 
     // Its rows are still here, so the ledger must still keep them out.
-    partner.store.forgetVehicle = forget;
+    partner.store.replica.forgetVehicle = forget;
     partner.sharing.remote.memberships = async () => {
       throw new Error('offline');
     };
