@@ -61,7 +61,7 @@ function device(world: InMemorySharingWorld, account: Account): Device {
     store,
     sharing,
     ownState,
-    sync: () => syncAll(store, world.remoteFor(account.uid), sharing, clock, ownState),
+    sync: () => syncAll(store, world.remoteFor(account.uid), sharing, ownState),
   };
 }
 
@@ -422,7 +422,7 @@ describe('when the account itself has trouble', () => {
       pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
     });
     const car = await store.addVehicle({ name: 'Solo' });
-    const result = await syncAll(store, world.remoteFor('solo'), null, new MonotonicClock(), new InMemorySyncState());
+    const result = await syncAll(store, world.remoteFor('solo'), null, new InMemorySyncState());
     expect(result.own.ok).toBe(true);
     expect(result.shares).toEqual({ synced: [], ended: [], failed: [], rejected: [], outcomes: [], unreachable: false, memberships: null, clashed: [] });
     expect((await rowsIn(world, 'solo')).vehicles).toEqual([car.id]);

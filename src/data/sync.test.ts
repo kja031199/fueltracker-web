@@ -202,7 +202,7 @@ describe('erasing a tombstone that is already in the account', () => {
     });
 
     expect(await store.scrubTombstones()).toBe(1);
-    const result = await syncOnce(store, remote, clock);
+    const result = await syncOnce(store, remote, new InMemorySyncState());
     expect(result.ok).toBe(true);
 
     const after = await remote.pull();
@@ -250,7 +250,7 @@ describe('a refusal is not the same as being unreachable', () => {
 
   it('reports a refused pull as refused, not as unreachable', async () => {
     const { store, clock } = storeWith();
-    const result = await syncOnce(store, new RefusingRemote('pull'), clock);
+    const result = await syncOnce(store, new RefusingRemote('pull'), new InMemorySyncState());
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -268,7 +268,7 @@ describe('a refusal is not the same as being unreachable', () => {
     const { store, clock } = storeWith();
     await store.addVehicle({ name: 'Civic' });
 
-    const result = await syncOnce(store, new RefusingRemote('push'), clock);
+    const result = await syncOnce(store, new RefusingRemote('push'), new InMemorySyncState());
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -281,7 +281,7 @@ describe('a refusal is not the same as being unreachable', () => {
     // The remedy is specific: send your account id to whoever runs this copy.
     // A message that does not say that leaves the one actionable fact out.
     const { store, clock } = storeWith();
-    const result = await syncOnce(store, new RefusingRemote('pull'), clock);
+    const result = await syncOnce(store, new RefusingRemote('pull'), new InMemorySyncState());
     if (result.ok) throw new Error('expected a refusal');
     expect(result.reason).toMatch(/account id/i);
   });
@@ -292,7 +292,7 @@ describe('a refusal is not the same as being unreachable', () => {
     const remote = new InMemoryRemoteStore();
     remote.failPull = true;
 
-    const result = await syncOnce(store, remote, clock);
+    const result = await syncOnce(store, remote, new InMemorySyncState());
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -306,7 +306,7 @@ describe('a refusal is not the same as being unreachable', () => {
     const remote = new InMemoryRemoteStore();
     remote.failPush = true;
 
-    const result = await syncOnce(store, remote, clock);
+    const result = await syncOnce(store, remote, new InMemorySyncState());
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -387,7 +387,7 @@ describe('a local row the account cannot address', () => {
     ]);
     const remote = new StrictRemoteStore();
 
-    const result = await syncOnce(store, remote, clock);
+    const result = await syncOnce(store, remote, new InMemorySyncState());
 
     expect(result.ok).toBe(true);
     const after = await remote.pull();
@@ -398,7 +398,7 @@ describe('a local row the account cannot address', () => {
   it('reports the row rather than dropping it quietly', async () => {
     const { store, clock } = storeHolding([fillUp({ id: 'a/b', updatedAt: 900 })]);
 
-    const result = await syncOnce(store, new StrictRemoteStore(), clock);
+    const result = await syncOnce(store, new StrictRemoteStore(), new InMemorySyncState());
 
     if (!result.ok) throw new Error(result.reason);
     expect(result.outcome.unsendable).toEqual(['a/b']);
@@ -408,14 +408,14 @@ describe('a local row the account cannot address', () => {
     // Refusing to upload something is not a licence to destroy it. The row
     // stays readable here; the reader is told, and can export or fix it.
     const { store, clock } = storeHolding([fillUp({ id: 'a/b', updatedAt: 900 })]);
-    await syncOnce(store, new StrictRemoteStore(), clock);
+    await syncOnce(store, new StrictRemoteStore(), new InMemorySyncState());
     const local = await store.exportSnapshot();
     expect(local.fillUps.map((row) => row.id)).toEqual(['a/b']);
   });
 
   it('says nothing when every id is fine', async () => {
     const { store, clock } = storeHolding([fillUp({ id: 'good', updatedAt: 900 })]);
-    const result = await syncOnce(store, new StrictRemoteStore(), clock);
+    const result = await syncOnce(store, new StrictRemoteStore(), new InMemorySyncState());
     if (!result.ok) throw new Error(result.reason);
     expect(result.outcome.unsendable).toEqual([]);
   });
@@ -426,7 +426,7 @@ describe('syncOnce', () => {
     const { store } = storeWith();
     const remote = new InMemoryRemoteStore(snapshot({ vehicles: [vehicle()], fillUps: [fillUp()] }));
 
-    const result = await syncOnce(store, remote, fakeClock());
+    const result = await syncOnce(store, remote, new InMemorySyncState());
 
     expect(result.ok).toBe(true);
     expect(await store.vehicles()).toHaveLength(1);
@@ -438,7 +438,7 @@ describe('syncOnce', () => {
     await store.addVehicle({ name: 'Civic' });
     const remote = new InMemoryRemoteStore();
 
-    const result = await syncOnce(store, remote, fakeClock());
+    const result = await syncOnce(store, remote, new InMemorySyncState());
 
     expect(result.ok).toBe(true);
     expect((await pulled(remote)).vehicles).toHaveLength(1);
@@ -449,8 +449,8 @@ describe('syncOnce', () => {
     await store.addVehicle({ name: 'Civic' });
     const remote = new InMemoryRemoteStore();
 
-    await syncOnce(store, remote, fakeClock());
-    const second = await syncOnce(store, remote, fakeClock());
+    await syncOnce(store, remote, new InMemorySyncState());
+    const second = await syncOnce(store, remote, new InMemorySyncState());
 
     // Nothing left to write, because both sides agree on every updatedAt.
     expect(second.ok && second.outcome.pushed.written).toBe(0);
@@ -463,7 +463,7 @@ describe('syncOnce', () => {
       snapshot({ vehicles: [vehicle({ name: 'Remote name', updatedAt: 200 })] }),
     );
 
-    await syncOnce(store, remote, fakeClock());
+    await syncOnce(store, remote, new InMemorySyncState());
 
     const [stored] = await store.vehicles();
     expect(stored?.name).toBe('Local name');
@@ -477,7 +477,7 @@ describe('syncOnce', () => {
       snapshot({ vehicles: [vehicle({ updatedAt: 200, deletedAt: 200 })] }),
     );
 
-    await syncOnce(store, remote, fakeClock());
+    await syncOnce(store, remote, new InMemorySyncState());
 
     // A deletion has to travel as a fact; a hard delete would leave nothing to
     // learn from and the row would come back on the next push.
@@ -490,7 +490,7 @@ describe('syncOnce', () => {
     await store.removeVehicle(added.id);
     const remote = new InMemoryRemoteStore();
 
-    await syncOnce(store, remote, fakeClock());
+    await syncOnce(store, remote, new InMemorySyncState());
 
     expect((await pulled(remote)).vehicles[0]?.deletedAt).not.toBeNull();
   });
@@ -509,7 +509,7 @@ describe('syncOnce', () => {
       await r.vehicles.put(vehicle());
       const remote = new InMemoryRemoteStore(snapshot({ fillUps: [fillUp({ gallons })] }));
 
-      const result = await syncOnce(store, remote, fakeClock());
+      const result = await syncOnce(store, remote, new InMemorySyncState());
 
       // +Infinity passes a `> 0` check, which is why finiteness is tested
       // explicitly and not left to the positivity check downstream.
@@ -525,7 +525,7 @@ describe('syncOnce', () => {
       await r.vehicles.put(vehicle());
       const remote = new InMemoryRemoteStore(snapshot({ fillUps: [fillUp({ gallons })] }));
 
-      const result = await syncOnce(store, remote, fakeClock());
+      const result = await syncOnce(store, remote, new InMemorySyncState());
 
       // Finite, so shape validation passes it on; it is the draft gate that
       // knows a fill-up cannot have zero gallons.
@@ -545,7 +545,7 @@ describe('syncOnce', () => {
         fillUps: [{ ...fillUp(), date: 'yesterday' } as never],
       });
 
-      const result = await syncOnce(store, remote, fakeClock());
+      const result = await syncOnce(store, remote, new InMemorySyncState());
 
       expect(result.ok && result.outcome.invalid).toHaveLength(1);
       expect(await store.fillUps('v1')).toEqual([]);
@@ -564,7 +564,7 @@ describe('syncOnce', () => {
         }),
       );
 
-      const result = await syncOnce(store, remote, fakeClock());
+      const result = await syncOnce(store, remote, new InMemorySyncState());
 
       expect(result.ok && result.outcome.pulled.rejected).toHaveLength(1);
       expect(await store.fillUps('v1')).toHaveLength(2);
@@ -579,7 +579,7 @@ describe('syncOnce', () => {
         snapshot({ vehicles: [vehicle({ name: 'Ahead', updatedAt: ahead })] }),
       );
 
-      await syncOnce(store, remote, clock);
+      await syncOnce(store, remote, new InMemorySyncState());
 
       // Arriving first, it wins — which is correct, and is all this test used
       // to assert. What it also used to say was that a device with a wrong
@@ -605,14 +605,14 @@ describe('syncOnce', () => {
         snapshot({ vehicles: [vehicle({ id: 'v1', name: 'From the fast phone', updatedAt: skewed })] }),
       );
 
-      await syncOnce(store, remote, clock);
+      await syncOnce(store, remote, new InMemorySyncState());
 
       // Step 3: the correction, made on this device, after seeing that row.
       const seen = await store.vehicles();
       expect(seen[0]?.name).toBe('From the fast phone');
       await r.vehicles.put({ ...seen[0]!, name: 'Corrected here', updatedAt: clock.now() });
 
-      await syncOnce(store, remote, clock);
+      await syncOnce(store, remote, new InMemorySyncState());
 
       // It survives locally...
       expect((await store.vehicles())[0]?.name).toBe('Corrected here');
@@ -629,7 +629,7 @@ describe('syncOnce', () => {
         snapshot({ vehicles: [vehicle({ name: 'Decade ahead', updatedAt: absurd })] }),
       );
 
-      const result = await syncOnce(store, remote, clock);
+      const result = await syncOnce(store, remote, new InMemorySyncState());
 
       // Adopting a decade of skew would push the clock toward the edge of
       // integer precision, so it is refused — and that means this row keeps
@@ -649,17 +649,17 @@ describe('syncOnce', () => {
         snapshot({ vehicles: [vehicle({ id: 'v1', updatedAt: skewed })] }),
       );
 
-      await syncOnce(store, remote, clock);
+      await syncOnce(store, remote, new InMemorySyncState());
       expect(await store.vehicles()).toHaveLength(1);
 
       await store.removeVehicle('v1');
-      await syncOnce(store, remote, clock);
+      await syncOnce(store, remote, new InMemorySyncState());
 
       expect(await store.vehicles()).toEqual([]);
       expect((await remote.pull()).vehicles).toHaveLength(1);
       expect((await pulled(remote)).vehicles[0]?.deletedAt).not.toBeNull();
       // And it stays deleted on the next sync rather than being resurrected.
-      await syncOnce(store, remote, clock);
+      await syncOnce(store, remote, new InMemorySyncState());
       expect(await store.vehicles()).toEqual([]);
     });
 
@@ -669,7 +669,7 @@ describe('syncOnce', () => {
       const remote = new InMemoryRemoteStore();
       remote.failPull = true;
 
-      const result = await syncOnce(store, remote, fakeClock());
+      const result = await syncOnce(store, remote, new InMemorySyncState());
 
       expect(result.ok).toBe(false);
       expect(await store.vehicles()).toHaveLength(1);
@@ -680,7 +680,7 @@ describe('syncOnce', () => {
       const remote = new InMemoryRemoteStore(snapshot({ vehicles: [vehicle()] }));
       remote.failPush = true;
 
-      const result = await syncOnce(store, remote, fakeClock());
+      const result = await syncOnce(store, remote, new InMemorySyncState());
 
       // The data arrived; only the upload did not. Throwing the merge away
       // would make an offline write worse than no sync at all.
@@ -705,7 +705,7 @@ describe('syncOnce', () => {
       const remote = new InMemoryRemoteStore();
       remote.receiptByteLimit = 700 * 1024;
 
-      const result = await syncOnce(store, remote, fakeClock());
+      const result = await syncOnce(store, remote, new InMemorySyncState());
 
       expect(result.ok && result.outcome.pushed.receiptsOmitted).toBe(1);
       // The fill-up itself still synced — only the photo stayed behind.
@@ -728,7 +728,7 @@ describe('syncOnce', () => {
 
       const remote = new InMemoryRemoteStore();
       remote.receiptByteLimit = 700 * 1024;
-      await syncOnce(store, remote, fakeClock());
+      await syncOnce(store, remote, new InMemorySyncState());
 
       // Another device edits the row, so the account's photoless copy becomes
       // the newer one. Without preserveLocalReceipts this is where the only
@@ -739,7 +739,7 @@ describe('syncOnce', () => {
         fillUps: [{ ...current.fillUps[0]!, updatedAt: Date.now() + 10_000, station: 'Edited' }],
       });
 
-      await syncOnce(store, remote, fakeClock());
+      await syncOnce(store, remote, new InMemorySyncState());
 
       // The whole row: list rows carry no photo bytes since #53.
       const stored = await store.fillUp(entry.id);
@@ -754,7 +754,7 @@ describe('syncOnce', () => {
         snapshot({ vehicles: [vehicle({ schemaVersion: 99 })] }),
       );
 
-      const result = await syncOnce(store, remote, fakeClock());
+      const result = await syncOnce(store, remote, new InMemorySyncState());
 
       expect(result.ok && result.outcome.skippedNewerSchema).toBe(1);
       expect(await store.vehicles()).toEqual([]);
@@ -764,7 +764,7 @@ describe('syncOnce', () => {
 
     it('survives an account with nothing in it', async () => {
       const { store } = storeWith();
-      const result = await syncOnce(store, new InMemoryRemoteStore(), fakeClock());
+      const result = await syncOnce(store, new InMemoryRemoteStore(), new InMemorySyncState());
       expect(result.ok).toBe(true);
     });
   });
@@ -815,7 +815,7 @@ describe('one over-long field does not stop the upload (#50)', () => {
     ]);
     const remote = new RulesLikeRemote();
 
-    const result = await syncOnce(store, remote, clock);
+    const result = await syncOnce(store, remote, new InMemorySyncState());
 
     if (!result.ok) throw new Error(`expected success, got ${result.kind}: ${result.reason}`);
     expect(result.outcome.repaired).toBe(1);
@@ -827,9 +827,9 @@ describe('one over-long field does not stop the upload (#50)', () => {
   it('repairs once, not on every sync', async () => {
     const { store, clock } = legacyStore([fillUp({ id: 'long', updatedAt: 900, notes: 'n'.repeat(5000) })]);
     const remote = new RulesLikeRemote();
-    await syncOnce(store, remote, clock);
+    await syncOnce(store, remote, new InMemorySyncState());
 
-    const second = await syncOnce(store, remote, clock);
+    const second = await syncOnce(store, remote, new InMemorySyncState());
 
     if (!second.ok) throw new Error(second.reason);
     expect(second.outcome.repaired).toBe(0);
@@ -846,7 +846,7 @@ describe('one over-long field does not stop the upload (#50)', () => {
     ]);
     const remote = new RulesLikeRemote();
 
-    const result = await syncOnce(store, remote, clock);
+    const result = await syncOnce(store, remote, new InMemorySyncState());
 
     if (!result.ok) throw new Error(`expected success, got ${result.kind}: ${result.reason}`);
     expect(result.outcome.unsendable).toEqual(['orphan']);
@@ -861,7 +861,7 @@ describe('one over-long field does not stop the upload (#50)', () => {
       snapshot({ fillUps: [fillUp({ id: 'remote', updatedAt: 900, notes: 'n'.repeat(4001) })] }),
     );
 
-    await syncOnce(store, remote, clock);
+    await syncOnce(store, remote, new InMemorySyncState());
 
     const local = await store.exportSnapshot();
     expect(local.fillUps.find((row) => row.id === 'remote')?.notes).toHaveLength(4000);
@@ -903,7 +903,7 @@ describe('incremental pull (#52)', () => {
     const { store, clock } = storeWith();
     const state = new InMemorySyncState();
 
-    const result = await syncOnce(store, remote, clock, state);
+    const result = await syncOnce(store, remote, state);
 
     if (!result.ok) throw new Error(result.reason);
     expect(remote.pullLog[0]?.since).toBeNull();
@@ -919,9 +919,9 @@ describe('incremental pull (#52)', () => {
     const state = new InMemorySyncState();
     await store.addVehicle({ name: 'Second car' });
 
-    await syncOnce(store, remote, clock, state);
-    await syncOnce(store, remote, clock, state);
-    await syncOnce(store, remote, clock, state);
+    await syncOnce(store, remote, state);
+    await syncOnce(store, remote, state);
+    await syncOnce(store, remote, state);
 
     expect(remote.pullLog[2]?.rows).toBe(0);
     expect(remote.pullLog[2]?.since).not.toBeNull();
@@ -934,10 +934,10 @@ describe('incremental pull (#52)', () => {
     const { store, clock } = storeWith();
     const state = new InMemorySyncState();
     await store.addVehicle({ name: 'Car' });
-    await syncOnce(store, remote, clock, state);
-    await syncOnce(store, remote, clock, state);
+    await syncOnce(store, remote, state);
+    await syncOnce(store, remote, state);
 
-    const third = await syncOnce(store, remote, clock, state);
+    const third = await syncOnce(store, remote, state);
 
     if (!third.ok) throw new Error(third.reason);
     expect(third.outcome.pushed.written).toBe(0);
@@ -950,8 +950,8 @@ describe('incremental pull (#52)', () => {
     const { store, clock } = storeWith();
     const state = new InMemorySyncState();
 
-    await syncOnce(store, remote, clock, state);
-    await syncOnce(store, remote, clock, state);
+    await syncOnce(store, remote, state);
+    await syncOnce(store, remote, state);
 
     const since = remote.pullLog[1]?.since;
     expect(since).not.toBeNull();
@@ -963,13 +963,13 @@ describe('incremental pull (#52)', () => {
     const { store, clock } = storeWith();
     const state = new InMemorySyncState();
     const car = await store.addVehicle({ name: 'Car' });
-    await syncOnce(store, remote, clock, state); // vehicle stamped first
+    await syncOnce(store, remote, state); // vehicle stamped first
     await store.addFillUp(
       makeFuelEntryDraft({ date: new Date(2026, 0, 1), odometer: 1000, gallons: 10, pricePerGallon: 3 })!,
       car.id,
     );
-    await syncOnce(store, remote, clock, state); // fill-up stamped later
-    await syncOnce(store, remote, clock, state); // both echoes read
+    await syncOnce(store, remote, state); // fill-up stamped later
+    await syncOnce(store, remote, state); // both echoes read
 
     const marks = (await state.load())?.highWater;
     expect(marks?.vehicles).not.toBeNull();
@@ -993,12 +993,12 @@ describe('incremental pull (#52)', () => {
     const { store, clock } = storeWith();
     const state = new InMemorySyncState();
     await store.addVehicle({ name: 'Car' });
-    await syncOnce(store, remote, clock, state);
-    await syncOnce(store, remote, clock, state);
+    await syncOnce(store, remote, state);
+    await syncOnce(store, remote, state);
     const before = (await state.load())?.highWater.vehicles;
 
     lie = true;
-    await syncOnce(store, remote, clock, state);
+    await syncOnce(store, remote, state);
 
     expect((await state.load())?.highWater.vehicles).toBe(before);
   });
@@ -1017,11 +1017,11 @@ describe('incremental pull (#52)', () => {
     const { store, clock } = storeWith();
     const state = new InMemorySyncState();
     const car = await store.addVehicle({ name: 'Car' });
-    await syncOnce(store, unstamped, clock, state);
-    await syncOnce(store, unstamped, clock, state);
+    await syncOnce(store, unstamped, state);
+    await syncOnce(store, unstamped, state);
     inner.forget('vehicles', car.id);
 
-    await syncOnce(store, unstamped, clock, state);
+    await syncOnce(store, unstamped, state);
 
     expect((await inner.pull()).vehicles).toHaveLength(1);
   });
@@ -1032,12 +1032,12 @@ describe('incremental pull (#52)', () => {
     const aState = new InMemorySyncState();
     const b = storeWith(fakeClock(2_000_000));
     const bState = new InMemorySyncState();
-    await syncOnce(a.store, remote, a.clock, aState);
-    await syncOnce(a.store, remote, a.clock, aState);
+    await syncOnce(a.store, remote, aState);
+    await syncOnce(a.store, remote, aState);
 
     await b.store.addVehicle({ name: 'From B' });
-    await syncOnce(b.store, remote, b.clock, bState);
-    await syncOnce(a.store, remote, a.clock, aState);
+    await syncOnce(b.store, remote, bState);
+    await syncOnce(a.store, remote, aState);
 
     const last = remote.pullLog[remote.pullLog.length - 1];
     expect(last?.rows).toBe(1);
@@ -1048,10 +1048,10 @@ describe('incremental pull (#52)', () => {
     const remote = new InMemoryRemoteStore();
     const { store, clock } = storeWith();
     const state = new InMemorySyncState();
-    await syncOnce(store, remote, clock, state);
+    await syncOnce(store, remote, state);
 
     await store.addVehicle({ name: 'New' });
-    const result = await syncOnce(store, remote, clock, state);
+    const result = await syncOnce(store, remote, state);
 
     if (!result.ok) throw new Error(result.reason);
     expect(result.outcome.pushed.written).toBe(1);
@@ -1064,9 +1064,9 @@ describe('incremental pull (#52)', () => {
     const remote = new InMemoryRemoteStore(snapshot({ vehicles: [vehicle()] }));
     const { store, clock } = storeWith();
     const state = new InMemorySyncState();
-    await syncOnce(store, remote, clock, state);
+    await syncOnce(store, remote, state);
 
-    const second = await syncOnce(store, remote, clock, state);
+    const second = await syncOnce(store, remote, state);
 
     if (!second.ok) throw new Error(second.reason);
     expect(second.outcome.pushed.written).toBe(0);
@@ -1081,12 +1081,15 @@ describe('incremental pull (#52)', () => {
     const remote = new InMemoryRemoteStore(snapshot({ vehicles: [vehicle({ updatedAt: ahead })] }));
     const state = new InMemorySyncState();
     const first = storeWith(fakeClock(1_000_000));
-    await syncOnce(first.store, remote, first.clock, state);
+    await syncOnce(first.store, remote, state);
 
     // A new session a little later: the clock's floor is gone. Still behind
     // the fast device, which is the whole point.
+    // The same rows on disk, a new store over them with a fresh clock — what a
+    // reload is, now that sync takes its clock from the store (#91).
     const reloadedClock = fakeClock(1_000_000 + 60_000);
-    await syncOnce(first.store, remote, reloadedClock, state);
+    const reloaded = new FuelTrackerStore(first.repos, reloadedClock);
+    await syncOnce(reloaded, remote, state);
 
     // It must have been an incremental read — a full one would rebuild the
     // floor from the pulled rows and prove nothing. (It once silently was:
@@ -1100,11 +1103,11 @@ describe('incremental pull (#52)', () => {
     const remote = new InMemoryRemoteStore(snapshot({ vehicles: [vehicle()] }));
     const { store, clock } = storeWith();
     const state = new InMemorySyncState();
-    await syncOnce(store, remote, clock, state);
+    await syncOnce(store, remote, state);
     const saved = await state.load();
     await state.save({ ...saved!, version: saved!.version + 1 });
 
-    await syncOnce(store, remote, clock, state);
+    await syncOnce(store, remote, state);
 
     expect(remote.pullLog[1]?.since).toBeNull();
   });
@@ -1117,12 +1120,12 @@ describe('incremental pull (#52)', () => {
     const { store, clock } = storeWith();
     const state = new InMemorySyncState();
     await store.addVehicle({ name: 'Kept' });
-    await syncOnce(store, remote, clock, state);
+    await syncOnce(store, remote, state);
     const saved = await state.load();
     await state.save({ ...saved!, fullPulledAt: saved!.fullPulledAt - 8 * 86_400_000 });
     remote.forget('vehicles', (await store.vehicles())[0]!.id);
 
-    await syncOnce(store, remote, clock, state);
+    await syncOnce(store, remote, state);
 
     expect(remote.pullLog[1]?.since).toBeNull();
     expect((await remote.pull()).vehicles).toHaveLength(1);
@@ -1132,11 +1135,11 @@ describe('incremental pull (#52)', () => {
     const remote = new InMemoryRemoteStore(snapshot({ vehicles: [vehicle()] }));
     const { store, clock } = storeWith();
     const state = new InMemorySyncState();
-    await syncOnce(store, remote, clock, state);
+    await syncOnce(store, remote, state);
     const before = await state.load();
     remote.failPull = true;
 
-    await syncOnce(store, remote, clock, state);
+    await syncOnce(store, remote, state);
 
     expect(await state.load()).toEqual(before);
   });
@@ -1145,13 +1148,13 @@ describe('incremental pull (#52)', () => {
     const remote = new InMemoryRemoteStore();
     const { store, clock } = storeWith();
     const state = new InMemorySyncState();
-    await syncOnce(store, remote, clock, state);
+    await syncOnce(store, remote, state);
     await store.addVehicle({ name: 'Pending' });
     remote.failPush = true;
-    await syncOnce(store, remote, clock, state);
+    await syncOnce(store, remote, state);
 
     remote.failPush = false;
-    const retry = await syncOnce(store, remote, clock, state);
+    const retry = await syncOnce(store, remote, state);
 
     if (!retry.ok) throw new Error(retry.reason);
     expect(retry.outcome.pushed.written).toBe(1);
@@ -1168,10 +1171,41 @@ describe('a remote reading in full because its index is missing (#89)', () => {
       push: (rows) => remote.push(rows),
     };
 
-    const told = await syncOnce(store, fullRead, clock);
-    const quiet = await syncOnce(store, remote, clock);
+    const told = await syncOnce(store, fullRead, new InMemorySyncState());
+    const quiet = await syncOnce(store, remote, new InMemorySyncState());
 
     expect(told.ok && told.outcome.indexMissing).toBe(true);
     expect(quiet.ok && quiet.outcome.indexMissing).toBe(false);
+  });
+});
+
+describe('sync is wired to the store, not defaulted (#91)', () => {
+  it('needs its state, and takes no clock of its own', () => {
+    const neverRun = (store: FuelTrackerStore, remote: RemoteStore): void => {
+      // @ts-expect-error — a forgotten state was a fresh one, and a full read, every sync
+      void syncOnce(store, remote);
+      // @ts-expect-error — the clock is the store's; there is no second one to pass
+      void syncOnce(store, remote, new MonotonicClock(), new InMemorySyncState());
+    };
+    expect(neverRun).toBeTypeOf('function');
+    // store, remote, state: the options are the only thing with a default.
+    expect(syncOnce.length).toBe(3);
+  });
+
+  it('observes the account on the store’s own clock, so the next edit here is newer', async () => {
+    // A device a day ahead wrote the car. Nothing here is told which clock to
+    // use: the store's is the one, so the store's next stamp beats that row.
+    const ahead = Date.now() + 86_400_000;
+    const remote = new InMemoryRemoteStore(snapshot({ vehicles: [vehicle({ updatedAt: ahead })] }));
+    const store = new FuelTrackerStore({
+      vehicles: new InMemoryRepository<VehicleRecord>(),
+      fillUps: new InMemoryRepository<FillUpRecord>(),
+      pendingFillUps: new InMemoryRepository<import('./records').PendingFillUpRecord>(),
+    });
+
+    await syncOnce(store, remote, new InMemorySyncState());
+    const mine = await store.addVehicle({ name: 'Later' });
+
+    expect(mine.updatedAt).toBeGreaterThan(ahead);
   });
 });

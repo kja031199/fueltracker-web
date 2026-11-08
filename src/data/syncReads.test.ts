@@ -121,13 +121,13 @@ async function member(shares: number) {
     );
     const car = await ownerStore.addVehicle({ name: `Theirs ${i}` });
     await ownerStore.addFillUp(draft(20_000 + i), car.id);
-    await syncOnce(ownerStore, world.remoteFor(owner.uid), new MonotonicClock(), new InMemorySyncState());
+    await syncOnce(ownerStore, world.remoteFor(owner.uid), new InMemorySyncState());
     const invite = await world.sharingFor(owner).invite(car, ME.email);
     await world.sharingFor(ME).accept(invite);
   }
   const sharing = sharingFor(world, ME);
   const ownState = new InMemorySyncState();
-  const sync = () => syncAll(store, world.remoteFor(ME.uid), sharing, clock, ownState);
+  const sync = () => syncAll(store, world.remoteFor(ME.uid), sharing, ownState);
   return { store, repos, sync, world };
 }
 
@@ -168,7 +168,7 @@ describe('one sync reads each table at most once (#87)', () => {
     await store.addFillUp(draft(10_000), car.id);
     reset(repos);
 
-    expect((await syncOnce(store, world.remoteFor('solo'), clock, new InMemorySyncState())).ok).toBe(true);
+    expect((await syncOnce(store, world.remoteFor('solo'), new InMemorySyncState())).ok).toBe(true);
 
     expect(repos.fillUps.scans).toBeLessThanOrEqual(1);
     expect(repos.vehicles.scans).toBeLessThanOrEqual(1);
@@ -256,7 +256,7 @@ describe('reading once does not change what is sent (#87)', () => {
     const car = await store.addVehicle({ name: 'Solo' });
     const remote = world.remoteFor('solo');
     const state = new InMemorySyncState();
-    await syncOnce(store, remote, clock, state);
+    await syncOnce(store, remote, state);
 
     // Saved after this sync has looked at the device, before it pushes.
     let saved: FillUpRecord | null = null;
@@ -268,9 +268,9 @@ describe('reading once does not change what is sent (#87)', () => {
     };
     const local = new LocalView(store);
     await local.snapshot(); // the view is read before the save lands
-    await syncOnce(store, remote, clock, state, { local });
+    await syncOnce(store, remote, state, { local });
     remote.pull = pull;
-    await syncOnce(store, remote, clock, state);
+    await syncOnce(store, remote, state);
 
     const ids = ((await remote.pull(null)).fillUps as FillUpRecord[]).map((row) => row.id);
     expect(saved).not.toBeNull();

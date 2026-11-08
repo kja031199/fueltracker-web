@@ -310,6 +310,12 @@ npm ci --prefix .github/firebase-cli
   its car has gone. It used to take the *selected* car, which a sync can change
   under an open form. Don't add a car parameter back.
 
+- **The store's clock is sync's clock** (#91): `FuelTrackerStore.clock` is a
+  `MonotonicClock`, and `syncOnce(store, remote, state, options)` /
+  `syncAll(store, own, sharing, state)` take it from the store — there is no
+  clock parameter to get wrong, and the cursor `state` is required (a
+  defaulted one meant a full read on every sync). To simulate a reload in a
+  test, build a new store over the same repositories with a fresh clock.
 - **`updatedAt` is a logical clock**, `max(wallClock, highestSeen + 1)`, which
   is what makes last-write-wins mean *last edit* rather than *furthest-ahead
   clock*. Adoption is bounded at 30 days, or a row claiming `MAX_SAFE_INTEGER`

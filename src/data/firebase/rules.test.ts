@@ -481,7 +481,7 @@ describeWithEmulator('firestore.rules', () => {
         vehicle.id,
       );
 
-      const result = await syncOnce(store, emulatorRemote());
+      const result = await syncOnce(store, emulatorRemote(), new InMemorySyncState());
 
       expect(result.ok).toBe(true);
       const db = env.authenticatedContext(OWNER).firestore();
@@ -509,7 +509,7 @@ describeWithEmulator('firestore.rules', () => {
         pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
       });
 
-      const result = await syncOnce(store, emulatorRemote());
+      const result = await syncOnce(store, emulatorRemote(), new InMemorySyncState());
 
       expect(result.ok).toBe(true);
       const db = env.authenticatedContext(OWNER).firestore();
@@ -609,9 +609,9 @@ describeWithEmulator('firestore.rules', () => {
       await store.addVehicle({ name: 'Car' });
       const state = new InMemorySyncState();
 
-      const first = await syncOnce(store, remote, undefined, state);
-      const second = await syncOnce(store, remote, undefined, state);
-      const third = await syncOnce(store, remote, undefined, state);
+      const first = await syncOnce(store, remote, state);
+      const second = await syncOnce(store, remote, state);
+      const third = await syncOnce(store, remote, state);
 
       expect(first.ok && second.ok && third.ok).toBe(true);
       if (!third.ok) return;

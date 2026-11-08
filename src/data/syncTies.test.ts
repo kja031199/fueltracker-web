@@ -40,7 +40,7 @@ function device(remote: InMemoryRemoteStore): Device {
     clock,
   );
   const state = new InMemorySyncState();
-  return { store, sync: () => syncOnce(store, remote, clock, state) };
+  return { store, sync: () => syncOnce(store, remote, state) };
 }
 
 function draft(odometer: number): FuelEntryDraft {

@@ -11,6 +11,12 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-08
 
+- **No change you'll see: sync can no longer be wired to the wrong clock.**
+  The third step of tidying the data layer.
+  *Technical:* sync takes its clock from the store (always a
+  `MonotonicClock`), and its cursor state is a required argument; the
+  non-monotonic `systemClock` default is gone.
+  [#91](https://github.com/kja031199/fueltracker-web/issues/91) · [PR #118](https://github.com/kja031199/fueltracker-web/pull/118)
 - **No change you'll see: the data layer's modules now depend in one
   direction.** The second step of tidying it.
   *Technical:* `Repositories` → `repository.ts`, the store clock →
