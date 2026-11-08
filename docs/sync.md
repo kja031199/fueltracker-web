@@ -407,9 +407,13 @@ names, types, string lengths and receipt size. Identity alone stops another
 are what stop one junk field being inflated to the 1 MiB document cap and eating
 the daily quota.
 
-One consequence worth knowing before adding a field: the rules use `hasOnly`, so
-an unknown field is refused. **New fields must be deployed to the rules before a
-build that writes them** — change both in the same pull request.
+One consequence worth knowing before adding a field: the rules refuse an unknown
+field. **New fields must be deployed to the rules before a build that writes
+them** — change both in the same pull request. Each document's fields are listed
+once in the rules, in its `…Keys()` function (#92), and a test fails if a list
+differs from the record the client writes; every size limit is a named
+`label()`, `sized()` or `maxReceiptBytes()` the tests hold to the client's
+constants.
 
 The rules suite is 40 assertions against the emulator, including the positive
 cases built from records the app itself produces rather than hand-written

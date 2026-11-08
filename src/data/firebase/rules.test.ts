@@ -121,6 +121,13 @@ describeWithEmulator('firestore.rules', () => {
     await assertSucceeds(getDoc(doc(db, `users/${OWNER}/fillUps/f1`)));
   });
 
+  it('reads nobody\'s account document itself, the owner\'s included (#92)', async () => {
+    // The app reads only what is under it. A rule that allowed this covered a
+    // document that is never written, and was one more rule to keep right.
+    const db = env.authenticatedContext(OWNER).firestore();
+    await assertFails(getDoc(doc(db, `users/${OWNER}`)));
+  });
+
   it('refuses a shapeless write even to your own tree', async () => {
     // This test used to assert the opposite — that `{ gallons: 10 }` was
     // accepted — because identity was the only question the rules asked. Owning

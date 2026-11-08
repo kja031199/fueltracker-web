@@ -11,6 +11,14 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-08
 
+- **No change you'll see: the account's security rules are easier to keep
+  right.** Every limit they enforce is now checked against the app's own by
+  the tests, and each kind of document's fields are written down once.
+  *Technical:* `…Keys()` lists and one `shape()` helper in `firestore.rules`;
+  every size bound through `label()`/`sized()`/`maxReceiptBytes()`, held to
+  the client's constants; one `get()` instead of `exists()` then `get()`; no
+  rule for `users/{uid}` itself.
+  [#92](https://github.com/kja031199/fueltracker-web/issues/92) · [PR #115](https://github.com/kja031199/fueltracker-web/pull/115)
 - **Syncing uses fewer of your account's free reads when you share cars.** Each
   sync now checks which cars are shared with you once instead of twice, and the
   fill-up list stops asking who a car is shared with after it has asked once.

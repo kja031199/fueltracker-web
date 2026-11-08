@@ -39,11 +39,13 @@ rules_version = '2';
 //
 // ## Adding a field means editing this file first
 //
-// `hasOnly` means an unknown field is refused. That is the point — it is what
-// stops a junk field being inflated to the 1 MiB document cap — but it couples
-// the schema to these rules. A new field must be deployed here *before* a build
-// that writes it, or writes fail until it is. Change both in the same pull
-// request.
+// An unknown field is refused. That is the point — it is what stops a junk
+// field being inflated to the 1 MiB document cap — but it couples the schema
+// to these rules. A new field must be deployed here *before* a build that
+// writes it, or writes fail until it is. Change both in the same pull request.
+// Each document's fields are listed once, in its `…Keys()` function below
+// (#92), and `rulesLimits.test.ts` fails if a list differs from what the
+// client writes.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -88,10 +90,11 @@ service cloud.firestore {
         && liveCar(owner, vehicleId);
     }
 
-    // `owner`'s car exists and is not a tombstone.
+    // `owner`'s car exists and is not a tombstone. One `get()`: a car that does
+    // not exist makes it an error, which refuses as surely as `false` does —
+    // an `exists()` first read the same document twice (#92).
     function liveCar(owner, vehicleId) {
-      return exists(/databases/$(database)/documents/users/$(owner)/vehicles/$(vehicleId))
-        && get(/databases/$(database)/documents/users/$(owner)/vehicles/$(vehicleId)).data.deletedAt == null;
+      return get(/databases/$(database)/documents/users/$(owner)/vehicles/$(vehicleId)).data.deletedAt == null;
     }
 
     // The signed-in account's Google email, lowercased — only when Google has
@@ -121,6 +124,82 @@ service cloud.firestore {
     // `rulesLimits.test.ts` reads this number out of this file.
     function maxAheadMs() { return 2678400000; }
 
+    // ## Bounds (#92)
+    //
+    // Every size limit goes through one of these, so `rulesLimits.test.ts`
+    // can read each one and hold it to the client's constant; a bound written
+    // inline as `x.size() <= 200` was invisible to it. No `.size()` appears
+    // anywhere else in this file, and a test checks that too.
+
+    // Text of at most `max` UTF-16 units — what the client counts as well.
+    function label(field, max) {
+      return field is string && field.size() <= max;
+    }
+
+    // Text of `min` to `max` units: ids, which cannot be empty, and an address.
+    function sized(field, min, max) {
+      return field is string && field.size() >= min && field.size() <= max;
+    }
+
+    // The largest receipt photograph a document may carry: well under the
+    // 1 MiB document cap, and exactly MAX_SYNCED_RECEIPT_BYTES in
+    // firebase/remoteStore.ts. A larger receipt is pushed without its image
+    // rather than refused, so the app never hits this; it is here for
+    // everything that is not the app.
+    function maxReceiptBytes() { return 716800; }
+
+    function receipt(field) {
+      return field == null || (field is bytes && field.size() <= maxReceiptBytes());
+    }
+
+    function number(field) {
+      return finite(field);
+    }
+
+    function optionalNumber(field) {
+      return field == null || finite(field);
+    }
+
+    // ## Fields (#92)
+    //
+    // Each document's fields, listed once. `shape` checks a write has every
+    // one of them (but the optional ones) and nothing else. These lists used
+    // to be written out twice per document, `hasOnly` and `hasAll`, and adding
+    // a field meant editing six places.
+
+    function syncKeys() { return ['id', 'updatedAt', 'deletedAt', 'schemaVersion', 'syncedAt']; }
+
+    // Shared by fill-ups and submissions.
+    function measurementKeys() {
+      return ['date', 'odometer', 'gallons', 'pricePerGallon', 'isFullTank', 'fuelGrade', 'station', 'notes',
+              'latitude', 'longitude', 'receiptImageData'];
+    }
+
+    function vehicleKeys() { return syncKeys().concat(['name', 'make', 'model', 'year', 'createdAt']); }
+
+    function fillUpKeys() {
+      return syncKeys().concat(['vehicleId', 'missedPreviousFillUp', 'enteredBy']).concat(measurementKeys());
+    }
+
+    // Who logged a fill-up (#66): optional, so an older build can still write.
+    function optionalFillUpKeys() { return ['enteredBy']; }
+
+    function pendingKeys() {
+      return syncKeys().concat(['vehicleId', 'submittedAt', 'submitterName']).concat(measurementKeys());
+    }
+
+    function inviteKeys() { return ['ownerUid', 'vehicleId', 'email', 'ownerName', 'vehicleName', 'createdAt']; }
+
+    function memberKeys() { return ['uid', 'name', 'email', 'joinedAt']; }
+
+    function membershipKeys() { return ['ownerUid', 'vehicleId', 'ownerName', 'vehicleName']; }
+
+    // The write has every key in `keys` but those in `optional`, and no other.
+    function shape(keys, optional) {
+      return request.resource.data.keys().hasOnly(keys)
+        && request.resource.data.keys().hasAll(keys.removeAll(optional));
+    }
+
     // An invitation (#66): `invites/{ownerUid}__{vehicleId}__{email}`. The id
     // is deterministic so a member rule can find it with one `exists()`, and
     // so one car cannot hold two invitations for the same address.
@@ -129,25 +208,17 @@ service cloud.firestore {
         && (resource.data.ownerUid == request.auth.uid
             || (verifiedEmail() && resource.data.email == request.auth.token.email.lower()));
       allow create: if allowed()
-        && request.resource.data.keys().hasOnly(['ownerUid', 'vehicleId', 'email', 'ownerName', 'vehicleName', 'createdAt'])
-        && request.resource.data.keys().hasAll(['ownerUid', 'vehicleId', 'email', 'ownerName', 'vehicleName', 'createdAt'])
+        && shape(inviteKeys(), [])
         && request.resource.data.ownerUid == request.auth.uid
-        && request.resource.data.vehicleId is string
-        && request.resource.data.vehicleId.size() > 0
-        && request.resource.data.vehicleId.size() <= 200
-        && request.resource.data.email is string
-        && request.resource.data.email.size() > 2
-        && request.resource.data.email.size() <= 320
+        && sized(request.resource.data.vehicleId, 1, 200)
+        && sized(request.resource.data.email, 3, 320)
         && request.resource.data.email == request.resource.data.email.lower()
-        && request.resource.data.ownerName is string
-        && request.resource.data.ownerName.size() <= 200
-        && request.resource.data.vehicleName is string
-        && request.resource.data.vehicleName.size() <= 200
+        && label(request.resource.data.ownerName, 200)
+        && label(request.resource.data.vehicleName, 200)
         && finite(request.resource.data.createdAt)
         && inviteId == request.auth.uid + '__' + request.resource.data.vehicleId + '__' + request.resource.data.email
         // Only for a live car of your own.
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid)/vehicles/$(request.resource.data.vehicleId))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)/vehicles/$(request.resource.data.vehicleId)).data.deletedAt == null;
+        && liveCar(request.auth.uid, request.resource.data.vehicleId);
       // Withdrawn by the owner, or declined (or used up) by the invitee.
       allow delete: if allowed()
         && (resource.data.ownerUid == request.auth.uid
@@ -171,10 +242,8 @@ service cloud.firestore {
       // record's own id — so a row cannot be filed under a name that disagrees
       // with its contents, which is the shape a merge would reconcile wrongly.
       function syncFields(id) {
-        return request.resource.data.id is string
+        return sized(request.resource.data.id, 1, 200)
           && request.resource.data.id == id
-          && request.resource.data.id.size() > 0
-          && request.resource.data.id.size() <= 200
           // The merge stamp (#79). Last-write-wins means a stamp nobody can
           // beat locks a row for good — one a year ahead made a fill-up
           // impossible for anyone else to edit or delete. So: no further ahead
@@ -192,27 +261,6 @@ service cloud.firestore {
           // every other device for good. An out-of-date copy of the app is
           // refused here, keeps its change locally, and sends it once updated.
           && request.resource.data.syncedAt == request.time;
-      }
-
-      function label(field, max) {
-        return field is string && field.size() <= max;
-      }
-
-      function number(field) {
-        return finite(field);
-      }
-
-      function optionalNumber(field) {
-        return field == null || finite(field);
-      }
-
-      // Bounded well under the 1 MiB document cap, matching
-      // MAX_SYNCED_RECEIPT_BYTES in firebase/remoteStore.ts. A receipt larger
-      // than this is pushed without its image rather than rejected, so this
-      // bound should never be hit by the app — it is here for everything that
-      // is not the app.
-      function receipt(field) {
-        return field == null || (field is bytes && field.size() <= 716800);
       }
 
       // Measurements shared by fill-ups and submissions. Positivity is NOT
@@ -233,20 +281,14 @@ service cloud.firestore {
           && receipt(request.resource.data.receiptImageData);
       }
 
-      allow read: if owner();
+      // No rule for the account document itself (`users/{uid}`): the app never
+      // reads or writes it, only what is under it (#92).
 
       match /vehicles/{id} {
         allow read: if owner() || memberOf(uid, id);
         allow write: if owner()
           && syncFields(id)
-          && request.resource.data.keys().hasOnly([
-            'id', 'updatedAt', 'deletedAt', 'schemaVersion', 'syncedAt',
-            'name', 'make', 'model', 'year', 'createdAt'
-          ])
-          && request.resource.data.keys().hasAll([
-            'id', 'updatedAt', 'deletedAt', 'schemaVersion', 'syncedAt',
-            'name', 'make', 'model', 'year', 'createdAt'
-          ])
+          && shape(vehicleKeys(), [])
           && label(request.resource.data.name, 200)
           && label(request.resource.data.make, 200)
           && label(request.resource.data.model, 200)
@@ -278,8 +320,7 @@ service cloud.firestore {
             // Only a car that still exists (#80).
             && liveCar(uid, id)
             && !exists(/databases/$(database)/documents/users/$(request.auth.uid)/vehicles/$(id))
-            && request.resource.data.keys().hasOnly(['uid', 'name', 'email', 'joinedAt'])
-            && request.resource.data.keys().hasAll(['uid', 'name', 'email', 'joinedAt'])
+            && shape(memberKeys(), [])
             && request.resource.data.uid == memberUid
             && label(request.resource.data.name, 200)
             && request.resource.data.email == request.auth.token.email.lower()
@@ -295,10 +336,9 @@ service cloud.firestore {
         allow read: if owner();
         allow delete: if owner();
         allow create, update: if owner()
-          && request.resource.data.keys().hasOnly(['ownerUid', 'vehicleId', 'ownerName', 'vehicleName'])
-          && request.resource.data.keys().hasAll(['ownerUid', 'vehicleId', 'ownerName', 'vehicleName'])
+          && shape(membershipKeys(), [])
           && label(request.resource.data.ownerUid, 128)
-          && label(request.resource.data.vehicleId, 200)
+          && sized(request.resource.data.vehicleId, 1, 200)
           && label(request.resource.data.ownerName, 200)
           && label(request.resource.data.vehicleName, 200)
           && membershipId == request.resource.data.ownerUid + '__' + request.resource.data.vehicleId;
@@ -327,20 +367,8 @@ service cloud.firestore {
 
       function fillUpShape(id) {
         return syncFields(id)
-          && request.resource.data.keys().hasOnly([
-            'id', 'updatedAt', 'deletedAt', 'schemaVersion', 'syncedAt', 'vehicleId',
-            'date', 'odometer', 'gallons', 'pricePerGallon', 'isFullTank',
-            'missedPreviousFillUp', 'fuelGrade', 'station', 'notes',
-            'latitude', 'longitude', 'receiptImageData', 'enteredBy'
-          ])
-          && request.resource.data.keys().hasAll([
-            'id', 'updatedAt', 'deletedAt', 'schemaVersion', 'syncedAt', 'vehicleId',
-            'date', 'odometer', 'gallons', 'pricePerGallon', 'isFullTank',
-            'missedPreviousFillUp', 'fuelGrade', 'station', 'notes',
-            'latitude', 'longitude', 'receiptImageData'
-          ])
-          && label(request.resource.data.vehicleId, 200)
-          && request.resource.data.vehicleId.size() > 0
+          && shape(fillUpKeys(), optionalFillUpKeys())
+          && sized(request.resource.data.vehicleId, 1, 200)
           && request.resource.data.missedPreviousFillUp is bool
           // Who logged it (#66): optional, so an older build can still write.
           && (request.resource.data.get('enteredBy', null) == null
@@ -352,20 +380,8 @@ service cloud.firestore {
         allow read: if owner();
         allow write: if owner()
           && syncFields(id)
-          && request.resource.data.keys().hasOnly([
-            'id', 'updatedAt', 'deletedAt', 'schemaVersion', 'syncedAt', 'vehicleId',
-            'submittedAt', 'submitterName', 'date', 'odometer', 'gallons',
-            'pricePerGallon', 'isFullTank', 'fuelGrade', 'station', 'notes',
-            'latitude', 'longitude', 'receiptImageData'
-          ])
-          && request.resource.data.keys().hasAll([
-            'id', 'updatedAt', 'deletedAt', 'schemaVersion', 'syncedAt', 'vehicleId',
-            'submittedAt', 'submitterName', 'date', 'odometer', 'gallons',
-            'pricePerGallon', 'isFullTank', 'fuelGrade', 'station', 'notes',
-            'latitude', 'longitude', 'receiptImageData'
-          ])
-          && label(request.resource.data.vehicleId, 200)
-          && request.resource.data.vehicleId.size() > 0
+          && shape(pendingKeys(), [])
+          && sized(request.resource.data.vehicleId, 1, 200)
           && number(request.resource.data.submittedAt)
           && label(request.resource.data.submitterName, 200)
           && measurements();
