@@ -4,7 +4,8 @@ import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records
 import { FuelTrackerStore } from './store';
 import { InMemorySharingWorld, Refused, type Account } from './sharing';
 import { excluding, onlyFillUpsOf, shareStateKey, syncAll, type SharingSync } from './shareSync';
-import { InMemoryShareLedger, InMemorySyncState, type SyncStateStore } from './syncState';
+import { InMemorySyncState, type SyncStateStore } from './syncState';
+import { InMemoryShareLedger } from './shareLedger';
 import { MonotonicClock } from './syncClock';
 import { makeFuelEntryDraft, type FuelEntryDraft } from '../domain/fuelEntryDraft';
 import { computeFuelStatistics } from '../domain/fuelStatistics';

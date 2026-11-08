@@ -62,7 +62,8 @@ import type { SyncOutcome, SyncResult, RowScope } from './sync';
 import { syncOnce } from './sync';
 import { LocalView } from './localView';
 import type { MonotonicClock } from './syncClock';
-import type { ShareLedger, SyncStateStore } from './syncState';
+import type { SyncStateStore } from './syncState';
+import type { ShareLedger } from './shareLedger';
 
 export interface SharingSync {
   readonly remote: SharingRemote;

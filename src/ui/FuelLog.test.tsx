@@ -12,7 +12,8 @@ import { FuelLogProvider, useFuelLog, useSyncStatus, type FuelLog } from './fuel
 import { SAVE_SYNC_DELAY_MS } from './syncScheduler';
 import { InMemorySharingWorld } from '../data/sharing';
 import { LEDGER_UNREADABLE, type SharingSync } from '../data/shareSync';
-import { InMemoryShareLedger, InMemorySyncState } from '../data/syncState';
+import { InMemorySyncState } from '../data/syncState';
+import { InMemoryShareLedger } from '../data/shareLedger';
 
 /**
  * The one place a write happens (#56).

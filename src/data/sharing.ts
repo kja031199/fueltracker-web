@@ -27,41 +27,10 @@ import type { PullCursor, PushSummary, RawSnapshot, RemoteStore } from './remote
 import { InMemoryRemoteStore } from './remote';
 import { MAX_ACCEPTED_AHEAD_MS } from './syncClock';
 
-/** An open invitation to one car, addressed to one email. */
-export interface Invite {
-  readonly ownerUid: string;
-  readonly vehicleId: string;
-  /** Lowercased: the rules compare it to the token's address, lowercased. */
-  readonly email: string;
-  readonly ownerName: string;
-  readonly vehicleName: string;
-  readonly createdAt: number;
-}
-
-/** Somebody a car is shared with. */
-export interface Member {
-  readonly uid: string;
-  readonly name: string;
-  readonly email: string;
-  readonly joinedAt: number;
-}
-
-/** A car shared *with* this account. */
-export interface Membership {
-  readonly ownerUid: string;
-  readonly vehicleId: string;
-  readonly ownerName: string;
-  readonly vehicleName: string;
-}
-
-/** The signed-in account, as sharing needs it. */
-export interface Account {
-  readonly uid: string;
-  readonly name: string;
-  /** As Google reports it; compared lowercased. */
-  readonly email: string;
-  readonly emailVerified: boolean;
-}
+// The shapes themselves live in `sharingTypes.ts` (#91), so the storage
+// modules can name a membership without importing the in-memory world.
+export type { Account, Invite, Member, Membership } from './sharingTypes';
+import type { Account, Invite, Member, Membership } from './sharingTypes';
 
 export interface SharingRemote {
   // The owner's side.

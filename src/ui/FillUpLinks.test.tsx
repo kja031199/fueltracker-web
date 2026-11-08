@@ -9,7 +9,8 @@ import { FuelTrackerStore } from '../data/store';
 import { InMemoryRemoteStore } from '../data/remote';
 import { InMemorySharingWorld } from '../data/sharing';
 import type { SharingSync } from '../data/shareSync';
-import { InMemoryShareLedger, InMemorySyncState } from '../data/syncState';
+import { InMemorySyncState } from '../data/syncState';
+import { InMemoryShareLedger } from '../data/shareLedger';
 import {
   LINK_TEXT_LIMITS,
   MAX_LINK_PAYLOAD,

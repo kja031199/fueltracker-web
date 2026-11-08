@@ -8,7 +8,7 @@
 
 import { draftFromRecord } from './recordMapping';
 import type { FillUpRecord, PendingFillUpRecord, SyncFields, VehicleRecord, Snapshot } from './records';
-import type { Repositories } from './store';
+import type { Repositories } from './repository';
 import { isStorableId } from './recordId';
 import { atomically } from './atomically';
 import { boundFillUpText, boundPendingText, boundVehicleText } from './recordText';

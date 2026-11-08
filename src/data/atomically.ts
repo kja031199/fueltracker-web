@@ -8,7 +8,7 @@
  * here.
  */
 
-import type { Repositories } from './store';
+import type { Repositories } from './repository';
 
 /**
  * Runs `work` in the repositories' transaction — every write in it lands or

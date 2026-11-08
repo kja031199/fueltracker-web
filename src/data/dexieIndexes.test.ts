@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, test } from 'vitest';
 import 'fake-indexeddb/auto';
 import Dexie from 'dexie';
-import { DexieRepository, DexieSyncState, FuelTrackerDatabase } from './db';
+import { FuelTrackerDatabase } from './db';
+import { DexieRepository } from './dexieRepository';
+import { DexieSyncState } from './dexieState';
 import type { FillUpRecord } from './records';
 import { SCHEMA_VERSION } from './records';
 import { SYNC_CURSOR_VERSION } from './syncState';

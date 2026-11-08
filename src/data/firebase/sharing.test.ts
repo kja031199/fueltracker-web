@@ -7,7 +7,8 @@ import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../record
 import { FuelTrackerStore } from '../store';
 import type { Account } from '../sharing';
 import { syncAll, type SharingSync } from '../shareSync';
-import { InMemoryShareLedger, InMemorySyncState } from '../syncState';
+import { InMemorySyncState } from '../syncState';
+import { InMemoryShareLedger } from '../shareLedger';
 import { MonotonicClock } from '../syncClock';
 import { makeFuelEntryDraft } from '../../domain/fuelEntryDraft';
 import { FirestoreRemoteStore } from './remoteStore';

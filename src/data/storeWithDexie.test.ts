@@ -2,7 +2,8 @@ import { describe, expect, test } from 'vitest';
 import 'fake-indexeddb/auto';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { computeFuelStatistics } from '../domain/fuelStatistics';
-import { DexieRepository, FuelTrackerDatabase } from './db';
+import { FuelTrackerDatabase } from './db';
+import { DexieRepository } from './dexieRepository';
 import { FuelTrackerStore, toStats } from './store';
 import { seedDemoData } from './demoData';
 

@@ -8,7 +8,8 @@ import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/r
 import { FuelTrackerStore } from '../data/store';
 import { InMemorySharingWorld } from '../data/sharing';
 import type { SharingSync } from '../data/shareSync';
-import { InMemoryShareLedger, InMemorySyncState } from '../data/syncState';
+import { InMemorySyncState } from '../data/syncState';
+import { InMemoryShareLedger } from '../data/shareLedger';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { App } from './App';
 import { saveHasOnboarded } from './onboarding';

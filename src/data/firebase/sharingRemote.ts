@@ -30,7 +30,7 @@ import type { PullCursor, PushSummary, RawSnapshot, RemoteStore } from '../remot
 import { getFirestore } from 'firebase/firestore';
 import type { Account, Invite, Member, Membership, SharingRemote } from '../sharing';
 import { Refused, inviteKey, membershipKey, normalizeEmail } from '../sharing';
-import { parseLedger } from '../syncState';
+import { parseLedger } from '../shareLedger';
 import { TEXT_LIMITS, boundText } from '../../domain/textLimits';
 import { decode, encodeReceipt, fromMicros, toMicros } from './remoteStore';
 import { firebaseApp, type FirebaseSettings } from './config';

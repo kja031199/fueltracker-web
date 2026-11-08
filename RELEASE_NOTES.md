@@ -11,6 +11,13 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-08
 
+- **No change you'll see: the data layer's modules now depend in one
+  direction.** The second step of tidying it.
+  *Technical:* `Repositories` → `repository.ts`, the store clock →
+  `syncClock.ts`, sharing's shapes → `sharingTypes.ts`, the share ledger →
+  `shareLedger.ts`, and `db.ts` split into the schema, `dexieRepository.ts`
+  and `dexieState.ts`; a test refuses any import cycle in `src/data`.
+  [#91](https://github.com/kja031199/fueltracker-web/issues/91) · [PR #117](https://github.com/kja031199/fueltracker-web/pull/117)
 - **No change you'll see: how a fill-up is copied into storage is now written
   once.** The first step of tidying the app's data layer.
   *Technical:* `recordMapping.ts` (`fillUpFromDraft`, `pendingFromDraft`,
