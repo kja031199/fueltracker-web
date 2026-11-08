@@ -68,8 +68,11 @@ export interface SharingRemote {
   /** Invites `email` to `vehicle`. The address is normalised first. */
   invite(vehicle: Pick<VehicleRecord, 'id' | 'name'>, email: string): Promise<Invite>;
   withdrawInvite(vehicleId: string, email: string): Promise<void>;
-  /** Invitations this account has sent and nobody has answered. */
-  invitesSent(): Promise<Invite[]>;
+  /**
+   * Invitations this account has sent and nobody has answered — for one car
+   * when `vehicleId` is given, which the account then reads alone (#89).
+   */
+  invitesSent(vehicleId?: string): Promise<Invite[]>;
   /** Who a car is shared with. Readable by its owner and its members. */
   members(ownerUid: string, vehicleId: string): Promise<Member[]>;
   /** Removes a member, and withdraws any invitation of theirs still there (#80). */
@@ -156,6 +159,11 @@ export class InMemorySharingWorld {
   readonly members = new Map<string, Map<string, Member>>();
   /** member uid → memberships by key. */
   readonly memberships = new Map<string, Map<string, Membership>>();
+  /**
+   * How many times each sharing read has been made, by anyone (#89). On the
+   * free plan reads are what runs out, so tests count them.
+   */
+  readonly reads = { memberships: 0, members: 0, invitesForMe: 0, invitesSent: 0 };
 
   /** An account's own tree — what its ordinary sync pushes to and pulls from. */
   remoteFor(uid: string): InMemoryRemoteStore {
@@ -222,11 +230,15 @@ class InMemorySharing implements SharingRemote {
     this.world.invites.delete(inviteKey(this.me.uid, vehicleId, email));
   }
 
-  async invitesSent(): Promise<Invite[]> {
-    return [...this.world.invites.values()].filter((invite) => invite.ownerUid === this.me.uid);
+  async invitesSent(vehicleId?: string): Promise<Invite[]> {
+    this.world.reads.invitesSent += 1;
+    return [...this.world.invites.values()].filter(
+      (invite) => invite.ownerUid === this.me.uid && (vehicleId === undefined || invite.vehicleId === vehicleId),
+    );
   }
 
   async members(ownerUid: string, vehicleId: string): Promise<Member[]> {
+    this.world.reads.members += 1;
     if (ownerUid !== this.me.uid && !(await this.world.isLiveMember(ownerUid, vehicleId, this.me.uid))) {
       throw new Refused('members of a car you are not in');
     }
@@ -248,6 +260,7 @@ class InMemorySharing implements SharingRemote {
   }
 
   async invitesForMe(): Promise<Invite[]> {
+    this.world.reads.invitesForMe += 1;
     const email = this.myEmail();
     if (email === null) return [];
     return [...this.world.invites.values()].filter((invite) => invite.email === email);
@@ -291,6 +304,7 @@ class InMemorySharing implements SharingRemote {
   }
 
   async memberships(): Promise<Membership[]> {
+    this.world.reads.memberships += 1;
     return [...(this.world.memberships.get(this.me.uid)?.values() ?? [])];
   }
 

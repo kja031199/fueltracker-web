@@ -1158,3 +1158,20 @@ describe('incremental pull (#52)', () => {
     expect((await remote.pull()).vehicles).toHaveLength(1);
   });
 });
+
+describe('a remote reading in full because its index is missing (#89)', () => {
+  test('is reported in the outcome, and only when it happened', async () => {
+    const { store, clock } = storeWith();
+    const remote = new InMemoryRemoteStore();
+    const fullRead: RemoteStore = {
+      pull: async (since) => ({ ...(await remote.pull(since)), indexMissing: true }),
+      push: (rows) => remote.push(rows),
+    };
+
+    const told = await syncOnce(store, fullRead, clock);
+    const quiet = await syncOnce(store, remote, clock);
+
+    expect(told.ok && told.outcome.indexMissing).toBe(true);
+    expect(quiet.ok && quiet.outcome.indexMissing).toBe(false);
+  });
+});

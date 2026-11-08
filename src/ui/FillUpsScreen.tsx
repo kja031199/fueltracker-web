@@ -295,30 +295,29 @@ export function FillUpsScreen({ units }: Props): ReactElement {
  * name comes from the membership; everyone else's from the car's members.
  */
 function useEnteredByNames(vehicleId: string | null): ReadonlyMap<string, string> | null {
-  const { sharing, me } = useFuelLog();
-  const [names, setNames] = useState<ReadonlyMap<string, string> | null>(null);
-  const membership = vehicleId === null ? undefined : sharing.membershipFor(vehicleId);
-  const { enabled, membersOf } = sharing;
+  const { sharing, me, fillUps } = useFuelLog();
+  // Kept with the car they are for, so another car's names are never shown.
+  const [names, setNames] = useState<{ readonly vehicleId: string; readonly names: ReadonlyMap<string, string> | null } | null>(null);
+  const { enabled, namesFor } = sharing;
+  // Who entered this car's fill-ups, as a stable key: the names are asked for
+  // again only when somebody new appears (#89), not after every sync.
+  const entered = useMemo(
+    () => [...new Set(fillUps.map((row) => row.enteredBy ?? ''))].sort().join('\n'),
+    [fillUps],
+  );
 
   useEffect(() => {
     let cancelled = false;
-    setNames(null);
     if (!enabled || vehicleId === null || me === null) return;
-    void membersOf(vehicleId)
-      .then((members) => {
-        if (cancelled) return;
-        if (membership === undefined && members.length === 0) return; // not shared
-        const map = new Map<string, string>();
-        for (const member of members) map.set(member.uid, member.name || member.email);
-        if (membership !== undefined) map.set(membership.ownerUid, membership.ownerName || 'its owner');
-        map.set(me, 'you');
-        setNames(map);
+    void namesFor(vehicleId, entered.split('\n'))
+      .then((found) => {
+        if (!cancelled) setNames({ vehicleId, names: found });
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [enabled, membersOf, vehicleId, me, membership]);
+  }, [enabled, namesFor, vehicleId, me, entered]);
 
-  return names;
+  return enabled && me !== null && names !== null && names.vehicleId === vehicleId ? names.names : null;
 }

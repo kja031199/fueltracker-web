@@ -219,7 +219,9 @@ Rules Admin and Service Usage Consumer — see
 Granting a fourth role for a file that changes once in a long while is the
 wrong trade. Nothing breaks without it: the read falls back to the whole car
 (`withIndexFallback`), so sharing works from the first deploy, just with more
-reads until the index exists. `toolchain.test.ts` keeps the index declared.
+reads until the index exists. A member sees that in Settings, as part of the
+sync's notice ("shared cars were read in full…", #89), so a missing index
+does not go unnoticed. `toolchain.test.ts` keeps the index declared.
 
 The rules tests now include every file under `src/data/firebase/` — the CI step
 runs the directory, so a new emulator test file cannot be skipped by accident.

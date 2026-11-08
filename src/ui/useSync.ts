@@ -26,6 +26,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RemoteStore } from '../data/remote';
 import type { FuelTrackerStore } from '../data/store';
 import { syncAll, type SharingSync } from '../data/shareSync';
+import type { Membership } from '../data/sharing';
 import type { SyncOutcome } from '../data/sync';
 import { sharedSyncClock } from '../data/syncClock';
 import { InMemorySyncState, type SyncStateStore } from '../data/syncState';
@@ -74,6 +75,11 @@ export function useSync(
    * with its owner's account after this account's own sync. Null without one.
    */
   sharing: SharingSync | null = null,
+  /**
+   * Handed the cars shared with this account whenever a sync has just read
+   * them (#89), so the screens need not read them again.
+   */
+  onShares: (memberships: readonly Membership[]) => void = () => {},
 ): SyncStatus {
   const [fallbackState] = useState<SyncStateStore>(() => new InMemorySyncState());
   const state = syncState ?? fallbackState;
@@ -81,11 +87,15 @@ export function useSync(
   const [lastSyncedAt, setLastSyncedAt] = useAccountPreference(LAST_SYNCED, account, null);
   const [message, setMessage] = useState<string | null>(null);
   const [refused, setRefused] = useState(false);
+  // The latest callback, without making every new one restart the scheduler.
+  const sharesSeen = useRef(onShares);
+  sharesSeen.current = onShares;
   const run = useCallback(async () => {
     if (remote === null) return;
     setSyncing(true);
     try {
       const all = await syncAll(store, remote, sharing, sharedSyncClock, state);
+      if (all.shares.memberships !== null) sharesSeen.current(all.shares.memberships);
       const result = all.own;
       if (!result.ok) {
         setMessage(result.reason);
@@ -164,6 +174,13 @@ export function useSync(
           `changes to ${refused.vehicleName || 'a shared car'} were refused by ${refused.ownerName || 'its owner'}'s account and stay on this device only`,
         );
       }
+      // #89: one note however many cars it applies to. It settles by itself
+      // once the index is built, but until then every sync reads every row.
+      if (every.some((outcome) => outcome.indexMissing)) {
+        notes.push(
+          'shared cars were read in full because the database is still building an index — this settles by itself',
+        );
+      }
       if (all.shares.failed.length > 0) {
         notes.push(`${all.shares.failed.length} shared car(s) could not be reached and will be retried`);
       }
@@ -171,9 +188,15 @@ export function useSync(
 
       const changed =
         pulled.vehiclesWritten + pulled.fillUpsWritten + pulled.pendingWritten > 0;
-      // A shared car's sync can bring rows too; reloading is cheap next to
-      // showing someone a fill-up their partner logged a minute ago late.
-      const sharesMoved = all.shares.synced.length + all.shares.ended.length > 0;
+      // A shared car's sync can bring rows too — but only one that did (#89):
+      // every sync of a shared car used to reload every screen.
+      const sharesMoved =
+        all.shares.ended.length > 0 ||
+        all.shares.outcomes.some(
+          (outcome) =>
+            outcome.pulled.vehiclesWritten + outcome.pulled.fillUpsWritten + outcome.pulled.pendingWritten > 0 ||
+            outcome.repaired > 0,
+        );
       if (changed || repaired > 0 || sharesMoved) await onChanged();
     } finally {
       setSyncing(false);

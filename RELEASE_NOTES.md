@@ -11,6 +11,16 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-08
 
+- **Syncing uses fewer of your account's free reads when you share cars.** Each
+  sync now checks which cars are shared with you once instead of twice, and the
+  fill-up list stops asking who a car is shared with after it has asked once.
+  If shared cars are being read in full because the database is still building
+  an index, Settings now says so.
+  *Technical:* `syncAll` hands back the memberships it read; "entered by"
+  names cached per car (`namesFor`); invitations queried per car; a shared
+  car's document and fill-ups read in parallel; `indexMissing` reported;
+  screens reload only when a shared car's sync wrote rows.
+  [#89](https://github.com/kja031199/fueltracker-web/issues/89) · [PR #114](https://github.com/kja031199/fueltracker-web/pull/114)
 - **Release notes.** No change in the app: this file now records what each
   update changed, starting from the fill-up links.
   *Technical:* `RELEASE_NOTES.md`, and a "Release notes" check that fails a
