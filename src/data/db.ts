@@ -39,6 +39,13 @@ export class FuelTrackerDatabase extends Dexie {
   declare fillUps: Table<FillUpRecord, string>;
   declare pendingFillUps: Table<PendingFillUpRecord, string>;
   declare syncState: Table<{ readonly key: string } & Record<string, unknown>, string>;
+  /**
+   * What each sync cursor knows the account holds (#91): one row per version,
+   * keyed `{cursor key}␀{collection}/{id}` (a NUL between them), so a sync writes the versions it
+   * read and no others. They used to be one field of the cursor, rewritten
+   * whole on every sync.
+   */
+  declare knownVersions: Table<{ readonly key: string; readonly at: number }, string>;
 
   /**
    * `name` is required (#57). Its default used to be `'fueltracker'`, the
@@ -69,6 +76,16 @@ export class FuelTrackerDatabase extends Dexie {
       fillUps: 'id, vehicleId, date, deletedAt',
       pendingFillUps: 'id, vehicleId, deletedAt',
       syncState: 'key',
+    });
+    // Version 4 adds the known versions' own table (#91). It moves no data:
+    // the cursors written before it are version 1, discarded by the code that
+    // reads them, and the full read that follows fills this table.
+    this.version(4).stores({
+      vehicles: 'id, deletedAt',
+      fillUps: 'id, vehicleId, date, deletedAt',
+      pendingFillUps: 'id, vehicleId, deletedAt',
+      syncState: 'key',
+      knownVersions: 'key',
     });
   }
 }

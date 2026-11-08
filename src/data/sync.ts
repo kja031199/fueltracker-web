@@ -37,6 +37,8 @@ import type { SyncTarget } from './replica';
 import { LocalView } from './localView';
 import {
   SYNC_CURSOR_VERSION,
+  collectionOf,
+  type KnownUpdate,
   usableCursor,
   type SyncCursor,
   type SyncStateStore,
@@ -266,7 +268,19 @@ export async function syncOnce(
   // fast device's rows, so a full read stamped with it would look like it
   // happened in the future to the fresh clock after a reload, and every reload
   // would fall back to a full read. Mutation testing caught exactly that.
-  const cursor = usableCursor(saved, clock.wall()) ? saved : null;
+  let cursor = usableCursor(saved, clock.wall()) ? saved : null;
+  // What the account holds, as far as earlier syncs learned (#91: kept beside
+  // the cursor now). Unreadable, the cursor is not trusted either: a sync that
+  // knew nothing would re-send everything and, worse, rebuild the clock's
+  // floor from nothing. A full read rebuilds both.
+  let stored: Record<string, number> = {};
+  if (cursor !== null) {
+    try {
+      stored = await state.loadKnown();
+    } catch {
+      cursor = null;
+    }
+  }
 
   let raw: RawSnapshot;
   try {
@@ -293,19 +307,24 @@ export async function syncOnce(
   // to compare against.
   // A collection read in full replaces what was known about it, so a document
   // that has disappeared from the account stops being "known" and is sent again.
+  const readInFull = ALL_COLLECTIONS.filter(
+    (name) => cursor === null || cursor.highWater[name] === null || cursor.highWater[name] === undefined,
+  );
   const known: Record<string, number> = {};
-  if (cursor !== null) {
-    for (const [key, at] of Object.entries(cursor.known)) {
-      const name = key.slice(0, key.indexOf('/')) as Collection;
-      if (cursor.highWater[name] !== null && cursor.highWater[name] !== undefined) known[key] = at;
-    }
+  for (const [key, at] of Object.entries(stored)) {
+    if (!readInFull.includes(collectionOf(key))) known[key] = at;
   }
+  // What this pull taught: the only versions this sync writes (#91).
+  const learned: Record<string, number> = {};
   for (const [name, rows] of [
     ['vehicles', remoteSnapshot.vehicles],
     ['fillUps', remoteSnapshot.fillUps],
     ['pendingFillUps', remoteSnapshot.pendingFillUps],
   ] as const) {
-    for (const row of rows) known[keyOf(name, row.id)] = row.updatedAt;
+    for (const row of rows) {
+      known[keyOf(name, row.id)] = row.updatedAt;
+      learned[keyOf(name, row.id)] = row.updatedAt;
+    }
   }
 
   // Observed from **everything known**, not only from what was just pulled.
@@ -369,7 +388,7 @@ export async function syncOnce(
   // stays newer than what is known and is retried next time.
   const highWater = advance(cursor, raw.highWater);
   const fullPulledAt = cursor === null ? clock.wall() : cursor.fullPulledAt;
-  await persist(state, { highWater, known, fullPulledAt });
+  await persist(state, { highWater, known: { replace: readInFull, set: learned }, fullPulledAt });
 
   const localAfter = await local.snapshot();
   // Anything with an id the account cannot address is held back here, by name,
@@ -459,25 +478,29 @@ function advance(previous: SyncCursor | null, read: PullCursor | undefined): Pul
 }
 
 /**
- * Saves the cursor. A failure to save costs a full read next time, never data,
- * so it is not allowed to fail the sync.
+ * Saves what this sync learned, then the cursor. A failure to save costs a
+ * re-read next time, never data, so it is not allowed to fail the sync — and
+ * the cursor is saved only once the versions are (#91): a cursor moved past
+ * versions it never kept would leave the next sync knowing less than it read.
  */
 async function persist(
   state: SyncStateStore,
-  parts: { highWater: PullCursor; known: Record<string, number>; fullPulledAt: number },
+  parts: { highWater: PullCursor; known: KnownUpdate; fullPulledAt: number },
 ): Promise<void> {
   try {
+    await state.saveKnown(parts.known);
     await state.save({
       version: SYNC_CURSOR_VERSION,
       schemaVersion: SCHEMA_VERSION,
       highWater: parts.highWater,
-      known: { ...parts.known },
       fullPulledAt: parts.fullPulledAt,
     });
   } catch {
-    // Storage refused; the next sync starts from a full read.
+    // Storage refused; the next sync starts from the cursor it had.
   }
 }
+
+const ALL_COLLECTIONS: readonly Collection[] = ['vehicles', 'fillUps', 'pendingFillUps'];
 
 /**
  * Which of two versions of a row, stamped with the same `updatedAt`, wins.
