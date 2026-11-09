@@ -140,3 +140,40 @@ export function editableText(value: number | null, toDisplay: (canonical: number
   // decimals is the precision a pump prints and what the entry boundary keeps.
   return String(Math.round(toDisplay(value) * 1000) / 1000);
 }
+
+/**
+ * A receipt scan applied **into blanks only** (#93: moved out of the form).
+ *
+ * What somebody typed outranks what a camera guessed. A scanner that
+ * overwrites a hand-entered price is worse than one that does nothing,
+ * because the correction is invisible — the field just quietly holds a
+ * different number than the person put there. So gallons, price and station
+ * fill only where empty (a typed zero is not empty), the date only if it was
+ * never set by hand, and the photo is always the scan's: it is what was read.
+ */
+export function applyScan(
+  form: FillUpFormState,
+  scan: {
+    readonly gallons: number | null;
+    readonly pricePerGallon: number | null;
+    readonly date: Date | null;
+    readonly station: string | null;
+    readonly receiptImageData: Uint8Array;
+  },
+  options: { readonly dateTouched: boolean },
+): FillUpFormState {
+  return {
+    ...form,
+    gallons: form.gallons ?? scan.gallons,
+    pricePerGallon: form.pricePerGallon ?? scan.pricePerGallon,
+    station: form.station === '' ? (scan.station ?? '') : form.station,
+    receiptImageData: scan.receiptImageData,
+    ...(scan.date !== null && !options.dateTouched ? { date: scan.date } : {}),
+  };
+}
+
+/** A date as the local wall-clock string a `datetime-local` input wants — not an ISO instant. */
+export function datetimeLocalValue(date: Date): string {
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}

@@ -259,3 +259,13 @@ export function fillUpFacts(
   if (options.missed === true && entry.missedPreviousFillUp === true) facts.push('missed previous');
   return facts;
 }
+
+/**
+ * The year typed when adding a car (#93: moved out of Vehicles). Read as its
+ * leading whole number, as it always has been; blank or nonsense is this
+ * year rather than a stored NaN.
+ */
+export function vehicleYear(text: string, now: Date = new Date()): number {
+  const parsed = Number.parseInt(text, 10);
+  return Number.isFinite(parsed) ? parsed : now.getFullYear();
+}

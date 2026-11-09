@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import {
+  applyScan,
   canSaveForm,
+  datetimeLocalValue,
   draftFromForm,
   editableText,
   emptyFillUpForm,
@@ -147,5 +149,78 @@ describe('a stored value, as text to edit (#93: moved from the form component)',
     expect(editableText(10, (gallons) => gallons * 3.785411784)).toBe('37.854');
     expect(editableText(3.4999, same)).toBe('3.5');
     expect(editableText(12, same)).toBe('12');
+  });
+});
+
+describe('a receipt scan fills blanks only (#93: moved out of the form component)', () => {
+  const photo = new Uint8Array([9, 9, 9]);
+  const scan = {
+    gallons: 11.2,
+    pricePerGallon: 3.459,
+    date: new Date(2026, 4, 2, 8, 30),
+    station: 'Shell',
+    receiptImageData: photo,
+  };
+  const blank = { ...emptyFillUpForm(new Date(2026, 4, 3, 12, 0)), receiptImageData: null };
+
+  test('blank fields take what the scan read', () => {
+    const next = applyScan(blank, scan, { dateTouched: false });
+    expect(next.gallons).toBe(11.2);
+    expect(next.pricePerGallon).toBe(3.459);
+    expect(next.station).toBe('Shell');
+    expect(next.date).toEqual(scan.date);
+  });
+
+  test('what somebody typed outranks what a camera guessed', () => {
+    const typed = { ...blank, gallons: 9, pricePerGallon: 3.1, station: 'Costco' };
+    const next = applyScan(typed, scan, { dateTouched: false });
+    expect([next.gallons, next.pricePerGallon, next.station]).toEqual([9, 3.1, 'Costco']);
+  });
+
+  test('a typed zero is a value, not a blank', () => {
+    const next = applyScan({ ...blank, gallons: 0, pricePerGallon: 0 }, scan, { dateTouched: false });
+    expect([next.gallons, next.pricePerGallon]).toEqual([0, 0]);
+  });
+
+  test('a date set by hand survives; one never touched takes the receipt’s', () => {
+    expect(applyScan(blank, scan, { dateTouched: true }).date).toEqual(blank.date);
+    expect(applyScan(blank, scan, { dateTouched: false }).date).toEqual(scan.date);
+  });
+
+  test('a scan that read nothing changes nothing but the photo', () => {
+    const nothing = { gallons: null, pricePerGallon: null, date: null, station: null, receiptImageData: photo };
+    const next = applyScan(blank, nothing, { dateTouched: false });
+    expect(next).toEqual({ ...blank, receiptImageData: photo });
+  });
+
+  test('the photo is always the new one, even over an earlier scan’s', () => {
+    const earlier = { ...blank, receiptImageData: new Uint8Array([1]) };
+    expect(applyScan(earlier, scan, { dateTouched: true }).receiptImageData).toBe(photo);
+  });
+
+  test('nothing outside the scanned fields moves', () => {
+    const set = { ...blank, odometer: 12_000, isFullTank: false, missedPreviousFillUp: true, notes: 'n' };
+    const next = applyScan(set, scan, { dateTouched: false });
+    expect([next.odometer, next.isFullTank, next.missedPreviousFillUp, next.notes]).toEqual([12_000, false, true, 'n']);
+  });
+});
+
+describe('a date as a datetime-local value (#93: moved out of the form component)', () => {
+  test('local wall-clock time, every part zero-padded', () => {
+    expect(datetimeLocalValue(new Date(2026, 0, 5, 7, 4))).toBe('2026-01-05T07:04');
+    expect(datetimeLocalValue(new Date(2026, 11, 31, 23, 59))).toBe('2026-12-31T23:59');
+  });
+
+  test('midnight is 00:00, not 24:00 or a blank', () => {
+    expect(datetimeLocalValue(new Date(2026, 6, 1, 0, 0))).toBe('2026-07-01T00:00');
+  });
+
+  test('seconds are dropped, not rounded into the next minute', () => {
+    expect(datetimeLocalValue(new Date(2026, 6, 1, 9, 15, 59))).toBe('2026-07-01T09:15');
+  });
+
+  test('reads back as the same local minute', () => {
+    const date = new Date(2026, 2, 10, 14, 30);
+    expect(new Date(datetimeLocalValue(date)).getTime()).toBe(date.getTime());
   });
 });

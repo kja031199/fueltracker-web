@@ -268,6 +268,8 @@ Recorded so a regression in the tests themselves is visible:
 | Shared patterns (#93): `displayName` untrimmed / "missed previous" always shown / each `oneCopy` guard narrowed (frame, clipboard, name, confirm) | 4 / 1 / 2, 2, 1, 1 |
 | Styles (#93): the guard counting every style as computed / reading one-line styles only / counting an interpolated template as fixed / a fixed inline style put back | 1 / 1 / 2 / 1 |
 | Text colours (#93): secondary back to #6C6C70 / text colours not painted / the stylesheet copy drifting / contrast measured on the card only | 2 / 6 / 1 / 1 |
+| Split UI (#93): a scan overwriting a typed price / a typed zero read as blank / the scan's date over a hand-set one / the old photo kept / the form forgetting the date was set by hand / `datetime-local` unpadded | 2 / 1 / 1 / 1 / 1 / 4 |
+| Split UI (#93): a car's year NaN for nonsense / two of a row's panels open at once / a panel button that never closes / Settings without its backup section / the size limit raised to 500 / a stale size allowance kept | 1 / 1 / 2 / 7 / 1 / 1 |
 
 Equivalent, and kept as a backstop: `shape()` without its `hasAll`. Every
 required field is also read by a clause of its own, and reading a missing field

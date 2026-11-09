@@ -1,19 +1,12 @@
 import type { ReactElement } from 'react';
-import { useRef, useState } from 'react';
 import type { UnitPreferences } from '../domain/units';
 import type { AuthUser } from '../data/auth';
-import { useBackupStatus, useFuelLog, useSyncStatus } from './fuelLog';
-import { AccountId } from './AccountId';
 import { DEFAULT_IDLE_MINUTES } from '../domain/idleTimeout';
-import { describeSince } from '../domain/format';
-import {
-  DISTANCE_UNITS,
-  ECONOMY_UNITS,
-  VOLUME_UNITS,
-  distance,
-  economy,
-  volume,
-} from '../domain/units';
+import { UnitsSection } from './settings/UnitsSection';
+import { AccountSection } from './settings/AccountSection';
+import { SecuritySection } from './settings/SecuritySection';
+import { StorageSection } from './settings/StorageSection';
+import { BackupSection } from './settings/BackupSection';
 
 interface Props {
   readonly units: UnitPreferences;
@@ -28,11 +21,8 @@ interface Props {
 }
 
 /**
- * The account, units, and the honest note about where the data lives.
- *
- * Changing a unit changes only what is shown and what typed numbers are read
- * as; every stored value stays canonical, so nothing is rewritten and nothing
- * can be lost in a conversion.
+ * The account, units, and the honest note about where the data lives — one
+ * component per section, in \`ui/settings/\` (#93).
  */
 export function SettingsScreen({
   units,
@@ -42,273 +32,13 @@ export function SettingsScreen({
   syncEnabled = false,
   idleMinutes = DEFAULT_IDLE_MINUTES,
 }: Props): ReactElement {
-  // Backup, restore and sync all go through the fuel log (#56): an import
-  // refreshes the screens and schedules a sync, and a backup is recorded for
-  // the reminder (#93), without this screen asking.
-  const { saveBackup, exportCsv, importFile } = useFuelLog();
-  const { lastBackupAt } = useBackupStatus();
-  const sync = useSyncStatus();
-  const fileInput = useRef<HTMLInputElement>(null);
-  const [status, setStatus] = useState<string | null>(null);
-  const [problems, setProblems] = useState<readonly string[]>([]);
-
-  async function exportJson(): Promise<void> {
-    const saved = await saveBackup();
-    setProblems([]);
-    setStatus(
-      `Saved a backup of ${saved.vehicles} vehicle(s) and ${saved.fillUps} fill-up(s).`,
-    );
-  }
-
-  async function exportSpreadsheet(): Promise<void> {
-    const count = await exportCsv();
-    setProblems([]);
-    setStatus(`Saved ${count} fill-up(s) as CSV.`);
-  }
-
-  async function chooseFile(file: File): Promise<void> {
-    const { summary, problems: found } = await importFile(file);
-    setStatus(
-      summary === null
-        ? null
-        : `Imported ${summary.fillUpsWritten} fill-up(s) and ${summary.vehiclesWritten} vehicle(s). ` +
-            `${summary.skippedOlder} row(s) were already up to date.`,
-    );
-    setProblems(found);
-  }
-
   return (
     <div>
-      <section className="card" aria-labelledby="units-heading">
-        <h2 className="card__title" id="units-heading">
-          Units
-        </h2>
-
-        <div className="field">
-          <label className="field__label" htmlFor="unit-volume">
-            Volume
-          </label>
-          <select
-            id="unit-volume"
-            value={units.volume}
-            onChange={(e) =>
-              onChange({ ...units, volume: e.target.value as UnitPreferences['volume'] })
-            }
-          >
-            {VOLUME_UNITS.map((unit) => (
-              <option key={unit} value={unit}>
-                {volume[unit].name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="field">
-          <label className="field__label" htmlFor="unit-distance">
-            Distance
-          </label>
-          <select
-            id="unit-distance"
-            value={units.distance}
-            onChange={(e) =>
-              onChange({ ...units, distance: e.target.value as UnitPreferences['distance'] })
-            }
-          >
-            {DISTANCE_UNITS.map((unit) => (
-              <option key={unit} value={unit}>
-                {distance[unit].name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="field">
-          <label className="field__label" htmlFor="unit-economy">
-            Fuel economy
-          </label>
-          <select
-            id="unit-economy"
-            value={units.economy}
-            onChange={(e) =>
-              onChange({ ...units, economy: e.target.value as UnitPreferences['economy'] })
-            }
-          >
-            {ECONOMY_UNITS.map((unit) => (
-              <option key={unit} value={unit}>
-                {economy[unit].name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <p className="note flush">
-          Readings are stored in miles, US gallons and MPG whatever you pick here — changing a unit
-          changes what you see and type, never what is saved.
-        </p>
-      </section>
-
-      {account !== undefined && (
-        <section className="card" aria-labelledby="account-heading">
-          <h2 className="card__title" id="account-heading">
-            Account
-          </h2>
-          <p className="stack-sm">
-            Signed in as <strong>{account.email === '' ? account.displayName : account.email}</strong>.
-          </p>
-
-          <AccountId uid={account.uid}>
-            Send this to whoever runs this copy of FuelTracker if they need to give your
-            account access.
-          </AccountId>
-
-          {syncEnabled ? (
-            <>
-              <p className="stack-sm">
-                Last synced {describeSince(sync.lastSyncedAt)}.
-              </p>
-              <button
-                className="button"
-                type="button"
-                onClick={() => void sync.syncNow()}
-                disabled={sync.syncing}
-              >
-                {sync.syncing ? 'Syncing…' : 'Sync now'}
-              </button>
-              {sync.message !== null && (
-                <p className="warning after-sm" role="status">
-                  {sync.message}
-                </p>
-              )}
-            </>
-          ) : (
-            <p className="warning stack-sm">
-              This build has no backend configured, so nothing is syncing — your fuel log is only on
-              this device.
-            </p>
-          )}
-
-          {onSignOut !== undefined && (
-            <p className="after">
-              <button className="button button--secondary" type="button" onClick={onSignOut}>
-                Sign out
-              </button>
-            </p>
-          )}
-        </section>
-      )}
-
-      <section className="card" aria-labelledby="security-heading">
-        <h2 className="card__title" id="security-heading">
-          Security
-        </h2>
-        {/* Stated, not offered (#70): the period is set for everyone by the
-            administrator, and there is nothing here to change or switch off. */}
-        <p className="stack-sm">
-          For security, you are signed out after {idleMinutes} minutes of inactivity. This applies
-          to everyone using FuelTracker and cannot be changed here.
-        </p>
-        {/* The limits, next to the statement rather than in a help page. This
-            protects less than its name suggests, and a lock that implies more
-            safety than it delivers is worse than none. */}
-        <p className="stack-sm">
-          Your fuel log stays on this device either way. Signing out ends the session; it does not
-          hide your fill-ups from anyone who opens the browser&rsquo;s developer tools, and it is a
-          small addition to locking the device itself.
-        </p>
-        <p className="warning flush">
-          Signing back in needs a connection, so a device that is offline cannot get back into the
-          app until it reconnects.
-        </p>
-      </section>
-
-      <section className="card" aria-labelledby="storage-heading">
-        <h2 className="card__title" id="storage-heading">
-          Where your data lives
-        </h2>
-        <p className="stack-sm">
-          Your fuel log is stored in this browser and kept in your Google account. Nobody else can
-          read it — not another signed-in person, and not anyone without your account — except a
-          car you choose to share, which the people you share it with can see and log (Vehicles →
-          Share).
-        </p>
-        <p className="stack-sm">
-          Because there is a copy in your account, clearing your browser data no longer loses your
-          history: signing in again pulls it back.
-        </p>
-        <p className="warning flush">
-          Receipt photos are the exception. A large one stays on the device that took it rather than
-          syncing, so it is the one thing a cleared browser can still lose. Exporting a backup is
-          still worth doing — it is the only copy that does not depend on anyone else's service.
-        </p>
-      </section>
-
-      <section className="card" aria-labelledby="backup-heading">
-        <h2 className="card__title" id="backup-heading">
-          Backup and restore
-        </h2>
-
-        <p className="stack-sm">
-          Last backup: <strong>{describeSince(lastBackupAt)}</strong>.
-        </p>
-        <p className="stack muted">
-          Only the JSON export counts as a backup. The CSV is fill-ups only — no vehicles, no
-          deletions, no receipt photos — so it is for spreadsheets, not for restoring.
-        </p>
-
-        <div className="row-actions">
-          <button className="button" type="button" onClick={() => void exportJson()}>
-            Export backup (JSON)
-          </button>
-          <button className="button button--secondary" type="button" onClick={() => void exportSpreadsheet()}>
-            Export spreadsheet (CSV)
-          </button>
-          <button
-            className="button button--secondary"
-            type="button"
-            onClick={() => fileInput.current?.click()}
-          >
-            Import a file
-          </button>
-        </div>
-
-        <input
-          ref={fileInput}
-          type="file"
-          accept=".json,.csv,application/json,text/csv"
-          hidden
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            // Reset first, so choosing the same file twice fires again.
-            event.target.value = '';
-            if (file !== undefined) void chooseFile(file);
-          }}
-        />
-
-        {status !== null && (
-          <p className="flush-bottom" role="status">
-            {status}
-          </p>
-        )}
-
-        {problems.length > 0 && (
-          <div className="warning space-above">
-            <strong>{problems.length} row(s) could not be imported:</strong>
-            <ul className="indent-list">
-              {problems.slice(0, 10).map((problem) => (
-                <li key={problem}>{problem}</li>
-              ))}
-            </ul>
-            {problems.length > 10 && <p className="flush">…and {problems.length - 10} more.</p>}
-          </div>
-        )}
-
-        <p className="note flush-bottom">
-          The JSON backup is the complete one — every vehicle, every fill-up, and the deletions
-          too — and importing it merges rather than replaces, so restoring an old backup will not
-          wipe out newer entries. The CSV is for spreadsheets: fill-ups only, in miles and US
-          gallons whatever you have selected above, with the unit named in each column heading.
-        </p>
-      </section>
+      <UnitsSection units={units} onChange={onChange} />
+      {account !== undefined && <AccountSection account={account} onSignOut={onSignOut} syncEnabled={syncEnabled} />}
+      <SecuritySection idleMinutes={idleMinutes} />
+      <StorageSection />
+      <BackupSection />
     </div>
   );
 }

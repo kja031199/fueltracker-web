@@ -52,7 +52,11 @@ Hosting at `fueltracker-899eb.web.app`.
   (`FuelLogProvider` / `useFuelLog`, `useSyncStatus` for sync status and
   `useBackupStatus` for the backup reminder) owns the data, sync, **every
   write** and every backup, export and file import;
-  `AppShell` (in `App.tsx`) is the signed-in app (#56).
+  `AppShell` (in `App.tsx`) is the signed-in app (#56). Since #93 the fuel
+  log's shape is `fuelLogTypes.ts` and its sharing lists `useSharingView.ts`;
+  the fill-up form's state and save are `useFillUpForm.ts` (the scan rule,
+  `applyScan`, is pure in `domain/fillUpForm.ts`); Settings is one component
+  per section in `ui/settings/`; a car's row is `VehicleRow`, with one `mode`.
 
 No file or test counts here: the first version carried them and they were wrong
 a pull request later. Run `npm test` for the real figure.
@@ -530,6 +534,13 @@ npm ci --prefix .github/firebase-cli
   first-paint copy that `accessiblePalette.test.ts` holds to the palette; edit
   the palette, then the copy. A utility that loses to a more specific
   component selector needs a matching selector (`.field input.checkbox`).
+- **No interface file over 300 lines** (#93; `src/test/fileSize.test.ts`).
+  Past that a component is usually several things: split out a hook for its
+  state (`useFillUpForm`), a component per section (`ui/settings/`), a row
+  with its own state (`VehicleRow`), and the pure rules into `domain/`. An
+  exception is named in the test's `ALLOWED` with the most it may be and the
+  change that removes it (`App.tsx`, until part 5's route table); the test
+  fails once the exception is no longer needed.
 
 - **Keep the fuel log's context value stable** (#88). Every screen reads
   `useFuelLog()`, so a value rebuilt each render re-renders all of them: it

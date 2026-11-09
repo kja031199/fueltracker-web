@@ -1,100 +1,18 @@
 import type { ReactElement } from 'react';
-import { useState } from 'react';
-import type { FormEvent } from 'react';
-import { vehicleSubtitle } from '../domain/format';
 import { useFuelLog } from './fuelLog';
-import { SharePanel } from './SharePanel';
-import { ConfirmButton } from './ConfirmButton';
-import { RequestLinkPanel } from './RequestLinkPanel';
-import { TEXT_LIMITS } from '../domain/textLimits';
+import { AddVehicleForm } from './AddVehicleForm';
+import { VehicleRow } from './VehicleRow';
 
-/** Vehicles, read from and written through the fuel log (#56). */
+/**
+ * Vehicles, read from and written through the fuel log (#56): the add form,
+ * and a row per car that keeps its own one mode (#93).
+ */
 export function VehiclesScreen({ ownerName = '' }: { readonly ownerName?: string } = {}): ReactElement {
-  const { vehicles, selectedVehicleId, selectVehicle: onSelect, addVehicle, removeVehicle, sharing } =
-    useFuelLog();
-  // Which car's sharing panel is open, and which shared car is being left.
-  const [sharingId, setSharingId] = useState<string | null>(null);
-  // Which car's fill-up request link is showing (#3).
-  const [requestingId, setRequestingId] = useState<string | null>(null);
-  const [leavingId, setLeavingId] = useState<string | null>(null);
-  const [name, setName] = useState('');
-  const [make, setMake] = useState('');
-  const [model, setModel] = useState('');
-  const [year, setYear] = useState(String(new Date().getFullYear()));
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
-
-  const canAdd = name.trim() !== '';
-
-  async function add(event: FormEvent): Promise<void> {
-    event.preventDefault();
-    if (!canAdd) return;
-    const parsedYear = Number.parseInt(year, 10);
-    await addVehicle({
-      name: name.trim(),
-      make: make.trim(),
-      model: model.trim(),
-      // A blank or nonsense year falls back to this one rather than storing NaN.
-      year: Number.isFinite(parsedYear) ? parsedYear : new Date().getFullYear(),
-    });
-    setName('');
-    setMake('');
-    setModel('');
-  }
-
-  async function remove(id: string): Promise<void> {
-    await removeVehicle(id);
-    setConfirmingId(null);
-  }
+  const { vehicles, selectedVehicleId, selectVehicle } = useFuelLog();
 
   return (
     <div>
-      <section className="card" aria-labelledby="add-vehicle-heading">
-        <h2 className="card__title" id="add-vehicle-heading">
-          Add a vehicle
-        </h2>
-        <form onSubmit={(event) => void add(event)}>
-          <div className="field">
-            <label className="field__label" htmlFor="vehicle-name">
-              Name
-            </label>
-            <input
-              id="vehicle-name"
-              maxLength={TEXT_LIMITS.name}
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Daily Driver"
-              required
-            />
-          </div>
-          <div className="field">
-            <label className="field__label" htmlFor="vehicle-make">
-              Make
-            </label>
-            <input id="vehicle-make" maxLength={TEXT_LIMITS.make} value={make} onChange={(e) => setMake(e.target.value)} />
-          </div>
-          <div className="field">
-            <label className="field__label" htmlFor="vehicle-model">
-              Model
-            </label>
-            <input id="vehicle-model" maxLength={TEXT_LIMITS.model} value={model} onChange={(e) => setModel(e.target.value)} />
-          </div>
-          <div className="field">
-            <label className="field__label" htmlFor="vehicle-year">
-              Year
-            </label>
-            <input
-              id="vehicle-year"
-              type="number"
-              inputMode="numeric"
-              value={year}
-              onChange={(e) => setYear(e.target.value)}
-            />
-          </div>
-          <button className="button" type="submit" disabled={!canAdd}>
-            Add vehicle
-          </button>
-        </form>
-      </section>
+      <AddVehicleForm />
 
       <section aria-labelledby="vehicles-heading">
         <h2 className="card__title" id="vehicles-heading">
@@ -104,110 +22,15 @@ export function VehiclesScreen({ ownerName = '' }: { readonly ownerName?: string
           <p className="empty">No vehicles yet. Add one above to start logging fill-ups.</p>
         ) : (
           <ul className="list-plain">
-            {vehicles.map((vehicle) => {
-              const subtitle = vehicleSubtitle(vehicle);
-              const selected = vehicle.id === selectedVehicleId;
-              // A car shared *with* you is its owner's: you can leave it, not
-              // delete or share it (#66).
-              const membership = sharing.membershipFor(vehicle.id);
-              // Deleting a vehicle takes its whole history with it, so it asks
-              // first rather than offering an undo that does not exist yet.
-              const deleting = (asking: boolean): ReactElement => (
-                <ConfirmButton
-                  asking={asking}
-                  onAsk={() => setConfirmingId(vehicle.id)}
-                  onCancel={() => setConfirmingId(null)}
-                  onConfirm={() => void remove(vehicle.id)}
-                  label="Delete"
-                  confirmLabel={`Delete ${vehicle.name} and its fill-ups${
-                    sharing.enabled ? ', for everyone it is shared with' : ''
-                  }`}
-                  cancelLabel="Keep"
-                />
-              );
-              return (
-                <li className="card" key={vehicle.id}>
-                  <div className="row-between">
-                    <div>
-                      <strong>{vehicle.name}</strong>
-                      {subtitle !== '' && (
-                        <div className="note">
-                          {subtitle}
-                        </div>
-                      )}
-                      {membership !== undefined && (
-                        <div className="note">
-                          Shared with you by {membership.ownerName || 'its owner'}
-                        </div>
-                      )}
-                    </div>
-                    {selected && (
-                      <span className="accent-blue bold">Selected</span>
-                    )}
-                  </div>
-                  <div className="row-actions space-above-sm">
-                    {!selected && (
-                      <button
-                        className="button button--secondary"
-                        type="button"
-                        onClick={() => onSelect(vehicle.id)}
-                      >
-                        Select
-                      </button>
-                    )}
-                    {membership !== undefined ? (
-                      <ConfirmButton
-                        asking={leavingId === vehicle.id}
-                        onAsk={() => setLeavingId(vehicle.id)}
-                        onCancel={() => setLeavingId(null)}
-                        onConfirm={() => {
-                          setLeavingId(null);
-                          void sharing.leave(membership);
-                        }}
-                        label="Leave"
-                        confirmLabel={`Leave ${vehicle.name}`}
-                        cancelLabel="Stay"
-                        tone="secondary"
-                      />
-                    ) : confirmingId === vehicle.id ? (
-                      deleting(true)
-                    ) : (
-                      <>
-                        <button
-                          className="button button--secondary"
-                          type="button"
-                          aria-expanded={requestingId === vehicle.id}
-                          onClick={() => setRequestingId(requestingId === vehicle.id ? null : vehicle.id)}
-                        >
-                          {requestingId === vehicle.id ? 'Done' : 'Request a fill-up'}
-                        </button>
-                        {sharing.enabled && (
-                          <button
-                            className="button button--secondary"
-                            type="button"
-                            aria-expanded={sharingId === vehicle.id}
-                            onClick={() => setSharingId(sharingId === vehicle.id ? null : vehicle.id)}
-                          >
-                            {sharingId === vehicle.id ? 'Done sharing' : 'Share'}
-                          </button>
-                        )}
-                        {deleting(false)}
-                      </>
-                    )}
-                  </div>
-                  {membership !== undefined && leavingId === vehicle.id && (
-                    <p className="after-sm">
-                      Leaving removes {vehicle.name} from this device and your others. Fill-ups you logged
-                      stay with {membership.ownerName || 'its owner'}.
-                    </p>
-                  )}
-                  {membership === undefined && sharingId === vehicle.id && <SharePanel vehicle={vehicle} />}
-                  {membership === undefined && requestingId === vehicle.id && (
-                    <RequestLinkPanel vehicle={vehicle} ownerName={ownerName} />
-                  )}
-                </li>
-              );
-            })}
+            {vehicles.map((vehicle) => (
+              <VehicleRow
+                key={vehicle.id}
+                vehicle={vehicle}
+                selected={vehicle.id === selectedVehicleId}
+                onSelect={selectVehicle}
+                ownerName={ownerName}
+              />
+            ))}
           </ul>
         )}
       </section>
