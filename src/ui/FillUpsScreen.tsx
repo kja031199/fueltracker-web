@@ -10,6 +10,7 @@ import type { FuelGrade } from '../domain/fuelGrade';
 import { currency, distance as formatDistance, volume as formatVolume } from '../domain/format';
 import type { UnitPreferences } from '../domain/units';
 import { distance, volume } from '../domain/units';
+import { totalCost } from '../domain/models';
 import { FillUpForm } from './FillUpForm';
 import { useFuelLog } from './fuelLog';
 import { PendingReview } from './PendingReview';
@@ -243,7 +244,7 @@ export function FillUpsScreen({ units }: Props): ReactElement {
                       </div>
                     )}
                   </div>
-                  <strong>{currency(record.gallons * record.pricePerGallon)}</strong>
+                  <strong>{currency(totalCost(record))}</strong>
                 </div>
                 <div className="row-actions" style={{ marginTop: 10 }}>
                   <button

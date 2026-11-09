@@ -8,7 +8,6 @@ import { FuelTrackerStore } from '../data/store';
 import { StubAuthProvider } from '../data/auth';
 import { InMemoryRemoteStore } from '../data/remote';
 import { App } from './App';
-import { describeSyncTime } from './SettingsScreen';
 
 function makeStore(): FuelTrackerStore {
   return new FuelTrackerStore({
@@ -369,32 +368,3 @@ describe('the account section', () => {
   });
 });
 
-describe('describeSyncTime', () => {
-  const now = new Date('2026-03-10T12:00:00Z').getTime();
-
-  test('says so plainly when nothing has synced yet', () => {
-    expect(describeSyncTime(null, now)).toBe('not yet');
-  });
-
-  test('reads as just now inside a minute', () => {
-    expect(describeSyncTime(now - 5_000, now)).toBe('just now');
-  });
-
-  test('counts minutes, then hours', () => {
-    expect(describeSyncTime(now - 3 * 60_000, now)).toBe('3 minutes ago');
-    expect(describeSyncTime(now - 60_000, now)).toBe('1 minute ago');
-    expect(describeSyncTime(now - 2 * 3_600_000, now)).toBe('2 hours ago');
-    expect(describeSyncTime(now - 3_600_000, now)).toBe('1 hour ago');
-  });
-
-  test('falls back to a date once it stops being recent', () => {
-    expect(describeSyncTime(now - 3 * 24 * 3_600_000, now)).toBe(
-      new Date(now - 3 * 24 * 3_600_000).toLocaleDateString(),
-    );
-  });
-
-  test('does not read a clock-skewed future timestamp as a negative age', () => {
-    // A device whose clock is ahead would otherwise produce "-4 minutes ago".
-    expect(describeSyncTime(now + 240_000, now)).toBe('just now');
-  });
-});

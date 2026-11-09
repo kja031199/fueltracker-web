@@ -2,7 +2,8 @@ import { describe, expect, test } from 'vitest';
 import { MAX_RECEIPT_BYTES, makeFuelEntryDraft, type FuelEntryDraft } from '../domain/fuelEntryDraft';
 import { TEXT_LIMITS } from '../domain/textLimits';
 import { SCHEMA_VERSION } from './records';
-import { draftFromRecord, fillUpFromDraft, pendingFromDraft } from './recordMapping';
+import { draftFromRecord, fillUpFromDraft, formFromRecord, pendingFromDraft } from './recordMapping';
+import { draftFromForm, emptyFillUpForm } from '../domain/fillUpForm';
 
 /**
  * A draft and a record, in each direction, written once (#91).
@@ -131,5 +132,25 @@ describe('a record becomes a draft only if it would pass the gate', () => {
     const back = draftFromRecord(record);
     expect(back?.notes).toHaveLength(TEXT_LIMITS.notes);
     expect(back?.receiptImageData).toBeNull();
+  });
+});
+
+describe('a stored fill-up, as the form edits it (#93: moved from the form component)', () => {
+  test('fills every field the form has, and nothing else', () => {
+    const form = formFromRecord(fillUpFromDraft(draft(), FILL_UP_META));
+    expect(Object.keys(form).sort()).toEqual(Object.keys(emptyFillUpForm()).sort());
+  });
+
+  test('opening a fill-up and saving it untouched saves what it was', () => {
+    const record = fillUpFromDraft(draft(), FILL_UP_META);
+    expect(draftFromForm(formFromRecord(record))).toEqual(draftFromRecord(record));
+  });
+
+  test('the date comes back as a date, and the photo as the same bytes', () => {
+    const record = fillUpFromDraft(draft(), FILL_UP_META);
+    const form = formFromRecord(record);
+    expect(form.date).toBeInstanceOf(Date);
+    expect(form.date.getTime()).toBe(record.date);
+    expect(form.receiptImageData).toBe(record.receiptImageData);
   });
 });

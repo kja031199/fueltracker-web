@@ -52,6 +52,22 @@ export const volume: Record<VolumeUnit, VolumeSpec> = {
   },
 };
 
+/**
+ * A canonical **price per gallon** as a price per the given unit (#93): a
+ * litre costs a gallon's price over the litres in a gallon. A price is per
+ * volume, so it converts the other way from a volume — the one place that is
+ * written, where the form, the formatter and the weekday insight each used to
+ * divide by `fromGallons(1)` themselves.
+ */
+export function pricePerUnit(pricePerGallon: number, unit: VolumeUnit): number {
+  return pricePerGallon / volume[unit].fromGallons(1);
+}
+
+/** A price per the given unit, as typed, back to canonical price per gallon. */
+export function pricePerGallonFrom(price: number, unit: VolumeUnit): number {
+  return price * volume[unit].fromGallons(1);
+}
+
 interface DistanceSpec {
   readonly abbreviation: string;
   readonly name: string;

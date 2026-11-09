@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { FUEL_GRADES, fuelGradeFromRaw } from './fuelGrade';
-import { MAX_RECEIPT_BYTES, draftTotalCost, makeFuelEntryDraft } from './fuelEntryDraft';
+import { MAX_RECEIPT_BYTES, makeFuelEntryDraft } from './fuelEntryDraft';
+import { totalCost } from './models';
 import { TEXT_LIMITS } from './textLimits';
 
 const valid = () => ({
@@ -51,7 +52,7 @@ describe('the write chokepoint rejects bad measurements', () => {
 
   test('total cost is derived, never stored', () => {
     const d = makeFuelEntryDraft({ ...valid(), gallons: 10, pricePerGallon: 3.5 })!;
-    expect(draftTotalCost(d)).toBeCloseTo(35, 10);
+    expect(totalCost(d)).toBeCloseTo(35, 10);
   });
 });
 

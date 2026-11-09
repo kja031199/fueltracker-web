@@ -121,16 +121,6 @@ export interface Snapshot {
   readonly pendingFillUps: readonly PendingFillUpRecord[];
 }
 
-/**
- * Total cost is always derived from gallons × price, never stored — the same
- * rule the domain layer follows. A stored total is a second source of truth
- * that can disagree with its own inputs.
- */
-export function recordTotalCost(
-  record: Pick<FillUpRecord, 'gallons' | 'pricePerGallon'>,
-): number {
-  return record.gallons * record.pricePerGallon;
-}
 
 /**
  * Presence check for a usable receipt. Empty bytes count as none, so a stray

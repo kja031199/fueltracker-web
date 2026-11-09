@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { decodeSubmission } from '../data/fillUpLink';
 import type { ReceiveResult } from './fuelLog';
 import { useFuelLog, useSyncStatus } from './fuelLog';
-import { DoneButton, LinkScreen, linkProblemText } from './SubmitScreen';
+import { DoneButton, LinkScreen } from './LinkScreen';
+import { linkProblemText } from './linkMessages';
 
 interface Props {
   /** The submission link's payload, as the address carried it. */

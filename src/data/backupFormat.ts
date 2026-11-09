@@ -25,6 +25,7 @@
 import type { FillUpRecord, Snapshot } from './records';
 import { SCHEMA_VERSION } from './records';
 import { MAX_RECEIPT_BYTES } from '../domain/fuelEntryDraft';
+import { totalCost } from '../domain/models';
 import { validateFillUp, validatePending, validateVehicle } from './recordValidation';
 import { isRecord } from './guards';
 
@@ -348,7 +349,7 @@ export function toCsv(records: readonly FillUpRecord[]): string {
         String(record.odometer),
         String(record.gallons),
         String(record.pricePerGallon),
-        String(record.gallons * record.pricePerGallon),
+        String(totalCost(record)),
         record.isFullTank ? 'yes' : 'no',
         record.missedPreviousFillUp ? 'yes' : 'no',
         record.fuelGrade,

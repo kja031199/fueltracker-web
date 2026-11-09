@@ -14,6 +14,7 @@ import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { TEXT_LIMITS, boundText } from '../domain/textLimits';
 import type { FillUpRecord, PendingFillUpRecord } from './records';
 import { SCHEMA_VERSION } from './records';
+import type { FillUpFormState } from '../domain/fillUpForm';
 
 /** The measurements and details a draft carries, as both records store them. */
 function measurementsOf(draft: FuelEntryDraft) {
@@ -103,4 +104,22 @@ export function draftFromRecord(record: FillUpRecord | PendingFillUpRecord): Fue
     longitude: record.longitude,
     receiptImageData: record.receiptImageData,
   });
+}
+
+/** A stored fill-up as the form edits it, in canonical units. Moved from the form component (#93). */
+export function formFromRecord(record: FillUpRecord): FillUpFormState {
+  return {
+    date: new Date(record.date),
+    odometer: record.odometer,
+    gallons: record.gallons,
+    pricePerGallon: record.pricePerGallon,
+    isFullTank: record.isFullTank,
+    missedPreviousFillUp: record.missedPreviousFillUp,
+    fuelGrade: record.fuelGrade,
+    station: record.station,
+    notes: record.notes,
+    latitude: record.latitude,
+    longitude: record.longitude,
+    receiptImageData: record.receiptImageData,
+  };
 }

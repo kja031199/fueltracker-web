@@ -4,16 +4,19 @@ import type { FillUpFormState } from '../domain/fillUpForm';
 import {
   canSaveForm,
   draftFromForm,
+  editableText,
   emptyFillUpForm,
   formTotalCost,
   odometerLooksWrong,
+  parseTypedNumber,
   previousOdometer,
 } from '../domain/fillUpForm';
+import { formFromRecord } from '../data/recordMapping';
 import { FUEL_GRADES } from '../domain/fuelGrade';
 import type { FuelGrade } from '../domain/fuelGrade';
 import { currency, distance as formatDistance } from '../domain/format';
 import type { UnitPreferences } from '../domain/units';
-import { distance, volume } from '../domain/units';
+import { distance, pricePerGallonFrom, pricePerUnit, volume } from '../domain/units';
 import type { FillUpRecord, FillUpSummary } from '../data/records';
 import { useFuelLog } from './fuelLog';
 import { importReceiptPhoto } from './importReceipt';
@@ -47,50 +50,6 @@ interface Props {
   };
 }
 
-/** A stored record read back into canonical form state. */
-function formFrom(record: FillUpRecord): FillUpFormState {
-  return {
-    date: new Date(record.date),
-    odometer: record.odometer,
-    gallons: record.gallons,
-    pricePerGallon: record.pricePerGallon,
-    isFullTank: record.isFullTank,
-    missedPreviousFillUp: record.missedPreviousFillUp,
-    fuelGrade: record.fuelGrade,
-    station: record.station,
-    notes: record.notes,
-    latitude: record.latitude,
-    longitude: record.longitude,
-    receiptImageData: record.receiptImageData,
-  };
-}
-
-/**
- * Parses a typed number, treating blank and nonsense alike as "not entered".
- *
- * Returning `null` rather than `NaN` is what keeps the draft's validation the
- * only thing deciding whether a form can be saved — a `NaN` odometer would
- * otherwise have to be caught twice.
- */
-function parseNumber(text: string): number | null {
-  if (text.trim() === '') return null;
-  const value = Number(text);
-  return Number.isFinite(value) ? value : null;
-}
-
-/**
- * A canonical value rendered as editable text.
- *
- * Only used to seed a field when editing an existing record — never to re-render
- * text the reader is in the middle of typing. See the note on `numericText`.
- */
-function displayText(value: number | null, toDisplay: (canonical: number) => number): string {
-  if (value === null) return '';
-  // Conversion produces long tails (10 gal → 37.854117839999996); three
-  // decimals is the precision a pump prints and what the entry boundary keeps.
-  return String(Math.round(toDisplay(value) * 1000) / 1000);
-}
-
 /**
  * The fill-up form.
  *
@@ -122,7 +81,7 @@ export function FillUpForm({
   // Saving goes through the fuel log, which refreshes and syncs (#56).
   const { addFillUp, updateFillUp } = useFuelLog();
   const [form, setForm] = useState<FillUpFormState>(() =>
-    editing === null ? emptyFillUpForm() : formFrom(editing),
+    editing === null ? emptyFillUpForm() : formFromRecord(editing),
   );
   const [saving, setSaving] = useState(false);
   // Why the last save did not go through, kept on screen with what was typed.
@@ -151,17 +110,17 @@ export function FillUpForm({
     gallons: string;
     price: string;
   }>(() => ({
-    odometer: displayText(
+    odometer: editableText(
       editing === null ? null : editing.odometer,
       distance[units.distance].fromMiles,
     ),
-    gallons: displayText(
+    gallons: editableText(
       editing === null ? null : editing.gallons,
       volume[units.volume].fromGallons,
     ),
-    price: displayText(
+    price: editableText(
       editing === null ? null : editing.pricePerGallon,
-      (canonical) => canonical / volume[units.volume].fromGallons(1),
+      (canonical) => pricePerUnit(canonical, units.volume),
     ),
   }));
 
@@ -176,7 +135,7 @@ export function FillUpForm({
     toCanonical: (displayed: number) => number,
   ): void {
     setNumericText((current) => ({ ...current, [field]: text }));
-    const typed = parseNumber(text);
+    const typed = parseTypedNumber(text);
     const canonical = typed === null ? null : toCanonical(typed);
     if (field === 'odometer') update('odometer', canonical);
     else if (field === 'gallons') update('gallons', canonical);
@@ -234,13 +193,13 @@ export function FillUpForm({
         ...current,
         gallons:
           current.gallons === '' && suggestion.gallons !== null
-            ? displayText(suggestion.gallons, volumeSpec.fromGallons)
+            ? editableText(suggestion.gallons, volumeSpec.fromGallons)
             : current.gallons,
         price:
           current.price === '' && suggestion.pricePerGallon !== null
-            ? displayText(
+            ? editableText(
                 suggestion.pricePerGallon,
-                (canonical) => canonical / volumeSpec.fromGallons(1),
+                (canonical) => pricePerUnit(canonical, units.volume),
               )
             : current.price,
       }));
@@ -406,7 +365,7 @@ export function FillUpForm({
           inputMode="decimal"
           value={numericText.price}
           onChange={(event) =>
-            typeNumber('price', event.target.value, (typed) => typed * volumeSpec.fromGallons(1))
+            typeNumber('price', event.target.value, (typed) => pricePerGallonFrom(typed, units.volume))
           }
         />
       </div>

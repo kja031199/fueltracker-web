@@ -23,7 +23,13 @@ Hosting at `fueltracker-899eb.web.app`.
   draft gate, the palette, the backup reminder, the idle-timeout rule, the scan
   parsers (`scanning/`). **It imports nothing from `data/` or `ui/`, nor
   React, Dexie or Firebase**, and `src/test/layering.test.ts` enforces that
-  (#54, #93), along with `data/` never importing `ui/`.
+  (#54, #93), along with `data/` never importing `ui/`. A pure function a
+  component needs goes here and is tested here, not inside the component
+  (#93): `describeSince`, `vehicleSubtitle` (`format.ts`), `parseTypedNumber`,
+  `editableText` (`fillUpForm.ts`). One that reads a record goes beside the
+  record mappings (`formFromRecord`, `data/recordMapping.ts`); a sentence
+  about a data-layer code goes in `ui/*Messages.ts` (`syncMessages`,
+  `linkMessages`).
 - `src/data/` — records and persistence. `store.ts` is the write surface,
   `repository.ts` the storage abstraction (and `Repositories`), `db.ts` the
   Dexie schema with its adapters beside it (`dexieRepository.ts`,
@@ -286,6 +292,15 @@ npm ci --prefix .github/firebase-cli
   offline scanning failed. `ocrAssets.test.ts` checks the route is a RegExp.
 
 ### Data and sync
+
+- **Cost is `totalCost`, and a price per litre is `pricePerUnit`** (#93).
+  `totalCost` (`domain/models.ts`) is the only `gallons × price` in the
+  source — records, drafts, the form, the CSV, the lists and the pump reader
+  all call it, and `src/test/oneTotalCost.test.ts` fails on another copy.
+  A canonical price per gallon becomes a price per the reader's unit through
+  `pricePerUnit` / `pricePerGallonFrom` (`domain/units.ts`): a price is per
+  volume, so it converts the opposite way from a volume, and five places used
+  to divide by `fromGallons(1)` themselves.
 
 - **Screens get `FillUpSummary`, not `FillUpRecord`** (#53). `store.fillUps()`
   carries no photo bytes. To edit, load the whole row with `store.fillUp(id)`:

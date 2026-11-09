@@ -95,7 +95,3 @@ export function makeFuelEntryDraft(input: FuelEntryDraftInput): FuelEntryDraft |
   };
 }
 
-/** Total cost is always derived, never stored. */
-export function draftTotalCost(draft: FuelEntryDraft): number {
-  return draft.gallons * draft.pricePerGallon;
-}
