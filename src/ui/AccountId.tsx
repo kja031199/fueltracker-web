@@ -12,12 +12,13 @@
  * refused, while every data read they attempt is being denied. That is why the
  * no-access screen (#41) can show it at all.
  *
- * Extracted rather than written twice: the clipboard handling has three
- * outcomes and a quiet failure mode, and two copies of it would drift.
+ * The clipboard handling is `useCopyToClipboard`, shared with the link
+ * panel: it has three outcomes and a quiet failure mode, and two copies of it
+ * would drift (#93).
  */
 
 import type { ReactElement } from 'react';
-import { useState } from 'react';
+import { useCopyToClipboard } from './useCopyToClipboard';
 
 interface Props {
   readonly uid: string;
@@ -26,29 +27,9 @@ interface Props {
 }
 
 export function AccountId({ uid, children }: Props): ReactElement {
-  const [copied, setCopied] = useState<'yes' | 'failed' | null>(null);
-
-  /**
-   * Puts the id on the clipboard, and says so either way.
-   *
-   * The id is on screen regardless, so the button is a convenience and its
-   * failure is not important — but a dead button that silently does nothing is
-   * worse than one that admits it. No clipboard at all is the ordinary case on
-   * plain http or with the permission blocked.
-   */
-  async function copy(): Promise<void> {
-    try {
-      const clipboard: Clipboard | undefined = navigator.clipboard;
-      if (clipboard === undefined) {
-        setCopied('failed');
-        return;
-      }
-      await clipboard.writeText(uid);
-      setCopied('yes');
-    } catch {
-      setCopied('failed');
-    }
-  }
+  // The id is on screen regardless, so the button is a convenience — but a
+  // dead button that silently does nothing is worse than one that admits it.
+  const { state: copied, copy } = useCopyToClipboard();
 
   return (
     <>
@@ -59,16 +40,16 @@ export function AccountId({ uid, children }: Props): ReactElement {
         <p style={{ margin: '0 0 8px', opacity: 0.8 }}>{children}</p>
       )}
       <p style={{ margin: '0 0 8px' }}>
-        <button className="button button--secondary" type="button" onClick={() => void copy()}>
+        <button className="button button--secondary" type="button" onClick={() => void copy(uid)}>
           Copy account id
         </button>
-        {copied !== null && (
+        {copied !== 'idle' && (
           // Deliberately not role="status": the settings screen already has
           // two, and a third would make `getByRole('status')` ambiguous for
           // every test that reads the sync or import message. `aria-live`
           // announces it without claiming the role.
           <span aria-live="polite" style={{ marginLeft: 8, opacity: 0.8 }}>
-            {copied === 'yes'
+            {copied === 'copied'
               ? 'Copied.'
               : 'Your browser would not let the app use the clipboard — copy it by hand.'}
           </span>

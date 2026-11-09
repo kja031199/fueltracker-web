@@ -509,6 +509,16 @@ npm ci --prefix .github/firebase-cli
 
 ### Rendering
 
+- **One copy of each shared pattern** (#93): a page is `ScreenFrame`, a
+  confirm-then-act is `ConfirmButton`, a copy is `useCopyToClipboard`, a
+  fill-up in a list is `FillUpSummary` (its grey line from `fillUpFacts`), a
+  person is `displayName`. `src/test/oneCopy.test.ts` fails on another
+  `className="app"`, `navigator.clipboard`, `name || email`, or hand-written
+  Keep/Stay button. **The page title is inside `<main>`**, always, so it is
+  inside a landmark; banners go in `before` and the tab bar in `after`.
+  `ConfirmButton` is controlled — the screen keeps which row is asking, so
+  only one asks at a time.
+
 - **Keep the fuel log's context value stable** (#88). Every screen reads
   `useFuelLog()`, so a value rebuilt each render re-renders all of them: it
   once cost about ten commits per save. `useAppData` and `useSync` return

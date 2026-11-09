@@ -7,13 +7,15 @@ import { DASHBOARD_TIME_RANGES } from '../domain/dashboardTimeRange';
 import type { DashboardTimeRange } from '../domain/dashboardTimeRange';
 import { FUEL_GRADES } from '../domain/fuelGrade';
 import type { FuelGrade } from '../domain/fuelGrade';
-import { currency, distance as formatDistance, volume as formatVolume } from '../domain/format';
+import { fillUpFacts } from '../domain/format';
 import type { UnitPreferences } from '../domain/units';
 import { distance, volume } from '../domain/units';
 import { totalCost } from '../domain/models';
 import { FillUpForm } from './FillUpForm';
 import { useFuelLog } from './fuelLog';
 import { PendingReview } from './PendingReview';
+import { FillUpSummary } from './FillUpSummary';
+import { ConfirmButton } from './ConfirmButton';
 
 interface Props {
   /** A display preference of this browser, not data, so still a prop. */
@@ -222,30 +224,19 @@ export function FillUpsScreen({ units }: Props): ReactElement {
           <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             {visible.map((record) => (
               <li className="card" key={record.id}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                  <div>
-                    <strong>{new Date(record.date).toLocaleDateString()}</strong>
-                    {record.station !== '' && (
-                      <span style={{ color: 'var(--text-secondary)' }}> · {record.station}</span>
-                    )}
+                <FillUpSummary
+                  title={new Date(record.date).toLocaleDateString()}
+                  subtitle={record.station}
+                  facts={fillUpFacts(record, units, { missed: true })}
+                  notes={record.notes}
+                  cost={totalCost(record)}
+                >
+                  {enteredByName !== null && record.enteredBy != null && enteredByName.has(record.enteredBy) && (
                     <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                      {formatVolume(record.gallons, units.volume, true)} ·{' '}
-                      {formatDistance(record.odometer, units.distance, true)} ·{' '}
-                      {record.fuelGrade}
-                      {!record.isFullTank && ' · partial fill'}
-                      {record.missedPreviousFillUp && ' · missed previous'}
+                      Entered by {enteredByName.get(record.enteredBy)}
                     </div>
-                    {record.notes !== '' && (
-                      <div style={{ fontSize: '0.9rem' }}>{record.notes}</div>
-                    )}
-                    {enteredByName !== null && record.enteredBy != null && enteredByName.has(record.enteredBy) && (
-                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                        Entered by {enteredByName.get(record.enteredBy)}
-                      </div>
-                    )}
-                  </div>
-                  <strong>{currency(totalCost(record))}</strong>
-                </div>
+                  )}
+                </FillUpSummary>
                 <div className="row-actions" style={{ marginTop: 10 }}>
                   <button
                     className="button button--secondary"
@@ -254,32 +245,15 @@ export function FillUpsScreen({ units }: Props): ReactElement {
                   >
                     Edit
                   </button>
-                  {confirmingId === record.id ? (
-                    <>
-                      <button
-                        className="button button--danger"
-                        type="button"
-                        onClick={() => void remove(record.id)}
-                      >
-                        Delete this fill-up
-                      </button>
-                      <button
-                        className="button button--secondary"
-                        type="button"
-                        onClick={() => setConfirmingId(null)}
-                      >
-                        Keep
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      className="button button--danger"
-                      type="button"
-                      onClick={() => setConfirmingId(record.id)}
-                    >
-                      Delete
-                    </button>
-                  )}
+                  <ConfirmButton
+                    asking={confirmingId === record.id}
+                    onAsk={() => setConfirmingId(record.id)}
+                    onCancel={() => setConfirmingId(null)}
+                    onConfirm={() => void remove(record.id)}
+                    label="Delete"
+                    confirmLabel="Delete this fill-up"
+                    cancelLabel="Keep"
+                  />
                 </div>
               </li>
             ))}

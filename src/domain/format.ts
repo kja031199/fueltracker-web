@@ -17,7 +17,7 @@
  * boundary, and nowhere else.
  */
 
-import type { DistanceUnit, EconomyUnit, VolumeUnit } from './units';
+import type { DistanceUnit, EconomyUnit, UnitPreferences, VolumeUnit } from './units';
 import {
   distance as distanceUnits,
   economy as economyUnits,
@@ -223,4 +223,39 @@ export function vehicleSubtitle(vehicle: { readonly year: number; readonly make:
   const parts = [String(vehicle.year), vehicle.make, vehicle.model].filter((p) => p !== '');
   const joined = parts.join(' ');
   return joined === String(vehicle.year) ? '' : joined;
+}
+
+/**
+ * Who a person is shown as (#93): their name, else their email, else the
+ * fallback. Trimmed, so a name of only spaces shows the email instead of a
+ * blank. Written four times as `name || email` before.
+ */
+export function displayName(
+  person: { readonly name: string; readonly email: string },
+  fallback = 'someone',
+): string {
+  return person.name.trim() || person.email.trim() || fallback;
+}
+
+/**
+ * The grey line under a fill-up (#93): volume, distance and grade in the
+ * reader's units, then what is unusual about it. "Missed previous" only where
+ * asked — it is a fact about the reader's own log, which a fill-up sent by
+ * link does not have.
+ */
+export function fillUpFacts(
+  entry: {
+    readonly gallons: number;
+    readonly odometer: number;
+    readonly fuelGrade: string;
+    readonly isFullTank: boolean;
+    readonly missedPreviousFillUp?: boolean;
+  },
+  units: UnitPreferences,
+  options: { readonly missed?: boolean } = {},
+): string[] {
+  const facts = [volume(entry.gallons, units.volume, true), distance(entry.odometer, units.distance, true), entry.fuelGrade];
+  if (!entry.isFullTank) facts.push('partial fill');
+  if (options.missed === true && entry.missedPreviousFillUp === true) facts.push('missed previous');
+  return facts;
 }

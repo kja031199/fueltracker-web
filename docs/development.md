@@ -264,6 +264,8 @@ Recorded so a regression in the tests themselves is visible:
 | One formula (#93): `totalCost` adding / the guard missing `gallons * price` / the guard reading `ui/` only / `pricePerUnit` multiplying / `pricePerGallonFrom` using the wrong factor / the form storing a per-litre price | 26 / 1 / 1 / 4 / 4 / 2 |
 | Pure logic out of components (#93): `describeSince` taking NaN / `vehicleSubtitle` keeping a year alone / `parseTypedNumber` taking Infinity / reading blank as 0 / `editableText` unrounded / `formFromRecord` losing the date | 1 each, 2 for the last |
 | Equivalent, kept for readability: `describeSince` without its clamp — a future time is a negative age, already under a minute, so it reads "just now" either way | — |
+| Shared patterns (#93): the first press acting / cancel doing nothing / confirm taking the first button's tone / the title outside `<main>` / the tab bar dropped / no clipboard claiming copied / a refusal claiming copied | 6 / 2 / 1 / 8 / 7 / 2 / 6 |
+| Shared patterns (#93): `displayName` untrimmed / "missed previous" always shown / each `oneCopy` guard narrowed (frame, clipboard, name, confirm) | 4 / 1 / 2, 2, 1, 1 |
 
 Equivalent, and kept as a backstop: `shape()` without its `hasAll`. Every
 required field is also read by a clause of its own, and reading a missing field

@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
 import { useState } from 'react';
-import { currency, distance as formatDistance, volume as formatVolume } from '../domain/format';
+import { fillUpFacts } from '../domain/format';
+import { FillUpSummary } from './FillUpSummary';
 import type { UnitPreferences } from '../domain/units';
 import { totalCost } from '../domain/models';
 import { useFuelLog } from './fuelLog';
@@ -53,23 +54,13 @@ export function PendingReview({ units }: { readonly units: UnitPreferences }): R
           const car = vehicles.find((vehicle) => vehicle.id === row.vehicleId);
           return (
             <li key={row.id} style={{ borderTop: '1px solid var(--separator)', padding: '10px 0' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <div>
-                  <strong>{car?.name ?? 'A deleted car'}</strong>
-                  <span style={{ color: 'var(--text-secondary)' }}>
-                    {' '}
-                    · from {row.submitterName || 'someone'} · {new Date(row.date).toLocaleDateString()}
-                  </span>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                    {formatVolume(row.gallons, units.volume, true)} ·{' '}
-                    {formatDistance(row.odometer, units.distance, true)} · {row.fuelGrade}
-                    {!row.isFullTank && ' · partial fill'}
-                    {row.station !== '' && ` · ${row.station}`}
-                  </div>
-                  {row.notes !== '' && <div style={{ fontSize: '0.9rem' }}>{row.notes}</div>}
-                </div>
-                <strong>{currency(totalCost(row))}</strong>
-              </div>
+              <FillUpSummary
+                title={car?.name ?? 'A deleted car'}
+                subtitle={`from ${row.submitterName || 'someone'} · ${new Date(row.date).toLocaleDateString()}`}
+                facts={[...fillUpFacts(row, units), ...(row.station === '' ? [] : [row.station])]}
+                notes={row.notes}
+                cost={totalCost(row)}
+              />
               {refused === row.id && (
                 <p className="warning" role="alert" style={{ margin: '8px 0 0' }}>
                   This could not be added — its car is gone, or its numbers no longer check out. Reject it to

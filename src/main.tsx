@@ -44,6 +44,7 @@ import type { SharingSync } from './data/shareSync';
 import { developmentUsesProduction, readSettings } from './data/firebase/settings';
 import { installCspWatch } from './ui/cspWatch';
 import { WrongProjectScreen } from './ui/WrongProjectScreen';
+import { ScreenFrame } from './ui/ScreenFrame';
 import './ui/styles.css';
 
 // Before anything renders, so a violation during load is caught. Records
@@ -95,9 +96,9 @@ function render(
 
 function renderOpening(): void {
   root.render(
-    <div className="app">
+    <ScreenFrame>
       <p className="empty">Opening your fuel log…</p>
-    </div>,
+    </ScreenFrame>,
   );
 }
 
