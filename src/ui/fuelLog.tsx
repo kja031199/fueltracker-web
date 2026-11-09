@@ -42,7 +42,10 @@ import type { Submission } from '../data/fillUpLink';
 import type { AppData } from './useAppData';
 import { useAppData } from './useAppData';
 import type { BackupSummary } from './exportBackup';
-import { saveJsonBackup } from './exportBackup';
+import { saveCsvExport, saveJsonBackup } from './exportBackup';
+import { parseBackupFile } from '../data/backupFormat';
+import type { BackupPromptReason } from '../domain/exportReminder';
+import { useBackupNudge } from './backupNudge';
 import type { SyncStatus } from './useSync';
 import { useSync } from './useSync';
 
@@ -138,16 +141,45 @@ export interface FuelLog extends Omit<AppData, 'reload'> {
    * refreshed, but nothing is synced, because nothing here changed.
    */
   loadFillUp(id: string): Promise<FillUpRecord | undefined>;
-  /** Everything, tombstones included: what the CSV export filters. */
-  exportSnapshot(): Promise<Snapshot>;
-  /** Downloads a JSON backup and says what it held. */
+  /**
+   * Downloads a JSON backup, says what it held, and **records it for the
+   * reminder** — whichever screen asked (#93). The no-access screen used to
+   * download one and record nothing.
+   */
   saveBackup(): Promise<BackupSummary>;
+  /** Downloads the live fill-ups as CSV and says how many. Not a backup, so not recorded. */
+  exportCsv(): Promise<number>;
+  /**
+   * Reads a file somebody chose — `.csv` or a JSON backup — and imports it.
+   * A file that cannot be read imports nothing and says why.
+   */
+  importFile(file: File): Promise<FileImport>;
+}
+
+/** What importing a file did: the store's summary, or null when the file could not be read; and every row or reason to show. */
+export interface FileImport {
+  readonly summary: ImportSummary | null;
+  readonly problems: readonly string[];
+}
+
+/**
+ * The backup reminder, as the screens see it (#93). Its own context, like sync
+ * status: the banner and Settings read it, and recording a backup re-renders
+ * them, not every screen.
+ */
+export interface BackupStatus {
+  /** Why a backup is being suggested, or null when it is not. */
+  readonly reason: BackupPromptReason | null;
+  readonly lastBackupAt: number | null;
+  /** Dismiss for a week. Deliberately not forever. */
+  readonly snooze: () => void;
 }
 
 export type ReceiveResult = 'queued' | 'duplicate' | 'no-such-car' | 'not-yours';
 
 const FuelLogContext = createContext<FuelLog | null>(null);
 const SyncStatusContext = createContext<SyncStatus | null>(null);
+const BackupStatusContext = createContext<BackupStatus | null>(null);
 
 export interface FuelLogProviderProps {
   readonly store: FuelTrackerStore;
@@ -186,6 +218,13 @@ export function FuelLogProvider({
   );
   const { reload } = data;
   const { afterWrite } = sync;
+  const nudge = useBackupNudge(data.fillUpCount, uid);
+  const { recordBackup, snooze } = nudge;
+  const lastBackupAt = nudge.state.lastExportAt;
+  const backup = useMemo<BackupStatus>(
+    () => ({ reason: nudge.reason, lastBackupAt, snooze }),
+    [nudge.reason, lastBackupAt, snooze],
+  );
   const shared = remote === null ? null : sharing;
 
   /** The rule, once: write, then refresh, then sync. A throw skips both. */
@@ -204,6 +243,7 @@ export function FuelLogProvider({
     const { reload: _reload, ...shown } = data;
     const receive = written((submission: Submission) => store.receiveSubmission(submission));
     const update = written((id: string, draft: FuelEntryDraft) => store.updateFillUp(id, draft));
+    const importBackup = written((snapshot: Snapshot) => store.importBackup(snapshot));
     // The device's ledger is read as well as the lists in state, which are
     // filled asynchronously: a link opened as the app starts is checked
     // against what this device knows, not against lists still loading.
@@ -238,7 +278,7 @@ export function FuelLogProvider({
         }
       },
       removeFillUp: written((id: string) => store.removeFillUp(id)),
-      importBackup: written((snapshot: Snapshot) => store.importBackup(snapshot)),
+      importBackup,
       receiveSubmission: async (submission: Submission): Promise<ReceiveResult> =>
         (await heldByMembership(submission.vehicleId)) ? 'not-yours' : receive(submission),
       approveSubmission: written((id: string) => store.approvePendingFillUp(id)),
@@ -248,17 +288,30 @@ export function FuelLogProvider({
         if (whole === undefined) await reload();
         return whole;
       },
-      exportSnapshot: () => store.exportSnapshot(),
-      saveBackup: () => saveJsonBackup(store),
+      saveBackup: async () => {
+        const saved = await saveJsonBackup(store);
+        recordBackup(saved.fillUps);
+        return saved;
+      },
+      exportCsv: () => saveCsvExport(store),
+      importFile: async (file: File): Promise<FileImport> => {
+        const parsed = parseBackupFile(file.name, await file.text());
+        if (parsed.value === null) return { summary: null, problems: [parsed.error ?? 'That file could not be read.'] };
+        const summary = await importBackup(parsed.value);
+        return { summary, problems: [...parsed.skipped, ...summary.rejected] };
+      },
     };
     // Every input here is stable between changes (#88): `data` and
-    // `sharingView` are memoised, and `written` depends only on `reload` and
-    // `afterWrite`, which never change. Sync status is deliberately not one.
-  }, [data, written, store, reload, sharingView, uid, shared]);
+    // `sharingView` are memoised, `written` depends only on `reload` and
+    // `afterWrite`, which never change, and `recordBackup` only on the
+    // account. Sync and backup status are deliberately not inputs.
+  }, [data, written, store, reload, sharingView, uid, shared, recordBackup]);
 
   return (
     <SyncStatusContext.Provider value={sync}>
-      <FuelLogContext.Provider value={log}>{children}</FuelLogContext.Provider>
+      <BackupStatusContext.Provider value={backup}>
+        <FuelLogContext.Provider value={log}>{children}</FuelLogContext.Provider>
+      </BackupStatusContext.Provider>
     </SyncStatusContext.Provider>
   );
 }
@@ -270,6 +323,15 @@ export function useFuelLog(): FuelLog {
     throw new Error('useFuelLog() was called outside <FuelLogProvider>; App renders the screens inside one.');
   }
   return log;
+}
+
+/** The backup reminder. Only inside `FuelLogProvider`. */
+export function useBackupStatus(): BackupStatus {
+  const status = useContext(BackupStatusContext);
+  if (status === null) {
+    throw new Error('useBackupStatus() was called outside <FuelLogProvider>; App renders the screens inside one.');
+  }
+  return status;
 }
 
 /**

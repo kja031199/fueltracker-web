@@ -9,6 +9,16 @@ request. Every pull request that closes an issue adds its note here — the
 "Release notes" check refuses one that does not
 ([how it works](docs/development.md#release-notes)).
 
+## 2026-11-09
+
+- **Saving a copy from the "no access" screen now counts as a backup**, so
+  the reminder stops telling you that you have never saved one.
+  *Technical:* the fuel log owns the backup reminder: `saveBackup()` records
+  it whichever screen asks, and screens read it through `useBackupStatus()`.
+  `exportCsv()` and `importFile()` move out of Settings into the log, and
+  `parseBackupFile` reads a chosen file without the `as never[]` cast.
+  [#93](https://github.com/kja031199/fueltracker-web/issues/93) · [PR #124](https://github.com/kja031199/fueltracker-web/pull/124)
+
 ## 2026-11-08
 
 - **No change you'll see: the tests that keep the app's layers apart now see

@@ -15,14 +15,13 @@ import { loadUnitPreferences, saveUnitPreferences } from './unitSettings';
 import { HAS_ONBOARDED } from './onboarding';
 import { useAccountPreference } from './preferences';
 import { useAuth } from './useAuth';
-import { FuelLogProvider, useFuelLog, useSyncStatus } from './fuelLog';
+import { FuelLogProvider, useBackupStatus, useFuelLog, useSyncStatus } from './fuelLog';
 import type { Tab } from './useTabRoute';
 import { useRoute } from './useTabRoute';
 import { useServiceWorker } from './useServiceWorker';
 import { UpdateBanner } from './UpdateBanner';
 import { BackupBanner } from './BackupBanner';
 import { InvitationsBanner } from './InvitationsBanner';
-import { useBackupNudge } from './backupNudge';
 import { SignInScreen } from './SignInScreen';
 import { NoAccessScreen } from './NoAccessScreen';
 import { WelcomeScreen } from './WelcomeScreen';
@@ -226,17 +225,13 @@ function AppShell({
   const showReceived = useCallback(() => setTab('fillups', { replace: true }), [setTab]);
   // Account-scoped (#55): read for this uid, and re-read if it changes.
   const [hasOnboarded, setHasOnboarded] = useAccountPreference(HAS_ONBOARDED, account.uid, false);
-  const backup = useBackupNudge(log.fillUpCount, account.uid);
+  const backup = useBackupStatus();
   const serviceWorker = useServiceWorker();
 
   // Decided from loaded data, so a returning reader whose flag was cleared (a
   // new browser profile, an imported backup) is not marched through a
   // first-run flow over data they already have.
   const onboarding = !log.loading && shouldOnboard(hasOnboarded, log.vehicles.length);
-
-  function backUp(): void {
-    void log.saveBackup().then((saved) => backup.recordBackup(saved.fillUps));
-  }
 
   if (log.loading) {
     return (
@@ -280,7 +275,7 @@ function AppShell({
   return gated(
     <div className="app">
       <UpdateBanner state={serviceWorker} />
-      <BackupBanner reason={backup.reason} onBackUp={backUp} onDismiss={backup.snooze} />
+      <BackupBanner reason={backup.reason} onBackUp={() => void log.saveBackup()} onDismiss={backup.snooze} />
       <InvitationsBanner />
       <h1 className="app__title">FuelTracker</h1>
       <main className="app__main">
@@ -289,8 +284,6 @@ function AppShell({
           <SettingsScreen
             units={units}
             onChange={onUnitsChange}
-            onBackedUp={backup.recordBackup}
-            lastBackupAt={backup.state.lastExportAt}
             account={account}
             onSignOut={onSignOut}
             idleMinutes={idleMinutes}

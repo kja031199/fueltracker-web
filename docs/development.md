@@ -259,6 +259,8 @@ Recorded so a regression in the tests themselves is visible:
 | Boundary tests (#93): the reader seeing single quotes only / no dynamic `import()` / no side-effect import / comments read as imports / relative paths left unresolved | 3 / 4 / 2 / 2 / 3 |
 | Boundary tests (#93): Firebase allowed in `domain/` / a package or a layer matched by prefix (`reactive`, `src/database`) / the store check on `.tsx` only / a stale allowance kept / the SDK's home matched by substring / `@firebase/*` missed | 1 / 1 each / 2 / 1 / 1 / 1 |
 | Boundary tests (#93), planted files the old tests passed: a double-quoted `data/` import in `domain/` / a dynamic store import from a `ui/` `.ts` helper / `firebase/firestore` in `ui/` / `react` in `domain/` / `data/` importing `ui/` / a dynamic import closing a cycle in `data/` | caught, each |
+| Backup recording (#93): `saveBackup` recording nothing / a CSV recorded as a backup / an unreadable file still imported / the CSV's skipped rows or the store's rejected rows dropped / an import bypassing `written` / backup status an input of the log | 5 / 2 / 2 / 1 each / 2 / 1 |
+| Backup recording (#93): the `.csv` extension case-sensitive / matched anywhere in the name / CSV skips lost in `parseBackupFile` / CSV with tombstones / Settings ignoring the last backup | 1 each |
 
 Equivalent, and kept as a backstop: `shape()` without its `hasAll`. Every
 required field is also read by a clause of its own, and reading a missing field

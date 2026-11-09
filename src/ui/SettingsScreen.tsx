@@ -1,12 +1,8 @@
 import type { ReactElement } from 'react';
 import { useRef, useState } from 'react';
 import type { UnitPreferences } from '../domain/units';
-import type { Snapshot } from '../data/records';
 import type { AuthUser } from '../data/auth';
-import { useFuelLog, useSyncStatus } from './fuelLog';
-import { backupFilename } from '../data/backup';
-import { parseCsv, parseJsonBackup, toCsv } from '../data/backupFormat';
-import { downloadText } from './download';
+import { useBackupStatus, useFuelLog, useSyncStatus } from './fuelLog';
 import { AccountId } from './AccountId';
 import { DEFAULT_IDLE_MINUTES } from '../domain/idleTimeout';
 import {
@@ -26,10 +22,6 @@ interface Props {
   readonly onSignOut?: () => void;
   /** False when this build has no backend configured, so nothing syncs. */
   readonly syncEnabled?: boolean;
-  /** Records that a JSON backup was taken, for the reminder. */
-  readonly onBackedUp?: (fillUpCount: number) => void;
-  /** Epoch ms of the last JSON backup, or null if there has never been one. */
-  readonly lastBackupAt?: number | null;
   /** The administrator's inactivity period (#70). Shown, never editable. */
   readonly idleMinutes?: number;
 }
@@ -59,13 +51,13 @@ export function SettingsScreen({
   account,
   onSignOut,
   syncEnabled = false,
-  onBackedUp,
-  lastBackupAt = null,
   idleMinutes = DEFAULT_IDLE_MINUTES,
 }: Props): ReactElement {
   // Backup, restore and sync all go through the fuel log (#56): an import
-  // refreshes the screens and schedules a sync without this screen asking.
-  const { saveBackup, exportSnapshot, importBackup } = useFuelLog();
+  // refreshes the screens and schedules a sync, and a backup is recorded for
+  // the reminder (#93), without this screen asking.
+  const { saveBackup, exportCsv, importFile } = useFuelLog();
+  const { lastBackupAt } = useBackupStatus();
   const sync = useSyncStatus();
   const fileInput = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<string | null>(null);
@@ -73,49 +65,27 @@ export function SettingsScreen({
 
   async function exportJson(): Promise<void> {
     const saved = await saveBackup();
-    // Recorded so the reminder knows this happened. Only a JSON export counts
-    // — see the CSV handler below.
-    onBackedUp?.(saved.fillUps);
     setProblems([]);
     setStatus(
       `Saved a backup of ${saved.vehicles} vehicle(s) and ${saved.fillUps} fill-up(s).`,
     );
   }
 
-  async function exportCsv(): Promise<void> {
-    const snapshot = await exportSnapshot();
-    // Tombstones are a backup concern, not a spreadsheet one — a deleted
-    // fill-up is not a row anybody wants in their expenses.
-    const live = snapshot.fillUps.filter((record) => record.deletedAt === null);
-    downloadText(toCsv(live), backupFilename(new Date(), 'csv'), 'text/csv');
+  async function exportSpreadsheet(): Promise<void> {
+    const count = await exportCsv();
     setProblems([]);
-    // Deliberately does NOT count as a backup. CSV is fill-ups only — no
-    // vehicles, no tombstones, no receipt bytes — so marking someone protected
-    // by it would be telling them a restore will return something it will not.
-    setStatus(`Saved ${live.length} fill-up(s) as CSV.`);
+    setStatus(`Saved ${count} fill-up(s) as CSV.`);
   }
 
-  async function importFile(file: File): Promise<void> {
-    const text = await file.text();
-    const isCsv = file.name.toLowerCase().endsWith('.csv');
-    const parsed = isCsv ? parseCsv(text) : parseJsonBackup(text);
-
-    if (parsed.value === null) {
-      setStatus(null);
-      setProblems([parsed.error ?? 'That file could not be read.']);
-      return;
-    }
-
-    const snapshot = isCsv
-      ? { vehicles: [], fillUps: parsed.value as never[], pendingFillUps: [] }
-      : (parsed.value as Snapshot);
-    const summary = await importBackup(snapshot);
-
+  async function chooseFile(file: File): Promise<void> {
+    const { summary, problems: found } = await importFile(file);
     setStatus(
-      `Imported ${summary.fillUpsWritten} fill-up(s) and ${summary.vehiclesWritten} vehicle(s). ` +
-        `${summary.skippedOlder} row(s) were already up to date.`,
+      summary === null
+        ? null
+        : `Imported ${summary.fillUpsWritten} fill-up(s) and ${summary.vehiclesWritten} vehicle(s). ` +
+            `${summary.skippedOlder} row(s) were already up to date.`,
     );
-    setProblems([...parsed.skipped, ...summary.rejected]);
+    setProblems(found);
   }
 
   return (
@@ -300,7 +270,7 @@ export function SettingsScreen({
           <button className="button" type="button" onClick={() => void exportJson()}>
             Export backup (JSON)
           </button>
-          <button className="button button--secondary" type="button" onClick={() => void exportCsv()}>
+          <button className="button button--secondary" type="button" onClick={() => void exportSpreadsheet()}>
             Export spreadsheet (CSV)
           </button>
           <button
@@ -321,7 +291,7 @@ export function SettingsScreen({
             const file = event.target.files?.[0];
             // Reset first, so choosing the same file twice fires again.
             event.target.value = '';
-            if (file !== undefined) void importFile(file);
+            if (file !== undefined) void chooseFile(file);
           }}
         />
 

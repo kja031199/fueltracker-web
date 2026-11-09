@@ -490,3 +490,15 @@ export function parseCsv(text: string): ParseResult<FillUpRecord[]> {
   }
   return { value: records, error: null, skipped };
 }
+
+/**
+ * A file somebody chose to import, read by its name (#93): `.csv` as fill-ups
+ * alone, anything else as a JSON backup. The one place that decides, so a
+ * screen hands over the file and gets a snapshot or a reason back.
+ */
+export function parseBackupFile(name: string, text: string): ParseResult<Snapshot> {
+  if (!name.toLowerCase().endsWith('.csv')) return parseJsonBackup(text);
+  const parsed = parseCsv(text);
+  const value = parsed.value === null ? null : { vehicles: [], fillUps: parsed.value, pendingFillUps: [] };
+  return { ...parsed, value };
+}

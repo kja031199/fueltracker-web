@@ -10,6 +10,7 @@ import type { PushSummary, RawSnapshot, RemoteStore } from '../data/remote';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { App } from './App';
 import { saveHasOnboarded } from './onboarding';
+import { loadBackupState } from './backupNudge';
 
 /**
  * What somebody sees when they are signed in but not on the allowlist.
@@ -156,6 +157,37 @@ describe('a signed-in account that is not on the allowlist', () => {
     await screen.findByRole('heading', { name: /does not have access/i });
 
     expect(screen.getByRole('button', { name: /export|save a copy/i })).toBeInTheDocument();
+  });
+
+  test('an export from here counts as a backup, like one from Settings (#93)', async () => {
+    // It used to download the file and record nothing, so the reminder went on
+    // saying "you have never saved a backup" to somebody who just had — the
+    // drift `exportBackup.ts` was written to prevent. The fuel log records it
+    // now, whichever screen asked.
+    Object.defineProperty(URL, 'createObjectURL', { value: vi.fn(() => 'blob:x'), writable: true });
+    Object.defineProperty(URL, 'revokeObjectURL', { value: vi.fn(), writable: true });
+    const store = makeStore();
+    const vehicle = await store.addVehicle({ name: 'Civic' });
+    for (let i = 0; i < 2; i += 1) {
+      const draft = makeFuelEntryDraft({
+        date: new Date(2026, 0, 1 + i),
+        odometer: 10_000 + i * 300,
+        gallons: 10,
+        pricePerGallon: 3.5,
+      });
+      if (draft === null) throw new Error('fixture draft failed validation');
+      await store.addFillUp(draft, vehicle.id);
+    }
+    const user = userEvent.setup();
+    render(<App store={store} auth={signedIn()} remote={refusing()} />);
+    await screen.findByRole('heading', { name: /does not have access/i });
+    expect(loadBackupState(USER.uid).lastExportAt).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: /export|save a copy/i }));
+
+    await waitFor(() => expect(loadBackupState(USER.uid).lastExportAt).not.toBeNull());
+    expect(loadBackupState(USER.uid).fillUpsAtLastExport).toBe(2);
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
   });
 
   test('is not offered an export when there is nothing to export', async () => {
