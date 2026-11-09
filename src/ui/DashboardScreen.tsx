@@ -132,20 +132,13 @@ export function DashboardScreen({ units }: Props): ReactElement {
       ) : (
         <>
           {insight !== null && (
-            <p className="card" style={{ color: 'var(--accent-orange)' }}>
+            <p className="card accent-orange">
               {insight}
             </p>
           )}
 
           <ul
-            style={{
-              listStyle: 'none',
-              margin: 0,
-              padding: 0,
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-              gap: 'var(--gap)',
-            }}
+          className="kpi-grid"
           >
             {kpis.map((kpi) => (
               // The card is labelled as one phrase rather than three separate
@@ -156,19 +149,18 @@ export function DashboardScreen({ units }: Props): ReactElement {
                   {kpi.title}
                 </span>
                 <div
+                  className="kpi-value"
                   aria-hidden="true"
-                  style={{
-                    fontSize: '1.5rem',
-                    fontWeight: 700,
-                    color: `var(--accent-${hueFor(kpi.metric)})`,
-                  }}
+                  // The hue is the metric's, worked out per KPI: the one part
+                  // of this that is not fixed, so the one part left inline.
+                  style={{ color: `var(--accent-${hueFor(kpi.metric)})` }}
                 >
                   {kpi.value ?? '—'}
                 </div>
                 {kpi.detail !== null && (
                   <div
+                    className="note"
                     aria-hidden="true"
-                    style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}
                   >
                     {kpi.detail}
                   </div>
@@ -228,7 +220,7 @@ export function DashboardScreen({ units }: Props): ReactElement {
           />
 
           {stats.suspectSegmentIds.size > 0 && (
-            <p className="warning" style={{ marginTop: 'var(--gap)' }}>
+            <p className="warning space-above">
               {stats.suspectSegmentIds.size} fill-up
               {stats.suspectSegmentIds.size === 1 ? ' looks' : 's look'} like a fill-up went
               unlogged before {stats.suspectSegmentIds.size === 1 ? 'it' : 'them'} — the economy

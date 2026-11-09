@@ -73,8 +73,8 @@ export function SharePanel({ vehicle }: { readonly vehicle: VehicleRecord }): Re
   }
 
   return (
-    <div style={{ marginTop: 10 }}>
-      <p style={{ margin: '0 0 8px' }}>
+    <div className="space-above-sm">
+      <p className="stack-sm">
         Someone you share {vehicle.name} with sees its whole history — including receipt photos, notes
         and stations — and can add, correct and delete its fill-ups. They see nothing else of yours.
       </p>
@@ -100,9 +100,9 @@ export function SharePanel({ vehicle }: { readonly vehicle: VehicleRecord }): Re
       </form>
 
       {members.length > 0 && (
-        <ul aria-label={`Shared with`} style={{ listStyle: 'none', padding: 0, margin: '10px 0 0' }}>
+        <ul className="list-plain space-above-sm" aria-label={`Shared with`}>
           {members.map((member) => (
-            <li key={member.uid} className="row-actions" style={{ alignItems: 'center' }}>
+            <li key={member.uid} className="row-actions align-center">
               <span>
                 Shared with <strong>{displayName(member)}</strong>
                 {member.name !== '' && member.email !== '' ? ` (${member.email})` : ''}
@@ -122,9 +122,9 @@ export function SharePanel({ vehicle }: { readonly vehicle: VehicleRecord }): Re
       )}
 
       {pending.length > 0 && (
-        <ul aria-label="Waiting to accept" style={{ listStyle: 'none', padding: 0, margin: '10px 0 0' }}>
+        <ul className="list-plain space-above-sm" aria-label="Waiting to accept">
           {pending.map((invitation) => (
-            <li key={invitation.email} className="row-actions" style={{ alignItems: 'center' }}>
+            <li key={invitation.email} className="row-actions align-center">
               <span>Invited {invitation.email}, waiting for them to accept</span>
               <button
                 className="button button--secondary"
@@ -141,12 +141,12 @@ export function SharePanel({ vehicle }: { readonly vehicle: VehicleRecord }): Re
       )}
 
       {status !== null && (
-        <p role="status" style={{ margin: '8px 0 0' }}>
+        <p className="after-sm" role="status">
           {status}
         </p>
       )}
       {problem !== null && (
-        <p className="warning" role="alert" style={{ margin: '8px 0 0' }}>
+        <p className="warning after-sm" role="alert">
           {problem}
         </p>
       )}

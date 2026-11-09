@@ -27,12 +27,12 @@ export function FillUpSummary({
   readonly children?: ReactNode;
 }): ReactElement {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+    <div className="row-between">
       <div>
         <strong>{title}</strong>
-        {subtitle !== '' && <span style={{ color: 'var(--text-secondary)' }}> · {subtitle}</span>}
-        <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{facts.join(' · ')}</div>
-        {notes !== '' && <div style={{ fontSize: '0.9rem' }}>{notes}</div>}
+        {subtitle !== '' && <span className="muted"> · {subtitle}</span>}
+        <div className="note">{facts.join(' · ')}</div>
+        {notes !== '' && <div className="fine">{notes}</div>}
         {children}
       </div>
       <strong>{currency(cost)}</strong>

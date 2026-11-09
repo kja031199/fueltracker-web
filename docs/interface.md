@@ -121,6 +121,21 @@ the stock colour instead and it reads 0.4 higher than what the app renders. That
 mistake shipped once upstream and only CI caught it; two tests now pin the
 recursion so a re-derivation cannot quietly optimise the looser problem.
 
+The text colours are measured too, since #93. They were hex written into the
+stylesheet by hand, and stock light-mode secondary grey (#6C6C70) turned out to
+be **4.69:1** on the page background — inside WCAG's 4.5, but under the
+palette's own 4.7. It is now #6B6B6F, the nearest grey that clears it (4.76:1
+on the page, 5.31:1 on a card). `textPrimary` and `textSecondary` sit in the
+palette beside the surfaces, `applyPalette` paints them, and the stylesheet
+keeps a first-paint copy that a test holds to the palette. Text is never faded
+with `opacity`: a faded colour is one nothing measures, so quieter text uses the
+measured secondary colour (`.muted`, `.note`).
+
+Fixed styling lives in `styles.css` as utility classes (`.stack-sm`, `.muted`,
+`.list-plain` and the rest); an inline `style` is only for a value worked out at
+render time, such as a metric's hue. `src/test/inlineStyles.test.ts` refuses a
+fixed one.
+
 ## Charts, and why they are hand-drawn
 
 Six charts, in plain SVG, for **2.5 KB gzipped**. A charting library would have

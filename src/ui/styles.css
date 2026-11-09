@@ -4,9 +4,14 @@
  * hard-codes a hue, so the contrast guarantee applies to what is painted.
  */
 
+/*
+ * The text colours are the palette's (`textPrimary`, `textSecondary`), which
+ * `applyPalette` sets at runtime. These copies are only for the first paint,
+ * before it runs, and `accessiblePalette.test.ts` fails if they drift (#93).
+ */
 :root {
-  --text-primary: #1c1c1e;
-  --text-secondary: #6c6c70;
+  --text-primary: rgb(28 28 30);
+  --text-secondary: rgb(107 107 111);
   --separator: rgb(198 198 200 / 60%);
   --radius: 12px;
   --gap: 12px;
@@ -14,8 +19,8 @@
 }
 
 :root[data-scheme='dark'] {
-  --text-primary: #f2f2f7;
-  --text-secondary: #9a9aa0;
+  --text-primary: rgb(242 242 247);
+  --text-secondary: rgb(154 154 160);
   --separator: rgb(84 84 88 / 60%);
 }
 
@@ -258,3 +263,59 @@ body {
   color: var(--accent-blue);
   font-size: 0.9rem;
 }
+
+/* Utilities -------------------------------------------------------------
+   The fixed styling that used to be written inline, 94 times (#93). Inline
+   `style` is for a value worked out at render time only; `inlineStyles.test.ts`
+   refuses a fixed one. Last in the file, so a utility wins over a component
+   class of the same specificity. Text is never faded with `opacity`: a faded
+   colour is one no contrast test measures, so quieter text is `.muted`, the
+   palette's measured secondary colour. (A disabled button's opacity is
+   exempt: WCAG does not hold disabled controls to the contrast minimum.) */
+
+.flush { margin: 0; }
+.flush-top { margin-top: 0; }
+.flush-bottom { margin-bottom: 0; }
+.stack-xs { margin: 0 0 4px; }
+.stack-sm { margin: 0 0 8px; }
+.stack { margin: 0 0 var(--gap); }
+.after-sm { margin: 8px 0 0; }
+.after { margin: var(--gap) 0 0; }
+.space-above-sm { margin-top: 8px; }
+.space-above { margin-top: var(--gap); }
+.space-below-sm { margin-bottom: 8px; }
+.space-below { margin-bottom: var(--gap); }
+.inline-gap { margin-left: 8px; }
+
+.muted { color: var(--text-secondary); }
+.fine { font-size: 0.9rem; }
+.note { color: var(--text-secondary); font-size: 0.9rem; }
+.bold { font-weight: 600; }
+.accent-blue { color: var(--accent-blue); }
+.accent-orange { color: var(--accent-orange); }
+.break-all { word-break: break-all; }
+.clickable { cursor: pointer; }
+
+.list-plain { list-style: none; margin: 0; padding: 0; }
+.list-row { border-top: 1px solid var(--separator); padding: 10px 0; }
+.indent-list { margin: 4px 0 0; padding-left: 1.2em; }
+.row-between { display: flex; justify-content: space-between; gap: 8px; }
+.row-wrap { display: flex; gap: 8px; flex-wrap: wrap; }
+.align-center { align-items: center; }
+
+/* Outranks `.field input`, which would otherwise make a checkbox 44px tall. */
+.field input.checkbox,
+.checkbox { min-height: auto; width: 20px; height: 20px; }
+
+.kpi-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--gap);
+}
+.kpi-value { font-size: 1.5rem; font-weight: 700; }
+
+.empty--chart { padding: 24px 0; }
+.chart__svg { display: block; max-height: 200px; }

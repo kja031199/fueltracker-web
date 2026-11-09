@@ -66,7 +66,7 @@ export function NoAccessScreen({
         <h2 className="card__title" id="no-access-heading">
           This account does not have access
         </h2>
-        <p style={{ margin: '0 0 8px' }}>
+        <p className="stack-sm">
           You are signed in as <strong>{name}</strong>, but this copy of FuelTracker only
           syncs for accounts that have been added to it. Nothing you enter here would be
           saved to your account, so the app stays closed rather than pretending otherwise.
@@ -76,13 +76,13 @@ export function NoAccessScreen({
           Send this to whoever runs this copy of FuelTracker and ask them to add it.
         </AccountId>
 
-        <p style={{ margin: '0 0 8px' }}>
+        <p className="stack-sm">
           Adding an account means deploying a change, so it is{' '}
           <strong>not immediate</strong> — expect a few minutes rather than seconds. When
           they tell you it is done, use <em>Try again</em>; there is no need to reload.
         </p>
 
-        <p style={{ margin: '12px 0 0', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <p className="after row-wrap">
           <button className="button" type="button" onClick={onRetry} disabled={retrying}>
             {retrying ? 'Checking…' : 'Try again'}
           </button>
@@ -97,7 +97,7 @@ export function NoAccessScreen({
         </p>
 
         {onExport !== undefined && (
-          <p className="warning" style={{ margin: '12px 0 0' }}>
+          <p className="warning after">
             There are fill-ups stored in this browser that have not reached any account.
             Export them before clearing your browser data or signing out on this device —
             that file is the only copy.

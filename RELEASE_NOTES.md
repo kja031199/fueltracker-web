@@ -11,6 +11,15 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-09
 
+- **Grey text is a shade darker, so it is easier to read on the page
+  background in light mode; the small print that was faded out is now the
+  same measured grey.**
+  *Technical:* `textPrimary`/`textSecondary` join the palette and are
+  measured on the card and the page (light secondary #6C6C70, 4.69:1 on the
+  page, becomes #6B6B6F, 4.76:1); `opacity` on text is gone; 92 of 94 inline
+  styles become utility classes, and `inlineStyles.test.ts` refuses a fixed
+  one.
+  [#93](https://github.com/kja031199/fueltracker-web/issues/93) · [PR #127](https://github.com/kja031199/fueltracker-web/pull/127)
 - **Every screen's title now lines up with its content, the way the main app's
   always has, and someone sharing a car who gave only spaces for a name shows
   their email instead of a blank.**
