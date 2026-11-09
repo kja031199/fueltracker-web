@@ -20,14 +20,15 @@
  */
 
 import type { PumpReading } from './pumpScanParser';
+import { totalCost as costOf } from '../models';
 
 /**
  * The reconciliation tolerance, matching the pump parser's own triple search:
  * a cent either way, or 1% on larger totals.
  */
-export function reconciles(gallons: number, pricePerGallon: number, totalCost: number): boolean {
-  const error = Math.abs(gallons * pricePerGallon - totalCost);
-  return error <= Math.max(0.05, totalCost * 0.01);
+export function reconciles(gallons: number, pricePerGallon: number, total: number): boolean {
+  const error = Math.abs(costOf({ gallons, pricePerGallon }) - total);
+  return error <= Math.max(0.05, total * 0.01);
 }
 
 /** Every number the OCR text actually contained, in the parser's own shape. */

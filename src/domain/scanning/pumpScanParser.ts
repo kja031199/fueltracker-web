@@ -26,6 +26,8 @@
  * iPhone app's.
  */
 
+import { totalCost } from '../models';
+
 /** Values read off a pump display. Any field may be absent. */
 export interface PumpReading {
   readonly gallons: number | null;
@@ -167,7 +169,7 @@ function applyConsistentTriple(values: readonly number[], reading: MutableReadin
         if (k === i || k === j) continue;
         const price = pool[k]!;
         if (!inRange(price, PRICE_RANGE)) continue;
-        const error = Math.abs(gallons * price - total);
+        const error = Math.abs(totalCost({ gallons, pricePerGallon: price }) - total);
         const tolerance = Math.max(0.05, total * 0.01);
         // Strict `<` keeps the FIRST best triple on a tie, matching the Swift.
         if (error <= tolerance && error < (best?.error ?? Number.POSITIVE_INFINITY)) {
@@ -198,7 +200,8 @@ function deriveMissingValue(reading: MutableReading): void {
     }
   }
   if (reading.totalCost === null && reading.gallons !== null && reading.pricePerGallon !== null) {
-    reading.totalCost = roundHalfAwayFromZero(reading.gallons * reading.pricePerGallon * 100) / 100;
+    const cost = totalCost({ gallons: reading.gallons, pricePerGallon: reading.pricePerGallon });
+    reading.totalCost = roundHalfAwayFromZero(cost * 100) / 100;
   }
 }
 

@@ -2,9 +2,11 @@ import { describe, expect, test } from 'vitest';
 import {
   canSaveForm,
   draftFromForm,
+  editableText,
   emptyFillUpForm,
   formTotalCost,
   odometerLooksWrong,
+  parseTypedNumber,
   previousOdometer,
 } from './fillUpForm';
 import type { FillUpFormState } from './fillUpForm';
@@ -107,5 +109,43 @@ describe('the odometer sanity check', () => {
     const form = filled({ odometer: 9_000 });
     expect(odometerLooksWrong(form.odometer, 10_800)).toBe(true);
     expect(canSaveForm(form)).toBe(true);
+  });
+});
+
+describe('what was typed, as a number (#93: moved from the form component)', () => {
+  test('a number, with the space around it ignored', () => {
+    expect(parseTypedNumber('12.5')).toBe(12.5);
+    expect(parseTypedNumber(' 12.5 ')).toBe(12.5);
+    expect(parseTypedNumber('1e3')).toBe(1000);
+    expect(parseTypedNumber('0')).toBe(0);
+  });
+
+  test('blank is not entered, not zero', () => {
+    expect(parseTypedNumber('')).toBeNull();
+    expect(parseTypedNumber('   ')).toBeNull();
+  });
+
+  test('nonsense and the non-finite are not entered either, so the draft gate stays the only judge', () => {
+    for (const text of ['abc', '12abc', 'NaN', 'Infinity', '-Infinity', '1e400', '3,5']) {
+      expect(parseTypedNumber(text), text).toBeNull();
+    }
+  });
+
+  test('a negative number is passed on — refusing it is the draft’s job, not the parser’s', () => {
+    expect(parseTypedNumber('-5')).toBe(-5);
+  });
+});
+
+describe('a stored value, as text to edit (#93: moved from the form component)', () => {
+  const same = (value: number): number => value;
+
+  test('nothing stored is an empty field', () => {
+    expect(editableText(null, same)).toBe('');
+  });
+
+  test('the conversion is applied, and its long tail cut to the three decimals a pump prints', () => {
+    expect(editableText(10, (gallons) => gallons * 3.785411784)).toBe('37.854');
+    expect(editableText(3.4999, same)).toBe('3.5');
+    expect(editableText(12, same)).toBe('12');
   });
 });

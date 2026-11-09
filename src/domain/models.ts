@@ -27,8 +27,13 @@ export interface FuelEntry extends FuelEntryStats {
   readonly receiptImageData: Uint8Array | null;
 }
 
-/** Total cost is always derived from gallons × price, never stored. */
-export function totalCost(entry: Pick<FuelEntryStats, 'gallons' | 'pricePerGallon'>): number {
+/**
+ * What a fill-up cost: gallons × price per gallon. Always derived, never
+ * stored, and **written only here** (#93) — records, drafts, the form, the
+ * CSV, the lists and the pump reader all call it, and
+ * `src/test/oneTotalCost.test.ts` refuses another copy.
+ */
+export function totalCost(entry: { readonly gallons: number; readonly pricePerGallon: number }): number {
   return entry.gallons * entry.pricePerGallon;
 }
 

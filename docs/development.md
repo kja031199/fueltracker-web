@@ -261,6 +261,9 @@ Recorded so a regression in the tests themselves is visible:
 | Boundary tests (#93), planted files the old tests passed: a double-quoted `data/` import in `domain/` / a dynamic store import from a `ui/` `.ts` helper / `firebase/firestore` in `ui/` / `react` in `domain/` / `data/` importing `ui/` / a dynamic import closing a cycle in `data/` | caught, each |
 | Backup recording (#93): `saveBackup` recording nothing / a CSV recorded as a backup / an unreadable file still imported / the CSV's skipped rows or the store's rejected rows dropped / an import bypassing `written` / backup status an input of the log | 5 / 2 / 2 / 1 each / 2 / 1 |
 | Backup recording (#93): the `.csv` extension case-sensitive / matched anywhere in the name / CSV skips lost in `parseBackupFile` / CSV with tombstones / Settings ignoring the last backup | 1 each |
+| One formula (#93): `totalCost` adding / the guard missing `gallons * price` / the guard reading `ui/` only / `pricePerUnit` multiplying / `pricePerGallonFrom` using the wrong factor / the form storing a per-litre price | 26 / 1 / 1 / 4 / 4 / 2 |
+| Pure logic out of components (#93): `describeSince` taking NaN / `vehicleSubtitle` keeping a year alone / `parseTypedNumber` taking Infinity / reading blank as 0 / `editableText` unrounded / `formFromRecord` losing the date | 1 each, 2 for the last |
+| Equivalent, kept for readability: `describeSince` without its clamp — a future time is a negative age, already under a minute, so it reads "just now" either way | — |
 
 Equivalent, and kept as a backstop: `shape()` without its `hasAll`. Every
 required field is also read by a clause of its own, and reading a missing field

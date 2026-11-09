@@ -12,6 +12,7 @@
  * writes it. There is still exactly one write path.
  */
 
+import { totalCost } from './models';
 import type { FuelEntryDraft } from './fuelEntryDraft';
 import { makeFuelEntryDraft } from './fuelEntryDraft';
 import type { FuelGrade } from './fuelGrade';
@@ -57,7 +58,7 @@ export function emptyFillUpForm(now: Date = new Date()): FillUpFormState {
  * nothing while one is being edited.
  */
 export function formTotalCost(state: Pick<FillUpFormState, 'gallons' | 'pricePerGallon'>): number {
-  return (state.gallons ?? 0) * (state.pricePerGallon ?? 0);
+  return totalCost({ gallons: state.gallons ?? 0, pricePerGallon: state.pricePerGallon ?? 0 });
 }
 
 /**
@@ -112,4 +113,30 @@ export function previousOdometer(
 export function odometerLooksWrong(odometer: number | null, previous: number | null): boolean {
   if (odometer === null || previous === null) return false;
   return odometer <= previous;
+}
+
+/**
+ * Parses a typed number, treating blank and nonsense alike as "not entered".
+ *
+ * Returning `null` rather than `NaN` is what keeps the draft's validation the
+ * only thing deciding whether a form can be saved — a `NaN` odometer would
+ * otherwise have to be caught twice.
+ */
+export function parseTypedNumber(text: string): number | null {
+  if (text.trim() === '') return null;
+  const value = Number(text);
+  return Number.isFinite(value) ? value : null;
+}
+
+/**
+ * A canonical value rendered as editable text.
+ *
+ * Only used to seed a field when editing an existing record — never to re-render
+ * text the reader is in the middle of typing. See the note on `numericText`.
+ */
+export function editableText(value: number | null, toDisplay: (canonical: number) => number): string {
+  if (value === null) return '';
+  // Conversion produces long tails (10 gal → 37.854117839999996); three
+  // decimals is the precision a pump prints and what the entry boundary keeps.
+  return String(Math.round(toDisplay(value) * 1000) / 1000);
 }

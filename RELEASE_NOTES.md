@@ -11,6 +11,17 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-09
 
+- **No change you'll see: what a fill-up cost, and a price per litre, are now
+  worked out in one place.** A link's error message and the "last synced"
+  time read as before; a time that is not a number now reads "not yet"
+  rather than "Invalid Date".
+  *Technical:* one `totalCost` (`recordTotalCost` and `draftTotalCost` gone,
+  five inline copies replaced, a test refusing another);
+  `pricePerUnit`/`pricePerGallonFrom` for the five per-unit conversions;
+  `describeSince`, `vehicleSubtitle`, `parseTypedNumber`, `editableText` and
+  `formFromRecord` out of components and tested where they live;
+  `linkMessages.ts` and `LinkScreen.tsx` out of `SubmitScreen.tsx`.
+  [#93](https://github.com/kja031199/fueltracker-web/issues/93) · [PR #125](https://github.com/kja031199/fueltracker-web/pull/125)
 - **Saving a copy from the "no access" screen now counts as a backup**, so
   the reminder stops telling you that you have never saved one.
   *Technical:* the fuel log owns the backup reminder: `saveBackup()` records

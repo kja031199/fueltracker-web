@@ -1,18 +1,11 @@
 import type { ReactElement } from 'react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import type { VehicleRecord } from '../data/records';
+import { vehicleSubtitle } from '../domain/format';
 import { useFuelLog } from './fuelLog';
 import { SharePanel } from './SharePanel';
 import { RequestLinkPanel } from './RequestLinkPanel';
 import { TEXT_LIMITS } from '../domain/textLimits';
-
-/** "2021 Honda Civic", or nothing when only the year is known. */
-export function vehicleSubtitle(vehicle: VehicleRecord): string {
-  const parts = [String(vehicle.year), vehicle.make, vehicle.model].filter((p) => p !== '');
-  const joined = parts.join(' ');
-  return joined === String(vehicle.year) ? '' : joined;
-}
 
 /** Vehicles, read from and written through the fuel log (#56). */
 export function VehiclesScreen({ ownerName = '' }: { readonly ownerName?: string } = {}): ReactElement {

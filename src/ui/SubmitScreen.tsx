@@ -1,12 +1,13 @@
-import type { ReactElement, ReactNode } from 'react';
+import type { ReactElement } from 'react';
 import { useMemo, useState } from 'react';
-import type { LinkProblem } from '../data/fillUpLink';
 import { LINK_TEXT_LIMITS, decodeRequest, submissionUrl } from '../data/fillUpLink';
 import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
 import type { UnitPreferences } from '../domain/units';
 import { boundText } from '../domain/textLimits';
 import { FillUpForm } from './FillUpForm';
 import { LinkOut, appBase } from './LinkOut';
+import { DoneButton, LinkScreen } from './LinkScreen';
+import { linkProblemText } from './linkMessages';
 
 interface Props {
   /** The request link's payload, as the address carried it. */
@@ -101,56 +102,5 @@ export function SubmitScreen({ payload, accountName, units, onDone }: Props): Re
         forLink={{ title: `Fill-up for ${car}`, onDraft: makeLink }}
       />
     </LinkScreen>
-  );
-}
-
-/** What went wrong with a link, said so its reader knows what to do next. */
-export function linkProblemText(problem: LinkProblem, kind: 'request' | 'submission'): string {
-  const ask = kind === 'request' ? 'Ask for the request to be sent again.' : 'Ask for it to be sent again.';
-  switch (problem) {
-    case 'too-long':
-      return `This link is far longer than a fill-up link can be, so it was not read. ${ask}`;
-    case 'damaged':
-      return `This link is damaged — part of it was probably lost when it was copied. ${ask}`;
-    case 'wrong-kind':
-      return kind === 'request'
-        ? 'This is not a fill-up request link.'
-        : 'This is not a fill-up link.';
-    case 'newer-version':
-      return 'This link was made by a newer version of FuelTracker. Reload the page to update, then open the link again.';
-    case 'invalid':
-      return kind === 'request'
-        ? `This request does not name a car that can be logged. ${ask}`
-        : `The fill-up in this link does not add up — a number or the date is impossible — so it was not received. ${ask}`;
-  }
-}
-
-export function LinkScreen({
-  title,
-  children,
-}: {
-  readonly title: string;
-  readonly children: ReactNode;
-}): ReactElement {
-  return (
-    <div className="app">
-      <h1 className="app__title">FuelTracker</h1>
-      <main className="app__main">
-        <section className="card" aria-labelledby="link-screen-heading">
-          <h2 className="card__title" id="link-screen-heading">
-            {title}
-          </h2>
-          {children}
-        </section>
-      </main>
-    </div>
-  );
-}
-
-export function DoneButton({ onDone, label = 'Go to FuelTracker' }: { readonly onDone: () => void; readonly label?: string }): ReactElement {
-  return (
-    <button className="button button--secondary" type="button" onClick={onDone}>
-      {label}
-    </button>
   );
 }

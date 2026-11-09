@@ -2,6 +2,7 @@ import type { ReactElement } from 'react';
 import { useState } from 'react';
 import { currency, distance as formatDistance, volume as formatVolume } from '../domain/format';
 import type { UnitPreferences } from '../domain/units';
+import { totalCost } from '../domain/models';
 import { useFuelLog } from './fuelLog';
 
 /**
@@ -67,7 +68,7 @@ export function PendingReview({ units }: { readonly units: UnitPreferences }): R
                   </div>
                   {row.notes !== '' && <div style={{ fontSize: '0.9rem' }}>{row.notes}</div>}
                 </div>
-                <strong>{currency(row.gallons * row.pricePerGallon)}</strong>
+                <strong>{currency(totalCost(row))}</strong>
               </div>
               {refused === row.id && (
                 <p className="warning" role="alert" style={{ margin: '8px 0 0' }}>

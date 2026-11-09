@@ -18,7 +18,13 @@
  */
 
 import type { DistanceUnit, EconomyUnit, VolumeUnit } from './units';
-import { distance as distanceUnits, economy as economyUnits, regionForLocale, volume as volumeUnits } from './units';
+import {
+  distance as distanceUnits,
+  economy as economyUnits,
+  pricePerUnit,
+  regionForLocale,
+  volume as volumeUnits,
+} from './units';
 
 /**
  * Currency for a locale's region, defaulting to USD.
@@ -145,7 +151,7 @@ export function fuelPrice(
   options: CurrencyOptions = {},
 ): string {
   const locale = options.locale ?? 'en-US';
-  const perUnit = pricePerGallon / volumeUnits[unit].fromGallons(1);
+  const perUnit = pricePerUnit(pricePerGallon, unit);
   return numberFormat(locale, {
     style: 'currency',
     currency: options.currency ?? currencyForLocale(locale),
@@ -193,4 +199,28 @@ export function distance(miles: number, unit: DistanceUnit, withUnit = false): s
     maximumFractionDigits: 1,
   }).format(spec.fromMiles(miles));
   return withUnit ? `${number} ${spec.abbreviation}` : number;
+}
+
+/**
+ * "3 minutes ago", falling back to a date once it stops being recent — the
+ * last sync, the last backup. A time ahead of the clock (a skewed device)
+ * reads as "just now", never a negative age. Moved from Settings (#93).
+ */
+export function describeSince(at: number | null, now: number = Date.now()): string {
+  // Not a number reads as never, rather than as "Invalid Date".
+  if (at === null || !Number.isFinite(at)) return 'not yet';
+  const seconds = Math.max(0, Math.round((now - at) / 1000));
+  if (seconds < 60) return 'just now';
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  return new Date(at).toLocaleDateString();
+}
+
+/** "2021 Honda Civic" under a car's name, or nothing when only the year is known. Moved from Vehicles (#93). */
+export function vehicleSubtitle(vehicle: { readonly year: number; readonly make: string; readonly model: string }): string {
+  const parts = [String(vehicle.year), vehicle.make, vehicle.model].filter((p) => p !== '');
+  const joined = parts.join(' ');
+  return joined === String(vehicle.year) ? '' : joined;
 }

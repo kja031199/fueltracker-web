@@ -19,7 +19,7 @@
 import type { FuelEntryStats } from './models';
 import { plainCurrency } from './format';
 import type { UnitPreferences } from './units';
-import { US, volume } from './units';
+import { US, pricePerUnit, volume } from './units';
 
 /** Average price per gallon for one day of the week. */
 export interface WeekdayPrice {
@@ -221,6 +221,6 @@ export function weekdayPriceInsight(
   const cheapName = fullNames[cheapest.weekday - 1] ?? '';
   const priceyName = fullNames[priciest.weekday - 1] ?? '';
   const unit = volume[units.volume];
-  const perUnitDelta = plainCurrency(delta / unit.fromGallons(1), { locale });
+  const perUnitDelta = plainCurrency(pricePerUnit(delta, units.volume), { locale });
   return `You pay about ${perUnitDelta}/${unit.abbreviation} less on ${cheapName}s than ${priceyName}s.`;
 }

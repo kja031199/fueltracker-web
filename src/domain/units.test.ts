@@ -9,6 +9,8 @@ import {
   VOLUME_UNITS,
   distance,
   economy,
+  pricePerGallonFrom,
+  pricePerUnit,
   unitPreferencesForLocale,
   volume,
 } from './units';
@@ -130,5 +132,35 @@ describe('constants', () => {
   test('conversion factors are the exact defined values', () => {
     expect(LITERS_PER_GALLON).toBe(3.785411784);
     expect(KILOMETERS_PER_MILE).toBe(1.609344);
+  });
+});
+
+describe('a price per gallon, per the reader’s unit (#93)', () => {
+  test('gallons is the price itself', () => {
+    expect(pricePerUnit(3.499, 'gallons')).toBe(3.499);
+    expect(pricePerGallonFrom(3.499, 'gallons')).toBe(3.499);
+  });
+
+  test('a litre costs a gallon’s price over the litres in a gallon', () => {
+    expect(pricePerUnit(LITERS_PER_GALLON, 'liters')).toBeCloseTo(1, 12);
+    expect(pricePerUnit(3.785, 'liters')).toBeCloseTo(3.785 / LITERS_PER_GALLON, 12);
+    expect(pricePerGallonFrom(1, 'liters')).toBeCloseTo(LITERS_PER_GALLON, 12);
+  });
+
+  test('there and back is the same price, in both units', () => {
+    for (const unit of VOLUME_UNITS) {
+      for (const price of [0.001, 1.5, 3.499, 9.999, 250]) {
+        expect(pricePerGallonFrom(pricePerUnit(price, unit), unit)).toBeCloseTo(price, 10);
+      }
+    }
+  });
+
+  test('a price that is not a number stays one, rather than becoming a plausible value', () => {
+    for (const unit of VOLUME_UNITS) {
+      expect(pricePerUnit(Number.NaN, unit)).toBeNaN();
+      expect(pricePerUnit(Number.POSITIVE_INFINITY, unit)).toBe(Number.POSITIVE_INFINITY);
+      expect(pricePerGallonFrom(Number.NaN, unit)).toBeNaN();
+      expect(pricePerUnit(0, unit)).toBe(0);
+    }
   });
 });

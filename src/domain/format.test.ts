@@ -5,11 +5,13 @@ import {
   costPerDistance,
   currency,
   currencyForLocale,
+  describeSince,
   distance,
   economy,
   fuelPrice,
   numberFormat,
   plainCurrency,
+  vehicleSubtitle,
 } from './format';
 
 describe('currencyForLocale', () => {
@@ -217,5 +219,67 @@ describe('formatters are made once per shape (#88)', () => {
         );
       }
     }
+  });
+});
+
+describe('describeSince, how long ago something last happened (#93: moved from Settings)', () => {
+  const now = new Date('2026-03-10T12:00:00Z').getTime();
+
+  test('says so plainly when nothing has synced yet', () => {
+    expect(describeSince(null, now)).toBe('not yet');
+  });
+
+  test('reads as just now inside a minute', () => {
+    expect(describeSince(now - 5_000, now)).toBe('just now');
+  });
+
+  test('counts minutes, then hours', () => {
+    expect(describeSince(now - 3 * 60_000, now)).toBe('3 minutes ago');
+    expect(describeSince(now - 60_000, now)).toBe('1 minute ago');
+    expect(describeSince(now - 2 * 3_600_000, now)).toBe('2 hours ago');
+    expect(describeSince(now - 3_600_000, now)).toBe('1 hour ago');
+  });
+
+  test('falls back to a date once it stops being recent', () => {
+    expect(describeSince(now - 3 * 24 * 3_600_000, now)).toBe(
+      new Date(now - 3 * 24 * 3_600_000).toLocaleDateString(),
+    );
+  });
+
+  test('does not read a clock-skewed future timestamp as a negative age', () => {
+    // A device whose clock is ahead would otherwise produce "-4 minutes ago".
+    expect(describeSince(now + 240_000, now)).toBe('just now');
+  });
+
+  test('the edges between seconds, minutes, hours and a date', () => {
+    expect(describeSince(now - 59_000, now)).toBe('just now');
+    expect(describeSince(now - 60_000, now)).toBe('1 minute ago');
+    expect(describeSince(now - 59 * 60_000, now)).toBe('59 minutes ago');
+    expect(describeSince(now - 23 * 3_600_000, now)).toBe('23 hours ago');
+    expect(describeSince(now - 24 * 3_600_000, now)).toBe(new Date(now - 24 * 3_600_000).toLocaleDateString());
+  });
+
+  test('a time that is not a number reads as never, not as "Invalid Date"', () => {
+    expect(describeSince(Number.NaN, now)).toBe('not yet');
+    expect(describeSince(Number.POSITIVE_INFINITY, now)).toBe('not yet');
+    expect(describeSince(Number.NEGATIVE_INFINITY, now)).toBe('not yet');
+  });
+});
+
+describe('vehicleSubtitle (#93: moved from Vehicles)', () => {
+  const car = { year: 2021, make: 'Honda', model: 'Civic' };
+
+  test('year, make and model, as one line', () => {
+    expect(vehicleSubtitle(car)).toBe('2021 Honda Civic');
+  });
+
+  test('a part left empty is left out, not shown as a gap', () => {
+    expect(vehicleSubtitle({ ...car, make: '' })).toBe('2021 Civic');
+    expect(vehicleSubtitle({ ...car, model: '' })).toBe('2021 Honda');
+  });
+
+  test('a year alone says nothing worth a line', () => {
+    expect(vehicleSubtitle({ ...car, make: '', model: '' })).toBe('');
+    expect(vehicleSubtitle({ year: 0, make: '', model: '' })).toBe('');
   });
 });

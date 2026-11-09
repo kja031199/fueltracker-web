@@ -5,6 +5,7 @@ import type { AuthUser } from '../data/auth';
 import { useBackupStatus, useFuelLog, useSyncStatus } from './fuelLog';
 import { AccountId } from './AccountId';
 import { DEFAULT_IDLE_MINUTES } from '../domain/idleTimeout';
+import { describeSince } from '../domain/format';
 import {
   DISTANCE_UNITS,
   ECONOMY_UNITS,
@@ -24,18 +25,6 @@ interface Props {
   readonly syncEnabled?: boolean;
   /** The administrator's inactivity period (#70). Shown, never editable. */
   readonly idleMinutes?: number;
-}
-
-/** "3 minutes ago", falling back to a date once it stops being recent. */
-export function describeSyncTime(at: number | null, now: number = Date.now()): string {
-  if (at === null) return 'not yet';
-  const seconds = Math.max(0, Math.round((now - at) / 1000));
-  if (seconds < 60) return 'just now';
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
-  return new Date(at).toLocaleDateString();
 }
 
 /**
@@ -175,7 +164,7 @@ export function SettingsScreen({
           {syncEnabled ? (
             <>
               <p style={{ margin: '0 0 8px' }}>
-                Last synced {describeSyncTime(sync.lastSyncedAt)}.
+                Last synced {describeSince(sync.lastSyncedAt)}.
               </p>
               <button
                 className="button"
@@ -259,7 +248,7 @@ export function SettingsScreen({
         </h2>
 
         <p style={{ margin: '0 0 8px' }}>
-          Last backup: <strong>{describeSyncTime(lastBackupAt)}</strong>.
+          Last backup: <strong>{describeSince(lastBackupAt)}</strong>.
         </p>
         <p style={{ margin: '0 0 12px', opacity: 0.8 }}>
           Only the JSON export counts as a backup. The CSV is fill-ups only — no vehicles, no
