@@ -59,15 +59,15 @@ export function SignInScreen({
           Sign in to continue
         </h2>
         {notice !== null && (
-          <p className="warning" style={{ margin: '0 0 12px' }} role="status">
+          <p className="warning stack" role="status">
             {notice}
           </p>
         )}
-        <p style={{ margin: '0 0 8px' }}>
+        <p className="stack-sm">
           Log every fill-up and this works out your real fuel economy, what you actually spend,
           and which day of the week you tend to catch the cheapest price.
         </p>
-        <p style={{ margin: '0 0 12px' }}>
+        <p className="stack">
           Signing in with Google keeps your fuel log in your own account, so it survives clearing
           your browser data and follows you to your phone. Your fill-ups are readable only by
           you.
@@ -78,7 +78,7 @@ export function SignInScreen({
             {busy ? 'Signing in…' : 'Continue with Google'}
           </button>
         ) : (
-          <p className="warning" style={{ margin: 0 }}>
+          <p className="warning flush">
             This build has no Firebase configuration, so signing in is not possible. Copy
             <code> .env.example </code>
             to <code>.env.local</code>, fill in the project values, and restart the dev server.
@@ -86,12 +86,12 @@ export function SignInScreen({
         )}
 
         {error !== null && (
-          <p className="warning" style={{ margin: '12px 0 0' }} role="alert">
+          <p className="warning after" role="alert">
             {error}
           </p>
         )}
 
-        <p style={{ margin: '12px 0 0', opacity: 0.8 }}>
+        <p className="after muted">
           The first sign-in on a device needs a connection. After that the app opens and works
           offline, and syncs again when you are back.
         </p>

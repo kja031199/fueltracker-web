@@ -42,7 +42,7 @@ export function ChartFrame({
   const tableId = useId();
 
   return (
-    <figure className="chart" style={{ margin: 0 }}>
+    <figure className="chart flush">
       <figcaption className="card__title">{title}</figcaption>
 
       <div
@@ -54,8 +54,8 @@ export function ChartFrame({
 
       {rows.length > 0 && (
         <>
-          <details style={{ marginTop: 6 }}>
-            <summary style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+          <details className="space-above-sm">
+            <summary className="note clickable">
               Show the numbers
             </summary>
             <table id={tableId} className="chart__table">

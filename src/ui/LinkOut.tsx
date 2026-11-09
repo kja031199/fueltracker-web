@@ -43,14 +43,14 @@ export function LinkOut({ url, label }: Props): ReactElement {
         {label}
       </label>
       <textarea
+        className="break-all"
         id="link-out"
         readOnly
         rows={3}
         value={url}
         onFocus={(event) => event.target.select()}
-        style={{ wordBreak: 'break-all' }}
       />
-      <div className="row-actions" style={{ marginTop: 8 }}>
+      <div className="row-actions space-above-sm">
         <button className="button" type="button" onClick={() => void copy(url)}>
           Copy link
         </button>
@@ -61,7 +61,7 @@ export function LinkOut({ url, label }: Props): ReactElement {
         )}
       </div>
       {copyState !== 'idle' && (
-        <p role="status" style={{ margin: '8px 0 0' }}>
+        <p className="after-sm" role="status">
           {copyState === 'copied'
             ? 'Copied.'
             : 'This browser would not copy it. Select the link above and copy it yourself.'}

@@ -113,11 +113,11 @@ export function FillUpsScreen({ units }: Props): ReactElement {
         Log a fill-up
       </button>
 
-      <section className="card" style={{ marginTop: 'var(--gap)' }} aria-labelledby="filter-heading">
+      <section className="card space-above" aria-labelledby="filter-heading">
         <h2 className="card__title" id="filter-heading">
           Search and filter
           {isFilterActive(filter) && (
-            <span style={{ color: 'var(--accent-blue)' }}> · filters active</span>
+            <span className="accent-blue"> · filters active</span>
           )}
         </h2>
 
@@ -221,7 +221,7 @@ export function FillUpsScreen({ units }: Props): ReactElement {
         ) : visible.length === 0 ? (
           <p className="empty">Nothing matches those filters.</p>
         ) : (
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          <ul className="list-plain">
             {visible.map((record) => (
               <li className="card" key={record.id}>
                 <FillUpSummary
@@ -232,12 +232,12 @@ export function FillUpsScreen({ units }: Props): ReactElement {
                   cost={totalCost(record)}
                 >
                   {enteredByName !== null && record.enteredBy != null && enteredByName.has(record.enteredBy) && (
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                    <div className="note">
                       Entered by {enteredByName.get(record.enteredBy)}
                     </div>
                   )}
                 </FillUpSummary>
-                <div className="row-actions" style={{ marginTop: 10 }}>
+                <div className="row-actions space-above-sm">
                   <button
                     className="button button--secondary"
                     type="button"

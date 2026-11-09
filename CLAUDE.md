@@ -518,6 +518,18 @@ npm ci --prefix .github/firebase-cli
   inside a landmark; banners go in `before` and the tab bar in `after`.
   `ConfirmButton` is controlled — the screen keeps which row is asking, so
   only one asks at a time.
+- **Inline `style` is only for a computed value** (#93): a metric's hue, a
+  colour that depends on a total. Spacing, lists, rows and quiet text are
+  utility classes at the end of `styles.css` (`.stack-sm`, `.after-sm`,
+  `.muted`, `.note`, `.list-plain`, `.row-between`, …), and
+  `src/test/inlineStyles.test.ts` fails on a style whose values are all
+  literals. **Never fade text with `opacity`** — use `.muted`: the text
+  colours are palette values (`textPrimary`/`textSecondary` in
+  `accessiblePalette.ts`) measured on the card and the page, and a faded
+  colour is one nothing measures. The `--text-*` values in `styles.css` are a
+  first-paint copy that `accessiblePalette.test.ts` holds to the palette; edit
+  the palette, then the copy. A utility that loses to a more specific
+  component selector needs a matching selector (`.field input.checkbox`).
 
 - **Keep the fuel log's context value stable** (#88). Every screen reads
   `useFuelLog()`, so a value rebuilt each render re-renders all of them: it

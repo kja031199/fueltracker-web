@@ -103,7 +103,7 @@ export function VehiclesScreen({ ownerName = '' }: { readonly ownerName?: string
         {vehicles.length === 0 ? (
           <p className="empty">No vehicles yet. Add one above to start logging fill-ups.</p>
         ) : (
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          <ul className="list-plain">
             {vehicles.map((vehicle) => {
               const subtitle = vehicleSubtitle(vehicle);
               const selected = vehicle.id === selectedVehicleId;
@@ -127,25 +127,25 @@ export function VehiclesScreen({ ownerName = '' }: { readonly ownerName?: string
               );
               return (
                 <li className="card" key={vehicle.id}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                  <div className="row-between">
                     <div>
                       <strong>{vehicle.name}</strong>
                       {subtitle !== '' && (
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                        <div className="note">
                           {subtitle}
                         </div>
                       )}
                       {membership !== undefined && (
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                        <div className="note">
                           Shared with you by {membership.ownerName || 'its owner'}
                         </div>
                       )}
                     </div>
                     {selected && (
-                      <span style={{ color: 'var(--accent-blue)', fontWeight: 600 }}>Selected</span>
+                      <span className="accent-blue bold">Selected</span>
                     )}
                   </div>
-                  <div className="row-actions" style={{ marginTop: 10 }}>
+                  <div className="row-actions space-above-sm">
                     {!selected && (
                       <button
                         className="button button--secondary"
@@ -196,7 +196,7 @@ export function VehiclesScreen({ ownerName = '' }: { readonly ownerName?: string
                     )}
                   </div>
                   {membership !== undefined && leavingId === vehicle.id && (
-                    <p style={{ margin: '8px 0 0' }}>
+                    <p className="after-sm">
                       Leaving removes {vehicle.name} from this device and your others. Fill-ups you logged
                       stay with {membership.ownerName || 'its owner'}.
                     </p>

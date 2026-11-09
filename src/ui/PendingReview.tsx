@@ -42,18 +42,18 @@ export function PendingReview({ units }: { readonly units: UnitPreferences }): R
   }
 
   return (
-    <section className="card" aria-labelledby="pending-heading" style={{ marginBottom: 'var(--gap)' }}>
+    <section className="card space-below" aria-labelledby="pending-heading">
       <h2 className="card__title" id="pending-heading">
         Waiting for review ({pending.length})
       </h2>
-      <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: 0 }}>
+      <p className="note flush-top">
         Sent to you by link. Nothing here is in your log until you approve it.
       </p>
-      <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+      <ul className="list-plain">
         {pending.map((row) => {
           const car = vehicles.find((vehicle) => vehicle.id === row.vehicleId);
           return (
-            <li key={row.id} style={{ borderTop: '1px solid var(--separator)', padding: '10px 0' }}>
+            <li className="list-row" key={row.id}>
               <FillUpSummary
                 title={car?.name ?? 'A deleted car'}
                 subtitle={`from ${row.submitterName || 'someone'} · ${new Date(row.date).toLocaleDateString()}`}
@@ -62,12 +62,12 @@ export function PendingReview({ units }: { readonly units: UnitPreferences }): R
                 cost={totalCost(row)}
               />
               {refused === row.id && (
-                <p className="warning" role="alert" style={{ margin: '8px 0 0' }}>
+                <p className="warning after-sm" role="alert">
                   This could not be added — its car is gone, or its numbers no longer check out. Reject it to
                   clear it.
                 </p>
               )}
-              <div className="row-actions" style={{ marginTop: 8 }}>
+              <div className="row-actions space-above-sm">
                 {car !== undefined && (
                   <button
                     className="button"

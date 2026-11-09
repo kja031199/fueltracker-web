@@ -64,16 +64,16 @@ export function MetricLineChart({
     <div className="card">
       <ChartFrame title={title} summary={summary} rows={rows} rowHeadings={['Date', unit]}>
         {points.length === 0 ? (
-          <p className="empty" style={{ padding: '24px 0' }}>
+          <p className="empty empty--chart">
             Not enough data yet.
           </p>
         ) : (
           <svg
+            className="chart__svg"
             viewBox={`0 0 ${AREA.width} ${AREA.height}`}
             width="100%"
             focusable="false"
             aria-hidden="true"
-            style={{ display: 'block', maxHeight: 200 }}
           >
             {niceTicks(yExtent).map((tick) => {
               const y = scale(tick, yExtent, y0, y1);

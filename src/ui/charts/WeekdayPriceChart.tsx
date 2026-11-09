@@ -53,16 +53,16 @@ export function WeekdayPriceChart({
         rowHeadings={['Day', 'Average price']}
       >
         {prices.length === 0 ? (
-          <p className="empty" style={{ padding: '24px 0' }}>
+          <p className="empty empty--chart">
             Not enough data yet.
           </p>
         ) : (
           <svg
+            className="chart__svg"
             viewBox={`0 0 ${AREA.width} ${AREA.height}`}
             width="100%"
             focusable="false"
             aria-hidden="true"
-            style={{ display: 'block', maxHeight: 190 }}
           >
             {niceTicks(yExtent, 3).map((tick) => {
               const y = scale(tick, yExtent, y0, y1);

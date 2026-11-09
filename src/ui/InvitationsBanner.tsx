@@ -47,8 +47,8 @@ export function InvitationsBanner(): ReactElement | null {
         const who = invite.ownerName || 'Someone';
         const car = invite.vehicleName || 'a car';
         return (
-          <div key={key} style={{ marginBottom: 8 }}>
-            <p style={{ margin: '0 0 6px' }}>
+          <div className="space-below-sm" key={key}>
+            <p className="stack-sm">
               <strong>{who}</strong> wants to share <strong>{car}</strong> with you. You would both see
               and log its fill-ups — including receipt photos, notes and stations.
             </p>
@@ -69,7 +69,7 @@ export function InvitationsBanner(): ReactElement | null {
         );
       })}
       {problem !== null && (
-        <p className="warning" role="alert" style={{ margin: 0 }}>
+        <p className="warning flush" role="alert">
           {problem}
         </p>
       )}

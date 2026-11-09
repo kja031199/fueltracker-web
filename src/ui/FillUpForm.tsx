@@ -273,14 +273,14 @@ export function FillUpForm({
               if (file !== undefined) void importPhoto(file);
             }}
           />
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0 }}>
+          <p className="note flush">
             Photograph a paper receipt and the gallons, price, date and station are filled in for
             you — into empty fields only, so nothing you typed is overwritten. Pump displays are not
             supported; their segment digits are not readable by this. Needs a connection the first
             time.
           </p>
           {scanNote !== null && (
-            <p className="warning" role="status" style={{ marginTop: 6 }}>
+            <p className="warning space-above-sm" role="status">
               {scanNote}
             </p>
           )}
@@ -370,7 +370,7 @@ export function FillUpForm({
         />
       </div>
 
-      <p style={{ margin: '0 0 var(--gap)' }}>
+      <p className="stack">
         <span className="field__label">Total cost </span>
         <strong style={{ color: total > 0 ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
           {currency(total)}
@@ -379,11 +379,11 @@ export function FillUpForm({
 
       <div className="field field--inline">
         <input
+          className="checkbox"
           id="fillup-full"
           type="checkbox"
           checked={form.isFullTank}
           onChange={(event) => update('isFullTank', event.target.checked)}
-          style={{ minHeight: 'auto', width: 20, height: 20 }}
         />
         <label className="field__label" htmlFor="fillup-full">
           Filled the tank completely
@@ -393,11 +393,11 @@ export function FillUpForm({
       {forLink === undefined && (
         <div className="field field--inline">
           <input
+            className="checkbox"
             id="fillup-missed"
             type="checkbox"
             checked={form.missedPreviousFillUp}
             onChange={(event) => update('missedPreviousFillUp', event.target.checked)}
-            style={{ minHeight: 'auto', width: 20, height: 20 }}
           />
           <label className="field__label" htmlFor="fillup-missed">
             Missed logging a fill before this one
@@ -405,7 +405,7 @@ export function FillUpForm({
         </div>
       )}
 
-      <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: 0 }}>
+      <p className="note flush-top">
         Marking full tanks is what lets the app work out exact economy between
         fills. Leave it off for a partial fill — those gallons still count toward
         the next full tank. Marking a missed fill keeps an impossible-looking

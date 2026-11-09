@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import type { AccentHue, ColorScheme } from './accessiblePalette';
 import {
@@ -10,6 +11,8 @@ import {
   components,
   groupedBackground,
   paletteCssVariables,
+  textPrimary,
+  textSecondary,
   tintedBackground,
 } from './accessiblePalette';
 import type { RGB } from './contrast';
@@ -177,7 +180,8 @@ describe('paletteCssVariables', () => {
     }
     expect(variables['--surface-card']).toBe(toCssRgb(cardBackground(scheme)));
     expect(variables['--surface-grouped']).toBe(toCssRgb(groupedBackground(scheme)));
-    expect(Object.keys(variables)).toHaveLength(ACCENT_HUES.length * 2 + 2);
+    // An ink and a wash per hue, two surfaces, two text colours (#93).
+    expect(Object.keys(variables)).toHaveLength(ACCENT_HUES.length * 2 + 4);
   });
 
   test('every emitted value is a valid CSS colour', () => {
@@ -233,6 +237,77 @@ describe('metric', () => {
             .toBeGreaterThanOrEqual(REQUIREMENT);
         }
       }
+    }
+  });
+});
+
+/**
+ * The text colours are palette values, measured like the accents (#93).
+ *
+ * They were hex written into `styles.css` by hand, and nothing measured them.
+ * Light-mode secondary text, #6c6c70, was 4.67:1 on the page background:
+ * inside WCAG's 4.5, but under the margin this palette holds itself to. It is
+ * now the nearest grey that clears that margin on both surfaces.
+ */
+describe('text colours', () => {
+  const TEXT: [string, (scheme: ColorScheme) => RGB][] = [
+    ['primary', textPrimary],
+    ['secondary', textSecondary],
+  ];
+
+  /** Where text lands: on a card, or straight on the page. Both measured, always. */
+  const textSurfaces = (scheme: ColorScheme): [string, RGB][] => [
+    ['card', cardBackground(scheme)],
+    ['page', groupedBackground(scheme)],
+  ];
+
+  /** The worst ratio a text colour reaches over the surfaces it can land on. */
+  const worstContrast = (text: RGB, scheme: ColorScheme): number =>
+    Math.min(...textSurfaces(scheme).map(([, background]) => contrastRatio(text, background)));
+
+  describe.each(TEXT)('%s text', (_name, text) => {
+    test.each(COLOR_SCHEMES)('clears the palette margin on the card and the page in %s mode', (scheme) => {
+      expect(worstContrast(text(scheme), scheme)).toBeGreaterThanOrEqual(MINIMUM_TEXT_CONTRAST);
+      for (const [surface, background] of textSurfaces(scheme)) {
+        const ratio = contrastRatio(text(scheme), background);
+        expect(ratio, `${_name} text on the ${surface} in ${scheme} mode is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(
+          MINIMUM_TEXT_CONTRAST,
+        );
+      }
+    });
+
+    test.each(COLOR_SCHEMES)('is what the page is painted with in %s mode', (scheme) => {
+      expect(paletteCssVariables(scheme)[`--text-${_name}`]).toBe(toCssRgb(text(scheme)));
+    });
+  });
+
+  test('the old light secondary grey fails what is measured, so the measurement means something', () => {
+    // #6C6C70 clears the bar on a card (5.23:1) and fails it on the page
+    // (4.69:1): a measurement that left the page out would have passed it.
+    const old: RGB = { red: 0x6c / 255, green: 0x6c / 255, blue: 0x70 / 255 };
+    expect(contrastRatio(old, cardBackground('light'))).toBeGreaterThanOrEqual(MINIMUM_TEXT_CONTRAST);
+    expect(worstContrast(old, 'light')).toBeLessThan(MINIMUM_TEXT_CONTRAST);
+  });
+
+  test('secondary text is quieter than primary text, in both schemes', () => {
+    for (const scheme of COLOR_SCHEMES) {
+      expect(contrastRatio(textSecondary(scheme), cardBackground(scheme))).toBeLessThan(
+        contrastRatio(textPrimary(scheme), cardBackground(scheme)),
+      );
+    }
+  });
+
+  /**
+   * `styles.css` keeps a copy for the first paint, before `applyPalette` runs.
+   * A copy is a second source of truth unless something holds it to the first.
+   */
+  test.each(COLOR_SCHEMES)('the stylesheet’s first-paint copy matches the palette in %s mode', (scheme) => {
+    const css = readFileSync('src/ui/styles.css', 'utf8');
+    const block = scheme === 'light' ? /:root\s*\{([^}]*)\}/ : /:root\[data-scheme='dark'\]\s*\{([^}]*)\}/;
+    const body = block.exec(css)?.[1] ?? '';
+    for (const [name, text] of TEXT) {
+      const declared = new RegExp(`--text-${name}:\\s*([^;]+);`).exec(body)?.[1]?.trim();
+      expect(declared, `--text-${name} in ${scheme}`).toBe(toCssRgb(text(scheme)));
     }
   });
 });

@@ -24,8 +24,8 @@ export function RequestLinkPanel({
     [vehicle.id, vehicle.name, ownerName],
   );
   return (
-    <div style={{ marginTop: 10 }}>
-      <p style={{ margin: '0 0 8px' }}>
+    <div className="space-above-sm">
+      <p className="stack-sm">
         Send this to whoever is filling up {vehicle.name}. They fill in the fill-up and send you a link back;
         nothing reaches your log until you approve it under Fill-ups.
       </p>

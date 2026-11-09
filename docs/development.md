@@ -266,6 +266,8 @@ Recorded so a regression in the tests themselves is visible:
 | Equivalent, kept for readability: `describeSince` without its clamp — a future time is a negative age, already under a minute, so it reads "just now" either way | — |
 | Shared patterns (#93): the first press acting / cancel doing nothing / confirm taking the first button's tone / the title outside `<main>` / the tab bar dropped / no clipboard claiming copied / a refusal claiming copied | 6 / 2 / 1 / 8 / 7 / 2 / 6 |
 | Shared patterns (#93): `displayName` untrimmed / "missed previous" always shown / each `oneCopy` guard narrowed (frame, clipboard, name, confirm) | 4 / 1 / 2, 2, 1, 1 |
+| Styles (#93): the guard counting every style as computed / reading one-line styles only / counting an interpolated template as fixed / a fixed inline style put back | 1 / 1 / 2 / 1 |
+| Text colours (#93): secondary back to #6C6C70 / text colours not painted / the stylesheet copy drifting / contrast measured on the card only | 2 / 6 / 1 / 1 |
 
 Equivalent, and kept as a backstop: `shape()` without its `hasAll`. Every
 required field is also read by a clause of its own, and reading a missing field

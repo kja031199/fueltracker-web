@@ -33,13 +33,13 @@ export function AccountId({ uid, children }: Props): ReactElement {
 
   return (
     <>
-      <p style={{ margin: '0 0 4px' }}>
+      <p className="stack-xs">
         Your account id: <code>{uid}</code>
       </p>
       {children !== undefined && (
-        <p style={{ margin: '0 0 8px', opacity: 0.8 }}>{children}</p>
+        <p className="stack-sm muted">{children}</p>
       )}
-      <p style={{ margin: '0 0 8px' }}>
+      <p className="stack-sm">
         <button className="button button--secondary" type="button" onClick={() => void copy(uid)}>
           Copy account id
         </button>
@@ -48,7 +48,7 @@ export function AccountId({ uid, children }: Props): ReactElement {
           // two, and a third would make `getByRole('status')` ambiguous for
           // every test that reads the sync or import message. `aria-live`
           // announces it without claiming the role.
-          <span aria-live="polite" style={{ marginLeft: 8, opacity: 0.8 }}>
+          <span className="inline-gap muted" aria-live="polite">
             {copied === 'copied'
               ? 'Copied.'
               : 'Your browser would not let the app use the clipboard — copy it by hand.'}

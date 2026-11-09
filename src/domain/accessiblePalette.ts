@@ -131,6 +131,28 @@ export function groupedBackground(scheme: ColorScheme): RGB {
 }
 
 /**
+ * Body text — iOS's `label`. Measured against both surfaces like the accents
+ * (#93); it was hex written into `styles.css` by hand before.
+ */
+export function textPrimary(scheme: ColorScheme): RGB {
+  return scheme === 'dark'
+    ? { red: 0xf2 / 255, green: 0xf2 / 255, blue: 0xf7 / 255 } // #F2F2F7
+    : { red: 0x1c / 255, green: 0x1c / 255, blue: 0x1e / 255 }; // #1C1C1E
+}
+
+/**
+ * Quieter text — iOS's `secondaryLabel`, darkened in light mode by one step.
+ * The stock #6C6C70 is 4.69:1 on the page background, under
+ * {@link MINIMUM_TEXT_CONTRAST}; #6B6B6F is the nearest grey that clears it
+ * (4.76:1 on the page, 5.31:1 on a card).
+ */
+export function textSecondary(scheme: ColorScheme): RGB {
+  return scheme === 'dark'
+    ? { red: 0x9a / 255, green: 0x9a / 255, blue: 0xa0 / 255 } // #9A9AA0
+    : { red: 0x6b / 255, green: 0x6b / 255, blue: 0x6f / 255 }; // #6B6B6F
+}
+
+/**
  * The tint wash actually rendered behind a capsule: the hue at
  * {@link TINT_OPACITY} composited over the card background.
  *
@@ -153,6 +175,8 @@ export function paletteCssVariables(scheme: ColorScheme): Record<string, string>
   const variables: Record<string, string> = {
     '--surface-card': toCssRgb(cardBackground(scheme)),
     '--surface-grouped': toCssRgb(groupedBackground(scheme)),
+    '--text-primary': toCssRgb(textPrimary(scheme)),
+    '--text-secondary': toCssRgb(textSecondary(scheme)),
   };
   for (const hue of ACCENT_HUES) {
     variables[`--accent-${hue}`] = color(hue, scheme);
