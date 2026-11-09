@@ -1,15 +1,17 @@
 /**
- * Writing a JSON backup, in one place.
+ * Writing a backup or a CSV export, in one place.
  *
- * Shared because there are now two ways to ask for one — the button in
- * Settings and the reminder banner — and two copies of "take a snapshot,
- * serialise it, download it, record that it happened" is two places for the
- * recording to be forgotten.
+ * Shared because there are three ways to ask for a backup — the button in
+ * Settings, the reminder banner, and the no-access screen — and three copies
+ * of "take a snapshot, serialise it, download it, record that it happened" is
+ * three places for the recording to be forgotten. The no-access copy was the
+ * one that forgot (#93). Only the fuel log calls these, and it records the
+ * backup itself, so no screen has to remember.
  */
 
 import type { FuelTrackerStore } from '../data/store';
 import { backupFilename } from '../data/backup';
-import { toJsonBackup } from '../data/backupFormat';
+import { toCsv, toJsonBackup } from '../data/backupFormat';
 import { downloadText } from './download';
 
 export interface BackupSummary {
@@ -34,4 +36,18 @@ export async function saveJsonBackup(store: FuelTrackerStore): Promise<BackupSum
     vehicles: snapshot.vehicles.filter((record) => record.deletedAt === null).length,
     fillUps: snapshot.fillUps.filter((record) => record.deletedAt === null).length,
   };
+}
+
+/**
+ * Downloads the live fill-ups as CSV and says how many. Deliberately **not** a
+ * backup: CSV is fill-ups only — no vehicles, no tombstones, no receipt bytes —
+ * so counting it as one would tell somebody a restore will return what it will
+ * not. Tombstones are left out because a deleted fill-up is not a row anybody
+ * wants in their expenses.
+ */
+export async function saveCsvExport(store: FuelTrackerStore): Promise<number> {
+  const snapshot = await store.exportSnapshot();
+  const live = snapshot.fillUps.filter((record) => record.deletedAt === null);
+  downloadText(toCsv(live), backupFilename(new Date(), 'csv'), 'text/csv');
+  return live.length;
 }

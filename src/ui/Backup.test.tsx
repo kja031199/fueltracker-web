@@ -84,6 +84,18 @@ describe('exporting', () => {
     expect(captured[0]!.text).toContain('fueltracker-backup');
   });
 
+  test('says when the last backup was, and a backup taken here moves it (#93)', async () => {
+    const user = userEvent.setup();
+    captureDownloads();
+    await renderSettings(makeStore());
+    const line = (): HTMLElement => screen.getByText(/last backup:/i);
+    expect(line()).toHaveTextContent(/not yet/);
+
+    await user.click(screen.getByRole('button', { name: /export backup \(json\)/i }));
+
+    await waitFor(() => expect(line()).toHaveTextContent(/just now/));
+  });
+
   test('the CSV leaves deleted fill-ups out', async () => {
     // A tombstone is a backup concern, not a spreadsheet one — nobody wants a
     // deleted fill-up in their expense report.

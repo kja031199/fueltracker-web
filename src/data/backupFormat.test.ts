@@ -6,6 +6,7 @@ import {
   CSV_COLUMNS,
   base64ToBytes,
   bytesToBase64,
+  parseBackupFile,
   parseCsv,
   parseJsonBackup,
   splitCsv,
@@ -490,6 +491,50 @@ describe('CSV reading', () => {
     );
     const result = parseCsv(toCsv(rows));
     expect(result.value).toHaveLength(5_000);
+  });
+});
+
+describe('a chosen file, read by its name (#93)', () => {
+  // Moved out of the Settings screen, where it carried an `as never[]` cast.
+  test('a .csv is fill-ups alone, in a snapshot with no vehicles or submissions', () => {
+    const read = parseBackupFile('fuel.csv', toCsv([fillUp('f1')]));
+    expect(read.error).toBeNull();
+    expect(read.value?.vehicles).toEqual([]);
+    expect(read.value?.pendingFillUps).toEqual([]);
+    expect(read.value?.fillUps.map((row) => row.id)).toEqual(['f1']);
+  });
+
+  test('the extension is read whatever its case', () => {
+    expect(parseBackupFile('FUEL.CSV', toCsv([fillUp('f1')])).value?.fillUps).toHaveLength(1);
+  });
+
+  test('anything else is a JSON backup, whole', () => {
+    const read = parseBackupFile('backup.json', toJsonBackup(snapshot));
+    expect(read.value?.vehicles.map((row) => row.id)).toEqual(['v1']);
+    expect(read.value?.fillUps).toHaveLength(2);
+  });
+
+  test('only the last extension counts, and no extension means JSON', () => {
+    expect(parseBackupFile('fuel.csv.json', toJsonBackup(snapshot)).value?.vehicles).toHaveLength(1);
+    expect(parseBackupFile('', toJsonBackup(snapshot)).value?.vehicles).toHaveLength(1);
+    // A backup renamed to .csv is read as CSV, and says it cannot be.
+    expect(parseBackupFile('backup.csv', toJsonBackup(snapshot)).value).toBeNull();
+  });
+
+  test('a file that cannot be read says why, and holds nothing', () => {
+    expect(parseBackupFile('backup.json', '{ not json')).toEqual({
+      value: null,
+      error: 'That file is not valid JSON.',
+      skipped: [],
+    });
+    expect(parseBackupFile('fuel.csv', '')).toMatchObject({ value: null, error: 'That file is empty.' });
+  });
+
+  test('rows a CSV skips are still reported', () => {
+    const csv = toCsv([fillUp('f1')]) + '\n' + 'garbage,'.repeat(CSV_COLUMNS.length);
+    const read = parseBackupFile('fuel.csv', csv);
+    expect(read.value?.fillUps).toHaveLength(1);
+    expect(read.skipped.length).toBeGreaterThan(0);
   });
 });
 

@@ -8,7 +8,9 @@ import { InMemoryRemoteStore } from '../data/remote';
 import { FuelTrackerStore } from '../data/store';
 import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
-import { FuelLogProvider, useFuelLog, useSyncStatus, type FuelLog } from './fuelLog';
+import { FuelLogProvider, useBackupStatus, useFuelLog, useSyncStatus, type BackupStatus, type FuelLog } from './fuelLog';
+import { toJsonBackup } from '../data/backupFormat';
+import { loadBackupState } from './backupNudge';
 import { SAVE_SYNC_DELAY_MS } from './syncScheduler';
 import { InMemorySharingWorld } from '../data/sharing';
 import type { SharingSync } from '../data/shareSync';
@@ -50,6 +52,8 @@ interface Harness {
   readonly store: FuelTrackerStore;
   readonly remote: InMemoryRemoteStore;
   readonly log: () => FuelLog;
+  /** The backup reminder, and the log object itself rather than a copy of it. */
+  readonly seen: () => { readonly backup: BackupStatus; readonly raw: FuelLog };
 }
 
 async function mount(store: FuelTrackerStore = makeStore()): Promise<Harness> {
@@ -59,12 +63,15 @@ async function mount(store: FuelTrackerStore = makeStore()): Promise<Harness> {
       {children}
     </FuelLogProvider>
   );
-  const { result } = renderHook(() => ({ ...useFuelLog(), sync: useSyncStatus() }), { wrapper });
+  const { result } = renderHook(
+    () => ({ ...useFuelLog(), sync: useSyncStatus(), backup: useBackupStatus(), raw: useFuelLog() }),
+    { wrapper },
+  );
   await waitFor(() => expect(result.current.loading).toBe(false));
   // The mount sync, so later counts start from a settled remote.
   await waitFor(() => expect(remote.pullLog.length).toBeGreaterThan(0));
   await waitFor(() => expect(result.current.sync.syncing).toBe(false));
-  return { store, remote, log: () => result.current };
+  return { store, remote, log: () => result.current, seen: () => result.current };
 }
 
 /** The remote's copy of one row, by id, or undefined. Reads without counting as a sync. */
@@ -151,6 +158,34 @@ describe('every write reaches the account without anyone remembering to ask', ()
     });
     expect(log().vehicles.map((v) => v.id)).toContain(vehicle.id);
     await waitFor(async () => expect(await remoteRow(remote, vehicle.id)).toBeDefined(), SYNC_WINDOW);
+  });
+
+  test('importFile', async () => {
+    const source = makeStore();
+    const vehicle = await source.addVehicle({ name: 'Imported' });
+    const file = new File([toJsonBackup(await source.exportSnapshot())], 'backup.json');
+    const { remote, log } = await mount();
+    await act(async () => {
+      const result = await log().importFile(file);
+      expect(result.summary?.vehiclesWritten).toBe(1);
+      expect(result.problems).toEqual([]);
+    });
+    expect(log().vehicles.map((v) => v.id)).toContain(vehicle.id);
+    await waitFor(async () => expect(await remoteRow(remote, vehicle.id)).toBeDefined(), SYNC_WINDOW);
+  });
+
+  test('importFile reports a row the file could not be read for, and still imports the rest', async () => {
+    const { store, log } = await mount();
+    const vehicle = await store.addVehicle({ name: 'Civic' });
+    const csv =
+      'id,vehicle_id,date_iso,odometer_miles,gallons,price_per_gallon\n' +
+      `f1,${vehicle.id},2025-01-15T00:00:00Z,10000,10,3.5\n` +
+      `f2,${vehicle.id},not a date,10400,10,3.5\n`;
+    await act(async () => {
+      const result = await log().importFile(new File([csv], 'export.csv'));
+      expect(result.summary?.fillUpsWritten).toBe(1);
+      expect(result.problems).toEqual(['row 3 has an unreadable date']);
+    });
   });
 
   // Fill-ups sent by link (#3).
@@ -272,6 +307,24 @@ describe('when a write does not happen', () => {
     expect(remote.pullLog.length).toBe(syncsBefore);
   });
 
+  test('a file that cannot be read imports nothing, says why, and neither refreshes nor syncs', async () => {
+    const { store, remote, log } = await mount();
+    const importing = vi.spyOn(store, 'importBackup');
+    const vehicles = vi.spyOn(store, 'vehicles');
+    const syncsBefore = remote.pullLog.length;
+
+    let result: Awaited<ReturnType<FuelLog['importFile']>> | undefined;
+    await act(async () => {
+      result = await log().importFile(new File(['{ not json'], 'backup.json'));
+    });
+    await new Promise((resolve) => setTimeout(resolve, SAVE_SYNC_DELAY_MS + 500));
+
+    expect(result).toEqual({ summary: null, problems: ['That file is not valid JSON.'] });
+    expect(importing).not.toHaveBeenCalled();
+    expect(vehicles).not.toHaveBeenCalled();
+    expect(remote.pullLog.length).toBe(syncsBefore);
+  });
+
   test('opening a fill-up that has gone refreshes the list but syncs nothing', async () => {
     // Deleted on another device since the list was drawn: there is nothing
     // to send, only something to stop showing.
@@ -301,6 +354,82 @@ describe('when a write does not happen', () => {
     });
     expect(found?.id).toBe(entry.id);
     expect(write).not.toHaveBeenCalled();
+  });
+});
+
+describe('a backup is recorded by the log, whoever asked for it (#93)', () => {
+  // The no-access screen downloaded a backup and recorded nothing, because the
+  // recording was left to each caller. It is the log's job now.
+  function stubDownloads(): () => void {
+    const create = Object.getOwnPropertyDescriptor(URL, 'createObjectURL');
+    const revoke = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL');
+    Object.defineProperty(URL, 'createObjectURL', { value: vi.fn(() => 'blob:x'), writable: true, configurable: true });
+    Object.defineProperty(URL, 'revokeObjectURL', { value: vi.fn(), writable: true, configurable: true });
+    return () => {
+      if (create) Object.defineProperty(URL, 'createObjectURL', create);
+      if (revoke) Object.defineProperty(URL, 'revokeObjectURL', revoke);
+    };
+  }
+
+  async function withOneLiveAndOneDeleted(): Promise<FuelTrackerStore> {
+    const store = makeStore();
+    const vehicle = await store.addVehicle({ name: 'Civic' });
+    await store.addFillUp(draft(1000), vehicle.id);
+    const gone = await store.addFillUp(draft(1300), vehicle.id);
+    await store.removeFillUp(gone.id);
+    return store;
+  }
+
+  test('saveBackup records it for the reminder, with the live fill-ups it held', async () => {
+    const restore = stubDownloads();
+    try {
+      localStorage.clear();
+      const { log, seen } = await mount(await withOneLiveAndOneDeleted());
+      expect(seen().backup.lastBackupAt).toBeNull();
+
+      await act(async () => {
+        expect(await log().saveBackup()).toEqual({ vehicles: 1, fillUps: 1 });
+      });
+
+      expect(seen().backup.lastBackupAt).not.toBeNull();
+      expect(loadBackupState('u1')).toMatchObject({ fillUpsAtLastExport: 1 });
+    } finally {
+      restore();
+    }
+  });
+
+  test('a CSV export is not a backup, so it records nothing', async () => {
+    const restore = stubDownloads();
+    try {
+      localStorage.clear();
+      const { log, seen } = await mount(await withOneLiveAndOneDeleted());
+
+      await act(async () => {
+        expect(await log().exportCsv()).toBe(1); // the live one only
+      });
+
+      expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+      expect(seen().backup.lastBackupAt).toBeNull();
+      expect(loadBackupState('u1').lastExportAt).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  test('recording one changes the reminder, not the log every screen reads (#88)', async () => {
+    const restore = stubDownloads();
+    try {
+      localStorage.clear();
+      const { log, seen } = await mount();
+      const before = seen().raw;
+      await act(async () => {
+        await log().saveBackup();
+      });
+      expect(seen().backup.lastBackupAt).not.toBeNull();
+      expect(seen().raw).toBe(before);
+    } finally {
+      restore();
+    }
   });
 });
 

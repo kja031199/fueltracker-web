@@ -31,7 +31,8 @@ Hosting at `fueltracker-899eb.web.app`.
   `shareLedger.ts` the shared cars held, `records.ts` the record types and
   `Snapshot`, `recordMapping.ts` draft ↔ record,
   `recordValidation.ts` **the one decoder** for a row from anywhere (account,
-  JSON backup or CSV), `backupFormat.ts` the file envelopes around it,
+  JSON backup or CSV), `backupFormat.ts` the file envelopes around it
+  (`parseBackupFile` reads a chosen file by its name),
   `recordId.ts` which ids can be stored at all,
   `tombstone.ts` what a deletion leaves, `accountStore.ts` the per-account
   database. **No import cycles, and the storage modules never import the
@@ -42,8 +43,9 @@ Hosting at `fueltracker-899eb.web.app`.
   (`sdkBoundary.test.ts`, #93).
 - `src/ui/` — React: screens, hooks, hand-drawn SVG charts (`charts/`).
   `App.tsx` gates on auth and holds per-browser preferences; `fuelLog.tsx`
-  (`FuelLogProvider` / `useFuelLog`, and `useSyncStatus` for sync status)
-  owns the data, sync and **every write**;
+  (`FuelLogProvider` / `useFuelLog`, `useSyncStatus` for sync status and
+  `useBackupStatus` for the backup reminder) owns the data, sync, **every
+  write** and every backup, export and file import;
   `AppShell` (in `App.tsx`) is the signed-in app (#56).
 
 No file or test counts here: the first version carried them and they were wrong
@@ -408,6 +410,13 @@ npm ci --prefix .github/firebase-cli
   Known and unfixed; found while fixing #14.
 - **Only a JSON export counts as a backup.** CSV is fill-ups only — no
   vehicles, no tombstones, no receipt bytes.
+- **The fuel log records a backup, never a screen** (#93). `saveBackup()`
+  downloads and records it for the reminder in one step; `exportCsv()` records
+  nothing. Recording used to be each caller's job, and the no-access screen's
+  export forgot, so the reminder kept saying "never backed up" to somebody who
+  just had. A new way to ask for a backup calls `saveBackup()` and adds
+  nothing. Screens read the reminder through `useBackupStatus()`, its own
+  context, so recording one leaves the `useFuelLog()` object unchanged.
 - **A CSV cell is escaped for two readers.** RFC 4180 quoting is for the parser
   and does nothing for the spreadsheet: `"=1+1"` is still evaluated.
   `guardCsvCell` prefixes an apostrophe, the pattern allows leading apostrophes
