@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react';
+import { ScreenFrame } from './ScreenFrame';
 
 /**
  * Shown instead of the app when the browser will not open local storage —
@@ -7,14 +8,11 @@ import type { ReactElement } from 'react';
  */
 export function StorageErrorScreen({ detail }: { readonly detail: string }): ReactElement {
   return (
-    <div className="app">
-      <main className="app__main">
-        <h1 className="app__title">FuelTracker</h1>
-        <p className="warning">
-          Local storage is unavailable, so nothing can be saved or loaded. Private browsing or a
-          blocked-storage setting is the usual cause. ({detail})
-        </p>
-      </main>
-    </div>
+    <ScreenFrame>
+      <p className="warning">
+        Local storage is unavailable, so nothing can be saved or loaded. Private browsing or a
+        blocked-storage setting is the usual cause. ({detail})
+      </p>
+    </ScreenFrame>
   );
 }

@@ -16,6 +16,7 @@
 import type { ReactElement } from 'react';
 import { useState } from 'react';
 import type { AuthProvider } from '../data/auth';
+import { ScreenFrame } from './ScreenFrame';
 
 interface Props {
   readonly auth: AuthProvider;
@@ -52,52 +53,49 @@ export function SignInScreen({
   }
 
   return (
-    <div className="app">
-      <main className="app__main">
-        <h1 className="app__title">FuelTracker</h1>
-        <section className="card" aria-labelledby="signin-heading">
-          <h2 className="card__title" id="signin-heading">
-            Sign in to continue
-          </h2>
-          {notice !== null && (
-            <p className="warning" style={{ margin: '0 0 12px' }} role="status">
-              {notice}
-            </p>
-          )}
-          <p style={{ margin: '0 0 8px' }}>
-            Log every fill-up and this works out your real fuel economy, what you actually spend,
-            and which day of the week you tend to catch the cheapest price.
+    <ScreenFrame>
+      <section className="card" aria-labelledby="signin-heading">
+        <h2 className="card__title" id="signin-heading">
+          Sign in to continue
+        </h2>
+        {notice !== null && (
+          <p className="warning" style={{ margin: '0 0 12px' }} role="status">
+            {notice}
           </p>
-          <p style={{ margin: '0 0 12px' }}>
-            Signing in with Google keeps your fuel log in your own account, so it survives clearing
-            your browser data and follows you to your phone. Your fill-ups are readable only by
-            you.
+        )}
+        <p style={{ margin: '0 0 8px' }}>
+          Log every fill-up and this works out your real fuel economy, what you actually spend,
+          and which day of the week you tend to catch the cheapest price.
+        </p>
+        <p style={{ margin: '0 0 12px' }}>
+          Signing in with Google keeps your fuel log in your own account, so it survives clearing
+          your browser data and follows you to your phone. Your fill-ups are readable only by
+          you.
+        </p>
+
+        {configured ? (
+          <button className="button" type="button" onClick={signIn} disabled={busy}>
+            {busy ? 'Signing in…' : 'Continue with Google'}
+          </button>
+        ) : (
+          <p className="warning" style={{ margin: 0 }}>
+            This build has no Firebase configuration, so signing in is not possible. Copy
+            <code> .env.example </code>
+            to <code>.env.local</code>, fill in the project values, and restart the dev server.
           </p>
+        )}
 
-          {configured ? (
-            <button className="button" type="button" onClick={signIn} disabled={busy}>
-              {busy ? 'Signing in…' : 'Continue with Google'}
-            </button>
-          ) : (
-            <p className="warning" style={{ margin: 0 }}>
-              This build has no Firebase configuration, so signing in is not possible. Copy
-              <code> .env.example </code>
-              to <code>.env.local</code>, fill in the project values, and restart the dev server.
-            </p>
-          )}
-
-          {error !== null && (
-            <p className="warning" style={{ margin: '12px 0 0' }} role="alert">
-              {error}
-            </p>
-          )}
-
-          <p style={{ margin: '12px 0 0', opacity: 0.8 }}>
-            The first sign-in on a device needs a connection. After that the app opens and works
-            offline, and syncs again when you are back.
+        {error !== null && (
+          <p className="warning" style={{ margin: '12px 0 0' }} role="alert">
+            {error}
           </p>
-        </section>
-      </main>
-    </div>
+        )}
+
+        <p style={{ margin: '12px 0 0', opacity: 0.8 }}>
+          The first sign-in on a device needs a connection. After that the app opens and works
+          offline, and syncs again when you are back.
+        </p>
+      </section>
+    </ScreenFrame>
   );
 }

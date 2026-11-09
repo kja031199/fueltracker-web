@@ -5,6 +5,7 @@
  */
 
 import type { ReactElement, ReactNode } from 'react';
+import { ScreenFrame } from './ScreenFrame';
 
 export function LinkScreen({
   title,
@@ -14,17 +15,14 @@ export function LinkScreen({
   readonly children: ReactNode;
 }): ReactElement {
   return (
-    <div className="app">
-      <h1 className="app__title">FuelTracker</h1>
-      <main className="app__main">
-        <section className="card" aria-labelledby="link-screen-heading">
-          <h2 className="card__title" id="link-screen-heading">
-            {title}
-          </h2>
-          {children}
-        </section>
-      </main>
-    </div>
+    <ScreenFrame>
+      <section className="card" aria-labelledby="link-screen-heading">
+        <h2 className="card__title" id="link-screen-heading">
+          {title}
+        </h2>
+        {children}
+      </section>
+    </ScreenFrame>
   );
 }
 

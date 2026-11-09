@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { useState } from 'react';
+import { useCopyToClipboard } from './useCopyToClipboard';
 
 /**
  * The page a link opens on: this one, without its hash (#3).
@@ -26,18 +26,8 @@ interface Props {
  * way, and a failed copy says so rather than claiming success.
  */
 export function LinkOut({ url, label }: Props): ReactElement {
-  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const { state: copyState, copy } = useCopyToClipboard();
   const canShare = typeof navigator.share === 'function';
-
-  async function copy(): Promise<void> {
-    try {
-      if (navigator.clipboard === undefined) throw new Error('no clipboard');
-      await navigator.clipboard.writeText(url);
-      setCopyState('copied');
-    } catch {
-      setCopyState('failed');
-    }
-  }
 
   async function share(): Promise<void> {
     try {
@@ -61,7 +51,7 @@ export function LinkOut({ url, label }: Props): ReactElement {
         style={{ wordBreak: 'break-all' }}
       />
       <div className="row-actions" style={{ marginTop: 8 }}>
-        <button className="button" type="button" onClick={() => void copy()}>
+        <button className="button" type="button" onClick={() => void copy(url)}>
           Copy link
         </button>
         {canShare && (

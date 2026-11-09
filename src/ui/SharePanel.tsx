@@ -1,4 +1,5 @@
 import type { FormEvent, ReactElement } from 'react';
+import { displayName } from '../domain/format';
 import { useCallback, useEffect, useState } from 'react';
 import type { VehicleRecord } from '../data/records';
 import type { Invite, Member } from '../data/sharing';
@@ -103,17 +104,17 @@ export function SharePanel({ vehicle }: { readonly vehicle: VehicleRecord }): Re
           {members.map((member) => (
             <li key={member.uid} className="row-actions" style={{ alignItems: 'center' }}>
               <span>
-                Shared with <strong>{member.name || member.email}</strong>
+                Shared with <strong>{displayName(member)}</strong>
                 {member.name !== '' && member.email !== '' ? ` (${member.email})` : ''}
               </span>
               <button
                 className="button button--secondary"
                 type="button"
                 onClick={() =>
-                  void act(() => sharing.removeMember(vehicle.id, member.uid), `${member.name || member.email} no longer has ${vehicle.name}.`)
+                  void act(() => sharing.removeMember(vehicle.id, member.uid), `${displayName(member)} no longer has ${vehicle.name}.`)
                 }
               >
-                Remove {member.name || member.email}
+                Remove {displayName(member)}
               </button>
             </li>
           ))}

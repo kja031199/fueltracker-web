@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
+import { METRIC, US } from './units';
 import {
   DEFAULT_CURRENCY,
   volume,
@@ -6,8 +7,10 @@ import {
   currency,
   currencyForLocale,
   describeSince,
+  displayName,
   distance,
   economy,
+  fillUpFacts,
   fuelPrice,
   numberFormat,
   plainCurrency,
@@ -281,5 +284,53 @@ describe('vehicleSubtitle (#93: moved from Vehicles)', () => {
   test('a year alone says nothing worth a line', () => {
     expect(vehicleSubtitle({ ...car, make: '', model: '' })).toBe('');
     expect(vehicleSubtitle({ year: 0, make: '', model: '' })).toBe('');
+  });
+});
+
+describe('displayName, who a person is shown as (#93: four copies before)', () => {
+  test('their name, when they gave one', () => {
+    expect(displayName({ name: 'Sam', email: 'sam@example.com' })).toBe('Sam');
+  });
+
+  test('their email when the name is empty — or only spaces, which used to show as a blank', () => {
+    expect(displayName({ name: '', email: 'sam@example.com' })).toBe('sam@example.com');
+    expect(displayName({ name: '   ', email: 'sam@example.com' })).toBe('sam@example.com');
+  });
+
+  test('the fallback when there is neither', () => {
+    expect(displayName({ name: '', email: '' })).toBe('someone');
+    expect(displayName({ name: ' ', email: ' ' }, 'its owner')).toBe('its owner');
+  });
+
+  test('trimmed, so stray spaces never reach a sentence', () => {
+    expect(displayName({ name: '  Sam ', email: '' })).toBe('Sam');
+    expect(displayName({ name: '', email: ' sam@example.com ' })).toBe('sam@example.com');
+  });
+});
+
+describe('fillUpFacts, the grey line under a fill-up (#93: two copies before)', () => {
+  const entry = { gallons: 10, odometer: 12_345, fuelGrade: 'Regular', isFullTank: true, missedPreviousFillUp: false };
+
+  test('volume, distance and grade, in the reader’s units', () => {
+    expect(fillUpFacts(entry, US)).toEqual(['10 gal', '12,345 mi', 'Regular']);
+    const metric = fillUpFacts(entry, METRIC);
+    expect(metric[0]).toMatch(/^37\.854 L$/);
+    expect(metric[1]).toBe('19,867.4 km');
+  });
+
+  test('a partial fill says so', () => {
+    expect(fillUpFacts({ ...entry, isFullTank: false }, US)).toContain('partial fill');
+  });
+
+  test('a missed fill-up is said only where the line is about the reader’s own log', () => {
+    const missed = { ...entry, missedPreviousFillUp: true };
+    expect(fillUpFacts(missed, US, { missed: true })).toContain('missed previous');
+    expect(fillUpFacts(missed, US)).not.toContain('missed previous');
+    expect(fillUpFacts(entry, US, { missed: true })).not.toContain('missed previous');
+  });
+
+  test('zero and huge numbers are written out, never as NaN', () => {
+    const facts = fillUpFacts({ ...entry, gallons: 0, odometer: 9_999_999 }, US).join(' · ');
+    expect(facts).not.toMatch(/NaN|Infinity|undefined/);
   });
 });

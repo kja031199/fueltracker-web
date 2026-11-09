@@ -21,6 +21,7 @@ import { useRoute } from './useTabRoute';
 import { useServiceWorker } from './useServiceWorker';
 import { UpdateBanner } from './UpdateBanner';
 import { BackupBanner } from './BackupBanner';
+import { ScreenFrame } from './ScreenFrame';
 import { InvitationsBanner } from './InvitationsBanner';
 import { SignInScreen } from './SignInScreen';
 import { NoAccessScreen } from './NoAccessScreen';
@@ -155,9 +156,9 @@ export function App({
   // including offline, where the restore still succeeds.
   if (authState.status === 'loading') {
     return (
-      <div className="app">
+      <ScreenFrame>
         <p className="empty">Checking your account…</p>
-      </div>
+      </ScreenFrame>
     );
   }
 
@@ -235,9 +236,9 @@ function AppShell({
 
   if (log.loading) {
     return (
-      <div className="app">
+      <ScreenFrame>
         <p className="empty">Loading your fuel log…</p>
-      </div>
+      </ScreenFrame>
     );
   }
 
@@ -273,40 +274,44 @@ function AppShell({
   if (onboarding) return gated(<WelcomeScreen onStart={() => setHasOnboarded(true)} />);
 
   return gated(
-    <div className="app">
-      <UpdateBanner state={serviceWorker} />
-      <BackupBanner reason={backup.reason} onBackUp={() => void log.saveBackup()} onDismiss={backup.snooze} />
-      <InvitationsBanner />
-      <h1 className="app__title">FuelTracker</h1>
-      <main className="app__main">
-        {tab === 'vehicles' && <VehiclesScreen ownerName={account.displayName} />}
-        {tab === 'settings' && (
-          <SettingsScreen
-            units={units}
-            onChange={onUnitsChange}
-            account={account}
-            onSignOut={onSignOut}
-            idleMinutes={idleMinutes}
-            syncEnabled={syncEnabled}
-          />
-        )}
-        {tab === 'dashboard' && <DashboardScreen units={units} />}
-        {tab === 'fillups' && <FillUpsScreen units={units} />}
-      </main>
-      <nav className="tabs" aria-label="Sections">
-        {TAB_LABELS.map((entry) => (
-          <button
-            key={entry.id}
-            className="tabs__button"
-            type="button"
-            aria-current={tab === entry.id ? 'page' : undefined}
-            onClick={() => setTab(entry.id)}
-          >
-            {entry.label}
-          </button>
-        ))}
-      </nav>
-    </div>,
+    <ScreenFrame
+      before={
+        <>
+          <UpdateBanner state={serviceWorker} />
+          <BackupBanner reason={backup.reason} onBackUp={() => void log.saveBackup()} onDismiss={backup.snooze} />
+          <InvitationsBanner />
+        </>
+      }
+      after={
+        <nav className="tabs" aria-label="Sections">
+          {TAB_LABELS.map((entry) => (
+            <button
+              key={entry.id}
+              className="tabs__button"
+              type="button"
+              aria-current={tab === entry.id ? 'page' : undefined}
+              onClick={() => setTab(entry.id)}
+            >
+              {entry.label}
+            </button>
+          ))}
+        </nav>
+      }
+    >
+      {tab === 'vehicles' && <VehiclesScreen ownerName={account.displayName} />}
+      {tab === 'settings' && (
+        <SettingsScreen
+          units={units}
+          onChange={onUnitsChange}
+          account={account}
+          onSignOut={onSignOut}
+          idleMinutes={idleMinutes}
+          syncEnabled={syncEnabled}
+        />
+      )}
+      {tab === 'dashboard' && <DashboardScreen units={units} />}
+      {tab === 'fillups' && <FillUpsScreen units={units} />}
+    </ScreenFrame>,
   );
 }
 

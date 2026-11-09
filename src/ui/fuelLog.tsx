@@ -46,6 +46,7 @@ import { saveCsvExport, saveJsonBackup } from './exportBackup';
 import { parseBackupFile } from '../data/backupFormat';
 import type { BackupPromptReason } from '../domain/exportReminder';
 import { useBackupNudge } from './backupNudge';
+import { displayName } from '../domain/format';
 import type { SyncStatus } from './useSync';
 import { useSync } from './useSync';
 
@@ -436,7 +437,7 @@ function useSharingView(
         }
         if (membership === undefined && known.members.length === 0) return null; // not shared
         const shown = new Map<string, string>();
-        for (const member of known.members) shown.set(member.uid, member.name || member.email);
+        for (const member of known.members) shown.set(member.uid, displayName(member));
         if (membership !== undefined) shown.set(membership.ownerUid, membership.ownerName || 'its owner');
         shown.set(uid, 'you');
         return shown;

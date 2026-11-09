@@ -4,6 +4,7 @@ import type { FormEvent } from 'react';
 import { vehicleSubtitle } from '../domain/format';
 import { useFuelLog } from './fuelLog';
 import { SharePanel } from './SharePanel';
+import { ConfirmButton } from './ConfirmButton';
 import { RequestLinkPanel } from './RequestLinkPanel';
 import { TEXT_LIMITS } from '../domain/textLimits';
 
@@ -109,6 +110,21 @@ export function VehiclesScreen({ ownerName = '' }: { readonly ownerName?: string
               // A car shared *with* you is its owner's: you can leave it, not
               // delete or share it (#66).
               const membership = sharing.membershipFor(vehicle.id);
+              // Deleting a vehicle takes its whole history with it, so it asks
+              // first rather than offering an undo that does not exist yet.
+              const deleting = (asking: boolean): ReactElement => (
+                <ConfirmButton
+                  asking={asking}
+                  onAsk={() => setConfirmingId(vehicle.id)}
+                  onCancel={() => setConfirmingId(null)}
+                  onConfirm={() => void remove(vehicle.id)}
+                  label="Delete"
+                  confirmLabel={`Delete ${vehicle.name} and its fill-ups${
+                    sharing.enabled ? ', for everyone it is shared with' : ''
+                  }`}
+                  cancelLabel="Keep"
+                />
+              );
               return (
                 <li className="card" key={vehicle.id}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
@@ -140,56 +156,21 @@ export function VehiclesScreen({ ownerName = '' }: { readonly ownerName?: string
                       </button>
                     )}
                     {membership !== undefined ? (
-                      leavingId === vehicle.id ? (
-                        <>
-                          <button
-                            className="button button--danger"
-                            type="button"
-                            onClick={() => {
-                              setLeavingId(null);
-                              void sharing.leave(membership);
-                            }}
-                          >
-                            Leave {vehicle.name}
-                          </button>
-                          <button
-                            className="button button--secondary"
-                            type="button"
-                            onClick={() => setLeavingId(null)}
-                          >
-                            Stay
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          className="button button--secondary"
-                          type="button"
-                          onClick={() => setLeavingId(vehicle.id)}
-                        >
-                          Leave
-                        </button>
-                      )
+                      <ConfirmButton
+                        asking={leavingId === vehicle.id}
+                        onAsk={() => setLeavingId(vehicle.id)}
+                        onCancel={() => setLeavingId(null)}
+                        onConfirm={() => {
+                          setLeavingId(null);
+                          void sharing.leave(membership);
+                        }}
+                        label="Leave"
+                        confirmLabel={`Leave ${vehicle.name}`}
+                        cancelLabel="Stay"
+                        tone="secondary"
+                      />
                     ) : confirmingId === vehicle.id ? (
-                      <>
-                        {/* Deleting a vehicle takes its whole history with it,
-                            so it asks first rather than offering an undo that
-                            does not exist yet. */}
-                        <button
-                          className="button button--danger"
-                          type="button"
-                          onClick={() => void remove(vehicle.id)}
-                        >
-                          Delete {vehicle.name} and its fill-ups
-                          {sharing.enabled ? ', for everyone it is shared with' : ''}
-                        </button>
-                        <button
-                          className="button button--secondary"
-                          type="button"
-                          onClick={() => setConfirmingId(null)}
-                        >
-                          Keep
-                        </button>
-                      </>
+                      deleting(true)
                     ) : (
                       <>
                         <button
@@ -210,13 +191,7 @@ export function VehiclesScreen({ ownerName = '' }: { readonly ownerName?: string
                             {sharingId === vehicle.id ? 'Done sharing' : 'Share'}
                           </button>
                         )}
-                        <button
-                          className="button button--danger"
-                          type="button"
-                          onClick={() => setConfirmingId(vehicle.id)}
-                        >
-                          Delete
-                        </button>
+                        {deleting(false)}
                       </>
                     )}
                   </div>

@@ -61,6 +61,12 @@ body {
   margin-inline: auto;
 }
 
+/* The title sits inside <main> (ScreenFrame, #93), whose padding already sets
+   it in from the edge: only the space under it is the title's own. */
+.app__main > .app__title {
+  padding: 0 0 var(--gap);
+}
+
 /* Tabs ------------------------------------------------------------------ */
 
 .tabs {

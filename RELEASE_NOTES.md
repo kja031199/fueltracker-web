@@ -11,6 +11,14 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-09
 
+- **Every screen's title now lines up with its content, the way the main app's
+  always has, and someone sharing a car who gave only spaces for a name shows
+  their email instead of a blank.**
+  *Technical:* one `ScreenFrame` (the title inside `<main>` on every page, ten
+  frames before), `ConfirmButton` (three pairs), `useCopyToClipboard` (two),
+  `FillUpSummary` with `fillUpFacts` (two), and `displayName` (four);
+  `oneCopy.test.ts` refuses another copy of each.
+  [#93](https://github.com/kja031199/fueltracker-web/issues/93) · [PR #126](https://github.com/kja031199/fueltracker-web/pull/126)
 - **No change you'll see: what a fill-up cost, and a price per litre, are now
   worked out in one place.** A link's error message and the "last synced"
   time read as before; a time that is not a number now reads "not yet"
