@@ -11,6 +11,16 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-09
 
+- **No change you'll see, except that a car's Share and Request panels no
+  longer open at the same time — opening one closes the other.**
+  *Technical:* the fill-up form, the fuel log and Settings are split (474,
+  473 and 314 lines to 263, 219 and 44): `useFillUpForm` with
+  `ReceiptScanField` and `DecimalField`, the scan rule as a pure `applyScan`;
+  `fuelLogTypes.ts` and `useSharingView.ts`; `ui/settings/` with one component
+  per section. Vehicles gets `AddVehicleForm` and a `VehicleRow` with one
+  `mode` instead of four ids. `fileSize.test.ts` holds interface files to 300
+  lines, `App.tsx` excepted until the route table.
+  [#93](https://github.com/kja031199/fueltracker-web/issues/93) · [PR #128](https://github.com/kja031199/fueltracker-web/pull/128)
 - **Grey text is a shade darker, so it is easier to read on the page
   background in light mode; the small print that was faded out is now the
   same measured grey.**

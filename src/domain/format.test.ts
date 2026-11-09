@@ -15,6 +15,7 @@ import {
   numberFormat,
   plainCurrency,
   vehicleSubtitle,
+  vehicleYear,
 } from './format';
 
 describe('currencyForLocale', () => {
@@ -332,5 +333,31 @@ describe('fillUpFacts, the grey line under a fill-up (#93: two copies before)', 
   test('zero and huge numbers are written out, never as NaN', () => {
     const facts = fillUpFacts({ ...entry, gallons: 0, odometer: 9_999_999 }, US).join(' · ');
     expect(facts).not.toMatch(/NaN|Infinity|undefined/);
+  });
+});
+
+describe('vehicleYear, the year typed when adding a car (#93: moved out of Vehicles)', () => {
+  const now = new Date(2026, 10, 9);
+
+  test('a typed year is that year', () => {
+    expect(vehicleYear('2021', now)).toBe(2021);
+    expect(vehicleYear(' 2021 ', now)).toBe(2021);
+  });
+
+  test('blank or nonsense is this year, never NaN', () => {
+    for (const text of ['', '   ', 'abc', 'NaN', 'Infinity']) {
+      expect(vehicleYear(text, now), JSON.stringify(text)).toBe(2026);
+    }
+  });
+
+  test('it reads the leading whole number, as it always has', () => {
+    // Pinned rather than judged: the field is type="number", so a browser
+    // rarely sends these, and a stricter rule would be a change of its own.
+    expect(vehicleYear('2021x', now)).toBe(2021);
+    expect(vehicleYear('1e3', now)).toBe(1);
+    expect(vehicleYear('2021.7', now)).toBe(2021);
+    expect(vehicleYear('-5', now)).toBe(-5);
+    expect(vehicleYear('0', now)).toBe(0);
+    expect(vehicleYear('99999', now)).toBe(99999);
   });
 });

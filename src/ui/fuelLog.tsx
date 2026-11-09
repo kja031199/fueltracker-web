@@ -27,156 +27,26 @@
  */
 
 import type { ReactElement, ReactNode } from 'react';
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import type { FillUpRecord, Snapshot, VehicleRecord } from '../data/records';
-import type { ImportSummary } from '../data/backup';
+import { createContext, useCallback, useContext, useMemo, useRef } from 'react';
+import type { Snapshot } from '../data/records';
 import type { RemoteStore } from '../data/remote';
 import type { FuelTrackerStore, NewVehicle } from '../data/store';
 import type { SyncStateStore } from '../data/syncState';
 import type { SharingSync } from '../data/shareSync';
-import type { Invite, Member, Membership } from '../data/sharing';
-import { ShareClash } from '../data/sharing';
+import type { Membership } from '../data/sharing';
 import { StaleEdit } from '../data/staleEdit';
 import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
 import type { Submission } from '../data/fillUpLink';
-import type { AppData } from './useAppData';
 import { useAppData } from './useAppData';
-import type { BackupSummary } from './exportBackup';
 import { saveCsvExport, saveJsonBackup } from './exportBackup';
 import { parseBackupFile } from '../data/backupFormat';
-import type { BackupPromptReason } from '../domain/exportReminder';
 import { useBackupNudge } from './backupNudge';
-import { displayName } from '../domain/format';
 import type { SyncStatus } from './useSync';
 import { useSync } from './useSync';
+import { useSharingView } from './useSharingView';
+import type { BackupStatus, FileImport, FuelLog, ReceiveResult } from './fuelLogTypes';
 
-/**
- * Sharing a car (#66), as the screens see it. `enabled` is false without an
- * account to share through (no backend, or signed out), and then every list is
- * empty and every action refuses.
- */
-export interface SharingView {
-  readonly enabled: boolean;
-  /** Cars shared *with* this account. */
-  readonly sharedWithMe: readonly Membership[];
-  /** Invitations waiting for this account's verified email. */
-  readonly invitesForMe: readonly Invite[];
-  /** The membership a car is held by, or undefined when it is this account's own. */
-  membershipFor(vehicleId: string): Membership | undefined;
-  /** Invites `email` to one of this account's cars. */
-  invite(vehicle: Pick<VehicleRecord, 'id' | 'name'>, email: string): Promise<void>;
-  withdrawInvite(vehicleId: string, email: string): Promise<void>;
-  /** Unanswered invitations this account sent for one car. */
-  invitesSentFor(vehicleId: string): Promise<Invite[]>;
-  /** Who a car is shared with — this account's own car, or one shared with it. Read fresh. */
-  membersOf(vehicleId: string): Promise<Member[]>;
-  /**
-   * The names to show for who entered a car's fill-ups — `null` for a car
-   * nobody shares, where "entered by you" on every row would be noise.
-   * `entered` is the uids its fill-ups carry. Remembered per car (#89): read
-   * once, and again only when a fill-up names somebody it has not seen.
-   */
-  namesFor(vehicleId: string, entered: readonly (string | null | undefined)[]): Promise<ReadonlyMap<string, string> | null>;
-  removeMember(vehicleId: string, memberUid: string): Promise<void>;
-  /** Joins, then syncs so the car arrives at once. */
-  accept(invite: Invite): Promise<void>;
-  decline(invite: Invite): Promise<void>;
-  /** Leaves, then syncs, which forgets the car on this device. */
-  leave(membership: Membership): Promise<void>;
-}
-
-const SHARING_OFF: SharingView = {
-  enabled: false,
-  sharedWithMe: [],
-  invitesForMe: [],
-  membershipFor: () => undefined,
-  invite: () => Promise.reject(new Error('Sharing needs an account.')),
-  withdrawInvite: async () => {},
-  invitesSentFor: async () => [],
-  membersOf: async () => [],
-  namesFor: async () => null,
-  removeMember: async () => {},
-  accept: () => Promise.reject(new Error('Sharing needs an account.')),
-  decline: async () => {},
-  leave: async () => {},
-};
-
-/**
- * The fuel log. Sync status is **not** in here (#88): it changes several
- * times per sync, and every screen reads this — `useSyncStatus()` is its own
- * context, read by the few screens that show it.
- */
-export interface FuelLog extends Omit<AppData, 'reload'> {
-  readonly sharing: SharingView;
-  /** The signed-in account's uid, for "entered by you". Null when there is none. */
-  readonly me: string | null;
-
-  // Writes: each refreshes what is shown and schedules a sync.
-  addVehicle(vehicle: NewVehicle): Promise<VehicleRecord>;
-  removeVehicle(id: string): Promise<void>;
-  addFillUp(draft: FuelEntryDraft, vehicleId: string): Promise<FillUpRecord>;
-  /**
-   * Edits a fill-up on the car it is already on (#83). Rejects with
-   * `StaleEdit` when it, or its car, has gone since the form opened — and then
-   * refreshes, since what the screen shows is out of date.
-   */
-  updateFillUp(id: string, draft: FuelEntryDraft): Promise<FillUpRecord>;
-  removeFillUp(id: string): Promise<void>;
-  importBackup(snapshot: Snapshot): Promise<ImportSummary>;
-  /**
-   * Queues a fill-up that arrived by link (#3) for review. Refused as
-   * `'not-yours'` for a car shared *with* this account: requests are made
-   * from a car's owner, so a submission for somebody else's car was not sent
-   * here to be received.
-   */
-  receiveSubmission(submission: Submission): Promise<ReceiveResult>;
-  /** The fill-up it became, or null when it could not be (its car is gone, it no longer validates). */
-  approveSubmission(id: string): Promise<FillUpRecord | null>;
-  rejectSubmission(id: string): Promise<void>;
-
-  // Reads.
-  /**
-   * One fill-up whole, photo included, for editing. The list holds summaries
-   * without photo bytes (#53). `undefined` when it has gone since the list was
-   * drawn — deleted on another device and synced — in which case the list is
-   * refreshed, but nothing is synced, because nothing here changed.
-   */
-  loadFillUp(id: string): Promise<FillUpRecord | undefined>;
-  /**
-   * Downloads a JSON backup, says what it held, and **records it for the
-   * reminder** — whichever screen asked (#93). The no-access screen used to
-   * download one and record nothing.
-   */
-  saveBackup(): Promise<BackupSummary>;
-  /** Downloads the live fill-ups as CSV and says how many. Not a backup, so not recorded. */
-  exportCsv(): Promise<number>;
-  /**
-   * Reads a file somebody chose — `.csv` or a JSON backup — and imports it.
-   * A file that cannot be read imports nothing and says why.
-   */
-  importFile(file: File): Promise<FileImport>;
-}
-
-/** What importing a file did: the store's summary, or null when the file could not be read; and every row or reason to show. */
-export interface FileImport {
-  readonly summary: ImportSummary | null;
-  readonly problems: readonly string[];
-}
-
-/**
- * The backup reminder, as the screens see it (#93). Its own context, like sync
- * status: the banner and Settings read it, and recording a backup re-renders
- * them, not every screen.
- */
-export interface BackupStatus {
-  /** Why a backup is being suggested, or null when it is not. */
-  readonly reason: BackupPromptReason | null;
-  readonly lastBackupAt: number | null;
-  /** Dismiss for a week. Deliberately not forever. */
-  readonly snooze: () => void;
-}
-
-export type ReceiveResult = 'queued' | 'duplicate' | 'no-such-car' | 'not-yours';
+export type { BackupStatus, FileImport, FuelLog, ReceiveResult, SharingView } from './fuelLogTypes';
 
 const FuelLogContext = createContext<FuelLog | null>(null);
 const SyncStatusContext = createContext<SyncStatus | null>(null);
@@ -346,129 +216,4 @@ export function useSyncStatus(): SyncStatus {
     throw new Error('useSyncStatus() was called outside <FuelLogProvider>; App renders the screens inside one.');
   }
   return status;
-}
-
-/**
- * The sharing lists, kept fresh: read on mount and after every sync, from the
- * device's ledger first so a shared car is recognised as one even offline.
- * A failed read keeps the last good lists rather than emptying them.
- */
-function useSharingView(
-  sharing: SharingSync | null,
-  uid: string | null,
-  syncNow: () => Promise<void>,
-  lastSyncedAt: number | null,
-  store: FuelTrackerStore,
-  /** Where the sync hands over the memberships it read (#89). */
-  sharesRead: { current: (memberships: readonly Membership[]) => void },
-): SharingView {
-  const [sharedWithMe, setSharedWithMe] = useState<readonly Membership[]>([]);
-  const [invitesForMe, setInvitesForMe] = useState<readonly Invite[]>([]);
-  // Who each car is shared with, and every uid already asked about for it —
-  // so a uid that is nobody's now (a member since removed) is asked once.
-  const names = useRef(new Map<string, { members: readonly Member[]; asked: ReadonlySet<string> }>());
-
-  // Each list is replaced only when it differs (#88): these run after every
-  // sync, and a new array with the same entries re-rendered every screen.
-  // Once a sync has said which cars are shared, its answer wins over the
-  // ledger's: the ledger leaves out a share it would not record (#78), which
-  // still has to be listed so it can be left.
-  const synced = useRef(false);
-  useEffect(() => {
-    sharesRead.current = (memberships) => {
-      synced.current = true;
-      setSharedWithMe((shown) => unlessSame(shown, memberships));
-    };
-  }, [sharesRead]);
-
-  /**
-   * What only this view reads: the device's ledger, so a shared car is known
-   * as one before the first sync, and the invitations waiting for this account. The
-   * cars shared with it come from the sync, which has just read them (#89) —
-   * this used to read them again after every sync.
-   */
-  const refresh = useCallback(async () => {
-    if (sharing === null) return;
-    if (!synced.current) {
-      const held = await sharing.ledger.load().catch(() => null);
-      if (held !== null && !synced.current) setSharedWithMe((shown) => unlessSame(shown, held));
-    }
-    const invites = await sharing.remote.invitesForMe().catch(() => null);
-    if (invites !== null) setInvitesForMe((shown) => unlessSame(shown, invites));
-  }, [sharing]);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh, lastSyncedAt]);
-
-  return useMemo<SharingView>(() => {
-    if (sharing === null || uid === null) return SHARING_OFF;
-    const { remote } = sharing;
-    const membershipFor = (vehicleId: string): Membership | undefined =>
-      sharedWithMe.find((membership) => membership.vehicleId === vehicleId);
-    return {
-      enabled: true,
-      sharedWithMe,
-      invitesForMe,
-      membershipFor,
-      invite: async (vehicle, email) => {
-        await remote.invite(vehicle, email);
-      },
-      withdrawInvite: (vehicleId, email) => remote.withdrawInvite(vehicleId, email),
-      // That car's alone, not every invitation sent (#89).
-      invitesSentFor: (vehicleId) => remote.invitesSent(vehicleId),
-      membersOf: async (vehicleId) => {
-        const members = await remote.members(membershipFor(vehicleId)?.ownerUid ?? uid, vehicleId);
-        // A fresh read is the best answer the names can have, too.
-        names.current.set(vehicleId, { members, asked: new Set(members.map((member) => member.uid)) });
-        return members;
-      },
-      namesFor: async (vehicleId, entered) => {
-        const membership = membershipFor(vehicleId);
-        const owner = membership?.ownerUid ?? uid;
-        const others = entered.filter(
-          (who): who is string => typeof who === 'string' && who !== '' && who !== uid && who !== owner,
-        );
-        let known = names.current.get(vehicleId);
-        if (known === undefined || others.some((who) => !known!.asked.has(who))) {
-          const members = await remote.members(owner, vehicleId);
-          known = { members, asked: new Set([...(known?.asked ?? []), ...others, ...members.map((m) => m.uid)]) };
-          names.current.set(vehicleId, known);
-        }
-        if (membership === undefined && known.members.length === 0) return null; // not shared
-        const shown = new Map<string, string>();
-        for (const member of known.members) shown.set(member.uid, displayName(member));
-        if (membership !== undefined) shown.set(membership.ownerUid, membership.ownerName || 'its owner');
-        shown.set(uid, 'you');
-        return shown;
-      },
-      // The panel re-reads the members after this (`membersOf`), which
-      // refreshes the names too.
-      removeMember: (vehicleId, memberUid) => remote.removeMember(vehicleId, memberUid),
-      accept: async (invite) => {
-        // Checked here, before anything is written, as well as by the rules
-        // (which only see cars already in the account) and by sync (#78).
-        if (await store.hasVehicle(invite.vehicleId)) throw new ShareClash();
-        await remote.accept(invite);
-        names.current.delete(invite.vehicleId);
-        await refresh();
-        await syncNow();
-      },
-      decline: async (invite) => {
-        await remote.decline(invite);
-        await refresh();
-      },
-      leave: async (membership) => {
-        await remote.leave(membership);
-        names.current.delete(membership.vehicleId);
-        await syncNow();
-        await refresh();
-      },
-    };
-  }, [sharing, uid, sharedWithMe, invitesForMe, refresh, syncNow, store]);
-}
-
-/** `next`, unless it holds exactly what `shown` does — then `shown`, so nothing re-renders. */
-function unlessSame<T>(shown: readonly T[], next: readonly T[]): readonly T[] {
-  return JSON.stringify(shown) === JSON.stringify(next) ? shown : next;
 }

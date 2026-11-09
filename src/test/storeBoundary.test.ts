@@ -24,6 +24,8 @@ const ALLOWED: Record<string, string> = {
   'src/ui/useAppData.ts': 'the fuel log’s load of what the screens show',
   'src/ui/useSync.ts': 'runs a sync against the store for the fuel log',
   'src/ui/exportBackup.ts': 'takes the snapshot a backup is made from; only the fuel log calls it',
+  'src/ui/useSharingView.ts': 'the sharing lists the fuel log shows; only the fuel log calls it',
+  'src/ui/fuelLogTypes.ts': 'the fuel log’s own interface names the shape of a new vehicle (a type only)',
 };
 
 export function namesStore(file: string, source: string): boolean {
