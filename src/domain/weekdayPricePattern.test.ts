@@ -276,3 +276,11 @@ describe('degenerate and hostile input', () => {
     expect(prices[0]?.averagePrice).toBeCloseTo(3.0, 10);
   });
 });
+
+describe('the insight\u2019s amount in the reader\u2019s currency (#94)', () => {
+  test('the spread follows the style, while the day names stay with the English sentence', () => {
+    const insight = weekdayPriceInsight(TUESDAY_CHEAPER(), { units: METRIC, style: { locale: 'de-DE', currency: 'EUR' } });
+    expect(insight).toContain('0,03\u00a0€/L');
+    expect(insight).toContain('Tuesday');
+  });
+});

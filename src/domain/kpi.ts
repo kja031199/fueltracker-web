@@ -24,7 +24,9 @@ import type { FuelStatistics } from './fuelStatistics';
 import type { Metric } from './metric';
 import type { UnitPreferences } from './units';
 import { US, distance as distanceUnits, economy as economyUnits, volume as volumeUnits } from './units';
+import type { DisplayStyle } from './format';
 import {
+  US_STYLE,
   costPerDistance,
   currency,
   distance,
@@ -53,29 +55,35 @@ export function kpiAccessibilityLabel(kpi: KPI): string {
 }
 
 /** The full KPI set for the dashboard, rendered in the given units. */
-export function dashboardKPIs(stats: FuelStatistics, units: UnitPreferences = US): KPI[] {
+export function dashboardKPIs(
+  stats: FuelStatistics,
+  units: UnitPreferences = US,
+  style: DisplayStyle = US_STYLE,
+): KPI[] {
   const economySpec = economyUnits[units.economy];
   const distanceSpec = distanceUnits[units.distance];
   const volumeSpec = volumeUnits[units.volume];
 
-  const money = (value: number): string => currency(value);
+  // In the reader's locale and currency (#94); the default is unchanged.
+  const money = (value: number): string => currency(value, style);
+  const { locale } = style;
 
   return [
     {
       id: 'avgEconomy',
       title: `Avg ${economySpec.abbreviation}`,
-      value: stats.averageMPG === null ? null : economy(stats.averageMPG, units.economy),
+      value: stats.averageMPG === null ? null : economy(stats.averageMPG, units.economy, locale),
       detail: null,
       metric: 'economy',
     },
     {
       id: 'lastEconomy',
       title: `Last ${economySpec.abbreviation}`,
-      value: stats.lastMPG === null ? null : economy(stats.lastMPG, units.economy),
+      value: stats.lastMPG === null ? null : economy(stats.lastMPG, units.economy, locale),
       detail:
         stats.bestMPG === null
           ? null
-          : `Best: ${economy(stats.bestMPG, units.economy) ?? '—'}`,
+          : `Best: ${economy(stats.bestMPG, units.economy, locale) ?? '—'}`,
       metric: 'economy',
     },
     {
@@ -89,7 +97,7 @@ export function dashboardKPIs(stats: FuelStatistics, units: UnitPreferences = US
     {
       id: 'costPerDistance',
       title: `Cost per ${distanceSpec.singularNoun}`,
-      value: stats.costPerMile === null ? null : costPerDistance(stats.costPerMile, units.distance),
+      value: stats.costPerMile === null ? null : costPerDistance(stats.costPerMile, units.distance, style),
       detail: null,
       metric: 'spending',
     },
@@ -99,21 +107,21 @@ export function dashboardKPIs(stats: FuelStatistics, units: UnitPreferences = US
       value:
         stats.averagePricePerGallon === null
           ? null
-          : fuelPrice(stats.averagePricePerGallon, units.volume),
+          : fuelPrice(stats.averagePricePerGallon, units.volume, style),
       detail:
         stats.lastPricePerGallon === null
           ? null
-          : `Last: ${fuelPrice(stats.lastPricePerGallon, units.volume)}`,
+          : `Last: ${fuelPrice(stats.lastPricePerGallon, units.volume, style)}`,
       metric: 'price',
     },
     {
       id: 'distanceTracked',
       title: `${distanceSpec.name} Tracked`,
-      value: distance(stats.milesTracked, units.distance),
+      value: distance(stats.milesTracked, units.distance, false, locale),
       detail:
         stats.averageMilesBetweenFillUps === null
           ? null
-          : `${distance(stats.averageMilesBetweenFillUps, units.distance)} ${distanceSpec.abbreviation}/fill avg`,
+          : `${distance(stats.averageMilesBetweenFillUps, units.distance, false, locale)} ${distanceSpec.abbreviation}/fill avg`,
       metric: 'distance',
     },
     {
@@ -123,13 +131,13 @@ export function dashboardKPIs(stats: FuelStatistics, units: UnitPreferences = US
       detail:
         stats.averageGallonsPerFillUp === null
           ? null
-          : `${volume(stats.averageGallonsPerFillUp, units.volume)} ${volumeSpec.abbreviation} avg`,
+          : `${volume(stats.averageGallonsPerFillUp, units.volume, false, locale)} ${volumeSpec.abbreviation} avg`,
       metric: 'distance',
     },
     {
       id: 'totalVolume',
       title: `Total ${volumeSpec.name}`,
-      value: volume(stats.totalGallons, units.volume),
+      value: volume(stats.totalGallons, units.volume, false, locale),
       detail:
         stats.averageFillUpCost === null ? null : `${money(stats.averageFillUpCost)}/fill avg`,
       metric: 'price',

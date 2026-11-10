@@ -11,11 +11,12 @@ import type { UnitPreferences } from '../domain/units';
 import { clearActivity, forgetIdleTimeoutSetting, useIdleTimeout } from './idleTimeout';
 import { ADMIN_IDLE_MINUTES } from './adminSettings';
 import { applyPalette, preferredColorScheme, watchColorScheme } from './theme';
-import { loadUnitPreferences, saveUnitPreferences } from './unitSettings';
+import { loadCurrency, loadUnitPreferences, saveCurrency, saveUnitPreferences } from './unitSettings';
+import { displayLocale, type DisplayStyle } from '../domain/format';
 import { useAuth } from './useAuth';
 import { FuelLogProvider } from './fuelLog';
 import { AppShell } from './AppShell';
-import { SessionProvider, UnitsProvider } from './session';
+import { DisplayProvider, SessionProvider, UnitsProvider } from './session';
 import type { Tab } from './useTabRoute';
 import { ScreenFrame } from './ScreenFrame';
 import { SignInScreen } from './SignInScreen';
@@ -98,6 +99,11 @@ export function App({
   const authProvider = useMemo(() => auth ?? defaultAuth(), [auth]);
   const authState = useAuth(authProvider);
   const [units, setUnits] = useState<UnitPreferences>(() => loadUnitPreferences());
+  // One locale for numbers and dates, the browser's; the currency follows it
+  // unless picked in Settings (#94). Display only: nothing stored changes.
+  const [locale] = useState(() => displayLocale(typeof navigator === 'undefined' ? undefined : navigator.language));
+  const [currencyCode, setCurrencyCode] = useState(() => loadCurrency(locale));
+  const style = useMemo<DisplayStyle>(() => ({ locale, currency: currencyCode }), [locale, currencyCode]);
   const [idleSignOut, setIdleSignOut] = useState(false);
 
   const signedIn = authState.status === 'signedIn';
@@ -130,6 +136,10 @@ export function App({
   const changeUnits = useCallback((next: UnitPreferences): void => {
     setUnits(next);
     saveUnitPreferences(next);
+  }, []);
+  const changeCurrency = useCallback((code: string): void => {
+    setCurrencyCode(code);
+    saveCurrency(code);
   }, []);
   const signOut = useCallback(() => void authProvider.signOut(), [authProvider]);
 
@@ -173,14 +183,16 @@ export function App({
       {...(syncTimers === undefined ? {} : { syncTimers })}
     >
       <UnitsProvider units={units} setUnits={changeUnits}>
-        <SessionProvider
-          account={authState.user}
-          onSignOut={signOut}
-          syncEnabled={remote !== null}
-          idleMinutes={idleMinutes}
-        >
-          <AppShell account={authState.user} onSignOut={signOut} initialTab={initialTab} />
-        </SessionProvider>
+        <DisplayProvider style={style} setCurrency={changeCurrency}>
+          <SessionProvider
+            account={authState.user}
+            onSignOut={signOut}
+            syncEnabled={remote !== null}
+            idleMinutes={idleMinutes}
+          >
+            <AppShell account={authState.user} onSignOut={signOut} initialTab={initialTab} />
+          </SessionProvider>
+        </DisplayProvider>
       </UnitsProvider>
     </FuelLogProvider>
   );

@@ -13,6 +13,7 @@
 
 import type { UnitPreferences } from '../domain/units';
 import { unitPreferencesForLocale } from '../domain/units';
+import { currencyForLocale, displayLocale, isCurrencyCode } from '../domain/format';
 import { browserPreference, jsonCodec, readPreference, writePreference } from './preferences';
 
 function isUnitPreferences(value: unknown): value is UnitPreferences {
@@ -38,7 +39,9 @@ export function loadUnitPreferences(locale?: string): UnitPreferences {
   return (
     readPreference(UNITS) ??
     unitPreferencesForLocale(
-      locale ?? (typeof navigator === 'undefined' ? 'en-US' : navigator.language),
+      // Through `displayLocale`, so a missing or malformed browser language
+      // reads as US English rather than crashing on startup (#94).
+      locale ?? displayLocale(typeof navigator === 'undefined' ? undefined : navigator.language),
     )
   );
 }
@@ -49,4 +52,22 @@ export function loadUnitPreferences(locale?: string): UnitPreferences {
  */
 export function saveUnitPreferences(preferences: UnitPreferences): void {
   writePreference(UNITS, preferences);
+}
+
+const CURRENCY = browserPreference('currency', jsonCodec(isCurrencyCode));
+
+/**
+ * The currency amounts are shown in (#94): the one picked in Settings, else the
+ * one the browser's locale implies. A browser preference like the units, and
+ * for the same reason — it is how this device shows things, not data — so it
+ * does not sync and is not in backups. A stored value that is not a currency
+ * code (`isCurrencyCode`) is ignored rather than handed to `Intl`, which would
+ * throw on it and take the screen down.
+ */
+export function loadCurrency(locale: string): string {
+  return readPreference(CURRENCY) ?? currencyForLocale(locale);
+}
+
+export function saveCurrency(code: string): void {
+  if (isCurrencyCode(code)) writePreference(CURRENCY, code);
 }

@@ -12,13 +12,13 @@ import {
   weekdayPrices,
 } from '../domain/weekdayPricePattern';
 import { distance as distanceUnits, economy as economyUnits, volume as volumeUnits } from '../domain/units';
-import { currency, distance, fuelPrice } from '../domain/format';
+import { currency, distance, fuelPrice, numberFormat } from '../domain/format';
 import { mapValues } from '../domain/models';
 import { MetricLineChart } from './charts/MetricLineChart';
 import { MonthlyBarChart } from './charts/MonthlyBarChart';
 import { WeekdayPriceChart } from './charts/WeekdayPriceChart';
 import { useFuelLog } from './fuelLog';
-import { useUnits } from './session';
+import { useDisplay, useUnits } from './session';
 
 /**
  * The dashboard.
@@ -37,6 +37,9 @@ export function DashboardScreen(): ReactElement {
   // One base per rendering, so a component shown twice never repeats an id (#95).
   const idBase = useId();
   const { units } = useUnits();
+  // Numbers, dates and money in the reader's locale and currency (#94).
+  const { style } = useDisplay();
+  const { locale } = style;
   // What to chart comes from the fuel log, like every other screen (#56).
   const { vehicles, selectedVehicleId, selectVehicle: onSelect, fillUps } = useFuelLog();
   const [range, setRange] = useState<DashboardTimeRange>('All');
@@ -55,10 +58,10 @@ export function DashboardScreen(): ReactElement {
     () => computeFuelStatistics(toStats(fillUps), { from: cutoff }),
     [fillUps, cutoff],
   );
-  const kpis = useMemo(() => dashboardKPIs(stats, units), [stats, units]);
+  const kpis = useMemo(() => dashboardKPIs(stats, units, style), [stats, units, style]);
   // Mapped once, not once per use (#88).
   const inRangeStats = useMemo(() => toStats(inRange), [inRange]);
-  const insight = useMemo(() => weekdayPriceInsight(inRangeStats, { units }), [inRangeStats, units]);
+  const insight = useMemo(() => weekdayPriceInsight(inRangeStats, { units, style }), [inRangeStats, units, style]);
   const weekdays = useMemo(() => weekdayPrices(inRangeStats), [inRangeStats]);
   const cheapest = useMemo(() => cheapestWeekday(inRangeStats), [inRangeStats]);
 
@@ -172,7 +175,7 @@ export function DashboardScreen(): ReactElement {
             points={economySeries}
             metric="economy"
             unit={economySpec.abbreviation}
-            formatValue={(value) => value.toFixed(1)}
+            formatValue={(value) => numberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value)}
             average={averageEconomy}
           />
 
@@ -181,7 +184,7 @@ export function DashboardScreen(): ReactElement {
             points={stats.priceSeries}
             metric="price"
             unit={`per ${volumeSpec.abbreviation}`}
-            formatValue={(value) => fuelPrice(value, units.volume)}
+            formatValue={(value) => fuelPrice(value, units.volume, style)}
             average={stats.averagePricePerGallon}
           />
 
@@ -190,7 +193,7 @@ export function DashboardScreen(): ReactElement {
             points={stats.odometerSeries}
             metric="distance"
             unit={distanceSpec.abbreviation}
-            formatValue={(value) => distance(value, units.distance)}
+            formatValue={(value) => distance(value, units.distance, false, locale)}
           />
 
           <MonthlyBarChart
@@ -199,7 +202,7 @@ export function DashboardScreen(): ReactElement {
             value={(total) => total.totalSpent}
             metric="spending"
             unit="spent"
-            formatValue={(value) => currency(value)}
+            formatValue={(value) => currency(value, style)}
           />
 
           <MonthlyBarChart
@@ -208,13 +211,13 @@ export function DashboardScreen(): ReactElement {
             value={(total) => total.miles}
             metric="distance"
             unit={distanceSpec.abbreviation}
-            formatValue={(value) => distance(value, units.distance)}
+            formatValue={(value) => distance(value, units.distance, false, locale)}
           />
 
           <WeekdayPriceChart
             prices={weekdays}
             cheapestWeekday={cheapest?.weekday ?? null}
-            formatPrice={(value) => fuelPrice(value, units.volume)}
+            formatPrice={(value) => fuelPrice(value, units.volume, style)}
           />
 
           {stats.suspectSegmentIds.size > 0 && (

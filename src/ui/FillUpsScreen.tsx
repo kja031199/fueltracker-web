@@ -7,14 +7,14 @@ import { DASHBOARD_TIME_RANGES } from '../domain/dashboardTimeRange';
 import type { DashboardTimeRange } from '../domain/dashboardTimeRange';
 import { FUEL_GRADES } from '../domain/fuelGrade';
 import type { FuelGrade } from '../domain/fuelGrade';
-import { fillUpFacts, fillUpName } from '../domain/format';
+import { fillUpFacts, fillUpName, formatDate } from '../domain/format';
 import { totalCost } from '../domain/models';
 import { FillUpForm } from './FillUpForm';
 import { useFuelLog } from './fuelLog';
 import { PendingReview } from './PendingReview';
 import { FillUpSummary } from './FillUpSummary';
 import { ConfirmButton } from './ConfirmButton';
-import { useUnits } from './session';
+import { useDisplay, useUnits } from './session';
 import { useEnteredByNames } from './useEnteredByNames';
 
 /**
@@ -29,6 +29,7 @@ export function FillUpsScreen(): ReactElement {
   // One base per rendering, so a component shown twice never repeats an id (#95).
   const idBase = useId();
   const { units } = useUnits();
+  const { locale } = useDisplay().style;
   // The selected vehicle's history, and the writes, from the fuel log (#56).
   const { selectedVehicleId: vehicleId, fillUps, loadFillUp, removeFillUp } = useFuelLog();
   const enteredByName = useEnteredByNames(vehicleId);
@@ -235,9 +236,9 @@ export function FillUpsScreen(): ReactElement {
             {visible.map((record) => (
               <li className="card" key={record.id}>
                 <FillUpSummary
-                  title={new Date(record.date).toLocaleDateString()}
+                  title={formatDate(record.date, locale)}
                   subtitle={record.station}
-                  facts={fillUpFacts(record, units, { missed: true })}
+                  facts={fillUpFacts(record, units, { missed: true, locale })}
                   notes={record.notes}
                   cost={totalCost(record)}
                 >
@@ -252,7 +253,7 @@ export function FillUpsScreen(): ReactElement {
                     className="button button--secondary"
                     type="button"
                     onClick={() => void edit(record.id)}
-                    aria-label={`Edit ${fillUpName(record, units)}`}
+                    aria-label={`Edit ${fillUpName(record, units, locale)}`}
                   >
                     Edit
                   </button>
@@ -264,7 +265,7 @@ export function FillUpsScreen(): ReactElement {
                     label="Delete"
                     confirmLabel="Delete this fill-up"
                     cancelLabel="Keep"
-                    labelSuffix={fillUpName(record, units)}
+                    labelSuffix={fillUpName(record, units, locale)}
                   />
                 </div>
               </li>

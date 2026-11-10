@@ -3,6 +3,7 @@ import type { MonthlyTotal } from '../../domain/fuelStatistics';
 import { chartSummary } from '../../domain/chartAccessibility';
 import type { Metric } from '../../domain/metric';
 import { hueFor } from '../../domain/metric';
+import { useDisplay } from '../session';
 import { ChartFrame } from './ChartFrame';
 import { extentOf, niceTicks, plotBounds, scale } from './geometry';
 
@@ -17,8 +18,23 @@ interface Props {
 
 const AREA = { width: 320, height: 160, left: 46, right: 8, top: 10, bottom: 20 };
 
-const MONTH = new Intl.DateTimeFormat('en-US', { month: 'narrow' });
-const MONTH_LONG = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' });
+/**
+ * Month names in the reader's locale (#94), one pair of formatters per locale.
+ * They were fixed to US English beside amounts in the reader's own currency.
+ */
+const monthFormatters = new Map<string, { readonly short: Intl.DateTimeFormat; readonly long: Intl.DateTimeFormat }>();
+
+function monthNames(locale: string): { readonly short: Intl.DateTimeFormat; readonly long: Intl.DateTimeFormat } {
+  let found = monthFormatters.get(locale);
+  if (found === undefined) {
+    found = {
+      short: new Intl.DateTimeFormat(locale, { month: 'narrow' }),
+      long: new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }),
+    };
+    monthFormatters.set(locale, found);
+  }
+  return found;
+}
 
 /**
  * A month-by-month total, as bars.
@@ -36,6 +52,7 @@ export function MonthlyBarChart({
   formatValue,
 }: Props): ReactElement {
   const { x0, x1, y0, y1 } = plotBounds(AREA);
+  const months = monthNames(useDisplay().style.locale);
   const amounts = totals.map(value);
   const yExtent = extentOf(amounts, true);
 
@@ -50,7 +67,7 @@ export function MonthlyBarChart({
   const baseline = scale(0, yExtent, y0, y1);
 
   const rows = totals.map((total) => ({
-    label: MONTH_LONG.format(total.month),
+    label: months.long.format(total.month),
     value: formatValue(value(total)),
   }));
 
@@ -110,7 +127,7 @@ export function MonthlyBarChart({
                       fontSize={8}
                       fill="var(--text-secondary)"
                     >
-                      {MONTH.format(total.month)}
+                      {months.short.format(total.month)}
                     </text>
                   )}
                 </g>

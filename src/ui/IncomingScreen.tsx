@@ -1,14 +1,14 @@
 import type { ReactElement } from 'react';
 import { useMemo, useRef, useState } from 'react';
 import { decodeSubmission } from '../data/fillUpLink';
-import { fillUpFacts } from '../domain/format';
+import { fillUpFacts, formatDate } from '../domain/format';
 import { totalCost } from '../domain/models';
 import { FillUpSummary } from './FillUpSummary';
 import type { ReceiveResult } from './fuelLog';
 import { useFuelLog, useSyncStatus } from './fuelLog';
 import { DoneButton, LinkScreen } from './LinkScreen';
 import { linkProblemText } from './linkMessages';
-import { useUnits } from './session';
+import { useDisplay, useUnits } from './session';
 
 interface Props {
   /** The submission link's payload, as the address carried it. */
@@ -40,6 +40,7 @@ export function IncomingScreen({ payload, onReceived, onDone }: Props): ReactEle
   const { receiveSubmission, selectVehicle, vehicles } = log;
   const { syncNow } = useSyncStatus();
   const { units } = useUnits();
+  const { locale } = useDisplay().style;
   const decoded = useMemo(() => decodeSubmission(payload), [payload]);
   const [result, setResult] = useState<ReceiveResult | 'failed' | 'receiving' | null>(null);
   // One receive per link, however many times the button is pressed before the
@@ -104,8 +105,8 @@ export function IncomingScreen({ payload, onReceived, onDone }: Props): ReactEle
       </p>
       <FillUpSummary
         title={car?.name ?? 'A car not in your log'}
-        subtitle={draft.date.toLocaleDateString()}
-        facts={[...fillUpFacts(draft, units), ...(draft.station === '' ? [] : [draft.station])]}
+        subtitle={formatDate(draft.date.getTime(), locale)}
+        facts={[...fillUpFacts(draft, units, { locale }), ...(draft.station === '' ? [] : [draft.station])]}
         notes={draft.notes}
         cost={totalCost(draft)}
       />

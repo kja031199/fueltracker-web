@@ -125,3 +125,14 @@ describe('the spoken label', () => {
     expect(kpiAccessibilityLabel(byId(history, 'avgEconomy')!)).toBe('Avg MPG, 40.0');
   });
 });
+
+describe('in the reader\u2019s locale and currency (#94)', () => {
+  test('amounts, volumes and distances follow the style; the default is unchanged', () => {
+    const german = dashboardKPIs(computeFuelStatistics(history), METRIC, { locale: 'de-DE', currency: 'EUR' });
+    const spent = german.find((k) => k.id === 'totalSpent');
+    expect(spent?.value).toBe('90,00\u00a0€');
+    expect(german.find((k) => k.id === 'distanceTracked')?.value).toBe('1.287,5');
+    expect(german.find((k) => k.id === 'totalVolume')?.value).toBe('113,562');
+    expect(byId(history, 'totalSpent')?.value).toBe('$90.00');
+  });
+});

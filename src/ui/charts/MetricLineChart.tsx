@@ -4,6 +4,8 @@ import { downsampled } from '../../domain/models';
 import { chartSummary } from '../../domain/chartAccessibility';
 import type { Metric } from '../../domain/metric';
 import { hueFor } from '../../domain/metric';
+import { formatDate } from '../../domain/format';
+import { useDisplay } from '../session';
 import { ChartFrame } from './ChartFrame';
 import { extentOf, linePath, niceTicks, plotBounds, scale } from './geometry';
 
@@ -39,6 +41,7 @@ export function MetricLineChart({
   formatValue,
   average = null,
 }: Props): ReactElement {
+  const { locale } = useDisplay().style;
   const shown = downsampled(points, DOWNSAMPLE_THRESHOLD);
   // The summary describes the whole series, not the drawn sample.
   const summary = chartSummary(points, unit, formatValue);
@@ -54,7 +57,7 @@ export function MetricLineChart({
   }));
 
   const rows = shown.map((point) => ({
-    label: point.date.toLocaleDateString(),
+    label: formatDate(point.date.getTime(), locale),
     value: formatValue(point.value),
   }));
 

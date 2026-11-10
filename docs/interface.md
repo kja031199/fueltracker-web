@@ -41,6 +41,17 @@ keyboard and screen readers. It used to be unmounted on every switch, which
 threw away exactly the half-typed fill-up the app refuses to auto-update
 over.
 
+## Numbers, dates and money in the reader's locale (#94)
+
+The units follow the browser's language, and so do numbers and dates: a German
+browser sees `1.234,56 €`, `378,541 L` and `1.5.2026`, one locale throughout.
+The currency defaults from the same language and can be changed under Settings
+→ **Units and currency**. It only changes how amounts are shown: a price is
+whatever was typed at the pump, and nothing is converted or stored differently.
+Like the units, it is a setting of this browser, so it does not sync and is not
+in backups. The words are still English; the sentences move out of the domain
+code in later parts of #94, which is what would let them be translated.
+
 ## Where a change goes
 
 Every screen reads the fuel log and writes to it through one context,

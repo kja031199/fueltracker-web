@@ -11,6 +11,19 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-10
 
+- **Prices and numbers now follow your browser's language: a German browser
+  shows euros and 1.234,56. You can pick the currency in Settings → Units and
+  currency, and nothing you have entered is converted.** Dates use the same
+  language, so numbers and dates no longer disagree.
+  *Technical:* a `DisplayStyle` (`locale`, `currency`) from
+  `displayLocale(navigator.language)` and a currency browser preference,
+  provided by `useDisplay()` and passed to every money, number and date
+  formatter, `dashboardKPIs` and the weekday insight. Every default is
+  `US_STYLE`, byte-identical to before. `formatDate` replaces
+  `toLocaleDateString()`, and a guard keeps `'en-US'` in `format.ts` only.
+  A missing browser language no longer crashes the unit defaults. The
+  first of three steps on #94.
+  [#94](https://github.com/kja031199/fueltracker-web/issues/94) · [PR #139](https://github.com/kja031199/fueltracker-web/pull/139)
 - **The site's content policy is now stricter: it talks only to the Google
   services it uses and allows no inline styles.** It was checked on the live
   site first, so nothing you do should change. This completes the security
