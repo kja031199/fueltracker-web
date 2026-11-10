@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { draftWith, makeStore } from '../test/fixtures';
+import { draftWith, makeStore, saveHasOnboarded } from '../test/fixtures';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FuelTrackerStore } from '../data/store';
 import { App } from './App';
-import { saveHasOnboarded } from './onboarding';
 
 const draft = draftWith({ date: new Date(2025, 0, 15) });
 

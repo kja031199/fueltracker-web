@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { draftWith, makeStore } from '../test/fixtures';
+import { draftWith, makeStore, saveHasOnboarded } from '../test/fixtures';
 import type { FuelTrackerStore } from '../data/store';
 import { StubAuthProvider } from '../data/auth';
 import { InMemoryRemoteStore, type RawSnapshot } from '../data/remote';
 import { App } from './App';
-import { saveHasOnboarded } from './onboarding';
 
 /**
  * Numbers, dates and money in the reader's own locale (#94).
@@ -68,6 +67,31 @@ describe('a German browser (#94)', () => {
     expect(row).not.toBeNull();
     expect(within(row!).getByText(/^1\.234,56\s€$/)).toBeInTheDocument();
     expect(within(row!).getByText(/378,541 L/)).toBeInTheDocument();
+  });
+});
+
+describe('the weekday chart (#96)', () => {
+  /** Fill-ups on Sunday 3 and Monday 4 May 2026. */
+  async function storeWithAWeekend(): Promise<FuelTrackerStore> {
+    const store = makeStore();
+    const car = await store.addVehicle({ name: 'Golf' });
+    await store.addFillUp(draft({ date: new Date(2026, 4, 3, 9, 0), odometer: 10_000 }), car.id);
+    await store.addFillUp(draft({ date: new Date(2026, 4, 4, 9, 0), odometer: 10_300 }), car.id);
+    return store;
+  }
+
+  const days = () => screen.getAllByRole('rowheader').map((cell) => cell.textContent);
+
+  test.each([
+    ['de-DE', 'starts on Monday', ['Mo', 'So']],
+    ['en-US', 'starts on Sunday', ['Sun', 'Mon']],
+  ] as const)('in %s the week %s', async (language, _starts, order) => {
+    browserLanguage(language);
+    render(<App store={await storeWithAWeekend()} initialTab="dashboard" />);
+    await screen.findByRole('rowheader', { name: order[0] });
+    const shown = days();
+    expect(shown.indexOf(order[0])).toBeGreaterThanOrEqual(0);
+    expect(shown.indexOf(order[0])).toBeLessThan(shown.indexOf(order[1]));
   });
 });
 

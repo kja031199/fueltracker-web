@@ -27,7 +27,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { makeStore } from '../../test/fixtures';
+import { makeStore, submitted } from '../../test/fixtures';
 import { allowedUidsInRules, rulesEnvironment, signedIn } from '../../test/emulator';
 import {
   assertFails,
@@ -303,7 +303,7 @@ describe('firestore.rules', () => {
       const tombstone = (await repos.fillUps.listDeleted())[0];
       if (tombstone === undefined) throw new Error('fixture tombstone missing');
 
-      const pending = await store.submitFillUp(draft, vehicle.id, 'Sam');
+      const pending = await submitted(store, draft, vehicle.id, 'Sam');
 
       return { vehicle, fillUp, tombstone, pending };
     }

@@ -6,7 +6,6 @@ import {
   hasIdleTimedOut,
   idleMinutesFromConfig,
   lastActivityFrom,
-  msUntilIdleTimeout,
   normalizeIdleMinutes,
 } from './idleTimeout';
 
@@ -120,20 +119,6 @@ describe('hasIdleTimedOut', () => {
 
   test('treats a non-finite last activity as activity now', () => {
     expect(hasIdleTimedOut(PERIOD, Number.NaN, NOW)).toBe(false);
-  });
-});
-
-describe('msUntilIdleTimeout', () => {
-  test('counts down from the last activity', () => {
-    expect(msUntilIdleTimeout(PERIOD, NOW - 10 * MINUTE, NOW)).toBe(20 * MINUTE);
-  });
-
-  test('is zero rather than negative once the period has passed', () => {
-    expect(msUntilIdleTimeout(PERIOD, NOW - 90 * MINUTE, NOW)).toBe(0);
-  });
-
-  test('gives a full period for a last activity in the future', () => {
-    expect(msUntilIdleTimeout(PERIOD, NOW + 10 * MINUTE, NOW)).toBe(30 * MINUTE);
   });
 });
 

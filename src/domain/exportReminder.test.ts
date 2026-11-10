@@ -8,7 +8,6 @@ import {
   afterBackup,
   afterSnooze,
   backupPromptReason,
-  isBackupDue,
   type BackupState,
 } from './exportReminder';
 
@@ -67,8 +66,8 @@ describe('when it stays quiet', () => {
 
 describe('the exact boundaries', () => {
   it('is quiet at exactly the minimum entry count minus one, and asks at the minimum', () => {
-    expect(isBackupDue(state(), MINIMUM_ENTRIES_TO_PROMPT - 1, NOW)).toBe(false);
-    expect(isBackupDue(state(), MINIMUM_ENTRIES_TO_PROMPT, NOW)).toBe(true);
+    expect(backupPromptReason(state(), MINIMUM_ENTRIES_TO_PROMPT - 1, NOW)).toBeNull();
+    expect(backupPromptReason(state(), MINIMUM_ENTRIES_TO_PROMPT, NOW)).not.toBeNull();
   });
 
   it('is quiet at exactly the day limit and asks just past it', () => {
@@ -127,7 +126,7 @@ describe('recording what happened', () => {
   it('a backup clears the prompt', () => {
     const recorded = afterBackup(42, NOW);
     expect(recorded).toEqual({ lastExportAt: NOW, fillUpsAtLastExport: 42, snoozedUntil: null });
-    expect(isBackupDue(recorded, 42, NOW)).toBe(false);
+    expect(backupPromptReason(recorded, 42, NOW)).toBeNull();
   });
 
   it('a backup also clears an existing snooze', () => {
@@ -142,8 +141,8 @@ describe('recording what happened', () => {
   it('a snooze lasts exactly the stated number of days', () => {
     const snoozed = afterSnooze(state(), NOW);
     expect(snoozed.snoozedUntil).toBe(NOW + SNOOZE_DAYS * DAY);
-    expect(isBackupDue(snoozed, 100, NOW + (SNOOZE_DAYS - 1) * DAY)).toBe(false);
-    expect(isBackupDue(snoozed, 100, NOW + SNOOZE_DAYS * DAY)).toBe(true);
+    expect(backupPromptReason(snoozed, 100, NOW + (SNOOZE_DAYS - 1) * DAY)).toBeNull();
+    expect(backupPromptReason(snoozed, 100, NOW + SNOOZE_DAYS * DAY)).not.toBeNull();
   });
 
   it('a snooze keeps the backup history rather than resetting it', () => {

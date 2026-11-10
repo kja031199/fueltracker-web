@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { makeStore } from '../test/fixtures';
+import { makeStore, saveHasOnboarded } from '../test/fixtures';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StubAuthProvider } from '../data/auth';
 import type { PushSummary, RawSnapshot, RemoteStore } from '../data/remote';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { App } from './App';
-import { saveHasOnboarded } from './onboarding';
 import { loadBackupState } from './backupNudge';
 
 /**

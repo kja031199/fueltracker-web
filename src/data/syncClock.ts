@@ -6,10 +6,9 @@
  * Merges are last-write-wins on `updatedAt`, and `updatedAt` was whatever
  * `Date.now()` said on the device that wrote the row. A phone whose clock is a
  * year fast therefore writes rows that beat every other device's edits for a
- * year: the laptop's correction is overwritten on the next pull, and
- * `rowsToPush` then declines to push it because local is no longer greater
- * than remote. The edit does not conflict, does not warn, and does not come
- * back.
+ * year: the laptop's correction is overwritten on the next pull, and the push
+ * then declines to send it because local is no longer newer than the account's
+ * copy. The edit does not conflict, does not warn, and does not come back.
  *
  * ## Why a logical clock is safe here
  *
@@ -70,13 +69,6 @@ export class MonotonicClock implements StoreClock {
   ) {}
 
   /**
-   * A timestamp strictly greater than any previously issued or observed.
-   *
-   * Two writes inside the same millisecond get different values, which matters
-   * because `shouldReplace` compares with `>` — equal timestamps mean the
-   * second write silently loses.
-   */
-  /**
    * The device's wall clock, unadjusted. For *elapsed time* — how long since
    * the last full read (#52) — where the merge clock is the wrong tool: it
    * jumps ahead after observing a fast device's rows, and a fresh one after a
@@ -86,6 +78,13 @@ export class MonotonicClock implements StoreClock {
     return this.wallClock();
   }
 
+  /**
+   * A timestamp strictly greater than any previously issued or observed.
+   *
+   * Two writes inside the same millisecond get different values, which matters
+   * because `shouldReplace` compares with `>` — equal timestamps mean the
+   * second write silently loses.
+   */
   now(): number {
     const next = Math.max(this.wallClock(), this.lastIssued + 1);
     this.lastIssued = next;

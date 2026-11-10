@@ -2,10 +2,11 @@
  * A vehicle with six months of realistic history, ported from
  * `Shared/Support/PreviewData.swift`.
  *
- * Upstream this fills a SwiftUI preview container. Here it does double duty: it
- * is what a "try it without typing anything" demo loads, and it is a ready-made
+ * Upstream this fills a SwiftUI preview container. Here it is a ready-made
  * fixture for tests that need a plausible history rather than three hand-built
- * rows.
+ * rows. It was also meant for a "try it without typing anything" demo that was
+ * never built, which is why it lived in `src/data/` until #96 found nothing in
+ * the app importing it.
  *
  * ## Deterministic, unlike the original
  *
@@ -22,7 +23,7 @@
  */
 
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
-import type { FuelTrackerStore } from './store';
+import type { FuelTrackerStore } from '../data/store';
 
 /**
  * A small deterministic generator (mulberry32). Not cryptographic and not

@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, test } from 'vitest';
-import { makeStore } from '../test/fixtures';
+import { makeStore, saveHasOnboarded } from '../test/fixtures';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { InMemoryRepository } from '../data/repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
 import { FuelTrackerStore } from '../data/store';
 import { App } from './App';
-import { saveHasOnboarded } from './onboarding';
 
 beforeEach(() => {
   localStorage.clear();

@@ -1,11 +1,10 @@
 import { beforeEach, describe, expect, test } from 'vitest';
-import { makeStore } from '../test/fixtures';
+import { makeStore, saveHasOnboarded } from '../test/fixtures';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FuelTrackerStore } from '../data/store';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { App } from './App';
-import { saveHasOnboarded } from './onboarding';
 import { TAB_TABLE, TABS, parseTab, hashFor } from './useTabRoute';
 
 /**

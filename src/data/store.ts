@@ -230,24 +230,6 @@ export class FuelTrackerStore {
 
   // MARK: Pending submissions
 
-  /** Records a submission from someone else. Validated on the way in. */
-  async submitFillUp(
-    draft: FuelEntryDraft,
-    vehicleId: string,
-    submitterName: string,
-  ): Promise<PendingFillUpRecord> {
-    const now = this.clock.now();
-    const record = pendingFromDraft(draft, {
-      id: this.clock.newId(),
-      vehicleId,
-      updatedAt: now,
-      submittedAt: now,
-      submitterName,
-    });
-    await this.repos.pendingFillUps.put(record);
-    return record;
-  }
-
   /**
    * Queues a submission that arrived by link (#3), under the id the link
    * carried — so opening the same link twice, or after it was approved or
@@ -399,7 +381,3 @@ export class FuelTrackerStore {
   }
 
 }
-
-// `toStats` lives beside the records it maps (#56), so a screen can use it
-// without importing the store; re-exported here for existing callers.
-export { toStats } from './records';

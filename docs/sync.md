@@ -391,7 +391,7 @@ every text field, and nothing on the client did. So the app saved a
   `firestore.rules` and fails if the two ever differ. **Change both together,
   rules deployed first.**
 - **Bounded at every door:** the draft gate (station, notes), `addVehicle`,
-  `submitFillUp`, and `importBackup`, which is the door both a restored file and
+  `receiveSubmission`, and `importBackup`, which is the door both a restored file and
   a sync pull come through. The form inputs carry the same numbers as
   `maxLength`, so nobody can type past them.
 - **Shortened, never rejected.** This is the policy pulled text already

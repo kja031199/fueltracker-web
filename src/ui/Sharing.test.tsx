@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest';
-import { makeStore, sharingFor } from '../test/fixtures';
+import { makeStore, saveHasOnboarded, sharingFor } from '../test/fixtures';
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StubAuthProvider, type AuthUser } from '../data/auth';
@@ -9,7 +9,6 @@ import { InMemorySharingWorld } from '../data/sharing';
 import type { SharingSync } from '../data/shareSync';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { App } from './App';
-import { saveHasOnboarded } from './onboarding';
 
 /**
  * Sharing a car (#66) as two people meet it: the owner shares from the

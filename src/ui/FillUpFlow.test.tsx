@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, test } from 'vitest';
-import { draftWith, makeStore } from '../test/fixtures';
+import { draftWith, makeStore, saveHasOnboarded } from '../test/fixtures';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { InMemoryRepository } from '../data/repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
 import { FuelTrackerStore } from '../data/store';
 import { App } from './App';
-import { saveHasOnboarded } from './onboarding';
 import { TEXT_LIMITS } from '../domain/textLimits';
 
 const draft = draftWith({ date: new Date(2025, 0, 15) });

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { draftWith, makeStore, sharingFor } from '../test/fixtures';
+import { draftWith, makeStore, saveHasOnboarded, sharingFor } from '../test/fixtures';
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StubAuthProvider, type AuthUser } from '../data/auth';
@@ -20,7 +20,6 @@ import {
 } from '../data/fillUpLink';
 import { App } from './App';
 import { manualTimers, type ManualTimers } from '../test/manualTimers';
-import { saveHasOnboarded } from './onboarding';
 import { saveUnitPreferences } from './unitSettings';
 
 const draft = draftWith({

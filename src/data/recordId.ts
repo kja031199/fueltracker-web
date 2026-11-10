@@ -20,8 +20,8 @@
  * ```
  *
  * One such row is not one failed write. It is local and strictly newer than
- * anything remote, so `rowsToPush` includes it on every sync; the push is one
- * `writeBatch`, so **nothing else uploads either**; and it presents as the
+ * anything remote, so the push (`newerThanKnown`) includes it on every sync;
+ * the push is one `writeBatch`, so **nothing else uploads either**; and it presents as the
  * ordinary "not uploaded yet", which is indistinguishable from being offline.
  * Deleting the offending fill-up does not help — the tombstone carries the same
  * id. So this is a rule about availability, not tidiness.

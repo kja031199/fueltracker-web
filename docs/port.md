@@ -31,11 +31,6 @@ accident. Each one is recorded here and pinned by a test.
   write boundary and cannot reach the statistics layer. That makes it latent
   rather than live, but the point of the write guard is that a corrupted record
   must not poison a statistic, so the port closes the second hole as well.
-- **The vehicle showdown carries no `icon` field.** The original names SF
-  Symbols (`"leaf.fill"`, `"fuelpump.fill"`), which mean nothing off Apple's
-  platforms. Each row's `id` already identifies it uniquely and its order is
-  pinned by a test, so the interface layer maps `id` to whatever icon set it
-  uses and the domain module stays platform-free.
 - **Numeric fields keep the text you typed, not a re-rendered number.** A
   controlled input that round-trips through `Number` on every keystroke destroys
   a decimal as it is being entered: typing `3.5` parses `3.` to `3`, renders
@@ -105,6 +100,15 @@ honest list: things that were possible and were **chosen against**.
   blur — came back at confidence 36 with the output `GAL =, ( (CZ`. A scanner
   that is wrong is worse than no scanner, because a plausible wrong number is
   harder to notice than a blank field.
+- **No two-car comparison.** The iOS "vehicle showdown" (which car wins on
+  economy, cost per mile and the rest) was ported and phrased, but no web
+  screen ever showed it — it needs a second-car picker — and it was deleted in
+  [#96](https://github.com/kja031199/fueltracker-web/issues/96) rather than
+  carried as dead weight. Git history has it if the feature is built.
+- **Odometer scanning — not yet.** The odometer-photo parser
+  (`domain/scanning/odometerScanParser.ts`) is ported and tested but nothing
+  calls it; it is kept on purpose for
+  [#143](https://github.com/kja031199/fueltracker-web/issues/143).
 - **No PDF export.** CSV and JSON cover the two real jobs — a spreadsheet and a
   restore — and a PDF is neither.
 - **The shareable submission link — since built** ([#3](https://github.com/kja031199/fueltracker-web/issues/3)).

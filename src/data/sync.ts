@@ -177,15 +177,6 @@ export function preserveLocalReceipts(
 }
 
 /**
- * One full reconciliation: pull, merge, then push what is newer locally.
- *
- * Never throws. A failure to reach the account is an ordinary condition for an
- * offline-first app, and the caller's job is to show "not synced yet", not to
- * crash the screen someone is typing into. A failed **pull** leaves local
- * storage untouched; a failed **push** leaves the pulled merge in place, which
- * is correct — the data arrived, only the upload did not.
- */
-/**
  * Whether the account refused us, as opposed to being out of reach.
  *
  * Checked **structurally** rather than with `instanceof FirestoreError`:
@@ -236,6 +227,15 @@ export interface SyncOptions {
   readonly repair?: boolean;
 }
 
+/**
+ * One full reconciliation: pull, merge, then push what is newer locally.
+ *
+ * Never throws. A failure to reach the account is an ordinary condition for an
+ * offline-first app, and the caller's job is to show "not synced yet", not to
+ * crash the screen someone is typing into. A failed **pull** leaves local
+ * storage untouched; a failed **push** leaves the pulled merge in place, which
+ * is correct — the data arrived, only the upload did not.
+ */
 export async function syncOnce(
   store: SyncTarget,
   remote: RemoteStore,
@@ -447,7 +447,7 @@ function keyOf(collection: Collection, id: string): string {
 }
 
 /** Local rows newer than the version the account is known to hold. */
-function newerThanKnown<T extends { readonly id: string; readonly updatedAt: number }>(
+export function newerThanKnown<T extends { readonly id: string; readonly updatedAt: number }>(
   collection: Collection,
   rows: readonly T[],
   known: Readonly<Record<string, number>>,

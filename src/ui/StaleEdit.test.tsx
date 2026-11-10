@@ -1,11 +1,10 @@
 import { beforeEach, describe, expect, test } from 'vitest';
-import { draftWith, makeStore } from '../test/fixtures';
+import { draftWith, makeStore, saveHasOnboarded } from '../test/fixtures';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
 import { FillUpForm } from './FillUpForm';
 import { FuelLogProvider } from './fuelLog';
-import { saveHasOnboarded } from './onboarding';
 
 const draft = draftWith({ date: new Date(2025, 0, 15), station: 'Shell' });
 

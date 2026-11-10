@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { isScrubbed, tombstoneFillUp, tombstonePending } from './tombstone';
 import { MAX_RECEIPT_BYTES } from '../domain/fuelEntryDraft';
+import { TEXT_LIMITS } from '../domain/textLimits';
 import {
-  MAX_NAME_LENGTH,
-  MAX_NOTES_LENGTH,
   validateFillUp,
   validatePending,
   validateSnapshot,
@@ -148,17 +147,17 @@ describe('cosmetic problems repair the field', () => {
   it('truncates an essay in the notes rather than losing the fill-up', () => {
     // The row carries an odometer reading that the whole MPG chain depends on.
     // Dropping it because of its notes would be the worse outcome.
-    const result = validateFillUp({ ...FILL_UP, notes: 'n'.repeat(MAX_NOTES_LENGTH + 500) });
+    const result = validateFillUp({ ...FILL_UP, notes: 'n'.repeat(TEXT_LIMITS.notes + 500) });
     expect(typeof result).not.toBe('string');
     if (typeof result === 'string') return;
-    expect(result.notes).toHaveLength(MAX_NOTES_LENGTH);
+    expect(result.notes).toHaveLength(TEXT_LIMITS.notes);
     expect(result.odometer).toBe(10_000);
   });
 
   it('truncates an oversized station name', () => {
-    const result = validateFillUp({ ...FILL_UP, station: 's'.repeat(MAX_NAME_LENGTH + 1) });
+    const result = validateFillUp({ ...FILL_UP, station: 's'.repeat(TEXT_LIMITS.station + 1) });
     if (typeof result === 'string') throw new Error(result);
-    expect(result.station).toHaveLength(MAX_NAME_LENGTH);
+    expect(result.station).toHaveLength(TEXT_LIMITS.station);
   });
 
   it('turns a non-string label into an empty one, not "[object Object]"', () => {

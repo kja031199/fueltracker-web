@@ -432,7 +432,7 @@ npm run test:build   # vite build, then the *.build.test.ts files
   versions before the cursor; unreadable versions mean a full read.
 - **Text limits live in `TEXT_LIMITS` and must equal the rules'** (#50).
   `rulesLimits.test.ts` reads `firestore.rules` to enforce it. Text is bounded
-  at the draft gate, in `addVehicle`/`submitFillUp`, and in `importBackup`
+  at the draft gate, in `addVehicle`/`receiveSubmission`, and in `importBackup`
   (file *and* pull) — and in `FirestoreSharingRemote` both ways (#86): a
   display name, which Google does not limit, is cut on invite and accept, and
   names read back from invitations, members and the ledger are cut too.
@@ -520,8 +520,10 @@ npm run test:build   # vite build, then the *.build.test.ts files
   so a sender is not truncated unseen.
 - **Receiving is idempotent by the sender's id.** `receiveSubmission` looks for
   the id among live **and** tombstoned submissions, so a link opened twice, or
-  after approve/reject, queues nothing. Don't switch it to `submitFillUp`,
-  which mints a fresh id. `approvePendingFillUp` refuses a car that has gone.
+  after approve/reject, queues nothing. It is the only door into the review
+  queue (#96 deleted `submitFillUp`, which minted a fresh id and only tests
+  used); tests queue one through `submitted()` in `src/test/fixtures.ts`.
+  `approvePendingFillUp` refuses a car that has gone.
   The fuel log refuses (`'not-yours'`) a car shared *with* this account, checking
   the device's ledger as well as the lists in state, which load
   asynchronously. `IncomingScreen` answers "no such car" only after a fresh
@@ -635,8 +637,8 @@ npm run test:build   # vite build, then the *.build.test.ts files
   to `currency`/`fuelPrice`/`costPerDistance`, its `locale` to
   `volume`/`distance`/`economy`/`formatDate`/`fillUpFacts`/`fillUpName`/
   `describeSince`, and the whole style to the UI phrasers (`kpiText`,
-  `insightText`, `computeShowdownForDisplay`). **Every default is `US_STYLE`, which reproduces the old output byte
-  for byte** — the units rule — and `useDisplay()` without a provider is
+  `insightText`). **Every default is `US_STYLE`, which reproduces the old
+  output byte for byte** — the units rule — and `useDisplay()` without a provider is
   `US_STYLE`. Display only: nothing stored changes, and the currency converts
   nothing. A stored currency must pass `isCurrencyCode`, or `Intl` would throw
   on it. **Never `toLocaleDateString()` or a literal `'en-US'` outside
@@ -645,14 +647,11 @@ npm run test:build   # vite build, then the *.build.test.ts files
   sentence is English.
 - **`domain/` returns numbers; `ui/` writes the words** (#94 part C1). The
   dashboard's KPIs (`dashboardKPIs` → `KPI { id, value, detail }`), the
-  weekday insight (`WeekdayInsight`), chart summaries (`summarizeSeries` →
-  `SeriesSummary`) and showdown rows (`{ id, left, right, winner }`) carry no
-  text. Their sentences live in `ui/kpiText.ts`, `ui/insightText.ts`,
-  `ui/charts/chartSummary.ts` and `ui/showdownText.ts`; the fill-up and
+  weekday insight (`WeekdayInsight`) and chart summaries (`summarizeSeries` →
+  `SeriesSummary`) carry no text. Their sentences live in `ui/kpiText.ts`,
+  `ui/insightText.ts` and `ui/charts/chartSummary.ts`; the fill-up and
   vehicle phrasing (`fillUpFacts`, `fillUpName`, `describeSince`,
-  `displayName`…) in `ui/wording.ts`. A showdown win that *looks* like a tie
-  once formatted is demoted by the UI's `looksEqual`, because only the UI
-  knows what is shown. Each phraser defaults to US units and `US_STYLE`,
+  `displayName`…) in `ui/wording.ts`. Each phraser defaults to US units and `US_STYLE`,
   reproducing the old strings byte for byte, so the old string tests moved
   with them unchanged.
 - **`domain/` says nothing in English** (#94 part C2,
@@ -746,6 +745,16 @@ npm run test:build   # vite build, then the *.build.test.ts files
   name; comments are stripped first, so prose that mentions an import is not
   one. A new rule: write it as a pure function of that list, test it on a
   planted list, then run it over the files.
+
+- **Every file under `src/` is part of the app, or says why not** (#96,
+  `src/test/reachable.test.ts`). It walks the imports from `src/main.tsx`,
+  dynamic `import()` included, and fails on a production file the walk never
+  reaches. A vehicle comparison and an odometer parser were ported, tested and
+  refactored twice without ever being shown. To keep one on purpose, add it to
+  `KEPT` with the issue it waits on (the odometer parser waits on #143); the
+  test also fails once a kept file is wired in or deleted, so the list cannot
+  go stale. Test-only helpers live in `src/test/` (`fixtures.ts`,
+  `demoData.ts`), not in a production module.
 
 - **The tab is in the URL hash** (`#/dashboard`, `#/fillups`, `#/vehicles`,
   `#/settings`; `useTabRoute.ts`, #56). jsdom keeps one URL per test file, so

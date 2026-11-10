@@ -1,11 +1,12 @@
 import { describe, expect, test } from 'vitest';
-import { draftWith } from '../test/fixtures';
+import { draftWith, submitted } from '../test/fixtures';
 import 'fake-indexeddb/auto';
 import { computeFuelStatistics } from '../domain/fuelStatistics';
 import { FuelTrackerDatabase } from './db';
 import { DexieRepository } from './dexieRepository';
-import { FuelTrackerStore, toStats } from './store';
-import { seedDemoData } from './demoData';
+import { FuelTrackerStore } from './store';
+import { toStats } from './records';
+import { seedDemoData } from '../test/demoData';
 
 const draft = draftWith({ date: new Date(2025, 0, 15) });
 
@@ -114,7 +115,7 @@ describe('the store over IndexedDB', () => {
   test('submit and approve works end to end on real storage', async () => {
     const { store, db } = await openStore();
     const vehicle = await store.addVehicle({ name: 'Car' });
-    const pending = await store.submitFillUp(draft(), vehicle.id, 'Sam');
+    const pending = await submitted(store, draft(), vehicle.id, 'Sam');
     const approved = await store.approvePendingFillUp(pending.id);
 
     expect(approved).not.toBeNull();

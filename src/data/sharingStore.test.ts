@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { draft } from '../test/fixtures';
+import { draft, submitted } from '../test/fixtures';
 import { describe, expect, test } from 'vitest';
 import { InMemoryRepository } from './repository';
 import { FuelTrackerDatabase } from './db';
@@ -155,8 +155,8 @@ describe('forgetting, more widely', () => {
     const store = new FuelTrackerStore(memory(), undefined, 'me');
     const shared = await store.addVehicle({ name: 'Shared' });
     const mine = await store.addVehicle({ name: 'Mine' });
-    await store.submitFillUp(draft(), shared.id, 'Neighbour');
-    const kept = await store.submitFillUp(draft(), mine.id, 'Neighbour');
+    await submitted(store, draft(), shared.id, 'Neighbour');
+    const kept = await submitted(store, draft(), mine.id, 'Neighbour');
     await store.replica.forgetVehicle(shared.id);
     expect((await store.pendingFillUps()).map((p) => p.id)).toEqual([kept.id]);
   });

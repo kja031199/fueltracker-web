@@ -1,8 +1,8 @@
 /**
  * The remote half of persistence, as two methods.
  *
- * Deliberately the same minimalism as `Repository`: pull everything, push what
- * changed. No query language, no realtime subscription, no conflict callback —
+ * Deliberately the same minimalism as `Repository`: pull what changed since a
+ * cursor (everything, the first time — #52), push what changed. No query language, no realtime subscription, no conflict callback —
  * the conflict rule already exists (`shouldReplace` in `backup.ts`) and a
  * second one would be a second source of truth.
  *
@@ -193,7 +193,6 @@ export class InMemoryRemoteStore implements RemoteStore {
   }
 }
 
-/** Rows the remote side is missing or holds an older version of. */
 /**
  * Keeps the rows the account can actually address, and names the ones it cannot.
  *
@@ -227,18 +226,4 @@ export function sendableRows<T extends SyncFields>(
     else unsendable.push(row.id);
   }
   return sendable;
-}
-
-export function rowsToPush<T extends SyncFields>(
-  local: readonly T[],
-  remote: readonly T[],
-): T[] {
-  const remoteById = new Map(remote.map((row) => [row.id, row]));
-  return local.filter((row) => {
-    const existing = remoteById.get(row.id);
-    // Strictly greater, the same comparison `shouldReplace` uses. Equal means
-    // both sides already agree, and re-writing it would spend a quota write to
-    // change nothing.
-    return existing === undefined || row.updatedAt > existing.updatedAt;
-  });
 }

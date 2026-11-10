@@ -8,11 +8,6 @@
  * walked through it again just because this flag is missing.
  */
 
-import { accountPreference, flagCodec, writePreference } from './preferences';
+import { accountPreference, flagCodec } from './preferences';
 
 export const HAS_ONBOARDED = accountPreference('hasOnboarded', flagCodec('true'));
-
-/** Marks `uid` as welcomed. Not worth failing a first run over if it does not stick. */
-export function saveHasOnboarded(uid: string | null): void {
-  writePreference(HAS_ONBOARDED, true, uid);
-}

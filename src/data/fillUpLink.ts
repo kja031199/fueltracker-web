@@ -19,11 +19,11 @@
  * owner's review queue, and is checked once more when it is approved.
  *
  * ## Only what the submitter knows
-
-"Missed the previous fill-up" is not carried: it is a fact about the owner's
-log, which the submitter never sees, and the review queue has no place for it.
-
-## Text only, and small
+ *
+ * "Missed the previous fill-up" is not carried: it is a fact about the owner's
+ * log, which the submitter never sees, and the review queue has no place for it.
+ *
+ * ## Text only, and small
  *
  * No receipt photo (it would not fit) and no coordinates (nobody needs to
  * send their location by link). Text is shortened to `LINK_TEXT_LIMITS` on

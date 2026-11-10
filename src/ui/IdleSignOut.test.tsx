@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { makeStore } from '../test/fixtures';
+import { makeStore, saveHasOnboarded } from '../test/fixtures';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { FuelTrackerStore } from '../data/store';
 import { StubAuthProvider } from '../data/auth';
@@ -7,7 +7,6 @@ import { ACTIVITY_STORAGE_KEY } from './idleTimeout';
 import { ADMIN_IDLE_MINUTES } from './adminSettings';
 import { DEFAULT_IDLE_MINUTES, idleMinutesFromConfig } from '../domain/idleTimeout';
 import { App } from './App';
-import { saveHasOnboarded } from './onboarding';
 
 /**
  * The idle timeout as a reader meets it.
