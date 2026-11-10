@@ -60,6 +60,11 @@ function policy(): Map<string, string> {
   return parsePolicy(raw ?? '');
 }
 
+/** A directive's value as its separate sources. */
+function sources(value: string | undefined): string[] {
+  return (value ?? '').split(/\s+/).filter((token) => token !== '');
+}
+
 /** A policy's text as a directive → value map. */
 function parsePolicy(raw: string): Map<string, string> {
   const directives = new Map<string, string>();
@@ -164,12 +169,42 @@ describe('the policy', () => {
     expect(tokens).toContain("'wasm-unsafe-eval'");
   });
 
-  it('names every origin the app contacts at runtime', () => {
-    const connect = policy().get('connect-src') ?? '';
-    // Firestore, token refresh and the identity toolkit.
-    expect(connect).toContain('googleapis.com');
-    // The auth handler, which the sign-in popup completes against.
-    expect(connect).toContain('firebaseapp.com');
+  /**
+   * Exact hosts, no wildcards (#82). The policy used to allow any
+   * `*.googleapis.com` — Cloud Storage among them, where anybody can host a
+   * bucket, so an exfiltration channel if an injection ever appeared — and any
+   * `*.firebaseapp.com`. These are the hosts the bundled Firebase SDK actually
+   * contacts, and a run of csp-check.md on the live site refused nothing
+   * under them before they were enforced.
+   */
+  it('names no wildcard host anywhere', () => {
+    for (const [directive, value] of policy()) {
+      expect(value, directive).not.toMatch(/\*/);
+    }
+  });
+
+  it('connects only to Firestore, the identity toolkit and token refresh', () => {
+    expect(sources(policy().get('connect-src')).sort()).toEqual(
+      [
+        "'self'",
+        'https://firestore.googleapis.com',
+        'https://identitytoolkit.googleapis.com',
+        'https://securetoken.googleapis.com',
+      ].sort(),
+    );
+  });
+
+  it('frames only this project’s auth domain and Google’s account chooser', () => {
+    // The sign-in popup's auth iframe is served from the auth domain.
+    expect(sources(policy().get('frame-src')).sort()).toEqual(
+      [`https://${PRODUCTION_PROJECT_ID}.firebaseapp.com`, 'https://accounts.google.com'].sort(),
+    );
+  });
+
+  it('allows no inline style', () => {
+    // React's `style` props go through CSSOM, which CSP does not govern; the
+    // built page has no `style=` attribute (checked above).
+    expect(sources(policy().get('style-src'))).toEqual(["'self'"]);
   });
 
   it('names no CDN: the receipt reader is served from this origin', () => {
@@ -194,70 +229,6 @@ describe('the policy', () => {
     expect(policy().get('object-src')).toBe("'none'");
     expect(policy().get('frame-ancestors')).toBe("'none'");
     expect(policy().get('base-uri')).toBe("'self'");
-  });
-});
-
-/**
- * The narrower policy, served **report-only** beside the enforced one until a
- * run of [csp-check.md](../../docs/csp-check.md) on the live site comes back
- * clean (#82). The enforced policy allows any `*.googleapis.com` — Cloud
- * Storage among them, where anybody can host a bucket, so an exfiltration
- * channel if an injection ever appeared — and any `*.firebaseapp.com`. This
- * one names the hosts the bundled SDK actually contacts, and drops
- * `'unsafe-inline'` from `style-src`.
- */
-describe('the narrower candidate, report-only until checked live (#82)', () => {
-  function candidate(): Map<string, string> {
-    const raw = headers().get('Content-Security-Policy-Report-Only');
-    expect(raw, 'the candidate is served as Content-Security-Policy-Report-Only').toBeDefined();
-    return parsePolicy(raw ?? '');
-  }
-  const sources = (value: string | undefined): string[] => (value ?? '').split(/\s+/).filter((t) => t !== '');
-
-  it('names no wildcard host anywhere', () => {
-    for (const [directive, value] of candidate()) {
-      expect(value, directive).not.toMatch(/\*/);
-    }
-  });
-
-  it('connects only to Firestore, the identity toolkit and token refresh', () => {
-    expect(sources(candidate().get('connect-src')).sort()).toEqual(
-      [
-        "'self'",
-        'https://firestore.googleapis.com',
-        'https://identitytoolkit.googleapis.com',
-        'https://securetoken.googleapis.com',
-      ].sort(),
-    );
-  });
-
-  it('frames only this project’s auth domain and Google’s account chooser', () => {
-    expect(sources(candidate().get('frame-src')).sort()).toEqual(
-      [`https://${PRODUCTION_PROJECT_ID}.firebaseapp.com`, 'https://accounts.google.com'].sort(),
-    );
-  });
-
-  it('allows no inline style', () => {
-    expect(sources(candidate().get('style-src'))).toEqual(["'self'"]);
-  });
-
-  it('has the same directives as the enforced policy, and allows nothing it refuses', () => {
-    // Promoting it can only take permissions away: every source it names is
-    // one the enforced policy already allows, if only through a wildcard.
-    const enforced = policy();
-    const narrow = candidate();
-    expect([...narrow.keys()].sort()).toEqual([...enforced.keys()].sort());
-    for (const [directive, value] of narrow) {
-      const allowed = sources(enforced.get(directive));
-      for (const source of sources(value)) {
-        const covered = allowed.some(
-          (wide) =>
-            wide === source ||
-            (wide.startsWith('https://*.') && source.startsWith('https://') && source.endsWith(wide.slice('https://*'.length))),
-        );
-        expect(covered, `${directive} ${source}`).toBe(true);
-      }
-    }
   });
 });
 

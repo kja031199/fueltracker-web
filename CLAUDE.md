@@ -281,14 +281,15 @@ npm run test:build   # vite build, then the *.build.test.ts files
   Firebase Auth injects to host its auth iframe: the live check refused sign-in
   twice without it. `script-src 'self'` holds for everything else only because
   the built page has no inline script, which the same file enforces.
-- **A narrower candidate is served report-only** beside it (#82):
-  `Content-Security-Policy-Report-Only` with exact hosts (`firestore`,
-  `identitytoolkit`, `securetoken.googleapis.com`; frame-src this project's
-  `firebaseapp.com` and `accounts.google.com`) and `style-src 'self'`.
-  `csp.build.test.ts` holds it to no wildcard and to allowing nothing the
-  enforced policy refuses. It is promoted only after a clean live check; the
-  watcher marks its refusals `(report-only)` (`disposition === 'report'`) so a
-  report tells "would break" from "is broken".
+- **Exact hosts, no wildcards, no inline style** (#82): `connect-src` is
+  `'self'` plus `firestore`, `identitytoolkit` and `securetoken.googleapis.com`;
+  `frame-src` is this project's `firebaseapp.com` and `accounts.google.com`;
+  `style-src` is `'self'`. Trialled report-only first, then enforced after a
+  clean live check. `csp.build.test.ts` pins each exactly, so a wildcard or
+  `'unsafe-inline'` coming back fails it. A future trial goes the same way: a
+  `Content-Security-Policy-Report-Only` header beside the enforced one, and
+  the watcher marks its refusals `(report-only)` (`disposition === 'report'`)
+  so a report tells "would break" from "is broken".
 - **Changing the policy needs the live check**, not reasoning: the deployed
   origin and the auth domain are unreachable from here, and
   signing in needs a real Google account. `cspWatch.ts` collects the evidence

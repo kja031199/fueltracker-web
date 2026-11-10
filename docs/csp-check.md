@@ -140,7 +140,25 @@ header may be served **alongside** the enforced one — that is how a stricter
 candidate gets tested. `src/ui/csp.build.test.ts` requires the enforcing header to be
 present, so it cannot be quietly replaced by a report-only one again.
 
-**On trial now** (#82): exact hosts in place of `*.googleapis.com` and
-`*.firebaseapp.com`, and `style-src 'self'` without `'unsafe-inline'`, served
-as the report-only candidate. A clean run of the flows above — no
-`(report-only)` lines — is what promotes it to the enforced policy.
+## The second run (#82)
+
+The policy named `*.googleapis.com` and `*.firebaseapp.com` and allowed inline
+styles. A narrower one — exact hosts, `style-src 'self'` — was served as a
+report-only candidate beside it, and the flows above were run on the live site
+on 2026-11-10. The report: **no violations recorded**, enforced or
+report-only. The candidate then became the enforced policy.
+
+## Expected console noise, which is not a CSP failure
+
+A run's DevTools console is not clean, and these red lines are expected:
+
+- **"Cross-Origin-Opener-Policy policy would block the window.closed call"**
+  (and `window.close`), during sign-in. Firebase Auth's popup flow polls the
+  Google sign-in window, and Google's own opener policy makes the browser log
+  this. Sign-in completes. This app's `Cross-Origin-Opener-Policy` stays
+  `same-origin-allow-popups`; `same-origin` is what would actually break it.
+- **Failed `POST https://firestore.googleapis.com/…/Listen/channel` and
+  `…/Write/channel`**, during the offline step. Firestore's long-lived
+  connections are cut when the network goes away. A CSP refusal reads
+  "Refused to connect … violates the following Content Security Policy
+  directive", and the watcher records it; a failed request does neither.

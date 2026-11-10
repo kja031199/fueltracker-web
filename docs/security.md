@@ -38,20 +38,21 @@ and a test asserts it is the *only* one. That does mean Google can serve
 arbitrary script to this page, which is already true of anybody using Firebase
 Auth's popup flow: there is no supported way to run it without that script.
 
-**A narrower policy is on trial** (#82), served as
-`Content-Security-Policy-Report-Only` beside the enforced one until a run of
-[csp-check.md](csp-check.md) on the live site comes back clean. The enforced
-policy allows any `*.googleapis.com` — Cloud Storage among them, where anybody
-can host a bucket, which would be an exfiltration channel if an injection ever
-appeared — and any `*.firebaseapp.com`. The candidate names what the bundled
-Firebase SDK actually contacts (`firestore`, `identitytoolkit` and
-`securetoken.googleapis.com`), frames only this project's auth domain and
-Google's account chooser, and drops `'unsafe-inline'` from `style-src`: React's
-`style` props go through CSSOM, which CSP does not govern, and the built page
-has no `style=` attribute (a test checks). `csp.build.test.ts` holds the
-candidate to allowing nothing the enforced policy refuses, so promoting it can
-only take permissions away. Once the live check is clean, it replaces the
-enforced policy.
+**It names exact hosts and allows no inline style** (#82). It used to allow
+any `*.googleapis.com` — Cloud Storage among them, where anybody can host a
+bucket, which would be an exfiltration channel if an injection ever appeared —
+and any `*.firebaseapp.com`. Now `connect-src` names what the bundled Firebase
+SDK actually contacts (`firestore`, `identitytoolkit` and
+`securetoken.googleapis.com`), `frame-src` only this project's auth domain and
+Google's account chooser, and `style-src` is `'self'` without
+`'unsafe-inline'`: React's `style` props go through CSSOM, which CSP does not
+govern, and the built page has no `style=` attribute (a test checks).
+`script-src` is unchanged.
+
+It went the same way as the first policy: served report-only beside the
+enforced one, then a run of [csp-check.md](csp-check.md) on the live site —
+sign-in, sync, a scan, an export and an offline reload, on 2026-11-10 — which
+recorded **no violations at all**, and only then enforced.
 
 The collector that produced the evidence lives in `src/ui/cspWatch.ts` and
 records nothing until somebody arms it. It stays, because the next change to
