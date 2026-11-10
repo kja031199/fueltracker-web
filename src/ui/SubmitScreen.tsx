@@ -2,7 +2,6 @@ import type { ReactElement } from 'react';
 import { useMemo, useState } from 'react';
 import { LINK_TEXT_LIMITS, decodeRequest, submissionUrl } from '../data/fillUpLink';
 import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
-import type { UnitPreferences } from '../domain/units';
 import { boundText } from '../domain/textLimits';
 import { FillUpForm } from './FillUpForm';
 import { LinkOut, appBase } from './LinkOut';
@@ -14,7 +13,6 @@ interface Props {
   readonly payload: string;
   /** Pre-fills "Your name": the signed-in account's display name. */
   readonly accountName: string;
-  readonly units: UnitPreferences;
   /** Leave the link for the app. */
   readonly onDone: () => void;
 }
@@ -31,7 +29,7 @@ interface Props {
  * idempotent: the same link opened twice, or pasted into two chats, is queued
  * once.
  */
-export function SubmitScreen({ payload, accountName, units, onDone }: Props): ReactElement {
+export function SubmitScreen({ payload, accountName, onDone }: Props): ReactElement {
   const request = useMemo(() => decodeRequest(payload), [payload]);
   const [id] = useState(() => crypto.randomUUID());
   const [name, setName] = useState(() => boundText(accountName, LINK_TEXT_LIMITS.submitterName));
@@ -94,7 +92,6 @@ export function SubmitScreen({ payload, accountName, units, onDone }: Props): Re
       </div>
       <FillUpForm
         vehicleId={vehicleId}
-        units={units}
         existing={[]}
         editing={null}
         onSaved={async () => {}}

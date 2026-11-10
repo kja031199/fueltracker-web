@@ -52,7 +52,11 @@ Hosting at `fueltracker-899eb.web.app`.
   (`FuelLogProvider` / `useFuelLog`, `useSyncStatus` for sync status and
   `useBackupStatus` for the backup reminder) owns the data, sync, **every
   write** and every backup, export and file import;
-  `AppShell` (in `App.tsx`) is the signed-in app (#56). Since #93 the fuel
+  `AppShell.tsx` is the signed-in app (#56): the tabs come from one
+  `TAB_TABLE` in `useTabRoute.ts`, each with a screen in a `Record<Tab, …>`,
+  and a visited tab is kept inside React's `<Activity>` (see Rendering). The
+  reader's units and the session are contexts in `session.tsx` (`useUnits`,
+  `useSession`), not props. Since #93 the fuel
   log's shape is `fuelLogTypes.ts` and its sharing lists `useSharingView.ts`;
   the fill-up form's state and save are `useFillUpForm.ts` (the scan rule,
   `applyScan`, is pure in `domain/fillUpForm.ts`); Settings is one component
@@ -539,8 +543,26 @@ npm ci --prefix .github/firebase-cli
   state (`useFillUpForm`), a component per section (`ui/settings/`), a row
   with its own state (`VehicleRow`), and the pure rules into `domain/`. An
   exception is named in the test's `ALLOWED` with the most it may be and the
-  change that removes it (`App.tsx`, until part 5's route table); the test
-  fails once the exception is no longer needed.
+  change that removes it; the test fails once the exception is no longer
+  needed. It is empty now — `App.tsx` was the last, until the route table.
+- **A tab keeps its state while another is shown** (#93). `AppShell` mounts
+  a tab the first time it is shown and then keeps it inside `<Activity>`:
+  hidden, it keeps a half-typed fill-up, its filter, its range; its effects
+  are cleaned up until it shows again; it is `display: none`. Two
+  consequences. **A hidden tab is still in the DOM**, so in a test a
+  `getByText`/`getByLabelText` can find its copy of a label — query by role
+  (`getByRole('textbox', { name })`), which skips hidden content as a screen
+  reader does. **A hidden tab still re-renders**, at low priority, when the
+  fuel log changes; that is the accepted cost. Don't go back to rendering
+  only the shown tab: that is what threw the work away.
+- **Units and the session are contexts, not props** (`session.tsx`, #93).
+  `useUnits()` outside a provider is US with a setter that does nothing, so a
+  screen rendered alone in a test needs no wrapper and shows exactly what is
+  stored. Settings takes no props; it reads `useSession()`.
+- **The selected car stays in `useAppData`** (#93 asked; kept on purpose).
+  It is applied in the same `setShown` as that car's fill-ups (#88); held as
+  UI state outside, it would change a render before them and bring back one
+  car's name over another's figures.
 
 - **Keep the fuel log's context value stable** (#88). Every screen reads
   `useFuelLog()`, so a value rebuilt each render re-renders all of them: it

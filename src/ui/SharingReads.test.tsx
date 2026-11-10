@@ -10,7 +10,6 @@ import { InMemorySharingWorld, type Account } from '../data/sharing';
 import type { SharingSync } from '../data/shareSync';
 import { InMemorySyncState } from '../data/syncState';
 import { InMemoryShareLedger } from '../data/shareLedger';
-import { US } from '../domain/units';
 import { FuelLogProvider, useFuelLog, useSyncStatus, type FuelLog } from './fuelLog';
 import type { SyncStatus } from './useSync';
 import { FillUpsScreen } from './FillUpsScreen';
@@ -90,7 +89,7 @@ async function mount(
   render(
     <FuelLogProvider store={store} remote={world.remoteFor(account.uid)} uid={account.uid} sharing={sharing}>
       <Probe />
-      <FillUpsScreen units={US} />
+      <FillUpsScreen />
     </FuelLogProvider>,
   );
   await waitFor(() => expect(status!.lastSyncedAt).not.toBeNull());

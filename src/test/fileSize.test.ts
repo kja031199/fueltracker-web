@@ -16,7 +16,7 @@ export const LIMIT = 300;
 
 /** Files allowed over the limit, each with the most it may be and why. */
 export const ALLOWED: Readonly<Record<string, { readonly lines: number; readonly reason: string }>> = {
-  'src/ui/App.tsx': { lines: 355, reason: 'its if-chain of screens becomes a route table in #93 part 5' },
+  // None. `App.tsx` was here at 355 lines until #93's route table split it.
 };
 
 const lineCount = (file: string): number => readFileSync(file, 'utf8').split('\n').length - 1;
@@ -32,7 +32,9 @@ describe('interface files stay small', () => {
     expect(lineCount(file)).toBeLessThanOrEqual(LIMIT);
   });
 
-  test.each(Object.entries(ALLOWED))('%s is allowed over, but no further, and only while it needs to be', (file, allowance) => {
+  // `test.each` over an empty table runs nothing, so it is skipped then, and
+  // this file still checks every interface file against the limit above.
+  test.skipIf(Object.keys(ALLOWED).length === 0).each(Object.entries(ALLOWED))('%s is allowed over, but no further, and only while it needs to be', (file, allowance) => {
     expect(allowance.reason.length).toBeGreaterThan(10);
     expect(lineCount(file)).toBeLessThanOrEqual(allowance.lines);
     expect(lineCount(file)).toBeGreaterThan(LIMIT);

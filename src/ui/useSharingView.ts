@@ -1,7 +1,7 @@
 /**
  * Sharing a car (#66), as the fuel log hands it to the screens: the lists of
  * cars shared with this account and invitations waiting for it, kept fresh,
- * and the actions on them. Moved out of \`fuelLog.tsx\` (#93); only the fuel
+ * and the actions on them. Moved out of `fuelLog.tsx` (#93); only the fuel
  * log calls it.
  */
 

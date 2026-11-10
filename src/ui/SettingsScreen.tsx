@@ -1,40 +1,22 @@
 import type { ReactElement } from 'react';
-import type { UnitPreferences } from '../domain/units';
-import type { AuthUser } from '../data/auth';
-import { DEFAULT_IDLE_MINUTES } from '../domain/idleTimeout';
 import { UnitsSection } from './settings/UnitsSection';
 import { AccountSection } from './settings/AccountSection';
 import { SecuritySection } from './settings/SecuritySection';
 import { StorageSection } from './settings/StorageSection';
 import { BackupSection } from './settings/BackupSection';
-
-interface Props {
-  readonly units: UnitPreferences;
-  readonly onChange: (units: UnitPreferences) => void;
-  /** Omitted by tests that are not about the account. */
-  readonly account?: AuthUser;
-  readonly onSignOut?: () => void;
-  /** False when this build has no backend configured, so nothing syncs. */
-  readonly syncEnabled?: boolean;
-  /** The administrator's inactivity period (#70). Shown, never editable. */
-  readonly idleMinutes?: number;
-}
+import { useSession } from './session';
 
 /**
  * The account, units, and the honest note about where the data lives — one
- * component per section, in \`ui/settings/\` (#93).
+ * component per section, in `ui/settings/` (#93). It takes no props: the
+ * units and the session come from their contexts (`session.tsx`), where it
+ * used to be handed eight.
  */
-export function SettingsScreen({
-  units,
-  onChange,
-  account,
-  onSignOut,
-  syncEnabled = false,
-  idleMinutes = DEFAULT_IDLE_MINUTES,
-}: Props): ReactElement {
+export function SettingsScreen(): ReactElement {
+  const { account, onSignOut, syncEnabled, idleMinutes } = useSession();
   return (
     <div>
-      <UnitsSection units={units} onChange={onChange} />
+      <UnitsSection />
       {account !== undefined && <AccountSection account={account} onSignOut={onSignOut} syncEnabled={syncEnabled} />}
       <SecuritySection idleMinutes={idleMinutes} />
       <StorageSection />

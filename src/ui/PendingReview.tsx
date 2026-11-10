@@ -2,9 +2,9 @@ import type { ReactElement } from 'react';
 import { useState } from 'react';
 import { fillUpFacts } from '../domain/format';
 import { FillUpSummary } from './FillUpSummary';
-import type { UnitPreferences } from '../domain/units';
 import { totalCost } from '../domain/models';
 import { useFuelLog } from './fuelLog';
+import { useUnits } from './session';
 
 /**
  * Fill-ups sent by link, waiting for the owner (#3): **Approve** adds one to
@@ -14,7 +14,8 @@ import { useFuelLog } from './fuelLog';
  *
  * Nothing is shown when nothing is waiting.
  */
-export function PendingReview({ units }: { readonly units: UnitPreferences }): ReactElement | null {
+export function PendingReview(): ReactElement | null {
+  const { units } = useUnits();
   const { pending, vehicles, approveSubmission, rejectSubmission } = useFuelLog();
   const [refused, setRefused] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);

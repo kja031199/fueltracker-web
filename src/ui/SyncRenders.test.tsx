@@ -23,9 +23,9 @@ vi.mock('./DashboardScreen', async (original) => {
   const actual = await original<typeof import('./DashboardScreen')>();
   return {
     ...actual,
-    DashboardScreen: (props: Parameters<typeof actual.DashboardScreen>[0]) => {
+    DashboardScreen: () => {
       counted.dashboard += 1;
-      return actual.DashboardScreen(props);
+      return actual.DashboardScreen();
     },
   };
 });
