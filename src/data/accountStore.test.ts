@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, test } from 'vitest';
+import { draftWith } from '../test/fixtures';
 // Before Dexie: it captures the IndexedDB global when the module loads.
 import 'fake-indexeddb/auto';
 import Dexie from 'dexie';
-import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import {
   LEGACY_DATABASE_NAME,
   databaseNameFor,
@@ -12,6 +12,8 @@ import {
 import { FuelTrackerDatabase } from './db';
 import { DexieRepository } from './dexieRepository';
 import { FuelTrackerStore } from './store';
+
+const draft = draftWith({ date: new Date(2025, 0, 15) });
 
 /**
  * Storage has to be separated by account, and this file exists because it was
@@ -28,18 +30,6 @@ import { FuelTrackerStore } from './store';
  * The first test below is the one that reproduces it. It fails against a single
  * shared database and passes only when the database name carries the uid.
  */
-
-function draft(overrides: Partial<Parameters<typeof makeFuelEntryDraft>[0]> = {}) {
-  const result = makeFuelEntryDraft({
-    date: new Date(2025, 0, 15),
-    odometer: 10_000,
-    gallons: 10,
-    pricePerGallon: 3.5,
-    ...overrides,
-  });
-  if (result === null) throw new Error('fixture draft failed validation');
-  return result;
-}
 
 /** A unique prefix per test, so tests cannot see each other's databases. */
 let prefix: string;

@@ -18,7 +18,9 @@ export function sdkOutsideItsHome(file: string, imports: readonly string[]): str
   return file.startsWith(HOME) ? [] : imports.filter((path) => FIREBASE.test(path));
 }
 
-const PRODUCTION = sourcesUnder('src', false);
+// `src/test/` is test support — the shared fixtures, the emulator setup — and
+// not shipped, though its files are not named `.test.ts` (#97).
+const PRODUCTION = sourcesUnder('src', false).filter((file) => !file.startsWith('src/test/'));
 
 describe('the Firebase SDK stays in data/firebase', () => {
   test('the rule catches the SDK by any entry point, and only outside its home', () => {

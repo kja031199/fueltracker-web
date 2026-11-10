@@ -1,10 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { makeStore } from '../test/fixtures';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { InMemoryRepository } from '../data/repository';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
-import { FuelTrackerStore } from '../data/store';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { App } from './App';
 import { saveHasOnboarded } from './onboarding';
@@ -23,11 +21,7 @@ afterEach(cleanup);
 const DAY = 86_400_000;
 
 test('a range admitting one fill-up still shows the economy of the drive that ended in it', async () => {
-  const store = new FuelTrackerStore({
-    vehicles: new InMemoryRepository<VehicleRecord>(),
-    fillUps: new InMemoryRepository<FillUpRecord>(),
-    pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-  });
+  const store = makeStore();
   const vehicle = await store.addVehicle({ name: 'Daily Driver' });
   const now = Date.now();
   // 300 miles on 10 gallons each time: 30 MPG. Only the last is inside 3M.
@@ -47,11 +41,7 @@ test('a range admitting one fill-up still shows the economy of the drive that en
 
 describe('the range still narrows what it should', () => {
   test('fill-up count reflects only the range', async () => {
-    const store = new FuelTrackerStore({
-      vehicles: new InMemoryRepository<VehicleRecord>(),
-      fillUps: new InMemoryRepository<FillUpRecord>(),
-      pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-    });
+    const store = makeStore();
     const vehicle = await store.addVehicle({ name: 'Daily Driver' });
     const now = Date.now();
     for (const [daysAgo, odometer] of [[200, 10_000], [10, 10_300]] as const) {

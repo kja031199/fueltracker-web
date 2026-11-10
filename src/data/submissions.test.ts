@@ -1,34 +1,16 @@
 import { describe, expect, test } from 'vitest';
-import { InMemoryRepository } from './repository';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records';
-import { FuelTrackerStore } from './store';
-import { makeFuelEntryDraft, type FuelEntryDraft } from '../domain/fuelEntryDraft';
+import { draftWith, makeStore } from '../test/fixtures';
+import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
+
+const draft = draftWith({ station: 'Shell', notes: 'note' });
 
 /**
  * Receiving a submission from a link (#3) and reviewing it.
  */
 
-function makeStore(): FuelTrackerStore {
-  return new FuelTrackerStore(
-    {
-      vehicles: new InMemoryRepository<VehicleRecord>(),
-      fillUps: new InMemoryRepository<FillUpRecord>(),
-      pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-    },
-    undefined,
-    'owner',
-  );
-}
-
-function draft(odometer = 10_000): FuelEntryDraft {
-  const made = makeFuelEntryDraft({ date: new Date(2026, 0, 1), odometer, gallons: 10, pricePerGallon: 3.5, station: 'Shell', notes: 'note' });
-  if (made === null) throw new Error('fixture draft failed validation');
-  return made;
-}
-
 describe('receiving a submission', () => {
   test('queues it under the id the link carried, with who sent it and when', async () => {
-    const store = makeStore();
+    const store = makeStore({ author: 'owner' });
     const car = await store.addVehicle({ name: 'Civic' });
     const result = await store.receiveSubmission({ id: 'sub-1', vehicleId: car.id, submitterName: 'Sam', submittedAt: 123, draft: draft() });
     expect(result).toBe('queued');
@@ -40,7 +22,7 @@ describe('receiving a submission', () => {
   test('keeps no photo or place, whatever the draft it was handed carries (#91)', async () => {
     // A link carries text only. The decoder makes such a draft, and the store
     // does not take that on trust.
-    const store = makeStore();
+    const store = makeStore({ author: 'owner' });
     const car = await store.addVehicle({ name: 'Civic' });
     const placed = makeFuelEntryDraft({
       date: new Date(2026, 0, 1), odometer: 10_000, gallons: 10, pricePerGallon: 3.5,
@@ -54,7 +36,7 @@ describe('receiving a submission', () => {
   });
 
   test('the same link twice queues it once', async () => {
-    const store = makeStore();
+    const store = makeStore({ author: 'owner' });
     const car = await store.addVehicle({ name: 'Civic' });
     const submission = { id: 'sub-1', vehicleId: car.id, submitterName: 'Sam', submittedAt: 1, draft: draft() };
     await store.receiveSubmission(submission);
@@ -64,7 +46,7 @@ describe('receiving a submission', () => {
   });
 
   test('a link already approved or rejected is not queued again', async () => {
-    const store = makeStore();
+    const store = makeStore({ author: 'owner' });
     const car = await store.addVehicle({ name: 'Civic' });
     const one = { id: 'sub-1', vehicleId: car.id, submitterName: 'Sam', submittedAt: 1, draft: draft() };
     const two = { ...one, id: 'sub-2' };
@@ -79,7 +61,7 @@ describe('receiving a submission', () => {
   });
 
   test('a car that is not here — never was, or was deleted — is refused', async () => {
-    const store = makeStore();
+    const store = makeStore({ author: 'owner' });
     const car = await store.addVehicle({ name: 'Civic' });
     await store.removeVehicle(car.id);
     const base = { id: 'sub-1', submitterName: 'Sam', submittedAt: 1, draft: draft() };
@@ -89,7 +71,7 @@ describe('receiving a submission', () => {
   });
 
   test('the submitter’s name is bounded like any text from outside', async () => {
-    const store = makeStore();
+    const store = makeStore({ author: 'owner' });
     const car = await store.addVehicle({ name: 'Civic' });
     await store.receiveSubmission({ id: 's', vehicleId: car.id, submitterName: 'x'.repeat(5000), submittedAt: 1, draft: draft() });
     expect((await store.pendingFillUps())[0]?.submitterName.length).toBeLessThanOrEqual(200);
@@ -98,7 +80,7 @@ describe('receiving a submission', () => {
 
 describe('approving', () => {
   test('makes a fill-up entered by the owner who approved it, and clears the queue', async () => {
-    const store = makeStore();
+    const store = makeStore({ author: 'owner' });
     const car = await store.addVehicle({ name: 'Civic' });
     await store.receiveSubmission({ id: 'sub-1', vehicleId: car.id, submitterName: 'Sam', submittedAt: 1, draft: draft() });
     const made = await store.approvePendingFillUp('sub-1');
@@ -109,7 +91,7 @@ describe('approving', () => {
   });
 
   test('is refused once the car has been deleted, and the submission stays to be dealt with', async () => {
-    const store = makeStore();
+    const store = makeStore({ author: 'owner' });
     const car = await store.addVehicle({ name: 'Civic' });
     await store.receiveSubmission({ id: 'sub-1', vehicleId: car.id, submitterName: 'Sam', submittedAt: 1, draft: draft() });
     await store.removeVehicle(car.id);
@@ -118,6 +100,6 @@ describe('approving', () => {
   });
 
   test('an unknown submission is nothing to approve', async () => {
-    expect(await makeStore().approvePendingFillUp('nope')).toBeNull();
+    expect(await makeStore({ author: 'owner' }).approvePendingFillUp('nope')).toBeNull();
   });
 });

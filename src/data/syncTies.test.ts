@@ -1,12 +1,11 @@
 import { describe, expect, test } from 'vitest';
-import { InMemoryRepository } from './repository';
+import { draft, makeStore } from '../test/fixtures';
 import { InMemoryRemoteStore } from './remote';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records';
+import type { FillUpRecord } from './records';
 import { FuelTrackerStore } from './store';
 import { syncOnce, tieWinner } from './sync';
 import { MonotonicClock } from './syncClock';
 import { InMemorySyncState } from './syncState';
-import { makeFuelEntryDraft, type FuelEntryDraft } from '../domain/fuelEntryDraft';
 
 /**
  * Two devices writing the same row in the same millisecond.
@@ -31,22 +30,9 @@ interface Device {
 
 function device(remote: InMemoryRemoteStore): Device {
   const clock = new MonotonicClock(() => FROZEN);
-  const store = new FuelTrackerStore(
-    {
-      vehicles: new InMemoryRepository<VehicleRecord>(),
-      fillUps: new InMemoryRepository<FillUpRecord>(),
-      pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-    },
-    clock,
-  );
+  const store = makeStore({ clock: clock });
   const state = new InMemorySyncState();
   return { store, sync: () => syncOnce(store, remote, state) };
-}
-
-function draft(odometer: number): FuelEntryDraft {
-  const made = makeFuelEntryDraft({ date: new Date(2026, 0, 1), odometer, gallons: 10, pricePerGallon: 3.5 });
-  if (made === null) throw new Error('fixture draft failed validation');
-  return made;
 }
 
 async function twoDevicesOneFillUp(): Promise<{ remote: InMemoryRemoteStore; a: Device; b: Device; car: string; id: string }> {

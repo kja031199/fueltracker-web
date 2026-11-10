@@ -275,6 +275,7 @@ Recorded so a regression in the tests themselves is visible:
 | Accessibility (#95): chart rows keyed by label again / Edit without its fill-up / Delete without its row / Request without its car / the title not focusable / no focus after a tab switch / the page title never set / no focus on opening or closing the form / a fixed id back / the id check matching `data-id` | 1 / 4 / 14 / 6 / 1 / 1 / 2 / 1 each / 2 / 1 |
 | Equivalent, kept: `AppShell` moving focus on arrival as well — it always mounts on its loading screen, whose title takes the focus and is then replaced, leaving focus where the guard would have. The guard stays for the day the shell renders content first. | — |
 | Faster tests (#97), still catching: the timers not passed on / a write that schedules no sync / a failed write still scheduling one / the same invitations re-rendering / every focus syncing / invitations shown to an unverified address / decoding a receipt before its bound | 14 / 14 / 1 / 1 / 1 / 1 / 1 |
+| Shared fixtures (#97): `makeStore` ignoring its author / its clock / a number not read as the odometer / a file's defaults beating a test's changes / a refused fixture returned as null / a signed-in user shared as unverified / the guard missing an arrow-function copy / a copy planted back | 5 / 1 / 7 / 5 / 1 / 11 / 1 / 1 |
 
 Equivalent, and kept as a backstop: `shape()` without its `hasAll`. Every
 required field is also read by a clause of its own, and reading a missing field

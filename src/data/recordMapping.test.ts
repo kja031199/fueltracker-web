@@ -1,9 +1,24 @@
 import { describe, expect, test } from 'vitest';
-import { MAX_RECEIPT_BYTES, makeFuelEntryDraft, type FuelEntryDraft } from '../domain/fuelEntryDraft';
+import { draftWith } from '../test/fixtures';
+import { MAX_RECEIPT_BYTES, makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { TEXT_LIMITS } from '../domain/textLimits';
 import { SCHEMA_VERSION } from './records';
 import { draftFromRecord, fillUpFromDraft, formFromRecord, pendingFromDraft } from './recordMapping';
 import { draftFromForm, emptyFillUpForm } from '../domain/fillUpForm';
+
+const draft = draftWith({
+  date: new Date(1_700_000_000_000),
+  gallons: 10.5,
+  pricePerGallon: 3.499,
+  isFullTank: false,
+  missedPreviousFillUp: true,
+  fuelGrade: 'Premium',
+  station: 'Shell',
+  notes: 'windy',
+  latitude: 51.5,
+  longitude: -0.12,
+  receiptImageData: new Uint8Array([1, 2, 3]),
+});
 
 /**
  * A draft and a record, in each direction, written once (#91).
@@ -12,26 +27,6 @@ import { draftFromForm, emptyFillUpForm } from '../domain/fillUpForm';
  * and once more in the import, and the copies had started to differ. These
  * pin the one mapping each way, and that a round trip changes nothing.
  */
-
-function draft(overrides: Partial<Parameters<typeof makeFuelEntryDraft>[0]> = {}): FuelEntryDraft {
-  const made = makeFuelEntryDraft({
-    date: new Date(1_700_000_000_000),
-    odometer: 10_000,
-    gallons: 10.5,
-    pricePerGallon: 3.499,
-    isFullTank: false,
-    missedPreviousFillUp: true,
-    fuelGrade: 'Premium',
-    station: 'Shell',
-    notes: 'windy',
-    latitude: 51.5,
-    longitude: -0.12,
-    receiptImageData: new Uint8Array([1, 2, 3]),
-    ...overrides,
-  });
-  if (made === null) throw new Error('fixture draft failed validation');
-  return made;
-}
 
 const FILL_UP_META = { id: 'f1', vehicleId: 'v1', updatedAt: 500, enteredBy: 'uid-a' } as const;
 const PENDING_META = { id: 'p1', vehicleId: 'v1', updatedAt: 500, submittedAt: 400, submitterName: 'Sam' } as const;

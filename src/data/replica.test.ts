@@ -1,7 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { InMemoryRepository } from './repository';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records';
-import { FuelTrackerStore } from './store';
+import { makeStore } from '../test/fixtures';
 import { Replica } from './replica';
 
 /**
@@ -12,14 +10,6 @@ import { Replica } from './replica';
  * rows by id, merging with a tie-break. Now those are on `Replica`, which the
  * store holds and sync is handed — the store's own type has none of them.
  */
-
-function makeStore(): FuelTrackerStore {
-  return new FuelTrackerStore({
-    vehicles: new InMemoryRepository<VehicleRecord>(),
-    fillUps: new InMemoryRepository<FillUpRecord>(),
-    pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-  });
-}
 
 describe('what the screens can reach (#91)', () => {
   test('the store has none of sync’s operations', () => {

@@ -1,9 +1,9 @@
-import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { makeStore } from '../../test/fixtures';
+import { allowedUidsInRules, describeWithEmulator, rulesEnvironment } from '../../test/emulator';
 import {
   assertFails,
   assertSucceeds,
-  initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import {
@@ -18,9 +18,7 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
-import { InMemoryRepository } from '../repository';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../records';
-import { FuelTrackerStore } from '../store';
+import type { FillUpRecord, VehicleRecord } from '../records';
 import { makeFuelEntryDraft } from '../../domain/fuelEntryDraft';
 
 /**
@@ -33,15 +31,7 @@ import { makeFuelEntryDraft } from '../../domain/fuelEntryDraft';
  * emulator, with documents shaped exactly as the app writes them.
  */
 
-const HOST = process.env.FIRESTORE_EMULATOR_HOST;
-const describeWithEmulator = describe.skipIf(HOST === undefined);
 
-function allowedUidsInRules(): string[] {
-  const source = readFileSync('firestore.rules', 'utf8');
-  const block = /function allowed\(\)[\s\S]*?\[([\s\S]*?)\]/.exec(source);
-  if (block === null) throw new Error('firestore.rules has no allowed() list');
-  return [...block[1]!.matchAll(/'([^']*)'/g)].map((match) => match[1]!);
-}
 
 const ALLOWED = allowedUidsInRules();
 const OWNER = ALLOWED[0]!;
@@ -57,11 +47,7 @@ const PRIVATE = 'car-private';
 const inviteId = (vehicleId: string, email: string): string => `${OWNER}__${vehicleId}__${email}`;
 
 async function records(): Promise<{ vehicle: VehicleRecord; fillUp: FillUpRecord }> {
-  const store = new FuelTrackerStore({
-    vehicles: new InMemoryRepository<VehicleRecord>(),
-    fillUps: new InMemoryRepository<FillUpRecord>(),
-    pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-  });
+  const store = makeStore();
   const vehicle = await store.addVehicle({ name: 'Civic' });
   const draft = makeFuelEntryDraft({ date: new Date(1_700_000_000_000), odometer: 10_000, gallons: 10, pricePerGallon: 3.5 });
   if (draft === null) throw new Error('fixture draft failed validation');
@@ -121,11 +107,7 @@ describeWithEmulator('sharing a car (#66)', () => {
   }
 
   beforeAll(async () => {
-    const [host, port] = (HOST ?? 'localhost:8080').split(':');
-    env = await initializeTestEnvironment({
-      projectId: 'fueltracker-sharing-test',
-      firestore: { rules: readFileSync('firestore.rules', 'utf8'), host, port: Number(port) },
-    });
+    env = await rulesEnvironment('fueltracker-sharing-test');
   });
 
   beforeEach(async () => {

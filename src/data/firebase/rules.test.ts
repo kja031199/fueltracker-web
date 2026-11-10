@@ -28,12 +28,12 @@
  * tests, or the logs behaving any differently.
  */
 
-import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { makeStore } from '../../test/fixtures';
+import { allowedUidsInRules, describeWithEmulator, rulesEnvironment } from '../../test/emulator';
 import {
   assertFails,
   assertSucceeds,
-  initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import {
@@ -57,28 +57,7 @@ import { syncOnce } from '../sync';
 import { FirestoreRemoteStore } from './remoteStore';
 import { InMemorySyncState } from '../syncState';
 
-const HOST = process.env.FIRESTORE_EMULATOR_HOST;
-// `describe.skipIf` rather than a thrown error: a checkout without the
-// emulator must still get a green suite, or everyone learns to ignore red.
-const describeWithEmulator = describe.skipIf(HOST === undefined);
 
-/**
- * The accounts the deployed rules allow, read out of the rules file itself.
- *
- * Parsed rather than duplicated, so this suite keeps testing whatever is
- * actually deployed: add a person to the allowlist and these tests still pass
- * unchanged, empty it and `the allowlist itself` below fails loudly. A regex
- * over the rules is crude, and the alternative — a second copy of the list in
- * the tests — is worse, because the copy that drifts is the one nobody checks.
- */
-function allowedUidsInRules(): string[] {
-  const source = readFileSync('firestore.rules', 'utf8');
-  const block = /function allowed\(\)[\s\S]*?\[([\s\S]*?)\]/.exec(source);
-  if (block === null) {
-    throw new Error('firestore.rules has no allowed() list — has the allowlist been removed?');
-  }
-  return [...block[1]!.matchAll(/'([^']*)'/g)].map((match) => match[1]!);
-}
 
 const ALLOWED = allowedUidsInRules();
 
@@ -101,15 +80,7 @@ describeWithEmulator('firestore.rules', () => {
   let env: RulesTestEnvironment;
 
   beforeAll(async () => {
-    const [host, port] = (HOST ?? 'localhost:8080').split(':');
-    env = await initializeTestEnvironment({
-      projectId: 'fueltracker-rules-test',
-      firestore: {
-        rules: readFileSync('firestore.rules', 'utf8'),
-        host,
-        port: Number(port),
-      },
-    });
+    env = await rulesEnvironment('fueltracker-rules-test');
   });
 
   afterAll(async () => {
@@ -468,11 +439,7 @@ describeWithEmulator('firestore.rules', () => {
 
     it('uploads every row, shortened to what the rules accept', async () => {
       await env.clearFirestore();
-      const store = new FuelTrackerStore({
-        vehicles: new InMemoryRepository<VehicleRecord>(),
-        fillUps: new InMemoryRepository<FillUpRecord>(),
-        pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-      });
+      const store = makeStore();
       const vehicle = await store.addVehicle({ name: 'Car' });
       const base = { odometer: 1000, gallons: 10, pricePerGallon: 3 };
       await store.addFillUp(makeFuelEntryDraft({ ...base, date: new Date(2026, 0, 1) })!, vehicle.id);
@@ -493,11 +460,7 @@ describeWithEmulator('firestore.rules', () => {
     it('uploads more rows than one batch holds, every batch of them (#91)', async () => {
       // Firestore takes at most 500 writes a batch; a long history is several.
       await env.clearFirestore();
-      const store = new FuelTrackerStore({
-        vehicles: new InMemoryRepository<VehicleRecord>(),
-        fillUps: new InMemoryRepository<FillUpRecord>(),
-        pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-      });
+      const store = makeStore();
       const vehicle = await store.addVehicle({ name: 'Car' });
       for (let i = 0; i < 520; i += 1) {
         await store.addFillUp(
@@ -544,11 +507,7 @@ describeWithEmulator('firestore.rules', () => {
 
   describe('the server stamp incremental sync reads by (#52)', () => {
     async function aFillUp(): Promise<FillUpRecord> {
-      const store = new FuelTrackerStore({
-        vehicles: new InMemoryRepository<VehicleRecord>(),
-        fillUps: new InMemoryRepository<FillUpRecord>(),
-        pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-      });
+      const store = makeStore();
       const vehicle = await store.addVehicle({ name: 'Car' });
       return store.addFillUp(
         makeFuelEntryDraft({ date: new Date(2026, 0, 1), odometer: 1000, gallons: 10, pricePerGallon: 3 })!,
@@ -624,11 +583,7 @@ describeWithEmulator('firestore.rules', () => {
         env.authenticatedContext(OWNER).firestore() as unknown as Firestore,
         OWNER,
       );
-      const store = new FuelTrackerStore({
-        vehicles: new InMemoryRepository<VehicleRecord>(),
-        fillUps: new InMemoryRepository<FillUpRecord>(),
-        pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-      });
+      const store = makeStore();
       await store.addVehicle({ name: 'Car' });
       const state = new InMemorySyncState();
 
@@ -648,11 +603,7 @@ describeWithEmulator('firestore.rules', () => {
     const DAY = 24 * 60 * 60 * 1000;
 
     async function aFillUp(): Promise<FillUpRecord> {
-      const store = new FuelTrackerStore({
-        vehicles: new InMemoryRepository<VehicleRecord>(),
-        fillUps: new InMemoryRepository<FillUpRecord>(),
-        pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-      });
+      const store = makeStore();
       const vehicle = await store.addVehicle({ name: 'Car' });
       return store.addFillUp(
         makeFuelEntryDraft({ date: new Date(2026, 0, 1), odometer: 1000, gallons: 10, pricePerGallon: 3 })!,

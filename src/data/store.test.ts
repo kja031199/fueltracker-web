@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from 'vitest';
+import { draftWith, makeStore } from '../test/fixtures';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
-import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
 import { computeFuelStatistics } from '../domain/fuelStatistics';
 import { InMemoryRepository } from './repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records';
@@ -9,6 +9,8 @@ import { MonotonicClock } from './syncClock';
 import { FuelTrackerStore, toStats } from './store';
 import { TEXT_LIMITS } from '../domain/textLimits';
 import { StaleEdit } from './staleEdit';
+
+const draft = draftWith({ date: new Date(2025, 0, 15) });
 
 /**
  * A clock over a wall clock that advances a millisecond per read, so ids and
@@ -24,32 +26,9 @@ function testClock(start = 1_000): MonotonicClock {
   );
 }
 
-function makeStore(clock: MonotonicClock = testClock()): FuelTrackerStore {
-  return new FuelTrackerStore(
-    {
-      vehicles: new InMemoryRepository<VehicleRecord>(),
-      fillUps: new InMemoryRepository<FillUpRecord>(),
-      pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-    },
-    clock,
-  );
-}
-
-function draft(overrides: Partial<Parameters<typeof makeFuelEntryDraft>[0]> = {}): FuelEntryDraft {
-  const result = makeFuelEntryDraft({
-    date: new Date(2025, 0, 15),
-    odometer: 10_000,
-    gallons: 10,
-    pricePerGallon: 3.5,
-    ...overrides,
-  });
-  if (result === null) throw new Error('fixture draft failed validation');
-  return result;
-}
-
 let store: FuelTrackerStore;
 beforeEach(() => {
-  store = makeStore();
+  store = makeStore({ clock: testClock() });
 });
 
 describe('vehicles', () => {
@@ -492,7 +471,7 @@ describe('text is bounded on every write (#50)', () => {
   const long = (n: number) => 'x'.repeat(n + 1);
 
   test('a vehicle\'s name, make and model are shortened to their limits', async () => {
-    const store = makeStore();
+    const store = makeStore({ clock: testClock() });
     const vehicle = await store.addVehicle({
       name: long(TEXT_LIMITS.name),
       make: long(TEXT_LIMITS.make),
@@ -504,7 +483,7 @@ describe('text is bounded on every write (#50)', () => {
   });
 
   test('a submitter name is shortened to its limit', async () => {
-    const store = makeStore();
+    const store = makeStore({ clock: testClock() });
     const pending = await store.submitFillUp(draft(), 'v1', long(TEXT_LIMITS.submitterName));
     expect(pending.submitterName).toHaveLength(TEXT_LIMITS.submitterName);
   });

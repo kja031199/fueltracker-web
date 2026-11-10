@@ -1,33 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { draftWith, makeStore } from '../test/fixtures';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { InMemoryRepository } from '../data/repository';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
 import { FuelTrackerStore } from '../data/store';
-import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { App } from './App';
 import { saveHasOnboarded } from './onboarding';
 
-function makeStore(): FuelTrackerStore {
-  return new FuelTrackerStore({
-    vehicles: new InMemoryRepository<VehicleRecord>(),
-    fillUps: new InMemoryRepository<FillUpRecord>(),
-    pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-  });
-}
-
-function draft(overrides: Partial<Parameters<typeof makeFuelEntryDraft>[0]> = {}) {
-  const result = makeFuelEntryDraft({
-    date: new Date(2025, 0, 15),
-    odometer: 10_000,
-    gallons: 10,
-    pricePerGallon: 3.5,
-    ...overrides,
-  });
-  if (result === null) throw new Error('fixture draft failed validation');
-  return result;
-}
+const draft = draftWith({ date: new Date(2025, 0, 15) });
 
 /** Captures what the page tried to hand the reader, instead of downloading it. */
 function captureDownloads(): { name: string; text: string }[] {

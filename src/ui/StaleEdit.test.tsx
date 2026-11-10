@@ -1,15 +1,14 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { draftWith, makeStore } from '../test/fixtures';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { InMemoryRepository } from '../data/repository';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
-import { FuelTrackerStore } from '../data/store';
-import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { App } from './App';
 import { FillUpForm } from './FillUpForm';
 import { FuelLogProvider } from './fuelLog';
 import { saveHasOnboarded } from './onboarding';
+
+const draft = draftWith({ date: new Date(2025, 0, 15), station: 'Shell' });
 
 /**
  * #83. The edit form can stay open while a sync changes the log under it. It
@@ -17,20 +16,6 @@ import { saveHasOnboarded } from './onboarding';
  * different car — so the fill-up moved silently; and a fill-up deleted
  * meanwhile was written back as a new row.
  */
-
-function makeStore(): FuelTrackerStore {
-  return new FuelTrackerStore({
-    vehicles: new InMemoryRepository<VehicleRecord>(),
-    fillUps: new InMemoryRepository<FillUpRecord>(),
-    pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-  });
-}
-
-function draft(station = 'Shell') {
-  const made = makeFuelEntryDraft({ date: new Date(2025, 0, 15), odometer: 10_000, gallons: 10, pricePerGallon: 3.5, station });
-  if (made === null) throw new Error('fixture draft failed validation');
-  return made;
-}
 
 beforeEach(() => {
   localStorage.clear();

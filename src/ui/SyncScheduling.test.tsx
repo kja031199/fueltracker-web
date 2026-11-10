@@ -1,11 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, test } from 'vitest';
+import { makeStore } from '../test/fixtures';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { InMemoryRepository } from '../data/repository';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
 import { InMemoryRemoteStore } from '../data/remote';
-import { FuelTrackerStore } from '../data/store';
 import { StubAuthProvider } from '../data/auth';
 import { App } from './App';
 import { saveHasOnboarded } from './onboarding';
@@ -17,14 +15,6 @@ afterEach(cleanup);
 
 function signedIn(): StubAuthProvider {
   return new StubAuthProvider({ status: 'signedIn', user: { uid: 'u1', email: 'a@example.com', displayName: 'A' } });
-}
-
-function makeStore(): FuelTrackerStore {
-  return new FuelTrackerStore({
-    vehicles: new InMemoryRepository<VehicleRecord>(),
-    fillUps: new InMemoryRepository<FillUpRecord>(),
-    pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-  });
 }
 
 test('a new vehicle reaches the account without the window losing and regaining focus', async () => {

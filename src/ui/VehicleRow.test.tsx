@@ -1,15 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { makeStore, sharingFor } from '../test/fixtures';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StubAuthProvider, type AuthUser } from '../data/auth';
-import { InMemoryRepository } from '../data/repository';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
-import { FuelTrackerStore } from '../data/store';
 import { InMemorySharingWorld } from '../data/sharing';
-import type { SharingSync } from '../data/shareSync';
-import { InMemorySyncState } from '../data/syncState';
-import { InMemoryShareLedger } from '../data/shareLedger';
 import { App } from './App';
 import { saveHasOnboarded } from './onboarding';
 
@@ -22,21 +17,8 @@ import { saveHasOnboarded } from './onboarding';
 
 const ME: AuthUser = { uid: 'me', email: 'me@example.com', displayName: 'Me', emailVerified: true };
 
-function sharingFor(world: InMemorySharingWorld): SharingSync {
-  return {
-    remote: world.sharingFor({ uid: ME.uid, name: ME.displayName, email: ME.email, emailVerified: true }),
-    stateFor: () => new InMemorySyncState(),
-    forgetState: async () => {},
-    ledger: new InMemoryShareLedger(),
-  };
-}
-
 async function openWith(names: readonly string[]): Promise<void> {
-  const store = new FuelTrackerStore({
-    vehicles: new InMemoryRepository<VehicleRecord>(),
-    fillUps: new InMemoryRepository<FillUpRecord>(),
-    pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-  });
+  const store = makeStore();
   for (const name of names) await store.addVehicle({ name });
   saveHasOnboarded(ME.uid);
   const world = new InMemorySharingWorld();
@@ -45,7 +27,7 @@ async function openWith(names: readonly string[]): Promise<void> {
       store={store}
       auth={new StubAuthProvider({ status: 'signedIn', user: ME })}
       remote={world.remoteFor(ME.uid)}
-      sharing={sharingFor(world)}
+      sharing={sharingFor(world, ME)}
       initialTab="vehicles"
     />,
   );

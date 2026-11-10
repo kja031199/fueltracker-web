@@ -1,15 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { makeStore, sharingFor } from '../test/fixtures';
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StubAuthProvider, type AuthUser } from '../data/auth';
-import { InMemoryRepository } from '../data/repository';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
+import type { VehicleRecord } from '../data/records';
 import { FuelTrackerStore } from '../data/store';
 import { InMemorySharingWorld } from '../data/sharing';
 import type { SharingSync } from '../data/shareSync';
-import { InMemorySyncState } from '../data/syncState';
-import { InMemoryShareLedger } from '../data/shareLedger';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { App } from './App';
 import { saveHasOnboarded } from './onboarding';
@@ -24,34 +22,6 @@ const KYLE: AuthUser = { uid: 'kyle', email: 'kyle@example.com', displayName: 'K
 const SAM: AuthUser = { uid: 'sam', email: 'sam@example.com', displayName: 'Sam', emailVerified: true };
 const WAIT = { timeout: 5000 };
 
-function makeStore(author: string): FuelTrackerStore {
-  return new FuelTrackerStore(
-    {
-      vehicles: new InMemoryRepository<VehicleRecord>(),
-      fillUps: new InMemoryRepository<FillUpRecord>(),
-      pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-    },
-    undefined,
-    author,
-  );
-}
-
-function sharingFor(world: InMemorySharingWorld, user: AuthUser): SharingSync {
-  const states = new Map<string, InMemorySyncState>();
-  return {
-    remote: world.sharingFor({ uid: user.uid, name: user.displayName, email: user.email, emailVerified: user.emailVerified === true }),
-    stateFor: (key) => {
-      const state = states.get(key) ?? new InMemorySyncState();
-      states.set(key, state);
-      return state;
-    },
-    forgetState: async (key) => {
-      states.delete(key);
-    },
-    ledger: new InMemoryShareLedger(),
-  };
-}
-
 interface Person {
   readonly user: AuthUser;
   readonly store: FuelTrackerStore;
@@ -60,7 +30,7 @@ interface Person {
 
 function person(world: InMemorySharingWorld, user: AuthUser): Person {
   saveHasOnboarded(user.uid);
-  return { user, store: makeStore(user.uid), sharing: sharingFor(world, user) };
+  return { user, store: makeStore({ author: user.uid }), sharing: sharingFor(world, user) };
 }
 
 function open(world: InMemorySharingWorld, who: Person, initialTab: 'vehicles' | 'fillups' | 'dashboard' | 'settings' = 'vehicles'): void {

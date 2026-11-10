@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { makeStore } from '../test/fixtures';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { InMemoryRepository } from '../data/repository';
@@ -7,14 +8,6 @@ import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/r
 import { FuelTrackerStore } from '../data/store';
 import { App } from './App';
 import { saveHasOnboarded } from './onboarding';
-
-function makeStore(): FuelTrackerStore {
-  return new FuelTrackerStore({
-    vehicles: new InMemoryRepository<VehicleRecord>(),
-    fillUps: new InMemoryRepository<FillUpRecord>(),
-    pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-  });
-}
 
 beforeEach(() => {
   localStorage.clear();

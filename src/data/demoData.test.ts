@@ -1,19 +1,10 @@
 import { describe, expect, test } from 'vitest';
+import { makeStore } from '../test/fixtures';
 import { computeFuelStatistics } from '../domain/fuelStatistics';
-import { InMemoryRepository } from './repository';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records';
 import { FuelTrackerStore, toStats } from './store';
 import { seedDemoData } from './demoData';
 
 const ANCHOR = new Date(2025, 5, 15);
-
-function makeStore(): FuelTrackerStore {
-  return new FuelTrackerStore({
-    vehicles: new InMemoryRepository<VehicleRecord>(),
-    fillUps: new InMemoryRepository<FillUpRecord>(),
-    pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-  });
-}
 
 describe('seedDemoData', () => {
   test('creates one vehicle and twelve fill-ups', async () => {

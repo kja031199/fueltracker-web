@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { draftWith, makeStore, sharingFor } from '../test/fixtures';
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StubAuthProvider, type AuthUser } from '../data/auth';
@@ -9,8 +10,6 @@ import { FuelTrackerStore } from '../data/store';
 import { InMemoryRemoteStore } from '../data/remote';
 import { InMemorySharingWorld } from '../data/sharing';
 import type { SharingSync } from '../data/shareSync';
-import { InMemorySyncState } from '../data/syncState';
-import { InMemoryShareLedger } from '../data/shareLedger';
 import {
   LINK_TEXT_LIMITS,
   MAX_LINK_PAYLOAD,
@@ -20,11 +19,19 @@ import {
   encodeSubmission,
   type Submission,
 } from '../data/fillUpLink';
-import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { App } from './App';
 import { manualTimers, type ManualTimers } from '../test/manualTimers';
 import { saveHasOnboarded } from './onboarding';
 import { saveUnitPreferences } from './unitSettings';
+
+const draft = draftWith({
+  date: new Date(2026, 9, 30, 8, 15),
+  odometer: 10_300,
+  gallons: 9.5,
+  pricePerGallon: 3.25,
+  station: 'Shell',
+  notes: 'After the trip',
+});
 
 /**
  * Fill-ups sent by link (#3), as the two people meet it: the owner asks from
@@ -36,18 +43,6 @@ import { saveUnitPreferences } from './unitSettings';
 const KYLE: AuthUser = { uid: 'kyle', email: 'kyle@example.com', displayName: 'Kyle', emailVerified: true };
 const SAM: AuthUser = { uid: 'sam', email: 'sam@example.com', displayName: 'Sam', emailVerified: true };
 const WAIT = { timeout: 5000 };
-
-function makeStore(author: string): FuelTrackerStore {
-  return new FuelTrackerStore(
-    {
-      vehicles: new InMemoryRepository<VehicleRecord>(),
-      fillUps: new InMemoryRepository<FillUpRecord>(),
-      pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-    },
-    undefined,
-    author,
-  );
-}
 
 interface OpenOptions {
   readonly store: FuelTrackerStore;
@@ -72,20 +67,6 @@ function open({ store, user = KYLE, hash, remote = null, sharing = null, initial
       {...(syncTimers === undefined ? {} : { syncTimers })}
     />,
   );
-}
-
-function draft(overrides: Partial<Parameters<typeof makeFuelEntryDraft>[0]> = {}) {
-  const made = makeFuelEntryDraft({
-    date: new Date(2026, 9, 30, 8, 15),
-    odometer: 10_300,
-    gallons: 9.5,
-    pricePerGallon: 3.25,
-    station: 'Shell',
-    notes: 'After the trip',
-    ...overrides,
-  });
-  if (made === null) throw new Error('fixture draft failed validation');
-  return made;
 }
 
 function submission(vehicleId: string, overrides: Partial<Submission> = {}): Submission {
@@ -113,7 +94,7 @@ afterEach(() => {
 
 describe('the owner asks', () => {
   test('Request a fill-up shows a link naming the car and the owner, and nothing else', async () => {
-    const store = makeStore(KYLE.uid);
+    const store = makeStore({ author: KYLE.uid });
     const car = await store.addVehicle({ name: 'Civic' });
     const user = userEvent.setup();
     open({ store, initialTab: 'vehicles' });
@@ -128,7 +109,7 @@ describe('the owner asks', () => {
   });
 
   test('Copy puts the link on the clipboard, and says so', async () => {
-    const store = makeStore(KYLE.uid);
+    const store = makeStore({ author: KYLE.uid });
     await store.addVehicle({ name: 'Civic' });
     const user = userEvent.setup();
     open({ store, initialTab: 'vehicles' });
@@ -141,7 +122,7 @@ describe('the owner asks', () => {
   });
 
   test('a clipboard that refuses is admitted to, not papered over', async () => {
-    const store = makeStore(KYLE.uid);
+    const store = makeStore({ author: KYLE.uid });
     await store.addVehicle({ name: 'Civic' });
     const user = userEvent.setup();
     vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValue(new Error('denied'));
@@ -153,7 +134,7 @@ describe('the owner asks', () => {
   });
 
   test('Share is offered only where the browser has a share sheet', async () => {
-    const store = makeStore(KYLE.uid);
+    const store = makeStore({ author: KYLE.uid });
     await store.addVehicle({ name: 'Civic' });
     const user = userEvent.setup();
     open({ store, initialTab: 'vehicles' });
@@ -178,7 +159,7 @@ describe('the owner asks', () => {
 
   test('a car shared with you is its owner’s to ask about: no request on it', async () => {
     const world = new InMemorySharingWorld();
-    const kyleStore = makeStore(KYLE.uid);
+    const kyleStore = makeStore({ author: KYLE.uid });
     const civic = await kyleStore.addVehicle({ name: 'Civic' });
     await world.remoteFor(KYLE.uid).push(await kyleStore.exportSnapshot());
     await world.sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true }).invite(civic, SAM.email);
@@ -188,7 +169,7 @@ describe('the owner asks', () => {
     await samRemote.accept(invite);
 
     saveHasOnboarded(SAM.uid);
-    const samStore = makeStore(SAM.uid);
+    const samStore = makeStore({ author: SAM.uid });
     await samStore.addVehicle({ name: 'Corolla' });
     open({ store: samStore, user: SAM, remote: world.remoteFor(SAM.uid), sharing: sharingFor(world, SAM), initialTab: 'vehicles' });
 
@@ -207,7 +188,7 @@ describe('the submitter answers', () => {
 
   test('fills it in and gets a link back — and nothing lands in their own log', async () => {
     // Sam has no cars and has never onboarded: the request is still what they see.
-    const store = makeStore(SAM.uid);
+    const store = makeStore({ author: SAM.uid });
     const user = userEvent.setup();
     open({ store, user: SAM, hash: requestHash() });
 
@@ -233,7 +214,7 @@ describe('the submitter answers', () => {
   test('a form in litres and kilometres still sends canonical gallons and miles', async () => {
     saveUnitPreferences({ volume: 'liters', distance: 'kilometers', economy: 'litersPer100km' });
     const user = userEvent.setup();
-    open({ store: makeStore(SAM.uid), user: SAM, hash: requestHash() });
+    open({ store: makeStore({ author: SAM.uid }), user: SAM, hash: requestHash() });
     await user.type(await screen.findByLabelText(/odometer/i), '16093.44');
     await user.type(screen.getByLabelText('Liters'), '37.854');
     await user.type(screen.getByLabelText(/price per liter/i), '1');
@@ -245,7 +226,7 @@ describe('the submitter answers', () => {
   });
 
   test('offers no photo and no "missed" box: a link carries neither', async () => {
-    open({ store: makeStore(SAM.uid), user: SAM, hash: requestHash() });
+    open({ store: makeStore({ author: SAM.uid }), user: SAM, hash: requestHash() });
     await screen.findByText(/kyle asked you/i);
     expect(screen.queryByRole('button', { name: /receipt photo/i })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/missed logging/i)).not.toBeInTheDocument();
@@ -255,7 +236,7 @@ describe('the submitter answers', () => {
 
   test('cannot make a link from a fill-up that does not add up', async () => {
     const user = userEvent.setup();
-    open({ store: makeStore(SAM.uid), user: SAM, hash: requestHash() });
+    open({ store: makeStore({ author: SAM.uid }), user: SAM, hash: requestHash() });
     await user.type(await screen.findByLabelText(/odometer/i), '10300');
     await user.type(screen.getByLabelText('Gallons'), '0');
     await user.type(screen.getByLabelText(/price per gallon/i), '3.25');
@@ -264,7 +245,7 @@ describe('the submitter answers', () => {
 
   test('Cancel leaves the link, replacing it so Back does not reopen it', async () => {
     const user = userEvent.setup();
-    open({ store: makeStore(SAM.uid), user: SAM, hash: requestHash() });
+    open({ store: makeStore({ author: SAM.uid }), user: SAM, hash: requestHash() });
     const before = window.history.length;
     await user.click(await screen.findByRole('button', { name: 'Cancel' }));
     expect(window.location.hash).toBe('#/dashboard');
@@ -279,7 +260,7 @@ describe('the submitter answers', () => {
     ['naming no car', `#/submit/${btoa(JSON.stringify({ v: 1, k: 'req', car: '../x' })).replace(/=+$/, '')}`, /does not name a car/i],
   ])('a request that is %s says so, and offers the way out', async (_label, hash, message) => {
     const user = userEvent.setup();
-    open({ store: makeStore(SAM.uid), user: SAM, hash });
+    open({ store: makeStore({ author: SAM.uid }), user: SAM, hash });
     expect(await screen.findByRole('alert')).toHaveTextContent(message);
     expect(screen.queryByRole('button', { name: 'Create link' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Go to FuelTracker' }));
@@ -290,7 +271,7 @@ describe('the submitter answers', () => {
     const user = userEvent.setup();
     const ids: string[] = [];
     for (let i = 0; i < 2; i += 1) {
-      open({ store: makeStore(SAM.uid), user: SAM, hash: requestHash() });
+      open({ store: makeStore({ author: SAM.uid }), user: SAM, hash: requestHash() });
       await user.type(await screen.findByLabelText(/odometer/i), '10300');
       await user.type(screen.getByLabelText('Gallons'), '9.5');
       await user.type(screen.getByLabelText(/price per gallon/i), '3.25');
@@ -306,7 +287,7 @@ describe('the submitter answers', () => {
 
 describe('the owner reviews', () => {
   async function kyleWithCivic(): Promise<{ store: FuelTrackerStore; car: VehicleRecord }> {
-    const store = makeStore(KYLE.uid);
+    const store = makeStore({ author: KYLE.uid });
     const car = await store.addVehicle({ name: 'Civic' });
     return { store, car };
   }
@@ -445,17 +426,17 @@ describe('the owner reviews', () => {
 
   test('a car not here yet is looked for in the account before giving up', async () => {
     // A fresh device: the car is in the account but has not synced down.
-    const elsewhere = makeStore(KYLE.uid);
+    const elsewhere = makeStore({ author: KYLE.uid });
     const car = await elsewhere.addVehicle({ name: 'Civic' });
     const remote = new InMemoryRemoteStore(await elsewhere.exportSnapshot());
-    const store = makeStore(KYLE.uid);
+    const store = makeStore({ author: KYLE.uid });
     open({ store, remote, hash: `#/incoming/${encodeSubmission(submission(car.id))}` });
     expect(await screen.findByRole('region', { name: /waiting for review \(1\)/i }, WAIT)).toBeInTheDocument();
   });
 
   test('the car arriving only after the first sync is still found: the refusal waits for a fresh one', async () => {
     // The mount sync finds nothing; the car reaches the account a moment later.
-    const elsewhere = makeStore(KYLE.uid);
+    const elsewhere = makeStore({ author: KYLE.uid });
     const car = await elsewhere.addVehicle({ name: 'Civic' });
     const later = await elsewhere.exportSnapshot();
     class LateRemote extends InMemoryRemoteStore {
@@ -467,7 +448,7 @@ describe('the owner reviews', () => {
       }
     }
     const remote = new LateRemote();
-    const store = makeStore(KYLE.uid);
+    const store = makeStore({ author: KYLE.uid });
     open({ store, remote, hash: `#/incoming/${encodeSubmission(submission(car.id))}` });
     expect(await screen.findByRole('region', { name: /waiting for review \(1\)/i }, WAIT)).toBeInTheDocument();
     expect(remote.pulls).toBeGreaterThanOrEqual(2);
@@ -482,7 +463,7 @@ describe('the owner reviews', () => {
 
   test('a fill-up for a car shared with you is not yours to receive', async () => {
     const world = new InMemorySharingWorld();
-    const kyleStore = makeStore(KYLE.uid);
+    const kyleStore = makeStore({ author: KYLE.uid });
     const civic = await kyleStore.addVehicle({ name: 'Civic' });
     await world.remoteFor(KYLE.uid).push(await kyleStore.exportSnapshot());
     await world.sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true }).invite(civic, SAM.email);
@@ -492,7 +473,7 @@ describe('the owner reviews', () => {
     await samRemote.accept(invite);
 
     saveHasOnboarded(SAM.uid);
-    const samStore = makeStore(SAM.uid);
+    const samStore = makeStore({ author: SAM.uid });
     open({
       store: samStore,
       user: SAM,
@@ -524,7 +505,7 @@ describe('the owner reviews', () => {
 describe('the whole round trip', () => {
   test('owner asks, submitter answers, owner approves', async () => {
     const user = userEvent.setup();
-    const kyleStore = makeStore(KYLE.uid);
+    const kyleStore = makeStore({ author: KYLE.uid });
     const car = await kyleStore.addVehicle({ name: 'Civic' });
 
     open({ store: kyleStore, initialTab: 'vehicles' });
@@ -532,7 +513,7 @@ describe('the whole round trip', () => {
     const requestLink = (screen.getByLabelText(/fill-up request/i) as HTMLTextAreaElement).value;
     cleanup();
 
-    open({ store: makeStore(SAM.uid), user: SAM, hash: requestLink.slice(requestLink.indexOf('#')) });
+    open({ store: makeStore({ author: SAM.uid }), user: SAM, hash: requestLink.slice(requestLink.indexOf('#')) });
     await user.type(await screen.findByLabelText(/odometer/i), '10300');
     await user.type(screen.getByLabelText('Gallons'), '9.5');
     await user.type(screen.getByLabelText(/price per gallon/i), '3.25');
@@ -546,18 +527,3 @@ describe('the whole round trip', () => {
   });
 });
 
-function sharingFor(world: InMemorySharingWorld, user: AuthUser): SharingSync {
-  const states = new Map<string, InMemorySyncState>();
-  return {
-    remote: world.sharingFor({ uid: user.uid, name: user.displayName, email: user.email, emailVerified: user.emailVerified === true }),
-    stateFor: (key) => {
-      const state = states.get(key) ?? new InMemorySyncState();
-      states.set(key, state);
-      return state;
-    },
-    forgetState: async (key) => {
-      states.delete(key);
-    },
-    ledger: new InMemoryShareLedger(),
-  };
-}

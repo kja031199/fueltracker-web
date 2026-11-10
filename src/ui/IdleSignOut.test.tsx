@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { makeStore } from '../test/fixtures';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
-import { InMemoryRepository } from '../data/repository';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
 import { FuelTrackerStore } from '../data/store';
 import { StubAuthProvider } from '../data/auth';
 import { ACTIVITY_STORAGE_KEY } from './idleTimeout';
@@ -29,11 +28,7 @@ import { saveHasOnboarded } from './onboarding';
 const USER = { uid: 'u1', email: 'driver@example.com', displayName: 'Driver' };
 
 async function storeWithAVehicle(): Promise<FuelTrackerStore> {
-  const store = new FuelTrackerStore({
-    vehicles: new InMemoryRepository<VehicleRecord>(),
-    fillUps: new InMemoryRepository<FillUpRecord>(),
-    pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-  });
+  const store = makeStore();
   await store.addVehicle({ name: 'Civic' });
   return store;
 }

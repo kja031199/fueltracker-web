@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { draft, makeStore } from '../test/fixtures';
 import { InMemoryRepository } from './repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records';
 import { FuelTrackerStore } from './store';
@@ -10,6 +11,10 @@ import { MonotonicClock } from './syncClock';
 import { makeFuelEntryDraft, type FuelEntryDraft } from '../domain/fuelEntryDraft';
 import { computeFuelStatistics } from '../domain/fuelStatistics';
 import { toStats } from './records';
+
+/** A fill-up whose day follows its odometer reading, so the readings are in date order. */
+const fillUpAt = (odometer: number, gallons = 10): FuelEntryDraft =>
+  draft({ odometer, gallons, date: new Date(2026, 0, odometer / 100) });
 
 /**
  * Two people, one car (#66), end to end through sync — against an in-memory
@@ -65,12 +70,6 @@ function device(world: InMemorySharingWorld, account: Account): Device {
   };
 }
 
-function draft(odometer: number, gallons = 10): FuelEntryDraft {
-  const made = makeFuelEntryDraft({ date: new Date(2026, 0, odometer / 100), odometer, gallons, pricePerGallon: 3.5 });
-  if (made === null) throw new Error('fixture draft failed validation');
-  return made;
-}
-
 /** The owner with a car, a fill-up on it, synced; the partner invited and joined. */
 async function sharedCar(): Promise<{
   world: InMemorySharingWorld;
@@ -82,7 +81,7 @@ async function sharedCar(): Promise<{
   const owner = device(world, OWNER);
   const partner = device(world, PARTNER);
   const car = await owner.store.addVehicle({ name: 'Civic' });
-  await owner.store.addFillUp(draft(10_000), car.id);
+  await owner.store.addFillUp(fillUpAt(10_000), car.id);
   await owner.sync();
   const invite = await owner.sharing.remote.invite(car, 'sam@example.com');
   await partner.sharing.remote.accept(invite);
@@ -130,7 +129,7 @@ describe('both logging the same car', () => {
   test('a fill-up the partner logs reaches the owner, entered by the partner', async () => {
     const { owner, partner, car } = await sharedCar();
     await partner.sync();
-    const theirs = await partner.store.addFillUp(draft(10_300), car.id);
+    const theirs = await partner.store.addFillUp(fillUpAt(10_300), car.id);
     await partner.sync();
     await owner.sync();
     const seen = (await owner.store.fillUps(car.id)).find((f) => f.id === theirs.id);
@@ -142,8 +141,8 @@ describe('both logging the same car', () => {
     const { owner, partner, car } = await sharedCar();
     await partner.sync();
     const [first] = await owner.store.fillUps(car.id);
-    await owner.store.updateFillUp(first!.id, draft(10_050));
-    const extra = await owner.store.addFillUp(draft(10_400), car.id);
+    await owner.store.updateFillUp(first!.id, fillUpAt(10_050));
+    const extra = await owner.store.addFillUp(fillUpAt(10_400), car.id);
     await owner.sync();
     await partner.sync();
     expect((await partner.store.fillUp(first!.id))?.odometer).toBe(10_050);
@@ -157,7 +156,7 @@ describe('both logging the same car', () => {
     const { owner, partner, car } = await sharedCar();
     await partner.sync();
     const [first] = await partner.store.fillUps(car.id);
-    await partner.store.updateFillUp(first!.id, draft(10_010));
+    await partner.store.updateFillUp(first!.id, fillUpAt(10_010));
     await partner.sync();
     await owner.sync();
     expect((await owner.store.fillUp(first!.id))?.odometer).toBe(10_010);
@@ -173,9 +172,9 @@ describe('both logging the same car', () => {
   test('both devices compute the same statistics for the car', async () => {
     const { owner, partner, car } = await sharedCar();
     await partner.sync();
-    await partner.store.addFillUp(draft(10_310, 9), car.id);
+    await partner.store.addFillUp(fillUpAt(10_310, 9), car.id);
     await partner.sync();
-    await owner.store.addFillUp(draft(10_640, 11), car.id);
+    await owner.store.addFillUp(fillUpAt(10_640, 11), car.id);
     await owner.sync();
     await partner.sync();
     await owner.sync();
@@ -200,10 +199,10 @@ describe('everything else stays private', () => {
   test('the partner’s own car stays in the partner’s account, and the owner’s other car never arrives', async () => {
     const { world, owner, partner } = await sharedCar();
     const ownersOther = await owner.store.addVehicle({ name: 'Truck' });
-    await owner.store.addFillUp(draft(50_000), ownersOther.id);
+    await owner.store.addFillUp(fillUpAt(50_000), ownersOther.id);
     await owner.sync();
     const partnersOwn = await partner.store.addVehicle({ name: 'Bike' });
-    await partner.store.addFillUp(draft(1_000), partnersOwn.id);
+    await partner.store.addFillUp(fillUpAt(1_000), partnersOwn.id);
     await partner.sync();
 
     expect((await partner.store.vehicles()).map((v) => v.name).sort()).toEqual(['Bike', 'Civic']);
@@ -258,7 +257,7 @@ describe('when sharing ends', () => {
   test('a fill-up the partner logged before leaving stays the owner’s', async () => {
     const { owner, partner, car } = await sharedCar();
     await partner.sync();
-    const theirs = await partner.store.addFillUp(draft(10_300), car.id);
+    const theirs = await partner.store.addFillUp(fillUpAt(10_300), car.id);
     await partner.sync();
     const [membership] = await partner.sharing.remote.memberships();
     await partner.sharing.remote.leave(membership!);
@@ -328,7 +327,7 @@ describe('several shares at once', () => {
     const { world, partner, car } = await sharedCar();
     const third = device(world, THIRD);
     const van = await third.store.addVehicle({ name: 'Van' });
-    await third.store.addFillUp(draft(30_000), van.id);
+    await third.store.addFillUp(fillUpAt(30_000), van.id);
     await third.sync();
     await partner.sharing.remote.accept(await third.sharing.remote.invite(van, PARTNER.email));
 
@@ -416,11 +415,7 @@ describe('when the account itself has trouble', () => {
 
   test('without sharing at all, it is the ordinary sync', async () => {
     const world = new InMemorySharingWorld();
-    const store = new FuelTrackerStore({
-      vehicles: new InMemoryRepository<VehicleRecord>(),
-      fillUps: new InMemoryRepository<FillUpRecord>(),
-      pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-    });
+    const store = makeStore();
     const car = await store.addVehicle({ name: 'Solo' });
     const result = await syncAll(store, world.remoteFor('solo'), null, new InMemorySyncState());
     expect(result.own.ok).toBe(true);
@@ -450,7 +445,7 @@ describe('the ledger', () => {
     partner.sharing.remote.memberships = async () => {
       throw new Error('offline');
     };
-    await partner.store.addFillUp(draft(10_400), car.id);
+    await partner.store.addFillUp(fillUpAt(10_400), car.id);
 
     const result = await partner.sync();
 
@@ -511,7 +506,7 @@ describe('the ledger', () => {
     partner.sharing.remote.memberships = async () => {
       throw new Error('offline');
     };
-    await partner.store.addFillUp(draft(10_400), car.id);
+    await partner.store.addFillUp(fillUpAt(10_400), car.id);
     await partner.sync();
     expect(await rowsIn(world, PARTNER.uid)).toEqual({ vehicles: [], fillUps: [] });
   });
@@ -591,7 +586,7 @@ describe('over time', () => {
     const { owner, partner, car } = await sharedCar();
     await partner.sync();
     const [entry] = await owner.store.fillUps(car.id);
-    await partner.store.updateFillUp(entry!.id, draft(10_020));
+    await partner.store.updateFillUp(entry!.id, fillUpAt(10_020));
     await owner.store.removeFillUp(entry!.id);
     await owner.sync();
     await partner.sync();
@@ -606,7 +601,7 @@ describe('over time', () => {
     // plainly in the docs: an unsynced entry on a car you lose goes with it.
     const { world, owner, partner, car } = await sharedCar();
     await partner.sync();
-    const late = await partner.store.addFillUp(draft(10_300), car.id);
+    const late = await partner.store.addFillUp(fillUpAt(10_300), car.id);
     await owner.sharing.remote.removeMember(car.id, PARTNER.uid);
     const result = await partner.sync();
     expect(result.shares.ended).toHaveLength(1);
@@ -618,7 +613,7 @@ describe('over time', () => {
   test('the owner’s view is never changed by the partner forgetting', async () => {
     const { world, owner, partner, car } = await sharedCar();
     await partner.sync();
-    await partner.store.addFillUp(draft(10_300), car.id);
+    await partner.store.addFillUp(fillUpAt(10_300), car.id);
     await partner.sync();
     const before = await rowsIn(world, OWNER.uid);
     const [membership] = await partner.sharing.remote.memberships();
@@ -651,7 +646,7 @@ describe('a share whose car id is already one of yours (#78)', () => {
     const owner = device(world, OWNER);
     const victim = device(world, PARTNER);
     const mine = await victim.store.addVehicle({ name: 'My Civic' });
-    await victim.store.addFillUp(draft(20_000), mine.id);
+    await victim.store.addFillUp(fillUpAt(20_000), mine.id);
     await victim.sync();
     // The inviter files a car under the leaked id, in their own tree.
     await world.remoteFor(OWNER.uid).push({
@@ -777,7 +772,7 @@ describe('a member cannot lock the owner’s fill-up with a far-future stamp (#7
 
     // The owner can still change it, and the change reaches the partner.
     await owner.sync();
-    await owner.store.updateFillUp(theirs.id, draft(10_123));
+    await owner.store.updateFillUp(theirs.id, fillUpAt(10_123));
     await owner.sync();
     await partner.sync();
     expect((await partner.store.fillUp(theirs.id))?.odometer).toBe(10_123);

@@ -1,10 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { makeStore } from '../test/fixtures';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StubAuthProvider } from '../data/auth';
-import { InMemoryRepository } from '../data/repository';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
 import type { RemoteStore } from '../data/remote';
 import { InMemoryRemoteStore } from '../data/remote';
 import { FuelTrackerStore } from '../data/store';
@@ -28,11 +27,7 @@ const as = (user: typeof A): StubAuthProvider =>
   new StubAuthProvider({ status: 'signedIn', user });
 
 function emptyStore(): FuelTrackerStore {
-  return new FuelTrackerStore({
-    vehicles: new InMemoryRepository<VehicleRecord>(),
-    fillUps: new InMemoryRepository<FillUpRecord>(),
-    pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-  });
+  return makeStore();
 }
 
 async function storeWith(fillUps: number): Promise<FuelTrackerStore> {

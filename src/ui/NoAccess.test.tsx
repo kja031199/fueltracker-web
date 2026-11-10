@@ -1,10 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { makeStore } from '../test/fixtures';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { InMemoryRepository } from '../data/repository';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
-import { FuelTrackerStore } from '../data/store';
 import { StubAuthProvider } from '../data/auth';
 import type { PushSummary, RawSnapshot, RemoteStore } from '../data/remote';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
@@ -59,14 +57,6 @@ function refusingUntilAllowed(): RemoteStore & { allow: () => void } {
       return { written: 0, receiptsOmitted: 0 };
     },
   };
-}
-
-function makeStore(): FuelTrackerStore {
-  return new FuelTrackerStore({
-    vehicles: new InMemoryRepository<VehicleRecord>(),
-    fillUps: new InMemoryRepository<FillUpRecord>(),
-    pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-  });
 }
 
 function signedIn(): StubAuthProvider {

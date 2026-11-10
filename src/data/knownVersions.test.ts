@@ -1,12 +1,11 @@
 import { describe, expect, test } from 'vitest';
+import { makeStore } from '../test/fixtures';
 import 'fake-indexeddb/auto';
 import Dexie from 'dexie';
 import { FuelTrackerDatabase } from './db';
 import { DexieSyncState } from './dexieState';
 import { InMemoryRemoteStore } from './remote';
-import { InMemoryRepository } from './repository';
-import { SCHEMA_VERSION, type FillUpRecord, type PendingFillUpRecord, type VehicleRecord } from './records';
-import { FuelTrackerStore } from './store';
+import { SCHEMA_VERSION, type VehicleRecord } from './records';
 import { syncOnce } from './sync';
 import { InMemorySyncState, type KnownUpdate, type SyncCursor, type SyncStateStore } from './syncState';
 
@@ -115,14 +114,6 @@ class Counting extends InMemorySyncState {
 
 function vehicle(id: string, updatedAt: number): VehicleRecord {
   return { id, updatedAt, deletedAt: null, schemaVersion: SCHEMA_VERSION, name: id, make: '', model: '', year: 2020, createdAt: 1 };
-}
-
-function makeStore(): FuelTrackerStore {
-  return new FuelTrackerStore({
-    vehicles: new InMemoryRepository<VehicleRecord>(),
-    fillUps: new InMemoryRepository<FillUpRecord>(),
-    pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-  });
 }
 
 describe('a sync writes only the versions it read (#91)', () => {

@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'vitest';
-import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
+import { draftWith, makeStore } from '../test/fixtures';
 import { InMemoryRepository } from './repository';
 import type { FillUpRecord, PendingFillUpRecord, SyncFields, VehicleRecord } from './records';
 import { FuelTrackerStore } from './store';
+
+const draft = draftWith({ pricePerGallon: 3 });
 
 /**
  * Local reads read only what they need (#53).
@@ -25,18 +27,6 @@ class CountingRepository<T extends SyncFields & { readonly vehicleId?: string }>
     this.vehicleReads.push(vehicleId);
     return super.listForVehicle(vehicleId);
   }
-}
-
-function draft(overrides: Partial<Parameters<typeof makeFuelEntryDraft>[0]> = {}) {
-  const result = makeFuelEntryDraft({
-    date: new Date(2026, 0, 1),
-    odometer: 10_000,
-    gallons: 10,
-    pricePerGallon: 3,
-    ...overrides,
-  });
-  if (result === null) throw new Error('fixture draft failed validation');
-  return result;
 }
 
 const PHOTO = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
@@ -121,11 +111,7 @@ describe('counting fill-ups', () => {
   });
 
   test('an empty log, and a log of nothing but deletions, both count zero', async () => {
-    const store = new FuelTrackerStore({
-      vehicles: new InMemoryRepository<VehicleRecord>(),
-      fillUps: new InMemoryRepository<FillUpRecord>(),
-      pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-    });
+    const store = makeStore();
     expect(await store.fillUpCount()).toBe(0);
     const car = await store.addVehicle({ name: 'Car' });
     const row = await store.addFillUp(draft(), car.id);
