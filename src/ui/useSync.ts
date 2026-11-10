@@ -31,6 +31,7 @@ import { syncFailureMessage } from './syncMessages';
 import type { SyncOutcome } from '../data/sync';
 import { InMemorySyncState, type SyncStateStore } from '../data/syncState';
 import { createSyncScheduler } from './syncScheduler';
+import type { SchedulerTimers } from './syncScheduler';
 import { accountPreference, numberCodec, useAccountPreference } from './preferences';
 
 /**
@@ -80,6 +81,12 @@ export function useSync(
    * them (#89), so the screens need not read them again.
    */
   onShares: (memberships: readonly Membership[]) => void = () => {},
+  /**
+   * The scheduler's clock and timers (#97). Omitted in the app, which uses the
+   * browser's; a test passes its own, so it fires the save-sync itself rather
+   * than waiting 1.5 seconds for it.
+   */
+  timers?: SchedulerTimers,
 ): SyncStatus {
   const [fallbackState] = useState<SyncStateStore>(() => new InMemorySyncState());
   const state = syncState ?? fallbackState;
@@ -208,7 +215,7 @@ export function useSync(
   // mount sync is in flight would otherwise push the same rows twice.
   const latest = useRef(run);
   latest.current = run;
-  const [scheduler] = useState(() => createSyncScheduler(() => latest.current()));
+  const [scheduler] = useState(() => createSyncScheduler(() => latest.current(), timers));
   useEffect(() => () => scheduler.dispose(), [scheduler]);
 
   // On mount, and whenever the account or store changes.

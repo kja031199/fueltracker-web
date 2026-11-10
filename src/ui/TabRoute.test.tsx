@@ -36,11 +36,17 @@ async function openApp(): Promise<void> {
   await screen.findByRole('navigation', { name: /sections/i });
 }
 
-/** The real browser fires `hashchange` asynchronously after history moves. */
+/** A browser event, as a promise — waited for, not slept past (#97). */
+function next(event: 'popstate' | 'hashchange'): Promise<void> {
+  return new Promise((resolve) => window.addEventListener(event, () => resolve(), { once: true }));
+}
+
+/** The real browser fires `popstate` asynchronously after history moves: wait for it. */
 async function back(): Promise<void> {
   await act(async () => {
+    const moved = next('popstate');
     window.history.back();
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await moved;
   });
 }
 
@@ -80,8 +86,9 @@ describe('the tab is in the address', () => {
   test('a hash changed while open — a typed address, a link — switches tab', async () => {
     await openApp();
     await act(async () => {
+      const changed = next('hashchange');
       window.location.hash = '#/vehicles';
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await changed;
     });
     await waitFor(() => expect(current()).toBe('Vehicles'));
   });

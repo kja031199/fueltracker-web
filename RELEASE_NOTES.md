@@ -11,6 +11,15 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-10
 
+- **No change you'll see: the test suite runs in about two-thirds of the
+  time, and no longer waits on the clock.** The first step of tidying the
+  tests.
+  *Technical:* `FuelLogProvider` and `App` take `syncTimers` (the scheduler's
+  existing seam); tests fire a save's sync with `manualTimers()` and count
+  `pending()` instead of sleeping. `FuelLog.test.tsx` 22.5 s → 1.3 s; the
+  other fixed sleeps wait on a counted read, a history event or a positive
+  control; the receipt-bound test builds 8 MB, not 400.
+  [#97](https://github.com/kja031199/fueltracker-web/issues/97) · [PR #131](https://github.com/kja031199/fueltracker-web/pull/131)
 - **Easier with a screen reader or a keyboard: each Edit, Delete, Share and
   Request button now says which fill-up or car it is for, and choosing a tab
   or opening the fill-up form moves focus to where you landed.** The browser

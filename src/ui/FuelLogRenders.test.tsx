@@ -7,7 +7,9 @@ import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/r
 import { InMemoryRemoteStore } from '../data/remote';
 import { FuelTrackerStore } from '../data/store';
 import { makeFuelEntryDraft, type FuelEntryDraft } from '../domain/fuelEntryDraft';
-import { FuelLogProvider, useFuelLog, type FuelLog } from './fuelLog';
+import { FuelLogProvider, useFuelLog, useSyncStatus, type FuelLog } from './fuelLog';
+import type { SyncStatus } from './useSync';
+import { manualTimers } from '../test/manualTimers';
 import { InMemorySharingWorld } from '../data/sharing';
 import type { SharingSync } from '../data/shareSync';
 import { InMemorySyncState } from '../data/syncState';
@@ -41,11 +43,13 @@ function draft(odometer: number): FuelEntryDraft {
   return made;
 }
 
-/** Lets pending effects, timers of zero and promise chains run out. */
+/**
+ * Lets React apply what has already resolved. Not a sleep (#97): every test
+ * here first waits for the thing it is about to count past — a sync finished,
+ * a read made — so there is nothing left to wait for but the render.
+ */
 async function settle(): Promise<void> {
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  });
+  await act(async () => {});
 }
 
 async function remoteHolds(remote: InMemoryRemoteStore, id: string): Promise<boolean> {
@@ -55,23 +59,40 @@ async function remoteHolds(remote: InMemoryRemoteStore, id: string): Promise<boo
   return snapshot.fillUps.some((row) => (row as { id?: unknown }).id === id);
 }
 
-function sharingOn(): SharingSync {
+interface SharingCase {
+  readonly sharing: SharingSync | null;
+  /** How many times the sharing lists have been re-read — once after each sync. None without sharing. */
+  readonly refreshes: () => number;
+}
+
+function sharingOff(): SharingCase {
+  return { sharing: null, refreshes: () => 0 };
+}
+
+function sharingOn(): SharingCase {
+  const world = new InMemorySharingWorld();
   return {
-    remote: new InMemorySharingWorld().sharingFor({ uid: 'u1', name: 'Me', email: 'me@example.com', emailVerified: true }),
-    stateFor: () => new InMemorySyncState(),
-    forgetState: async () => {},
-    ledger: new InMemoryShareLedger(),
+    sharing: {
+      remote: world.sharingFor({ uid: 'u1', name: 'Me', email: 'me@example.com', emailVerified: true }),
+      stateFor: () => new InMemorySyncState(),
+      forgetState: async () => {},
+      ledger: new InMemoryShareLedger(),
+    },
+    refreshes: () => world.reads.invitesForMe,
   };
 }
 
 describe('a save (#88)', () => {
-  const cases: [string, () => SharingSync | null][] = [
-    ['without sharing', () => null],
+  const cases: [string, () => SharingCase][] = [
+    ['without sharing', sharingOff],
     // The sharing lists are re-read after every sync; the same lists again
     // must not count as a change.
     ['with sharing', sharingOn],
   ];
-  test.each(cases)('re-renders a screen that shows only the vehicles once, sync included (%s)', async (_name, sharing) => {
+  test.each(cases)('re-renders a screen that shows only the vehicles once, sync included (%s)', async (_name, sharingCase) => {
+    const { sharing, refreshes } = sharingCase();
+    const timers = manualTimers();
+    let status: SyncStatus | null = null;
     const store = makeStore();
     const car = await store.addVehicle({ name: 'Civic' });
     const remote = new InMemoryRemoteStore();
@@ -85,27 +106,37 @@ describe('a save (#88)', () => {
     }
     function Actions(): null {
       log = useFuelLog();
+      status = useSyncStatus();
       return null;
     }
 
     render(
-      <FuelLogProvider store={store} remote={remote} uid="u1" sharing={sharing()}>
+      <FuelLogProvider store={store} remote={remote} uid="u1" sharing={sharing} syncTimers={timers}>
         <VehiclesOnly />
         <Actions />
       </FuelLogProvider>,
     );
-    // Loaded, and the mount sync done, before counting.
+    // Loaded, the mount sync done and its sharing refresh read, before counting.
     await waitFor(() => expect(remote.pullLog.length).toBeGreaterThan(0));
-    await settle();
+    await waitFor(() => expect(status!.syncing).toBe(false));
+    if (sharing !== null) await waitFor(() => expect(refreshes()).toBeGreaterThan(0));
     await settle();
     renders = 0;
+    const refreshedBefore = refreshes();
 
     let saved: FillUpRecord | null = null;
     await act(async () => {
       saved = await log!.addFillUp(draft(10_000), car.id);
     });
-    // The sync a save schedules has run.
-    await waitFor(async () => expect(await remoteHolds(remote, saved!.id)).toBe(true), { timeout: 5_000 });
+    // The sync a save schedules, run now rather than after its 1.5 s delay,
+    // and the sharing refresh after it.
+    expect(timers.pending()).toBe(1);
+    await act(async () => {
+      timers.fire();
+    });
+    await waitFor(async () => expect(await remoteHolds(remote, saved!.id)).toBe(true));
+    await waitFor(() => expect(status!.syncing).toBe(false));
+    if (sharing !== null) await waitFor(() => expect(refreshes()).toBeGreaterThan(refreshedBefore));
     await settle();
 
     // Once: the reload that shows the save. Not the sync, not its status.

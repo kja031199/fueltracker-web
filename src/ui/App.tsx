@@ -6,6 +6,7 @@ import { StubAuthProvider } from '../data/auth';
 import type { RemoteStore } from '../data/remote';
 import type { SyncStateStore } from '../data/syncState';
 import type { SharingSync } from '../data/shareSync';
+import type { SchedulerTimers } from './syncScheduler';
 import type { UnitPreferences } from '../domain/units';
 import { clearActivity, forgetIdleTimeoutSetting, useIdleTimeout } from './idleTimeout';
 import { ADMIN_IDLE_MINUTES } from './adminSettings';
@@ -78,6 +79,8 @@ export interface AppProps {
    * sharing, and wherever nothing syncs.
    */
   readonly sharing?: SharingSync | null;
+  /** Test seam (#97): the sync scheduler's timers, so a test fires the save-sync itself. */
+  readonly syncTimers?: SchedulerTimers;
 }
 
 export function App({
@@ -89,6 +92,7 @@ export function App({
   syncState,
   idleMinutes = ADMIN_IDLE_MINUTES,
   sharing = null,
+  syncTimers,
 }: AppProps): ReactElement {
   // Memoised, or a new stub on every render would resubscribe forever.
   const authProvider = useMemo(() => auth ?? defaultAuth(), [auth]);
@@ -166,6 +170,7 @@ export function App({
       uid={authState.user.uid}
       sharing={sharing}
       {...(syncState === undefined ? {} : { syncState })}
+      {...(syncTimers === undefined ? {} : { syncTimers })}
     >
       <UnitsProvider units={units} setUnits={changeUnits}>
         <SessionProvider

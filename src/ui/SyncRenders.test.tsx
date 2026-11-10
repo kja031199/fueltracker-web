@@ -40,7 +40,11 @@ class HeldRemote extends InMemoryRemoteStore {
     this.release = resolve;
   });
 
+  /** Reads asked for, counted as they start — before the hold. */
+  started = 0;
+
   override async pull(since?: PullCursor | null): Promise<RawSnapshot> {
+    this.started += 1;
     await this.held;
     return super.pull(since);
   }
@@ -60,11 +64,11 @@ test('the dashboard is not re-rendered by a sync that brings nothing', async () 
     user: { uid: 'u1', email: 'a@example.com', displayName: 'A' },
   });
   render(<App store={store} auth={auth} remote={remote} initialTab="dashboard" />);
-  // Showing the car, while the mount sync waits on the account.
+  // Showing the car, while the mount sync waits on the account: its read has
+  // started, and is held (#97: waited for, not slept past).
   await screen.findByRole('navigation', { name: /sections/i });
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  });
+  await waitFor(() => expect(remote.started).toBeGreaterThan(0));
+  await act(async () => {});
   counted.dashboard = 0;
 
   await act(async () => {
@@ -77,9 +81,9 @@ test('the dashboard is not re-rendered by a sync that brings nothing', async () 
     remote.pullLog.length = before;
     expect(held).toHaveLength(1);
   });
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  });
+  // The sync has finished: its last step records when it last worked.
+  await waitFor(() => expect(localStorage.getItem('fueltracker.lastSyncedAt.u.u1')).not.toBeNull());
+  await act(async () => {});
 
   expect(counted.dashboard).toBe(0);
 });

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StubAuthProvider, type AuthUser } from '../data/auth';
 import { InMemoryRepository } from '../data/repository';
@@ -22,6 +22,7 @@ import {
 } from '../data/fillUpLink';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { App } from './App';
+import { manualTimers, type ManualTimers } from '../test/manualTimers';
 import { saveHasOnboarded } from './onboarding';
 import { saveUnitPreferences } from './unitSettings';
 
@@ -55,9 +56,11 @@ interface OpenOptions {
   readonly remote?: InMemoryRemoteStore | null;
   readonly sharing?: SharingSync | null;
   readonly initialTab?: 'vehicles' | 'fillups' | 'dashboard';
+  /** The sync scheduler's timers, for a test that fires a save's sync itself (#97). */
+  readonly syncTimers?: ManualTimers;
 }
 
-function open({ store, user = KYLE, hash, remote = null, sharing = null, initialTab = 'dashboard' }: OpenOptions): void {
+function open({ store, user = KYLE, hash, remote = null, sharing = null, initialTab = 'dashboard', syncTimers }: OpenOptions): void {
   if (hash !== undefined) window.history.replaceState(null, '', `/${hash}`);
   render(
     <App
@@ -66,6 +69,7 @@ function open({ store, user = KYLE, hash, remote = null, sharing = null, initial
       remote={remote}
       sharing={sharing}
       initialTab={initialTab}
+      {...(syncTimers === undefined ? {} : { syncTimers })}
     />,
   );
 }
@@ -323,19 +327,25 @@ describe('the owner reviews', () => {
   test('Approve adds it to the log as the owner’s, and syncs it', async () => {
     const { store, car } = await kyleWithCivic();
     const remote = new InMemoryRemoteStore();
+    const timers = manualTimers();
     const user = userEvent.setup();
-    open({ store, remote, hash: `#/incoming/${encodeSubmission(submission(car.id))}` });
+    open({ store, remote, hash: `#/incoming/${encodeSubmission(submission(car.id))}`, syncTimers: timers });
 
     await user.click(await screen.findByRole('button', { name: /approve the fill-up from sam for civic/i }, WAIT));
     await waitFor(() => expect(screen.queryByRole('region', { name: /waiting for review/i })).not.toBeInTheDocument());
     expect(await screen.findByText(/10,300/)).toBeInTheDocument();
     const [made] = await store.fillUps(car.id);
     expect(made).toMatchObject({ odometer: 10_300, station: 'Shell', enteredBy: KYLE.uid });
+    // Approving scheduled its sync: run it now, not after the 1.5 s delay (#97).
+    await waitFor(() => expect(timers.pending()).toBe(1));
+    await act(async () => {
+      timers.fire();
+    });
     await waitFor(async () => {
       const pulled = await remote.pull(null);
       expect(pulled.fillUps).toHaveLength(1);
-    }, WAIT);
-  }, 10_000);
+    });
+  });
 
   test('Reject drops it, and the log is untouched', async () => {
     const { store, car } = await kyleWithCivic();
