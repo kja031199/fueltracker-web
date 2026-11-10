@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { fillUpFacts } from '../domain/format';
 import { FillUpSummary } from './FillUpSummary';
 import { totalCost } from '../domain/models';
@@ -15,6 +15,8 @@ import { useUnits } from './session';
  * Nothing is shown when nothing is waiting.
  */
 export function PendingReview(): ReactElement | null {
+  // One base per rendering, so a component shown twice never repeats an id (#95).
+  const idBase = useId();
   const { units } = useUnits();
   const { pending, vehicles, approveSubmission, rejectSubmission } = useFuelLog();
   const [refused, setRefused] = useState<string | null>(null);
@@ -43,8 +45,8 @@ export function PendingReview(): ReactElement | null {
   }
 
   return (
-    <section className="card space-below" aria-labelledby="pending-heading">
-      <h2 className="card__title" id="pending-heading">
+    <section className="card space-below" aria-labelledby={`${idBase}-pending-heading`}>
+      <h2 className="card__title" id={`${idBase}-pending-heading`}>
         Waiting for review ({pending.length})
       </h2>
       <p className="note flush-top">

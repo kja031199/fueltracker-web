@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react';
+import { useId } from 'react';
 import type { UnitPreferences } from '../../domain/units';
 import { DISTANCE_UNITS, ECONOMY_UNITS, VOLUME_UNITS, distance, economy, volume } from '../../domain/units';
 import { useUnits } from '../session';
@@ -9,19 +10,21 @@ import { useUnits } from '../session';
  * rewritten and nothing can be lost in a conversion.
  */
 export function UnitsSection(): ReactElement {
+  // One base per rendering, so a component shown twice never repeats an id (#95).
+  const idBase = useId();
   const { units, setUnits: onChange } = useUnits();
   return (
-    <section className="card" aria-labelledby="units-heading">
-      <h2 className="card__title" id="units-heading">
+    <section className="card" aria-labelledby={`${idBase}-units-heading`}>
+      <h2 className="card__title" id={`${idBase}-units-heading`}>
         Units
       </h2>
 
       <div className="field">
-        <label className="field__label" htmlFor="unit-volume">
+        <label className="field__label" htmlFor={`${idBase}-unit-volume`}>
           Volume
         </label>
         <select
-          id="unit-volume"
+          id={`${idBase}-unit-volume`}
           value={units.volume}
           onChange={(e) =>
             onChange({ ...units, volume: e.target.value as UnitPreferences['volume'] })
@@ -36,11 +39,11 @@ export function UnitsSection(): ReactElement {
       </div>
 
       <div className="field">
-        <label className="field__label" htmlFor="unit-distance">
+        <label className="field__label" htmlFor={`${idBase}-unit-distance`}>
           Distance
         </label>
         <select
-          id="unit-distance"
+          id={`${idBase}-unit-distance`}
           value={units.distance}
           onChange={(e) =>
             onChange({ ...units, distance: e.target.value as UnitPreferences['distance'] })
@@ -55,11 +58,11 @@ export function UnitsSection(): ReactElement {
       </div>
 
       <div className="field">
-        <label className="field__label" htmlFor="unit-economy">
+        <label className="field__label" htmlFor={`${idBase}-unit-economy`}>
           Fuel economy
         </label>
         <select
-          id="unit-economy"
+          id={`${idBase}-unit-economy`}
           value={units.economy}
           onChange={(e) =>
             onChange({ ...units, economy: e.target.value as UnitPreferences['economy'] })

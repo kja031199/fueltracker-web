@@ -269,3 +269,13 @@ export function vehicleYear(text: string, now: Date = new Date()): number {
   const parsed = Number.parseInt(text, 10);
   return Number.isFinite(parsed) ? parsed : now.getFullYear();
 }
+
+/**
+ * Which fill-up a row's buttons are for (#95): "the fill-up of 05/01/2026 at
+ * 10,000 mi". A list of buttons all named "Edit" is a list of guesses to a
+ * screen reader. The odometer reading is part of it so that two fill-ups on
+ * one day are still two names.
+ */
+export function fillUpName(entry: { readonly date: number; readonly odometer: number }, units: UnitPreferences): string {
+  return `the fill-up of ${new Date(entry.date).toLocaleDateString()} at ${distance(entry.odometer, units.distance, true)}`;
+}

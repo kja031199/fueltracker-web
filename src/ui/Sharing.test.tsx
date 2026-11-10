@@ -100,7 +100,7 @@ describe('sharing a car', () => {
     const user = userEvent.setup();
     open(world, kyle);
 
-    await user.click(await screen.findByRole('button', { name: 'Share' }));
+    await user.click(await screen.findByRole('button', { name: /^Share / }));
     expect(screen.getByText(/receipt photos, notes and stations/i)).toBeInTheDocument();
     expect(screen.getByText(/see nothing else of yours/i)).toBeInTheDocument();
     await user.type(screen.getByLabelText(/their google email/i), 'Sam@Example.com');
@@ -117,7 +117,7 @@ describe('sharing a car', () => {
     await kylesCivic(world, kyle);
     const user = userEvent.setup();
     open(world, kyle);
-    await user.click(await screen.findByRole('button', { name: 'Share' }));
+    await user.click(await screen.findByRole('button', { name: /^Share / }));
     await user.type(screen.getByLabelText(/their google email/i), 'sam at example');
     await user.click(screen.getByRole('button', { name: 'Invite' }));
     expect(await screen.findByText(/does not look like an email address/i)).toBeInTheDocument();
@@ -154,9 +154,9 @@ describe('sharing a car', () => {
     open(world, sam);
 
     await screen.findByText(/shared with you by kyle/i, {}, WAIT);
-    expect(screen.getByRole('button', { name: 'Leave' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Share' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Leave / })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Delete (?!the fill-up)/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Share / })).not.toBeInTheDocument();
   });
 
   test('declining answers it without joining', async () => {
@@ -222,7 +222,7 @@ describe('ending it', () => {
     const user = userEvent.setup();
     open(world, kyle);
 
-    await user.click(await screen.findByRole('button', { name: 'Share' }));
+    await user.click(await screen.findByRole('button', { name: /^Share / }));
     expect(await screen.findByText(/shared with/i, { selector: 'span' })).toHaveTextContent('Sam');
     await user.click(screen.getByRole('button', { name: /remove sam/i }));
     expect(await screen.findByText(/sam no longer has civic/i)).toBeInTheDocument();
@@ -239,7 +239,7 @@ describe('ending it', () => {
     const user = userEvent.setup();
     open(world, sam);
 
-    await user.click(await screen.findByRole('button', { name: 'Leave' }, WAIT));
+    await user.click(await screen.findByRole('button', { name: /^Leave / }, WAIT));
     expect(screen.getByText(/fill-ups you logged stay with kyle/i)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /leave civic/i }));
 
@@ -264,10 +264,10 @@ describe('when sharing is not available', () => {
       />,
     );
     await screen.findByText('Civic');
-    expect(screen.queryByRole('button', { name: 'Share' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Share / })).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: /invitations/i })).not.toBeInTheDocument();
     // And deleting does not mention people it cannot be shared with.
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Delete' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: /^Delete (?!the fill-up)/ }));
     expect(screen.getByRole('button', { name: /delete civic/i })).not.toHaveTextContent(/shared with/i);
   });
 });
@@ -280,7 +280,7 @@ describe('the owner’s side, more widely', () => {
     await kyle.sharing.remote.invite(car, SAM.email);
     const user = userEvent.setup();
     open(world, kyle);
-    await user.click(await screen.findByRole('button', { name: 'Share' }));
+    await user.click(await screen.findByRole('button', { name: /^Share / }));
     await user.click(await screen.findByRole('button', { name: /withdraw sam@example.com/i }));
     expect(await screen.findByRole('status')).toHaveTextContent(/withdrew the invitation/i);
     expect(world.invites.size).toBe(0);
@@ -294,7 +294,7 @@ describe('the owner’s side, more widely', () => {
     await kyle.sharing.remote.invite(car, SAM.email);
     const user = userEvent.setup();
     open(world, kyle);
-    await user.click(await screen.findByRole('button', { name: 'Share' }));
+    await user.click(await screen.findByRole('button', { name: /^Share / }));
     await user.type(screen.getByLabelText(/their google email/i), SAM.email);
     await user.click(screen.getByRole('button', { name: 'Invite' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/withdraw it to send a new one/i);
@@ -306,7 +306,7 @@ describe('the owner’s side, more widely', () => {
     await kylesCivic(world, kyle);
     const user = userEvent.setup();
     open(world, kyle);
-    await user.click(await screen.findByRole('button', { name: 'Share' }));
+    await user.click(await screen.findByRole('button', { name: /^Share / }));
     expect(screen.getByRole('button', { name: 'Invite' })).toBeDisabled();
     await user.type(screen.getByLabelText(/their google email/i), '   ');
     expect(screen.getByRole('button', { name: 'Invite' })).toBeDisabled();
@@ -319,7 +319,7 @@ describe('the owner’s side, more widely', () => {
     kyle.sharing.remote.members = () => Promise.reject(new Error('offline'));
     const user = userEvent.setup();
     open(world, kyle);
-    await user.click(await screen.findByRole('button', { name: 'Share' }));
+    await user.click(await screen.findByRole('button', { name: /^Share / }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/could not be loaded/i);
   });
 
@@ -329,7 +329,7 @@ describe('the owner’s side, more widely', () => {
     await kylesCivic(world, kyle);
     const user = userEvent.setup();
     open(world, kyle);
-    await user.click(await screen.findByRole('button', { name: 'Delete' }));
+    await user.click(await screen.findByRole('button', { name: /^Delete (?!the fill-up)/ }));
     expect(screen.getByRole('button', { name: /delete civic/i })).toHaveTextContent(/for everyone it is shared with/i);
   });
 
@@ -339,9 +339,9 @@ describe('the owner’s side, more widely', () => {
     await kylesCivic(world, kyle);
     const user = userEvent.setup();
     open(world, kyle);
-    await user.click(await screen.findByRole('button', { name: 'Share' }));
+    await user.click(await screen.findByRole('button', { name: /^Share / }));
     expect(screen.getByLabelText(/their google email/i)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Done sharing' }));
+    await user.click(screen.getByRole('button', { name: /^Done sharing / }));
     expect(screen.queryByLabelText(/their google email/i)).not.toBeInTheDocument();
   });
 });
@@ -386,9 +386,9 @@ describe('the partner’s side, more widely', () => {
     await sam.sharing.remote.accept(await kyle.sharing.remote.invite(car, SAM.email));
     const user = userEvent.setup();
     open(world, sam);
-    await user.click(await screen.findByRole('button', { name: 'Leave' }, WAIT));
+    await user.click(await screen.findByRole('button', { name: /^Leave / }, WAIT));
     await user.click(screen.getByRole('button', { name: 'Stay' }));
-    expect(screen.getByRole('button', { name: 'Leave' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Leave / })).toBeInTheDocument();
     expect(world.isMember(KYLE.uid, car.id, SAM.uid)).toBe(true);
   });
 
@@ -401,9 +401,9 @@ describe('the partner’s side, more widely', () => {
     await sam.store.addVehicle({ name: 'Bike' });
     open(world, sam);
     await screen.findByText(/shared with you by kyle/i, {}, WAIT);
-    expect(screen.getAllByRole('button', { name: 'Share' })).toHaveLength(1);
-    expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(1);
-    expect(screen.getAllByRole('button', { name: 'Leave' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /^Share / })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /^Delete (?!the fill-up)/ })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /^Leave / })).toHaveLength(1);
   });
 });
 
@@ -462,7 +462,7 @@ describe('deleting a car you share (#80)', () => {
     const user = userEvent.setup();
     open(world, kyle);
 
-    await user.click(await screen.findByRole('button', { name: 'Delete' }, WAIT));
+    await user.click(await screen.findByRole('button', { name: /^Delete (?!the fill-up)/ }, WAIT));
     await user.click(screen.getByRole('button', { name: /delete civic/i }));
 
     await waitFor(() => expect(world.isMember(KYLE.uid, car.id, SAM.uid)).toBe(false), WAIT);

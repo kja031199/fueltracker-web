@@ -55,6 +55,7 @@ export function VehicleRow({
         sharing.enabled ? ', for everyone it is shared with' : ''
       }`}
       cancelLabel="Keep"
+      labelSuffix={vehicle.name}
     />
   );
 
@@ -72,7 +73,12 @@ export function VehicleRow({
       </div>
       <div className="row-actions space-above-sm">
         {!selected && (
-          <button className="button button--secondary" type="button" onClick={() => onSelect(vehicle.id)}>
+          <button
+            className="button button--secondary"
+            type="button"
+            onClick={() => onSelect(vehicle.id)}
+            aria-label={`Select ${vehicle.name}`}
+          >
             Select
           </button>
         )}
@@ -89,6 +95,7 @@ export function VehicleRow({
             confirmLabel={`Leave ${vehicle.name}`}
             cancelLabel="Stay"
             tone="secondary"
+            labelSuffix={vehicle.name}
           />
         ) : mode === 'confirming' ? (
           deleting
@@ -99,6 +106,11 @@ export function VehicleRow({
               type="button"
               aria-expanded={mode === 'requesting'}
               onClick={() => toggle('requesting')}
+              aria-label={
+                mode === 'requesting'
+                  ? `Done with the request link for ${vehicle.name}`
+                  : `Request a fill-up for ${vehicle.name}`
+              }
             >
               {mode === 'requesting' ? 'Done' : 'Request a fill-up'}
             </button>
@@ -108,6 +120,7 @@ export function VehicleRow({
                 type="button"
                 aria-expanded={mode === 'sharing'}
                 onClick={() => toggle('sharing')}
+                aria-label={`${mode === 'sharing' ? 'Done sharing' : 'Share'} ${vehicle.name}`}
               >
                 {mode === 'sharing' ? 'Done sharing' : 'Share'}
               </button>

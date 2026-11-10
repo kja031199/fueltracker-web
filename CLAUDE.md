@@ -517,6 +517,26 @@ npm ci --prefix .github/firebase-cli
 
 ### Rendering
 
+- **Accessibility structure** (#95; `src/ui/Accessibility.test.tsx`):
+  - **A button repeated per row says which row.** `aria-label` starting with
+    the visible word (WCAG 2.5.3, label in name): "Edit the fill-up of …"
+    (`fillUpName`), "Request a fill-up for Civic"; `ConfirmButton` takes a
+    `labelSuffix`. An `aria-label`, not a visually hidden span: a hidden span
+    is still page text, so every `getByText('Civic')` in the tests found two.
+    In tests, match these names by their start (`/^Share /`), not exactly.
+  - **Focus follows the screen.** After a route change `AppShell` focuses the
+    page's `h1` (`tabIndex={-1}`, its name ends with the section: "FuelTracker
+    — Vehicles"); not on arrival, and compared with the last route rather than
+    counted, so StrictMode's double effect is not a change. Opening the
+    fill-up form focuses its heading (`focusHeading`), closing it the list's.
+    `ScreenFrame`'s `section` also sets `document.title`.
+  - **No fixed ids.** Every `id`/`htmlFor`/`aria-*` reference is
+    `${idBase}-name` from one `useId()` per component; the test fails on a
+    fixed string in any spelling. A heading query that could match the page
+    title too (it now names the section) needs `level: 2`.
+  - **A list's key is its identity, not its label.** Chart table rows are
+    keyed by position: two readings on one day share a label.
+
 - **One copy of each shared pattern** (#93): a page is `ScreenFrame`, a
   confirm-then-act is `ConfirmButton`, a copy is `useCopyToClipboard`, a
   fill-up in a list is `FillUpSummary` (its grey line from `fillUpFacts`), a

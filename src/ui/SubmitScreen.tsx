@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { LINK_TEXT_LIMITS, decodeRequest, submissionUrl } from '../data/fillUpLink';
 import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
 import { boundText } from '../domain/textLimits';
@@ -30,6 +30,8 @@ interface Props {
  * once.
  */
 export function SubmitScreen({ payload, accountName, onDone }: Props): ReactElement {
+  // One base per rendering, so a component shown twice never repeats an id (#95).
+  const idBase = useId();
   const request = useMemo(() => decodeRequest(payload), [payload]);
   const [id] = useState(() => crypto.randomUUID());
   const [name, setName] = useState(() => boundText(accountName, LINK_TEXT_LIMITS.submitterName));
@@ -80,11 +82,11 @@ export function SubmitScreen({ payload, accountName, onDone }: Props): ReactElem
         send back. Nothing is saved to your own log.
       </p>
       <div className="field">
-        <label className="field__label" htmlFor="submitter-name">
+        <label className="field__label" htmlFor={`${idBase}-submitter-name`}>
           Your name
         </label>
         <input
-          id="submitter-name"
+          id={`${idBase}-submitter-name`}
           maxLength={LINK_TEXT_LIMITS.submitterName}
           value={name}
           onChange={(event) => setName(event.target.value)}

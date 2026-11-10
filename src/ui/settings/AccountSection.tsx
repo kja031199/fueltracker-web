@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react';
+import { useId } from 'react';
 import type { AuthUser } from '../../data/auth';
 import { describeSince } from '../../domain/format';
 import { useSyncStatus } from '../fuelLog';
@@ -15,10 +16,12 @@ export function AccountSection({
   /** False when this build has no backend configured, so nothing syncs. */
   readonly syncEnabled: boolean;
 }): ReactElement {
+  // One base per rendering, so a component shown twice never repeats an id (#95).
+  const idBase = useId();
   const sync = useSyncStatus();
   return (
-    <section className="card" aria-labelledby="account-heading">
-      <h2 className="card__title" id="account-heading">
+    <section className="card" aria-labelledby={`${idBase}-account-heading`}>
+      <h2 className="card__title" id={`${idBase}-account-heading`}>
         Account
       </h2>
       <p className="stack-sm">

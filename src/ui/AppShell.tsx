@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { Activity, useCallback, useState } from 'react';
+import { Activity, useCallback, useEffect, useRef, useState } from 'react';
 import type { AuthUser } from '../data/auth';
 import { shouldOnboard } from '../domain/onboardingGate';
 import { HAS_ONBOARDED } from './onboarding';
@@ -62,6 +62,18 @@ export function AppShell({ account, onSignOut, initialTab }: AppShellProps): Rea
   // same render that shows it.
   const [visited, setVisited] = useState<readonly Tab[]>(() => (route.kind === 'tab' ? [route.tab] : []));
   if (route.kind === 'tab' && !visited.includes(route.tab)) setVisited([...visited, route.tab]);
+  // After a change of route — a tab chosen, a link left — focus goes to the
+  // page's title, which names where it landed (#95). Not on arrival: a page
+  // that has just loaded leaves focus where the browser puts it. Compared
+  // with the last route shown, not counted, so StrictMode's second effect
+  // run in development is not mistaken for a change.
+  const routeKey = route.kind === 'tab' ? `tab:${route.tab}` : route.kind;
+  const shownRoute = useRef(routeKey);
+  useEffect(() => {
+    if (shownRoute.current === routeKey) return;
+    shownRoute.current = routeKey;
+    document.querySelector<HTMLElement>('main h1')?.focus();
+  }, [routeKey]);
   const leaveLink = useCallback(() => setTab('dashboard', { replace: true }), [setTab]);
   const showReceived = useCallback(() => setTab('fillups', { replace: true }), [setTab]);
   // Account-scoped (#55): read for this uid, and re-read if it changes.
@@ -110,6 +122,7 @@ export function AppShell({ account, onSignOut, initialTab }: AppShellProps): Rea
 
   return gated(
     <ScreenFrame
+      section={TAB_TABLE.find((entry) => entry.id === tab)?.label}
       before={
         <>
           <UpdateBanner state={serviceWorker} />

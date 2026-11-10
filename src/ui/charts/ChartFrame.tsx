@@ -1,5 +1,4 @@
 import type { ReactElement, ReactNode } from 'react';
-import { useId } from 'react';
 
 interface Row {
   readonly label: string;
@@ -39,8 +38,6 @@ export function ChartFrame({
   rowHeadings,
   children,
 }: Props): ReactElement {
-  const tableId = useId();
-
   return (
     <figure className="chart flush">
       <figcaption className="card__title">{title}</figcaption>
@@ -55,10 +52,13 @@ export function ChartFrame({
       {rows.length > 0 && (
         <>
           <details className="space-above-sm">
-            <summary className="note clickable">
+            {/* Named after its chart (#95): the dashboard has six of these,
+                and six controls all called "Show the numbers" are six
+                guesses for a screen-reader user. */}
+            <summary className="note clickable" aria-label={`Show the numbers for ${title}`}>
               Show the numbers
             </summary>
-            <table id={tableId} className="chart__table">
+            <table className="chart__table">
               <caption className="visually-hidden">{title}</caption>
               <thead>
                 <tr>
@@ -67,8 +67,12 @@ export function ChartFrame({
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
-                  <tr key={row.label}>
+                {/* Keyed by position, not by label (#95): two readings on one
+                    day share a label, and a shared key let React reuse the
+                    wrong row. The rows are rebuilt whole from the series, so
+                    the position is the row's identity. */}
+                {rows.map((row, index) => (
+                  <tr key={index}>
                     <th scope="row">{row.label}</th>
                     <td>{row.value}</td>
                   </tr>

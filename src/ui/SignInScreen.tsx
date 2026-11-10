@@ -14,7 +14,7 @@
  */
 
 import type { ReactElement } from 'react';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import type { AuthProvider } from '../data/auth';
 import { ScreenFrame } from './ScreenFrame';
 
@@ -39,6 +39,8 @@ export function SignInScreen({
   configured = true,
   notice = null,
 }: Props): ReactElement {
+  // One base per rendering, so a component shown twice never repeats an id (#95).
+  const idBase = useId();
   const [busy, setBusy] = useState(false);
 
   async function signIn(): Promise<void> {
@@ -54,8 +56,8 @@ export function SignInScreen({
 
   return (
     <ScreenFrame>
-      <section className="card" aria-labelledby="signin-heading">
-        <h2 className="card__title" id="signin-heading">
+      <section className="card" aria-labelledby={`${idBase}-signin-heading`}>
+        <h2 className="card__title" id={`${idBase}-signin-heading`}>
           Sign in to continue
         </h2>
         {notice !== null && (

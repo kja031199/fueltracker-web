@@ -22,6 +22,13 @@ export interface ConfirmButtonProps {
   readonly cancelLabel: string;
   /** How the first button looks. Leaving is not destructive; deleting is. */
   readonly tone?: 'danger' | 'secondary';
+  /**
+   * What the first button is for, heard but not shown (#95): "Delete" in a
+   * list is "Delete the fill-up of 5 Jan…" to a screen reader. Given as the
+   * button's `aria-label`, which starts with the visible label (WCAG 2.5.3,
+   * label in name), and adds no text to the page.
+   */
+  readonly labelSuffix?: string;
 }
 
 export function ConfirmButton({
@@ -33,10 +40,16 @@ export function ConfirmButton({
   confirmLabel,
   cancelLabel,
   tone = 'danger',
+  labelSuffix = '',
 }: ConfirmButtonProps): ReactElement {
   if (!asking) {
     return (
-      <button className={`button button--${tone}`} type="button" onClick={onAsk}>
+      <button
+        className={`button button--${tone}`}
+        type="button"
+        onClick={onAsk}
+        aria-label={labelSuffix === '' ? undefined : `${label} ${labelSuffix}`}
+      >
         {label}
       </button>
     );

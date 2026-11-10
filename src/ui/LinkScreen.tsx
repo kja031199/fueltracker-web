@@ -5,6 +5,7 @@
  */
 
 import type { ReactElement, ReactNode } from 'react';
+import { useId } from 'react';
 import { ScreenFrame } from './ScreenFrame';
 
 export function LinkScreen({
@@ -14,10 +15,12 @@ export function LinkScreen({
   readonly title: string;
   readonly children: ReactNode;
 }): ReactElement {
+  // One base per rendering, so a component shown twice never repeats an id (#95).
+  const idBase = useId();
   return (
-    <ScreenFrame>
-      <section className="card" aria-labelledby="link-screen-heading">
-        <h2 className="card__title" id="link-screen-heading">
+    <ScreenFrame section={title}>
+      <section className="card" aria-labelledby={`${idBase}-link-screen-heading`}>
+        <h2 className="card__title" id={`${idBase}-link-screen-heading`}>
           {title}
         </h2>
         {children}
