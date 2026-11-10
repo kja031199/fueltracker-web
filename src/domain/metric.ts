@@ -37,15 +37,3 @@ const HUES: Record<Metric, AccentHue> = {
 export function hueFor(metric: Metric): AccentHue {
   return HUES[metric];
 }
-
-const NAMES: Record<Metric, string> = {
-  economy: 'Fuel economy',
-  price: 'Gas price',
-  spending: 'Spending',
-  distance: 'Distance',
-};
-
-/** Name a screen reader falls back to when a chart isn't given a specific title. */
-export function accessibilityName(metric: Metric): string {
-  return NAMES[metric];
-}

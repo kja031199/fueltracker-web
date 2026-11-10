@@ -16,6 +16,7 @@ import {
 import { distance as distanceUnits, economy as economyUnits, volume as volumeUnits } from '../domain/units';
 import { countOf, currency, distance, fuelPrice, numberFormat } from '../domain/format';
 import { mapValues } from '../domain/models';
+import { distanceWords, rangeLabel, volumeWords } from './words';
 import { MetricLineChart } from './charts/MetricLineChart';
 import { MonthlyBarChart } from './charts/MonthlyBarChart';
 import { WeekdayPriceChart } from './charts/WeekdayPriceChart';
@@ -129,7 +130,7 @@ export function DashboardScreen(): ReactElement {
         >
           {DASHBOARD_TIME_RANGES.map((option) => (
             <option key={option} value={option}>
-              {option === 'All' ? 'All time' : option}
+              {rangeLabel(option)}
             </option>
           ))}
         </select>
@@ -189,7 +190,7 @@ export function DashboardScreen(): ReactElement {
           />
 
           <MetricLineChart
-            title={`Price per ${volumeSpec.singularNoun.toLowerCase()}`}
+            title={`Price per ${volumeWords[units.volume].noun.toLowerCase()}`}
             points={stats.priceSeries}
             metric="price"
             unit={`per ${volumeSpec.abbreviation}`}
@@ -215,7 +216,7 @@ export function DashboardScreen(): ReactElement {
           />
 
           <MonthlyBarChart
-            title={`Monthly ${distanceSpec.name.toLowerCase()}`}
+            title={`Monthly ${distanceWords[units.distance].name.toLowerCase()}`}
             totals={stats.monthlyTotals}
             value={(total) => total.miles}
             metric="distance"

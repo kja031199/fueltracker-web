@@ -12,9 +12,10 @@ import type { ShowdownRow, ShowdownRowId, VehicleShowdown, Winner } from '../dom
 import { computeVehicleShowdown } from '../domain/vehicleShowdown';
 import type { Metric } from '../domain/metric';
 import type { UnitPreferences } from '../domain/units';
-import { US, distance as distanceUnits, economy as economyUnits, volume as volumeUnits } from '../domain/units';
+import { US, economy as economyUnits, volume as volumeUnits } from '../domain/units';
 import type { CurrencyOptions, DisplayStyle } from '../domain/format';
 import { US_STYLE, costPerDistance, currency, distance, economy, fuelPrice } from '../domain/format';
+import { distanceWords } from './words';
 
 /** One row as the screen shows it. */
 export interface ShowdownRowText {
@@ -42,11 +43,11 @@ export function showdownTitle(id: ShowdownRowId, units: UnitPreferences = US): s
     case 'mpg':
       return `Avg ${economyUnits[units.economy].abbreviation}`;
     case 'cpm':
-      return `Cost per ${distanceUnits[units.distance].singularNoun}`;
+      return `Cost per ${distanceWords[units.distance].noun}`;
     case 'ppg':
       return `Avg Price/${volumeUnits[units.volume].abbreviation}`;
     case 'miles':
-      return `${distanceUnits[units.distance].name} Tracked`;
+      return `${distanceWords[units.distance].name} Tracked`;
     case 'spent':
       return 'Total Spent';
     case 'fills':

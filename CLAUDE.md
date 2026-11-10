@@ -654,8 +654,21 @@ npm run test:build   # vite build, then the *.build.test.ts files
   once formatted is demoted by the UI's `looksEqual`, because only the UI
   knows what is shown. Each phraser defaults to US units and `US_STYLE`,
   reproducing the old strings byte for byte, so the old string tests moved
-  with them unchanged. Unit names, grade labels and metric names still live
-  in `domain/` until part C2.
+  with them unchanged.
+- **`domain/` says nothing in English** (#94 part C2,
+  `src/test/domainWords.test.ts`). It names things by identifier (`'liters'`,
+  a stored grade, a weekday *number*) and unit symbol (`gal`, `L/100km` —
+  symbols, like `€`); every word for those comes from `ui/words.ts`:
+  `volumeWords`/`distanceWords` (`name`, `noun`), `economyNames`,
+  `gradeLabel`, `rangeLabel` and `weekdayNames`/`weekdayName` (from `Intl`,
+  in the display locale). The guard reads every string literal in `domain/`
+  — comments and regexes skipped — and refuses a capitalised word or two
+  words in a row. Two kinds of word-shaped literal are allowed, by exact
+  value, in its `IDENTIFIERS` list: the stored fuel grades (`'Regular'`… are
+  Swift's `fuelGradeRaw` and cannot change) and the `'All'` range id. Don't
+  grow that list for a label: add the label to `ui/words.ts` instead.
+  `domain/scanning/` is exempt — it matches English *printed on* US pumps and
+  receipts. `formatDate` of a non-finite time is `—`, not "Invalid Date".
 - **Counts go through `countOf(n, { one, other }, locale)`** (#94, `format.ts`):
   `# row was` / `# rows were`, the `#` written in the display locale. The form
   is chosen by **English** plural rules, because the words are English — the

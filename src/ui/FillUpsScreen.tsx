@@ -9,6 +9,7 @@ import { FUEL_GRADES } from '../domain/fuelGrade';
 import type { FuelGrade } from '../domain/fuelGrade';
 import { formatDate } from '../domain/format';
 import { fillUpFacts, fillUpName } from './wording';
+import { gradeLabel, rangeLabel } from './words';
 import { totalCost } from '../domain/models';
 import { FillUpForm } from './FillUpForm';
 import { useFuelLog } from './fuelLog';
@@ -158,7 +159,7 @@ export function FillUpsScreen(): ReactElement {
           >
             {DASHBOARD_TIME_RANGES.map((range) => (
               <option key={range} value={range}>
-                {range === 'All' ? 'All time' : range}
+                {rangeLabel(range)}
               </option>
             ))}
           </select>
@@ -181,7 +182,7 @@ export function FillUpsScreen(): ReactElement {
             <option value="">Any</option>
             {FUEL_GRADES.map((grade) => (
               <option key={grade} value={grade}>
-                {grade}
+                {gradeLabel(grade)}
               </option>
             ))}
           </select>

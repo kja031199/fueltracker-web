@@ -12,6 +12,7 @@ import type { UnitPreferences } from '../domain/units';
 import { US, distance as distanceUnits, economy as economyUnits, volume as volumeUnits } from '../domain/units';
 import type { DisplayStyle } from '../domain/format';
 import { US_STYLE, costPerDistance, currency, distance, economy, fuelPrice, volume } from '../domain/format';
+import { distanceWords, volumeWords } from './words';
 
 export interface KpiText {
   readonly title: string;
@@ -36,7 +37,6 @@ export function kpiText(kpi: KPI, units: UnitPreferences = US, style: DisplaySty
 
 function titleOf(kpi: KPI, units: UnitPreferences): string {
   const economySpec = economyUnits[units.economy];
-  const distanceSpec = distanceUnits[units.distance];
   const volumeSpec = volumeUnits[units.volume];
   switch (kpi.id) {
     case 'avgEconomy':
@@ -46,15 +46,15 @@ function titleOf(kpi: KPI, units: UnitPreferences): string {
     case 'totalSpent':
       return 'Total Spent';
     case 'costPerDistance':
-      return `Cost per ${distanceSpec.singularNoun}`;
+      return `Cost per ${distanceWords[units.distance].noun}`;
     case 'avgPrice':
       return `Avg Price/${volumeSpec.abbreviation}`;
     case 'distanceTracked':
-      return `${distanceSpec.name} Tracked`;
+      return `${distanceWords[units.distance].name} Tracked`;
     case 'fillUps':
       return 'Fill-Ups';
     case 'totalVolume':
-      return `Total ${volumeSpec.name}`;
+      return `Total ${volumeWords[units.volume].name}`;
   }
 }
 

@@ -10,7 +10,7 @@
  */
 
 import type { WeekdayInsight } from '../domain/weekdayPricePattern';
-import { weekdayNames } from '../domain/weekdayPricePattern';
+import { weekdayNames } from './words';
 import type { UnitPreferences } from '../domain/units';
 import { US, pricePerUnit, volume } from '../domain/units';
 import type { DisplayStyle } from '../domain/format';

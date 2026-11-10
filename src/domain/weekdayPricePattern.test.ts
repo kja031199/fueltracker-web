@@ -71,10 +71,10 @@ describe('grouping and averaging', () => {
       .toEqual([7, 1, 2, 3, 4, 5, 6]);
   });
 
-  test('labels each weekday with its localised short symbol', () => {
+  test('returns the weekday by number and leaves naming it to the UI (#94)', () => {
     const prices = weekdayPrices([makeEntry(day(2025, 1, 7), 3.0)]);
     expect(prices[0]?.weekday).toBe(3);
-    expect(prices[0]?.symbol).toBe('Tue');
+    expect(Object.keys(prices[0]!).sort()).toEqual(['averagePrice', 'fillUpCount', 'weekday']);
   });
 });
 
