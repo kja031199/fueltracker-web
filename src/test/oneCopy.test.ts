@@ -45,6 +45,22 @@ const RULES: readonly Rule[] = [
     innocent: ['displayName(member)', 'row.submitterName || "someone"'],
   },
   {
+    // #94: one display locale for numbers and dates. A date in the browser's
+    // default locale (`toLocaleDateString()`), or anything pinned to US
+    // English, disagrees with the numbers beside it; both go through
+    // `format.ts`, which is the only place the default is spelled.
+    name: 'a fixed or default display locale',
+    home: 'src/domain/format.ts',
+    pattern: /\btoLocale(?:Date|Time)?String\(|['"]en-US['"]/,
+    planted: [
+      'title={new Date(record.date).toLocaleDateString()}',
+      "const MONTH = new Intl.DateTimeFormat('en-US', { month: 'narrow' });",
+      'label: point.date.toLocaleString(),',
+      'numberFormat("en-US", {})',
+    ],
+    innocent: ['title={formatDate(record.date, locale)}', 'options.locale ?? US_STYLE.locale', "lang: 'en-GB'"],
+  },
+  {
     name: 'the confirm-then-act pair',
     // `ConfirmButton` takes its labels as props, so no file should hold a
     // hand-written Keep or Stay button.

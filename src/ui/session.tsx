@@ -14,6 +14,8 @@ import { createContext, useContext, useMemo } from 'react';
 import type { UnitPreferences } from '../domain/units';
 import { US } from '../domain/units';
 import type { AuthUser } from '../data/auth';
+import type { DisplayStyle } from '../domain/format';
+import { US_STYLE } from '../domain/format';
 import { DEFAULT_IDLE_MINUTES } from '../domain/idleTimeout';
 
 export interface Units {
@@ -42,6 +44,35 @@ export function UnitsProvider({
 /** The reader's units, and the way to change them. */
 export function useUnits(): Units {
   return useContext(UnitsContext);
+}
+
+export interface Display {
+  /** The locale numbers and dates are shown in, and the currency of amounts. */
+  readonly style: DisplayStyle;
+  readonly setCurrency: (code: string) => void;
+}
+
+/**
+ * Without a provider, US English and dollars, and changing the currency does
+ * nothing — the same rule as the units, so a screen rendered on its own in a
+ * test needs no wrapper and prints what it always did (#94).
+ */
+const DISPLAY_DEFAULT: Display = { style: US_STYLE, setCurrency: () => {} };
+
+const DisplayContext = createContext<Display>(DISPLAY_DEFAULT);
+
+export function DisplayProvider({
+  style,
+  setCurrency,
+  children,
+}: Display & { readonly children: ReactNode }): ReactElement {
+  const value = useMemo(() => ({ style, setCurrency }), [style, setCurrency]);
+  return <DisplayContext.Provider value={value}>{children}</DisplayContext.Provider>;
+}
+
+/** How numbers, dates and money are shown, and the way to change the currency. */
+export function useDisplay(): Display {
+  return useContext(DisplayContext);
 }
 
 export interface Session {

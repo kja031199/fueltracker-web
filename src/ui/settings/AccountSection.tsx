@@ -4,6 +4,7 @@ import type { AuthUser } from '../../data/auth';
 import { describeSince } from '../../domain/format';
 import { useSyncStatus } from '../fuelLog';
 import { AccountId } from '../AccountId';
+import { useDisplay } from '../session';
 
 /** Settings → Account: who is signed in, their account id, sync, and signing out. */
 export function AccountSection({
@@ -19,6 +20,7 @@ export function AccountSection({
   // One base per rendering, so a component shown twice never repeats an id (#95).
   const idBase = useId();
   const sync = useSyncStatus();
+  const { locale } = useDisplay().style;
   return (
     <section className="card" aria-labelledby={`${idBase}-account-heading`}>
       <h2 className="card__title" id={`${idBase}-account-heading`}>
@@ -36,7 +38,7 @@ export function AccountSection({
       {syncEnabled ? (
         <>
           <p className="stack-sm">
-            Last synced {describeSince(sync.lastSyncedAt)}.
+            Last synced {describeSince(sync.lastSyncedAt, Date.now(), locale)}.
           </p>
           <button
             className="button"

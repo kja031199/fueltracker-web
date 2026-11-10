@@ -1,10 +1,10 @@
 import type { ReactElement } from 'react';
 import { useId, useState } from 'react';
-import { fillUpFacts } from '../domain/format';
+import { fillUpFacts, formatDate } from '../domain/format';
 import { FillUpSummary } from './FillUpSummary';
 import { totalCost } from '../domain/models';
 import { useFuelLog } from './fuelLog';
-import { useUnits } from './session';
+import { useDisplay, useUnits } from './session';
 
 /**
  * Fill-ups sent by link, waiting for the owner (#3): **Approve** adds one to
@@ -18,6 +18,7 @@ export function PendingReview(): ReactElement | null {
   // One base per rendering, so a component shown twice never repeats an id (#95).
   const idBase = useId();
   const { units } = useUnits();
+  const { locale } = useDisplay().style;
   const { pending, vehicles, approveSubmission, rejectSubmission } = useFuelLog();
   const [refused, setRefused] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -59,8 +60,8 @@ export function PendingReview(): ReactElement | null {
             <li className="list-row" key={row.id}>
               <FillUpSummary
                 title={car?.name ?? 'A deleted car'}
-                subtitle={`${fromWhom(row.submitterName)} · ${new Date(row.date).toLocaleDateString()}`}
-                facts={[...fillUpFacts(row, units), ...(row.station === '' ? [] : [row.station])]}
+                subtitle={`${fromWhom(row.submitterName)} · ${formatDate(row.date, locale)}`}
+                facts={[...fillUpFacts(row, units, { locale }), ...(row.station === '' ? [] : [row.station])]}
                 notes={row.notes}
                 cost={totalCost(row)}
               />

@@ -627,6 +627,22 @@ npm run test:build   # vite build, then the *.build.test.ts files
   `useUnits()` outside a provider is US with a setter that does nothing, so a
   screen rendered alone in a test needs no wrapper and shows exactly what is
   stored. Settings takes no props; it reads `useSession()`.
+- **One display locale, and a currency that follows it** (#94; `format.ts`,
+  `useDisplay()` in `session.tsx`). Numbers *and* dates use the browser's
+  language (`displayLocale(navigator.language)`, US English when `Intl` has no
+  data for it); the currency is `loadCurrency` (Settings → Units and currency,
+  else `currencyForLocale`). A `DisplayStyle` `{ locale, currency }` is passed
+  to `currency`/`fuelPrice`/`costPerDistance`, its `locale` to
+  `volume`/`distance`/`economy`/`formatDate`/`fillUpFacts`/`fillUpName`/
+  `describeSince`, and the whole style to `dashboardKPIs` and the weekday
+  insight. **Every default is `US_STYLE`, which reproduces the old output byte
+  for byte** — the units rule — and `useDisplay()` without a provider is
+  `US_STYLE`. Display only: nothing stored changes, and the currency converts
+  nothing. A stored currency must pass `isCurrencyCode`, or `Intl` would throw
+  on it. **Never `toLocaleDateString()` or a literal `'en-US'` outside
+  `format.ts`** (`oneCopy.test.ts`): use `formatDate(ms, locale)` and
+  `US_STYLE.locale`. The weekday insight's day names stay English because the
+  sentence is English; words move to the UI in #94's later parts.
 - **The selected car stays in `useAppData`** (#93 asked; kept on purpose).
   It is applied in the same `setShown` as that car's fill-ups (#88); held as
   UI state outside, it would change a render before them and bring back one

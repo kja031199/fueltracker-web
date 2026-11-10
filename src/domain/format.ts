@@ -45,6 +45,56 @@ const REGION_CURRENCY: Record<string, string> = {
 
 export const DEFAULT_CURRENCY = 'USD';
 
+/**
+ * How numbers, dates and money are shown (#94): the reader's locale, and the
+ * currency they pay in. Display only — storage is canonical whatever this is.
+ *
+ * One locale for numbers *and* dates, so the two never disagree on a screen:
+ * before, numbers were fixed to US English while dates followed the browser,
+ * and money was always dollars beside the browser's own kilometres and litres.
+ */
+export interface DisplayStyle {
+  /** A BCP 47 tag `Intl` supports. */
+  readonly locale: string;
+  /** An ISO 4217 code. */
+  readonly currency: string;
+}
+
+/**
+ * The default everywhere a style is optional. It reproduces, byte for byte,
+ * what every function printed before there was a style, which is what keeps
+ * the existing assertions valid (the same rule as units defaulting to `US`).
+ */
+export const US_STYLE: DisplayStyle = { locale: 'en-US', currency: 'USD' };
+
+/** The currencies Settings offers: one per region above, sorted. */
+export const CURRENCIES: readonly string[] = [...new Set(Object.values(REGION_CURRENCY))].sort();
+
+/**
+ * A well-formed ISO 4217 code: exactly three capital letters. `Intl` accepts
+ * any such code (unknown ones print as the code itself) and throws on anything
+ * else, so a stored value is checked here rather than trusted to it.
+ */
+export function isCurrencyCode(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-Z]{3}$/.test(value);
+}
+
+/**
+ * The locale to display in, from the browser's language: that tag if `Intl`
+ * supports it, otherwise US English. A blank, malformed or absurdly long
+ * value — `navigator.language` is the browser's, but a test or an odd browser
+ * can hand over anything — never reaches a formatter, where it would throw.
+ */
+export function displayLocale(language: unknown): string {
+  if (typeof language !== 'string' || language === '' || language.length > 100) return US_STYLE.locale;
+  try {
+    const [supported] = Intl.NumberFormat.supportedLocalesOf([language]);
+    return supported === undefined ? US_STYLE.locale : language;
+  } catch {
+    return US_STYLE.locale;
+  }
+}
+
 /** The currency code to use for a locale. */
 const formatters = new Map<string, Intl.NumberFormat>();
 const MAX_FORMATTERS = 64;
@@ -127,10 +177,10 @@ export function currency(value: number, options: CurrencyOptions = {}): string {
  * value looks like, and a showdown row needs to tell "no data" apart from a
  * formatted zero in order to call the row no-contest.
  */
-export function economy(mpg: number, unit: EconomyUnit): string | null {
+export function economy(mpg: number, unit: EconomyUnit, locale = US_STYLE.locale): string | null {
   const converted = economyUnits[unit].fromMPG(mpg);
   if (converted === null) return null;
-  return numberFormat('en-US', {
+  return numberFormat(locale, {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   }).format(converted);
@@ -182,9 +232,9 @@ export function costPerDistance(
  * Up to three fraction digits and no trailing zeros: a pump reads 9.5 gallons,
  * not 9.500, and 12.345 litres keeps every digit it printed.
  */
-export function volume(gallons: number, unit: VolumeUnit, withUnit = false): string {
+export function volume(gallons: number, unit: VolumeUnit, withUnit = false, locale = US_STYLE.locale): string {
   const spec = volumeUnits[unit];
-  const number = numberFormat('en-US', {
+  const number = numberFormat(locale, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 3,
   }).format(spec.fromGallons(gallons));
@@ -192,13 +242,33 @@ export function volume(gallons: number, unit: VolumeUnit, withUnit = false): str
 }
 
 /** A canonical **miles** value in the given distance unit, optionally suffixed. */
-export function distance(miles: number, unit: DistanceUnit, withUnit = false): string {
+export function distance(miles: number, unit: DistanceUnit, withUnit = false, locale = US_STYLE.locale): string {
   const spec = distanceUnits[unit];
-  const number = numberFormat('en-US', {
+  const number = numberFormat(locale, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 1,
   }).format(spec.fromMiles(miles));
   return withUnit ? `${number} ${spec.abbreviation}` : number;
+}
+
+const dateFormatters = new Map<string, Intl.DateTimeFormat>();
+
+/**
+ * A day, as the reader's locale writes one: `5/1/2026`, `1.5.2026`,
+ * `01/05/2026` (#94). One cached `Intl.DateTimeFormat` per locale, like
+ * `numberFormat`. With the default locale it prints exactly what
+ * `toLocaleDateString('en-US')` does, and a time that is not a finite number
+ * reads `Invalid Date`, as `toLocaleDateString` did, rather than throwing.
+ */
+export function formatDate(at: number, locale = US_STYLE.locale): string {
+  if (!Number.isFinite(at)) return 'Invalid Date';
+  let formatter = dateFormatters.get(locale);
+  if (formatter === undefined) {
+    formatter = new Intl.DateTimeFormat(locale);
+    if (dateFormatters.size >= MAX_FORMATTERS) dateFormatters.clear();
+    dateFormatters.set(locale, formatter);
+  }
+  return formatter.format(at);
 }
 
 /**
@@ -206,7 +276,7 @@ export function distance(miles: number, unit: DistanceUnit, withUnit = false): s
  * last sync, the last backup. A time ahead of the clock (a skewed device)
  * reads as "just now", never a negative age. Moved from Settings (#93).
  */
-export function describeSince(at: number | null, now: number = Date.now()): string {
+export function describeSince(at: number | null, now: number = Date.now(), locale = US_STYLE.locale): string {
   // Not a number reads as never, rather than as "Invalid Date".
   if (at === null || !Number.isFinite(at)) return 'not yet';
   const seconds = Math.max(0, Math.round((now - at) / 1000));
@@ -215,7 +285,7 @@ export function describeSince(at: number | null, now: number = Date.now()): stri
   if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
-  return new Date(at).toLocaleDateString();
+  return formatDate(at, locale);
 }
 
 /** "2021 Honda Civic" under a car's name, or nothing when only the year is known. Moved from Vehicles (#93). */
@@ -273,9 +343,14 @@ export function fillUpFacts(
     readonly missedPreviousFillUp?: boolean;
   },
   units: UnitPreferences,
-  options: { readonly missed?: boolean } = {},
+  options: { readonly missed?: boolean; readonly locale?: string } = {},
 ): string[] {
-  const facts = [volume(entry.gallons, units.volume, true), distance(entry.odometer, units.distance, true), entry.fuelGrade];
+  const locale = options.locale ?? US_STYLE.locale;
+  const facts = [
+    volume(entry.gallons, units.volume, true, locale),
+    distance(entry.odometer, units.distance, true, locale),
+    entry.fuelGrade,
+  ];
   if (!entry.isFullTank) facts.push('partial fill');
   if (options.missed === true && entry.missedPreviousFillUp === true) facts.push('missed previous');
   return facts;
@@ -297,6 +372,10 @@ export function vehicleYear(text: string, now: Date = new Date()): number {
  * screen reader. The odometer reading is part of it so that two fill-ups on
  * one day are still two names.
  */
-export function fillUpName(entry: { readonly date: number; readonly odometer: number }, units: UnitPreferences): string {
-  return `the fill-up of ${new Date(entry.date).toLocaleDateString()} at ${distance(entry.odometer, units.distance, true)}`;
+export function fillUpName(
+  entry: { readonly date: number; readonly odometer: number },
+  units: UnitPreferences,
+  locale = US_STYLE.locale,
+): string {
+  return `the fill-up of ${formatDate(entry.date, locale)} at ${distance(entry.odometer, units.distance, true, locale)}`;
 }

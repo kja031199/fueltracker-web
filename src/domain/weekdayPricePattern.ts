@@ -17,7 +17,8 @@
  */
 
 import type { FuelEntryStats } from './models';
-import { plainCurrency } from './format';
+import type { DisplayStyle } from './format';
+import { US_STYLE, plainCurrency } from './format';
 import type { UnitPreferences } from './units';
 import { US, pricePerUnit, volume } from './units';
 
@@ -39,7 +40,7 @@ export interface WeekdayOptions {
    * {@link firstWeekdayForLocale} to derive it.
    */
   readonly firstWeekday?: number;
-  /** BCP 47 tag for day names. Defaults to `'en-US'`. */
+  /** BCP 47 tag for day names. Defaults to US English (`US_STYLE`). */
   readonly locale?: string;
 }
 
@@ -106,7 +107,7 @@ export function weekdayPrices(
   options: WeekdayOptions = {},
 ): WeekdayPrice[] {
   const firstWeekday = options.firstWeekday ?? 1;
-  const symbols = weekdayNames(options.locale ?? 'en-US', 'short');
+  const symbols = weekdayNames(options.locale ?? US_STYLE.locale, 'short');
 
   const grouped = new Map<number, FuelEntryStats[]>();
   for (const entry of entries) {
@@ -176,6 +177,13 @@ export const MIN_INSIGHT_SPREAD_CENTS = 1;
 
 export interface InsightOptions extends WeekdayOptions {
   readonly units?: UnitPreferences;
+  /**
+   * The reader's locale and currency, for the amount (#94). The day names stay
+   * with `locale` — US English by default — because they sit inside an English
+   * sentence: "on Dienstags than Freitags" helps nobody. The sentence itself
+   * moves to the screen in a later part of #94.
+   */
+  readonly style?: DisplayStyle;
 }
 
 /**
@@ -216,11 +224,11 @@ export function weekdayPriceInsight(
   if (!(delta * 100 >= MIN_INSIGHT_SPREAD_CENTS)) return null;
 
   const units = options.units ?? US;
-  const locale = options.locale ?? 'en-US';
+  const locale = options.locale ?? US_STYLE.locale;
   const fullNames = weekdayNames(locale, 'long');
   const cheapName = fullNames[cheapest.weekday - 1] ?? '';
   const priceyName = fullNames[priciest.weekday - 1] ?? '';
   const unit = volume[units.volume];
-  const perUnitDelta = plainCurrency(pricePerUnit(delta, units.volume), { locale });
+  const perUnitDelta = plainCurrency(pricePerUnit(delta, units.volume), options.style ?? { locale });
   return `You pay about ${perUnitDelta}/${unit.abbreviation} less on ${cheapName}s than ${priceyName}s.`;
 }

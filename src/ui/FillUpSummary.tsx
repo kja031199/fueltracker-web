@@ -1,5 +1,6 @@
 import type { ReactElement, ReactNode } from 'react';
 import { currency } from '../domain/format';
+import { useDisplay } from './session';
 
 /**
  * One fill-up as a list shows it (#93): what it was, the grey facts line, its
@@ -26,6 +27,7 @@ export function FillUpSummary({
   /** Any further lines, under the notes. */
   readonly children?: ReactNode;
 }): ReactElement {
+  const { style } = useDisplay();
   return (
     <div className="row-between">
       <div>
@@ -35,7 +37,7 @@ export function FillUpSummary({
         {notes !== '' && <div className="fine">{notes}</div>}
         {children}
       </div>
-      <strong>{currency(cost)}</strong>
+      <strong>{currency(cost, style)}</strong>
     </div>
   );
 }

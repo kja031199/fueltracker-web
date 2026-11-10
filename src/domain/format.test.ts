@@ -18,6 +18,10 @@ import {
   vehicleSubtitle,
   vehicleYear,
   verifiedName,
+  US_STYLE,
+  displayLocale,
+  formatDate,
+  isCurrencyCode,
 } from './format';
 
 describe('currencyForLocale', () => {
@@ -406,5 +410,62 @@ describe('fillUpName, which fill-up a row’s buttons are for (#95)', () => {
 
   test('two on the same day are still told apart', () => {
     expect(fillUpName({ ...entry, odometer: 10_250 }, US)).not.toBe(fillUpName(entry, US));
+  });
+});
+
+describe('one display style: the reader\u2019s locale and currency (#94)', () => {
+  const GERMAN = { locale: 'de-DE', currency: 'EUR' } as const;
+
+  test('the US style is what every function did before, byte for byte', () => {
+    expect(US_STYLE).toEqual({ locale: 'en-US', currency: 'USD' });
+    expect(currency(1234.56, US_STYLE)).toBe(currency(1234.56));
+    expect(volume(12.3456, 'gallons', true, 'en-US')).toBe(volume(12.3456, 'gallons', true));
+    expect(formatDate(new Date(2026, 4, 1).getTime())).toBe(new Date(2026, 4, 1).toLocaleDateString('en-US'));
+  });
+
+  test('money, volume, distance and economy follow the locale', () => {
+    expect(currency(1234.56, GERMAN)).toBe('1.234,56\u00a0€');
+    expect(fuelPrice(3.499, 'gallons', GERMAN)).toBe('3,499\u00a0€');
+    expect(volume(100, 'liters', true, 'de-DE')).toBe('378,541 L');
+    expect(distance(1000, 'kilometers', true, 'de-DE')).toBe('1.609,3 km');
+    expect(economy(30, 'litersPer100km', 'de-DE')).toBe('7,8');
+  });
+
+  test('dates follow the same locale, so numbers and dates never disagree', () => {
+    const may1 = new Date(2026, 4, 1).getTime();
+    expect(formatDate(may1, 'de-DE')).toBe('1.5.2026');
+    expect(formatDate(may1, 'en-GB')).toBe('01/05/2026');
+    expect(fillUpName({ date: may1, odometer: 10_000 }, METRIC, 'de-DE')).toBe(
+      'the fill-up of 1.5.2026 at 16.093,4 km',
+    );
+    expect(fillUpFacts({ gallons: 10, odometer: 10_000, fuelGrade: 'Regular', isFullTank: true }, METRIC, { locale: 'de-DE' })).toEqual([
+      '37,854 L',
+      '16.093,4 km',
+      'Regular',
+    ]);
+    expect(describeSince(may1, may1 + 3 * 86_400_000, 'de-DE')).toBe('1.5.2026');
+  });
+
+  test('a date that is not a number reads as it always did, rather than throwing', () => {
+    expect(formatDate(Number.NaN, 'de-DE')).toBe('Invalid Date');
+    expect(formatDate(Number.POSITIVE_INFINITY)).toBe('Invalid Date');
+  });
+
+  test('the browser\u2019s language is used when Intl knows it, and en-US when not', () => {
+    expect(displayLocale('de-DE')).toBe('de-DE');
+    expect(displayLocale('fr')).toBe('fr');
+    // Well-formed tags Intl has no data for: it would quietly format in some
+    // other locale, so they are refused rather than passed on.
+    for (const unknown of ['xx', 'xx-XX', 'qaa']) expect(displayLocale(unknown), unknown).toBe('en-US');
+    for (const hostile of ['', '!!!', 'x'.repeat(10_000), undefined, null, 42]) {
+      expect(displayLocale(hostile as unknown as string), String(hostile).slice(0, 20)).toBe('en-US');
+    }
+  });
+
+  test('a currency is three capital letters, and nothing else is', () => {
+    for (const good of ['USD', 'EUR', 'GBP', 'JPY']) expect(isCurrencyCode(good), good).toBe(true);
+    for (const bad of ['XX', 'eur', 'EURO', '<script>', '', 'E U', 'x'.repeat(10_000), 42, null]) {
+      expect(isCurrencyCode(bad), String(bad).slice(0, 20)).toBe(false);
+    }
   });
 });

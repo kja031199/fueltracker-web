@@ -12,7 +12,7 @@ import { LINK_TEXT_LIMITS } from '../data/fillUpLink';
 import { useFillUpForm } from './useFillUpForm';
 import { ReceiptScanField } from './ReceiptScanField';
 import { DecimalField } from './DecimalField';
-import { useUnits } from './session';
+import { useDisplay, useUnits } from './session';
 
 interface Props {
   readonly vehicleId: string;
@@ -77,6 +77,7 @@ export function FillUpForm({
     if (focusHeading) heading.current?.focus();
   }, [focusHeading]);
   const { units } = useUnits();
+  const { style } = useDisplay();
   const {
     form,
     numericText,
@@ -177,7 +178,7 @@ export function FillUpForm({
       <p className="stack">
         <span className="field__label">Total cost </span>
         <strong style={{ color: total > 0 ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
-          {currency(total)}
+          {currency(total, style)}
         </strong>
       </p>
 

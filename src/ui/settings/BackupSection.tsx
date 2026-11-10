@@ -2,6 +2,7 @@ import type { ReactElement } from 'react';
 import { useId, useRef, useState } from 'react';
 import { describeSince } from '../../domain/format';
 import { useBackupStatus, useFuelLog } from '../fuelLog';
+import { useDisplay } from '../session';
 
 /**
  * Settings → Backup and restore. Backup, restore and sync all go through the
@@ -13,6 +14,7 @@ export function BackupSection(): ReactElement {
   const idBase = useId();
   const { saveBackup, exportCsv, importFile } = useFuelLog();
   const { lastBackupAt } = useBackupStatus();
+  const { locale } = useDisplay().style;
   const fileInput = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [problems, setProblems] = useState<readonly string[]>([]);
@@ -49,7 +51,7 @@ export function BackupSection(): ReactElement {
       </h2>
 
       <p className="stack-sm">
-        Last backup: <strong>{describeSince(lastBackupAt)}</strong>.
+        Last backup: <strong>{describeSince(lastBackupAt, Date.now(), locale)}</strong>.
       </p>
       <p className="stack muted">
         Only the JSON export counts as a backup. The CSV is fill-ups only — no vehicles, no

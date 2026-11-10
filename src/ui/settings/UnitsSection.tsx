@@ -2,21 +2,26 @@ import type { ReactElement } from 'react';
 import { useId } from 'react';
 import type { UnitPreferences } from '../../domain/units';
 import { DISTANCE_UNITS, ECONOMY_UNITS, VOLUME_UNITS, distance, economy, volume } from '../../domain/units';
-import { useUnits } from '../session';
+import { CURRENCIES } from '../../domain/format';
+import { useDisplay, useUnits } from '../session';
 
 /**
- * Settings → Units. Changing a unit changes only what is shown and what typed
- * numbers are read as; every stored value stays canonical, so nothing is
- * rewritten and nothing can be lost in a conversion.
+ * Settings → Units and currency. Changing a unit changes only what is shown and
+ * what typed numbers are read as; every stored value stays canonical, so
+ * nothing is rewritten and nothing can be lost in a conversion. The currency is
+ * the same (#94): it changes the symbol and format of amounts, and converts
+ * nothing — a price is whatever was typed at the pump.
  */
 export function UnitsSection(): ReactElement {
   // One base per rendering, so a component shown twice never repeats an id (#95).
   const idBase = useId();
   const { units, setUnits: onChange } = useUnits();
+  const { style, setCurrency } = useDisplay();
+  const currencies = CURRENCIES.includes(style.currency) ? CURRENCIES : [...CURRENCIES, style.currency].sort();
   return (
     <section className="card" aria-labelledby={`${idBase}-units-heading`}>
       <h2 className="card__title" id={`${idBase}-units-heading`}>
-        Units
+        Units and currency
       </h2>
 
       <div className="field">
@@ -76,10 +81,43 @@ export function UnitsSection(): ReactElement {
         </select>
       </div>
 
+      <div className="field">
+        <label className="field__label" htmlFor={`${idBase}-currency`}>
+          Currency
+        </label>
+        <select
+          id={`${idBase}-currency`}
+          aria-describedby={`${idBase}-currency-note`}
+          value={style.currency}
+          onChange={(e) => setCurrency(e.target.value)}
+        >
+          {currencies.map((code) => (
+            <option key={code} value={code}>
+              {currencyLabel(code, style.locale)}
+            </option>
+          ))}
+        </select>
+        <p className="fine" id={`${idBase}-currency-note`}>
+          Only changes how amounts are shown. Prices you have entered are not converted.
+        </p>
+      </div>
+
       <p className="note flush">
         Readings are stored in miles, US gallons and MPG whatever you pick here — changing a unit
         changes what you see and type, never what is saved.
       </p>
     </section>
   );
+}
+
+/** `EUR — €`: the code, and the symbol the reader's locale writes for it. */
+function currencyLabel(code: string, locale: string): string {
+  try {
+    const symbol = new Intl.NumberFormat(locale, { style: 'currency', currency: code })
+      .formatToParts(0)
+      .find((part) => part.type === 'currency')?.value;
+    return symbol === undefined || symbol === code ? code : `${code} — ${symbol}`;
+  } catch {
+    return code;
+  }
 }
