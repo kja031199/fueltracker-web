@@ -26,6 +26,31 @@ import {
   volume as volumeUnits,
 } from './units';
 
+/** The two forms an English count needs: `# row was`, `# rows were`. */
+export interface PluralForms {
+  readonly one: string;
+  readonly other: string;
+}
+
+/** English plural rules: the words are English, so English decides the form. */
+const ENGLISH_PLURALS = new Intl.PluralRules('en');
+
+/**
+ * A count with the words that agree with it (#94): `1 row was`, `3 rows were`.
+ * The `#` in the chosen form becomes the count, written in the reader's locale
+ * (`1.234` in German).
+ *
+ * The *form* is chosen by English rules, never the reader's: the sentence is
+ * English, and French counts 0 as singular ("0 row was"), while Polish and
+ * Arabic have categories English has no words for. It used to be a
+ * parenthesised "s", or a ternary on a count of one, written out by hand in
+ * each sentence.
+ */
+export function countOf(count: number, forms: PluralForms, locale: string = US_STYLE.locale): string {
+  const form = ENGLISH_PLURALS.select(count) === 'one' ? forms.one : forms.other;
+  return form.replace('#', numberFormat(locale, { maximumFractionDigits: 0 }).format(count));
+}
+
 /**
  * Currency for a locale's region, defaulting to USD.
  *
@@ -282,9 +307,9 @@ export function describeSince(at: number | null, now: number = Date.now(), local
   const seconds = Math.max(0, Math.round((now - at) / 1000));
   if (seconds < 60) return 'just now';
   const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  if (minutes < 60) return countOf(minutes, { one: '# minute ago', other: '# minutes ago' }, locale);
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  if (hours < 24) return countOf(hours, { one: '# hour ago', other: '# hours ago' }, locale);
   return formatDate(at, locale);
 }
 

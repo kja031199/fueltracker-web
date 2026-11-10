@@ -19,6 +19,7 @@ import {
   vehicleYear,
   verifiedName,
   US_STYLE,
+  countOf,
   displayLocale,
   formatDate,
   isCurrencyCode,
@@ -467,5 +468,38 @@ describe('one display style: the reader\u2019s locale and currency (#94)', () =>
     for (const bad of ['XX', 'eur', 'EURO', '<script>', '', 'E U', 'x'.repeat(10_000), 42, null]) {
       expect(isCurrencyCode(bad), String(bad).slice(0, 20)).toBe(false);
     }
+  });
+});
+
+describe('countOf: a count and the word that agrees with it (#94)', () => {
+  const ROWS = { one: '# row was', other: '# rows were' };
+
+  test('one is singular, and zero and many are plural', () => {
+    expect(countOf(1, ROWS)).toBe('1 row was');
+    expect(countOf(0, ROWS)).toBe('0 rows were');
+    expect(countOf(3, ROWS)).toBe('3 rows were');
+  });
+
+  test('the number is in the reader\u2019s locale', () => {
+    expect(countOf(1234, ROWS, 'de-DE')).toBe('1.234 rows were');
+    expect(countOf(1234, ROWS)).toBe('1,234 rows were');
+  });
+
+  test('the form follows English, since the words are English, whatever the locale', () => {
+    // French counts 0 as singular; "0 row was" would be wrong English.
+    expect(countOf(0, ROWS, 'fr-FR')).toBe('0 rows were');
+    // Polish and Arabic have more categories than English has words for.
+    expect(countOf(2, ROWS, 'pl-PL')).toBe('2 rows were');
+    expect(countOf(2, ROWS, 'ar')).toMatch(/rows were$/);
+  });
+
+  test('a form without a placeholder is used as it is', () => {
+    expect(countOf(1, { one: 'one row', other: 'several rows' })).toBe('one row');
+  });
+
+  test('odd counts never throw', () => {
+    expect(countOf(Number.NaN, ROWS)).toBe('NaN rows were');
+    expect(countOf(Number.POSITIVE_INFINITY, ROWS)).toBe('∞ rows were');
+    expect(countOf(-1, ROWS)).toBe('-1 row was');
   });
 });

@@ -61,6 +61,25 @@ const RULES: readonly Rule[] = [
     innocent: ['title={formatDate(record.date, locale)}', 'options.locale ?? US_STYLE.locale', "lang: 'en-GB'"],
   },
   {
+    // #94: "row(s)" is a shrug at the reader, and a hand-rolled
+    // `n === 1 ? '' : 's'` is how English plural rules get written down wrong
+    // once per sentence. Counts go through `countOf` in `format.ts`.
+    name: 'a hand-written plural',
+    home: null,
+    pattern: /[a-z]\(s\)|===\s*1\s*\?\s*['"`]/,
+    planted: [
+      '`${n} row(s) were skipped`',
+      "`${n} minute${n === 1 ? '' : 's'} ago`",
+      "{size === 1 ? ' looks' : 's look'}",
+      '`${tooNew === 1 ? "1 row was" : "rows"}`',
+    ],
+    innocent: [
+      'fillUps.map((r) => r.station).filter((s) => s !== \'\')',
+      'sorted.length % 2 === 1 ? sorted[middle]! : 0',
+      "countOf(n, { one: '# row was', other: '# rows were' })",
+    ],
+  },
+  {
     name: 'the confirm-then-act pair',
     // `ConfirmButton` takes its labels as props, so no file should hold a
     // hand-written Keep or Stay button.

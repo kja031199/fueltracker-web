@@ -11,6 +11,16 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-10
 
+- **Messages count properly: "1 fill-up", "3 rows were", never "fill-up(s)".**
+  Backup, import and sync messages, the dashboard's missed-fill warning and
+  "minutes ago" all agree with their numbers now.
+  *Technical:* `countOf(n, { one, other }, locale)` in `format.ts` picks the
+  form with English `Intl.PluralRules` — the words are English, so the
+  reader's locale must not decide (French counts 0 as singular) — and writes
+  the number in the display locale. Every "(s)" and hand-written
+  `=== 1 ? …` plural is gone, and `oneCopy.test.ts` keeps them out. The
+  second of three steps on #94.
+  [#94](https://github.com/kja031199/fueltracker-web/issues/94) · [PR #140](https://github.com/kja031199/fueltracker-web/pull/140)
 - **Prices and numbers now follow your browser's language: a German browser
   shows euros and 1.234,56. You can pick the currency in Settings → Units and
   currency, and nothing you have entered is converted.** Dates use the same

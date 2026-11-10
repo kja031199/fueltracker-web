@@ -151,7 +151,7 @@ describe('Settings', () => {
     render(<App store={await storeWith(MINIMUM_ENTRIES_TO_PROMPT)} initialTab="settings" />);
 
     await user.click(await screen.findByRole('button', { name: /export spreadsheet/i }));
-    await screen.findByText(/Saved \d+ fill-up\(s\) as CSV/i);
+    await screen.findByText(/Saved \d+ fill-ups? as CSV/i);
 
     expect(loadBackupState('local').lastExportAt).toBeNull();
     expect(screen.getByRole('button', { name: /save a backup/i })).toBeInTheDocument();
