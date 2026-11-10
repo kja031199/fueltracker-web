@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { makeStore } from '../test/fixtures';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { InMemoryRepository } from '../data/repository';
@@ -8,14 +9,6 @@ import { FuelTrackerStore } from '../data/store';
 import { StubAuthProvider } from '../data/auth';
 import { InMemoryRemoteStore } from '../data/remote';
 import { App } from './App';
-
-function makeStore(): FuelTrackerStore {
-  return new FuelTrackerStore({
-    vehicles: new InMemoryRepository<VehicleRecord>(),
-    fillUps: new InMemoryRepository<FillUpRecord>(),
-    pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-  });
-}
 
 const USER = { uid: 'u1', email: 'driver@example.com', displayName: 'Driver' };
 

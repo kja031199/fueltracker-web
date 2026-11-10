@@ -1,13 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, test, vi } from 'vitest';
+import { draft, makeStore } from '../test/fixtures';
 import type { ReactNode } from 'react';
 import { act, cleanup, render, renderHook, screen, waitFor } from '@testing-library/react';
-import { InMemoryRepository } from '../data/repository';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
+import type { FillUpRecord } from '../data/records';
 import { InMemoryRemoteStore } from '../data/remote';
 import { FuelTrackerStore } from '../data/store';
-import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
-import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { FuelLogProvider, useBackupStatus, useFuelLog, useSyncStatus, type BackupStatus, type FuelLog } from './fuelLog';
 import { toJsonBackup } from '../data/backupFormat';
 import { loadBackupState } from './backupNudge';
@@ -28,25 +26,6 @@ import { InMemoryShareLedger } from '../data/shareLedger';
  */
 
 afterEach(cleanup);
-
-function makeStore(): FuelTrackerStore {
-  return new FuelTrackerStore({
-    vehicles: new InMemoryRepository<VehicleRecord>(),
-    fillUps: new InMemoryRepository<FillUpRecord>(),
-    pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-  });
-}
-
-function draft(odometer: number): FuelEntryDraft {
-  const made = makeFuelEntryDraft({
-    date: new Date(2026, 0, 1),
-    odometer,
-    gallons: 10,
-    pricePerGallon: 3.5,
-  });
-  if (made === null) throw new Error('fixture draft failed validation');
-  return made;
-}
 
 interface Harness {
   readonly store: FuelTrackerStore;

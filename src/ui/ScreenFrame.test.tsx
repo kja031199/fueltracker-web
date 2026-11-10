@@ -1,10 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { makeStore } from '../test/fixtures';
 import type { ReactElement } from 'react';
 import { cleanup, render, screen } from '@testing-library/react';
-import { InMemoryRepository } from '../data/repository';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
-import { FuelTrackerStore } from '../data/store';
 import { StubAuthProvider } from '../data/auth';
 import type { PushSummary, RawSnapshot, RemoteStore } from '../data/remote';
 import { App } from './App';
@@ -21,14 +19,6 @@ import { LinkScreen } from './LinkScreen';
  */
 
 const USER = { uid: 'frame-uid', email: 'frame@example.com', displayName: 'Frame' };
-
-function makeStore(): FuelTrackerStore {
-  return new FuelTrackerStore({
-    vehicles: new InMemoryRepository<VehicleRecord>(),
-    fillUps: new InMemoryRepository<FillUpRecord>(),
-    pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-  });
-}
 
 function refusing(): RemoteStore {
   return {

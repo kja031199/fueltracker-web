@@ -1,15 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import type { ReactElement } from 'react';
+import { draft, makeStore, sharingFor } from '../test/fixtures';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
-import { InMemoryRepository } from '../data/repository';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
 import { FuelTrackerStore } from '../data/store';
-import { makeFuelEntryDraft, type FuelEntryDraft } from '../domain/fuelEntryDraft';
 import { InMemorySharingWorld, type Account } from '../data/sharing';
 import type { SharingSync } from '../data/shareSync';
-import { InMemorySyncState } from '../data/syncState';
-import { InMemoryShareLedger } from '../data/shareLedger';
 import { FuelLogProvider, useFuelLog, useSyncStatus, type FuelLog } from './fuelLog';
 import type { SyncStatus } from './useSync';
 import { FillUpsScreen } from './FillUpsScreen';
@@ -26,40 +21,6 @@ afterEach(cleanup);
 
 const ME: Account = { uid: 'u1', name: 'Kyle', email: 'kyle@example.com', emailVerified: true };
 const THEM: Account = { uid: 'u2', name: 'Sam', email: 'sam@example.com', emailVerified: true };
-
-function draft(odometer: number): FuelEntryDraft {
-  const made = makeFuelEntryDraft({ date: new Date(2026, 0, 1), odometer, gallons: 10, pricePerGallon: 3.5 });
-  if (made === null) throw new Error('fixture draft failed validation');
-  return made;
-}
-
-function storeFor(account: Account): FuelTrackerStore {
-  return new FuelTrackerStore(
-    {
-      vehicles: new InMemoryRepository<VehicleRecord>(),
-      fillUps: new InMemoryRepository<FillUpRecord>(),
-      pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-    },
-    undefined,
-    account.uid,
-  );
-}
-
-function sharingFor(world: InMemorySharingWorld, account: Account): SharingSync {
-  const states = new Map<string, InMemorySyncState>();
-  return {
-    remote: world.sharingFor(account),
-    stateFor: (key) => {
-      const state = states.get(key) ?? new InMemorySyncState();
-      states.set(key, state);
-      return state;
-    },
-    forgetState: async (key) => {
-      states.delete(key);
-    },
-    ledger: new InMemoryShareLedger(),
-  };
-}
 
 /**
  * After a sync, the sharing lists are re-read; this waits for that read —
@@ -114,7 +75,7 @@ async function syncAgain(mounted: Mounted): Promise<void> {
 describe('a sync that changes nothing (#89)', () => {
   test('reads the shared cars once, and asks who a car nobody shares is shared with never', async () => {
     const world = new InMemorySharingWorld();
-    const store = storeFor(ME);
+    const store = makeStore({ author: ME.uid });
     const car = await store.addVehicle({ name: 'Civic' });
     await store.addFillUp(draft(10_000), car.id);
     const mounted = await mount(world, ME, store);
@@ -132,14 +93,14 @@ describe('a sync that changes nothing (#89)', () => {
   test('on a car shared with you, does not reload the screens', async () => {
     const world = new InMemorySharingWorld();
     // The owner's car, in the owner's account, shared with this account.
-    const owner = storeFor(THEM);
+    const owner = makeStore({ author: THEM.uid });
     const car = await owner.addVehicle({ name: 'Jazz' });
     await owner.addFillUp(draft(20_000), car.id);
     const ownerSnapshot = await owner.exportSnapshot();
     await world.remoteFor(THEM.uid).push(ownerSnapshot);
     await world.sharingFor(ME).accept(await world.sharingFor(THEM).invite(car, ME.email));
 
-    const store = storeFor(ME);
+    const store = makeStore({ author: ME.uid });
     const mounted = await mount(world, ME, store);
     await waitFor(() => expect(mounted.log().vehicles.map((v) => v.id)).toEqual([car.id]));
 
@@ -154,7 +115,7 @@ describe('a sync that changes nothing (#89)', () => {
 describe('the cars shared with you, as the screens see them (#89)', () => {
   test('come from what the sync read — a share it would not record is still listed, so it can be left', async () => {
     const world = new InMemorySharingWorld();
-    const store = storeFor(ME);
+    const store = makeStore({ author: ME.uid });
     const mine = await store.addVehicle({ name: 'Civic' });
     // Somebody shares a car whose id is already one of this device's (#78):
     // the sync leaves it out of the device's ledger, and says to leave it.
@@ -171,7 +132,7 @@ describe('the cars shared with you, as the screens see them (#89)', () => {
 describe('who entered each fill-up (#89)', () => {
   test('is asked once per car, and again only when a fill-up names somebody new', async () => {
     const world = new InMemorySharingWorld();
-    const store = storeFor(ME);
+    const store = makeStore({ author: ME.uid });
     const car = await store.addVehicle({ name: 'Civic' });
     const mounted = await mount(world, ME, store);
     const { sharing } = mounted.log();
@@ -206,7 +167,7 @@ describe('who entered each fill-up (#89)', () => {
 describe('invitations sent for one car (#89)', () => {
   test('are read for that car only', async () => {
     const world = new InMemorySharingWorld();
-    const store = storeFor(ME);
+    const store = makeStore({ author: ME.uid });
     const civic = await store.addVehicle({ name: 'Civic' });
     const jazz = await store.addVehicle({ name: 'Jazz' });
     await world.remoteFor(ME.uid).push(await store.exportSnapshot());
@@ -222,7 +183,7 @@ describe('invitations sent for one car (#89)', () => {
 describe('a shared car read in full while its index builds (#89)', () => {
   test('is said, once, in what the sync reports', async () => {
     const world = new InMemorySharingWorld();
-    const store = storeFor(ME);
+    const store = makeStore({ author: ME.uid });
     await store.addVehicle({ name: 'Civic' });
     const sharing = sharingFor(world, ME);
     // Every shared car's read falls back; two cars, one note.
@@ -232,7 +193,7 @@ describe('a shared car read in full while its index builds (#89)', () => {
       return { pull: async (since) => ({ ...(await scoped.pull(since)), indexMissing: true }), push: (rows) => scoped.push(rows) };
     };
     for (const name of ['Jazz', 'Golf']) {
-      const owner = storeFor(THEM);
+      const owner = makeStore({ author: THEM.uid });
       const car = await owner.addVehicle({ name });
       await world.remoteFor(THEM.uid).push(await owner.exportSnapshot());
       await world.sharingFor(ME).accept(await world.sharingFor(THEM).invite(car, ME.email));

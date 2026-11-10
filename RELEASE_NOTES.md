@@ -11,6 +11,14 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-10
 
+- **No change you'll see: the tests share one set of fixtures instead of
+  copying them into every file.** The second step of tidying the tests.
+  *Technical:* `src/test/fixtures.ts` (`makeStore`, `draft`/`draftWith`,
+  `sharingFor`) and `src/test/emulator.ts` replace 18 `makeStore`s, 16
+  `draft`s, 5 `sharingFor`s and 3 copies of the emulator setup; 42 test
+  files, about 750 lines of copies gone. `fixtures.test.ts` refuses a second
+  definition.
+  [#97](https://github.com/kja031199/fueltracker-web/issues/97) · [PR #132](https://github.com/kja031199/fueltracker-web/pull/132)
 - **No change you'll see: the test suite runs in about two-thirds of the
   time, and no longer waits on the clock.** The first step of tidying the
   tests.

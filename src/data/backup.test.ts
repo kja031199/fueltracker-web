@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { draftWith } from '../test/fixtures';
 import { computeFuelStatistics } from '../domain/fuelStatistics';
 import { parseJsonBackup, toJsonBackup } from './backupFormat';
 import { backupFilename, exportSnapshot, importBackup } from './backup';
@@ -6,10 +7,11 @@ import { InMemoryRepository } from './repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records';
 import { FuelTrackerStore, toStats } from './store';
 import type { Repositories } from './repository';
-import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { seedDemoData } from './demoData';
 import { TEXT_LIMITS } from '../domain/textLimits';
 import { SCHEMA_VERSION } from './records';
+
+const draft = draftWith({ date: new Date(2025, 0, 15) });
 
 function makeRepos(): Repositories {
   return {
@@ -17,18 +19,6 @@ function makeRepos(): Repositories {
     fillUps: new InMemoryRepository<FillUpRecord>(),
     pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
   };
-}
-
-function draft(overrides: Partial<Parameters<typeof makeFuelEntryDraft>[0]> = {}) {
-  const result = makeFuelEntryDraft({
-    date: new Date(2025, 0, 15),
-    odometer: 10_000,
-    gallons: 10,
-    pricePerGallon: 3.5,
-    ...overrides,
-  });
-  if (result === null) throw new Error('fixture draft failed validation');
-  return result;
 }
 
 describe('exportSnapshot', () => {

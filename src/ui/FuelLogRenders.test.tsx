@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, test } from 'vitest';
+import { draft, makeStore } from '../test/fixtures';
 import type { ReactElement } from 'react';
 import { act, cleanup, render, waitFor } from '@testing-library/react';
 import { InMemoryRepository } from '../data/repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
 import { InMemoryRemoteStore } from '../data/remote';
 import { FuelTrackerStore } from '../data/store';
-import { makeFuelEntryDraft, type FuelEntryDraft } from '../domain/fuelEntryDraft';
 import { FuelLogProvider, useFuelLog, useSyncStatus, type FuelLog } from './fuelLog';
 import type { SyncStatus } from './useSync';
 import { manualTimers } from '../test/manualTimers';
@@ -28,20 +28,6 @@ import type { FillUpSummary } from '../data/records';
  */
 
 afterEach(cleanup);
-
-function makeStore(): FuelTrackerStore {
-  return new FuelTrackerStore({
-    vehicles: new InMemoryRepository<VehicleRecord>(),
-    fillUps: new InMemoryRepository<FillUpRecord>(),
-    pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-  });
-}
-
-function draft(odometer: number): FuelEntryDraft {
-  const made = makeFuelEntryDraft({ date: new Date(2026, 0, 1), odometer, gallons: 10, pricePerGallon: 3.5 });
-  if (made === null) throw new Error('fixture draft failed validation');
-  return made;
-}
 
 /**
  * Lets React apply what has already resolved. Not a sleep (#97): every test

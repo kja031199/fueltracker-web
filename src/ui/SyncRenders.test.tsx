@@ -1,10 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { makeStore } from '../test/fixtures';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
-import { InMemoryRepository } from '../data/repository';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
 import { InMemoryRemoteStore, type PullCursor, type RawSnapshot } from '../data/remote';
-import { FuelTrackerStore } from '../data/store';
 import { StubAuthProvider } from '../data/auth';
 import { App } from './App';
 import { saveHasOnboarded } from './onboarding';
@@ -52,11 +50,7 @@ class HeldRemote extends InMemoryRemoteStore {
 
 test('the dashboard is not re-rendered by a sync that brings nothing', async () => {
   saveHasOnboarded('u1');
-  const store = new FuelTrackerStore({
-    vehicles: new InMemoryRepository<VehicleRecord>(),
-    fillUps: new InMemoryRepository<FillUpRecord>(),
-    pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-  });
+  const store = makeStore();
   await store.addVehicle({ name: 'Civic' });
   const remote = new HeldRemote();
   const auth = new StubAuthProvider({

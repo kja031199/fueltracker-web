@@ -1,4 +1,5 @@
 import 'fake-indexeddb/auto';
+import { draft } from '../test/fixtures';
 import { describe, expect, test } from 'vitest';
 import { InMemoryRepository } from './repository';
 import { FuelTrackerDatabase } from './db';
@@ -8,7 +9,6 @@ import { FuelTrackerStore } from './store';
 import { type Repositories } from './repository';
 import { validateFillUp } from './recordValidation';
 import { tombstoneFillUp } from './tombstone';
-import { makeFuelEntryDraft, type FuelEntryDraft } from '../domain/fuelEntryDraft';
 
 /**
  * The store's part in sharing a car (#66): who entered a fill-up, and
@@ -30,12 +30,6 @@ function dexie(): Repositories {
     fillUps: new DexieRepository<FillUpRecord>(db.fillUps),
     pendingFillUps: new DexieRepository<PendingFillUpRecord>(db.pendingFillUps),
   };
-}
-
-function draft(odometer = 10_000): FuelEntryDraft {
-  const made = makeFuelEntryDraft({ date: new Date(2026, 0, 1), odometer, gallons: 10, pricePerGallon: 3.5 });
-  if (made === null) throw new Error('fixture draft failed validation');
-  return made;
 }
 
 describe.each([

@@ -599,6 +599,17 @@ npm ci --prefix .github/firebase-cli
 
 ### Tests
 
+- **Fixtures are shared: `src/test/fixtures.ts`** (#97). `makeStore({ author,
+  clock })`, `draft(overrides | odometer)` through the real gate, and
+  `sharingFor(world, user | account)`; the emulator suites take
+  `describeWithEmulator`, `allowedUidsInRules` and `rulesEnvironment` from
+  `src/test/emulator.ts`. A file that needs other defaults says so in one line
+  — `const draft = draftWith({ date: new Date(2025, 0, 15) })` — rather than
+  writing its own: copies drift, and one `makeStore()` had quietly made every
+  fill-up "entered by owner". `fixtures.test.ts` fails on a second definition
+  or a hand-built empty store. `src/test/` is test support, not app code: the
+  SDK boundary skips it.
+
 - **A boundary test reads imports through `src/test/imports.ts`, never its own
   pattern** (#93). `layering`, `storeBoundary`, `sdkBoundary` and
   `importCycles` all do. Each used to match `from '…'` its own way, and the

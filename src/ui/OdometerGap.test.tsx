@@ -1,9 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { makeStore } from '../test/fixtures';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { InMemoryRepository } from '../data/repository';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
 import { FuelTrackerStore } from '../data/store';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { App } from './App';
@@ -15,11 +14,7 @@ import { saveHasOnboarded } from './onboarding';
  */
 
 async function carEvery300(): Promise<FuelTrackerStore> {
-  const store = new FuelTrackerStore({
-    vehicles: new InMemoryRepository<VehicleRecord>(),
-    fillUps: new InMemoryRepository<FillUpRecord>(),
-    pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-  });
+  const store = makeStore();
   const car = await store.addVehicle({ name: 'Civic' });
   for (const [i, odometer] of [10_000, 10_300, 10_600, 10_900].entries()) {
     const draft = makeFuelEntryDraft({ date: new Date(2026, 0, 1 + i * 7), odometer, gallons: 10, pricePerGallon: 3.5 });
@@ -78,11 +73,7 @@ describe('the missed fill-up hint', () => {
   });
 
   test('stays quiet on a new car with too little history to judge', async () => {
-    const store = new FuelTrackerStore({
-      vehicles: new InMemoryRepository<VehicleRecord>(),
-      fillUps: new InMemoryRepository<FillUpRecord>(),
-      pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-    });
+    const store = makeStore();
     const car = await store.addVehicle({ name: 'New' });
     const draft = makeFuelEntryDraft({ date: new Date(2026, 0, 1), odometer: 10_000, gallons: 10, pricePerGallon: 3.5 });
     await store.addFillUp(draft!, car.id);

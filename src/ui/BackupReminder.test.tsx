@@ -1,9 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { makeStore } from '../test/fixtures';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { InMemoryRepository } from '../data/repository';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
 import { FuelTrackerStore } from '../data/store';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { MINIMUM_ENTRIES_TO_PROMPT, SNOOZE_DAYS } from '../domain/exportReminder';
@@ -20,11 +19,7 @@ import { App } from './App';
  */
 
 async function storeWith(fillUps: number): Promise<FuelTrackerStore> {
-  const store = new FuelTrackerStore({
-    vehicles: new InMemoryRepository<VehicleRecord>(),
-    fillUps: new InMemoryRepository<FillUpRecord>(),
-    pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-  });
+  const store = makeStore();
   const vehicle = await store.addVehicle({ name: 'Civic' });
   for (let i = 0; i < fillUps; i += 1) {
     const draft = makeFuelEntryDraft({
@@ -120,11 +115,7 @@ describe('the backup reminder', () => {
   test('counts fill-ups across every vehicle, not just the selected one', async () => {
     // Three cars with two fill-ups each is six worth losing. Counting only the
     // selected vehicle would keep this reader under the threshold forever.
-    const store = new FuelTrackerStore({
-      vehicles: new InMemoryRepository<VehicleRecord>(),
-      fillUps: new InMemoryRepository<FillUpRecord>(),
-      pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-    });
+    const store = makeStore();
     for (const name of ['Civic', 'Truck', 'Van']) {
       const vehicle = await store.addVehicle({ name });
       for (let i = 0; i < 2; i += 1) {

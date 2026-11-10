@@ -1,11 +1,13 @@
 import { describe, expect, test } from 'vitest';
+import { draftWith } from '../test/fixtures';
 import 'fake-indexeddb/auto';
-import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { computeFuelStatistics } from '../domain/fuelStatistics';
 import { FuelTrackerDatabase } from './db';
 import { DexieRepository } from './dexieRepository';
 import { FuelTrackerStore, toStats } from './store';
 import { seedDemoData } from './demoData';
+
+const draft = draftWith({ date: new Date(2025, 0, 15) });
 
 /**
  * The store over the real storage engine.
@@ -25,18 +27,6 @@ async function openStore(): Promise<{ store: FuelTrackerStore; db: FuelTrackerDa
     pendingFillUps: new DexieRepository(db.pendingFillUps),
   });
   return { store, db };
-}
-
-function draft(overrides: Partial<Parameters<typeof makeFuelEntryDraft>[0]> = {}) {
-  const result = makeFuelEntryDraft({
-    date: new Date(2025, 0, 15),
-    odometer: 10_000,
-    gallons: 10,
-    pricePerGallon: 3.5,
-    ...overrides,
-  });
-  if (result === null) throw new Error('fixture draft failed validation');
-  return result;
 }
 
 describe('the store over IndexedDB', () => {

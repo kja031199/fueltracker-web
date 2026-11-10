@@ -1,10 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { makeStore } from '../test/fixtures';
 import { readFileSync } from 'node:fs';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { InMemoryRepository } from '../data/repository';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
 import { FuelTrackerStore } from '../data/store';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { App } from './App';
@@ -22,11 +21,7 @@ import { sourcesUnder } from '../test/imports';
 
 async function setUp(tab: 'fillups' | 'vehicles' | 'dashboard' = 'fillups'): Promise<FuelTrackerStore> {
   saveHasOnboarded('local');
-  const store = new FuelTrackerStore({
-    vehicles: new InMemoryRepository<VehicleRecord>(),
-    fillUps: new InMemoryRepository<FillUpRecord>(),
-    pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-  });
+  const store = makeStore();
   const civic = await store.addVehicle({ name: 'Civic' });
   await store.addVehicle({ name: 'Golf' });
   for (const [i, odometer] of [10_000, 10_300].entries()) {

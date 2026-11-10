@@ -1,13 +1,12 @@
 import { describe, expect, test } from 'vitest';
-import { makeFuelEntryDraft, type FuelEntryDraft } from '../domain/fuelEntryDraft';
+import { draft, sharingFor } from '../test/fixtures';
 import { InMemoryRepository } from './repository';
 import type { FillUpRecord, PendingFillUpRecord, SyncFields, VehicleRecord } from './records';
 import { FuelTrackerStore } from './store';
 import { InMemorySharingWorld, type Account } from './sharing';
-import { syncAll, type SharingSync } from './shareSync';
+import { syncAll } from './shareSync';
 import { syncOnce } from './sync';
 import { InMemorySyncState } from './syncState';
-import { InMemoryShareLedger } from './shareLedger';
 import { MonotonicClock } from './syncClock';
 import { LocalView } from './localView';
 
@@ -75,29 +74,7 @@ function reset(repos: Counted): void {
   repos.pendingFillUps.reset();
 }
 
-function draft(odometer: number): FuelEntryDraft {
-  const made = makeFuelEntryDraft({ date: new Date(2026, 0, 1), odometer, gallons: 10, pricePerGallon: 3.5 });
-  if (made === null) throw new Error('fixture draft failed validation');
-  return made;
-}
-
 const ME: Account = { uid: 'me', name: 'Sam', email: 'sam@example.com', emailVerified: true };
-
-function sharingFor(world: InMemorySharingWorld, account: Account): SharingSync {
-  const states = new Map<string, InMemorySyncState>();
-  return {
-    remote: world.sharingFor(account),
-    stateFor: (key) => {
-      const state = states.get(key) ?? new InMemorySyncState();
-      states.set(key, state);
-      return state;
-    },
-    forgetState: async (key) => {
-      states.delete(key);
-    },
-    ledger: new InMemoryShareLedger(),
-  };
-}
 
 /** `shares` owners each share one car, with a fill-up, with ME. */
 async function member(shares: number) {

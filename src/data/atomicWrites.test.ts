@@ -11,10 +11,9 @@
  */
 
 import { describe, expect, test } from 'vitest';
+import { draftWith } from '../test/fixtures';
 import 'fake-indexeddb/auto';
 import Dexie from 'dexie';
-import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
-import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
 import { openAccountStore } from './accountStore';
 import { FuelTrackerDatabase } from './db';
 import { dexieRepositories } from './dexieRepository';
@@ -28,16 +27,7 @@ import { MonotonicClock } from './syncClock';
 import { InMemorySyncState } from './syncState';
 import { TEXT_LIMITS } from '../domain/textLimits';
 
-function draft(odometer = 10_000): FuelEntryDraft {
-  const result = makeFuelEntryDraft({
-    date: new Date(1_700_000_000_000),
-    odometer,
-    gallons: 10,
-    pricePerGallon: 3.5,
-  });
-  if (result === null) throw new Error('fixture draft failed validation');
-  return result;
-}
+const draft = draftWith({ date: new Date(1_700_000_000_000) });
 
 function fillUp(overrides: Partial<FillUpRecord> = {}): FillUpRecord {
   return {

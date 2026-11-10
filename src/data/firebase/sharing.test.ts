@@ -1,6 +1,6 @@
-import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
-import { initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
+import { allowedUidsInRules, describeWithEmulator, rulesEnvironment } from '../../test/emulator';
+import type { RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { doc, setDoc, type Firestore } from 'firebase/firestore';
 import { InMemoryRepository } from '../repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../records';
@@ -54,15 +54,7 @@ describe('falling back while an index builds', () => {
   });
 });
 
-const HOST = process.env.FIRESTORE_EMULATOR_HOST;
-const describeWithEmulator = describe.skipIf(HOST === undefined);
 
-function allowedUidsInRules(): string[] {
-  const source = readFileSync('firestore.rules', 'utf8');
-  const block = /function allowed\(\)[\s\S]*?\[([\s\S]*?)\]/.exec(source);
-  if (block === null) throw new Error('firestore.rules has no allowed() list');
-  return [...block[1]!.matchAll(/'([^']*)'/g)].map((match) => match[1]!);
-}
 
 const [OWNER_UID, PARTNER_UID] = allowedUidsInRules();
 const OWNER: Account = { uid: OWNER_UID!, name: 'Kyle', email: 'kyle@example.com', emailVerified: true };
@@ -72,11 +64,7 @@ describeWithEmulator('sharing through the real rules', () => {
   let env: RulesTestEnvironment;
 
   beforeAll(async () => {
-    const [host, port] = (HOST ?? 'localhost:8080').split(':');
-    env = await initializeTestEnvironment({
-      projectId: 'fueltracker-sharing-e2e',
-      firestore: { rules: readFileSync('firestore.rules', 'utf8'), host, port: Number(port) },
-    });
+    env = await rulesEnvironment('fueltracker-sharing-e2e');
   });
 
   beforeEach(async () => {
