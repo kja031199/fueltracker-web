@@ -68,7 +68,7 @@ owner's machine could open a genuine Google popup for it.
    rules file deploys to both. Then **Try again** on the no-access screen.
 
 The [Firestore emulator](development.md) is the alternative when you only need
-the rules, not a real sign-in: `src/data/firebase/rules.test.ts` already runs
+the rules, not a real sign-in: `src/data/firebase/rules.emulator.test.ts` already runs
 against it with a throwaway project id.
 
 ### And on production: remove `localhost`
@@ -223,8 +223,10 @@ reads until the index exists. A member sees that in Settings, as part of the
 sync's notice ("shared cars were read in full…", #89), so a missing index
 does not go unnoticed. `toolchain.test.ts` keeps the index declared.
 
-The rules tests now include every file under `src/data/firebase/` — the CI step
-runs the directory, so a new emulator test file cannot be skipped by accident.
+The rules tests are every `*.emulator.test.ts` file, run by `npm run test:rules`
+(#97) — a Vitest project chosen by name, so a new emulator test file is picked
+up by naming it, and `src/test/projects.test.ts` fails on one that imports the
+emulator setup under any other name.
 
 The rules deploy is not optional. A database created in production mode denies
 everything until they are uploaded, so sign-in succeeds and then every read

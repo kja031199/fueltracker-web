@@ -108,9 +108,8 @@ Use the pinned CLI, which is what CI runs:
 
 ```bash
 npm ci --prefix .github/firebase-cli
-.github/firebase-cli/node_modules/.bin/firebase emulators:exec \
-  --only firestore --project fueltracker-rules-test \
-  "npx vitest run src/data/firebase/"
+npm run test:rules   # the *.emulator.test.ts files, inside emulators:exec
+npm run test:build   # vite build, then the *.build.test.ts files
 ```
 
 (`firebase-tools` is the CLI; `firebase` is the SDK and ships no binary.)
@@ -200,7 +199,7 @@ npm ci --prefix .github/firebase-cli
 ### Rules and deploy
 
 - **`firestore.rules` carries a sign-in allowlist, so adding a *person* is a
-  deploy too.** Uids, not emails. `rules.test.ts` parses the list out of the
+  deploy too.** Uids, not emails. `rules.emulator.test.ts` parses the list out of the
   rules file rather than copying it, and fails if the list is empty or still
   holds a placeholder. Steps: [docs/accounts.md](docs/accounts.md).
 - **The merge stamp is bounded in the rules** (#79): `updatedAt` at most
@@ -261,7 +260,7 @@ npm ci --prefix .github/firebase-cli
 - **`Cross-Origin-Opener-Policy: same-origin` breaks `signInWithPopup`** by
   severing `window.opener`. The value is `same-origin-allow-popups`, and a test
   asserts it is not the dangerous one.
-- **The CSP is enforced** (#28), and `csp.test.ts` reads only the enforcing
+- **The CSP is enforced** (#28), and `csp.build.test.ts` reads only the enforcing
   header — so reverting to report-only fails the whole file rather than passing
   quietly. `script-src` is `'self'` plus `https://apis.google.com`, which
   Firebase Auth injects to host its auth iframe: the live check refused sign-in
@@ -297,7 +296,7 @@ npm ci --prefix .github/firebase-cli
 - **`runtimeCaching` matchers are copied into `sw.js` as source text.** Use a
   RegExp, never a function that closes over a variable in `vite.config.ts`. The
   first tesseract route used `base`, threw inside `sw.js`, never matched, and
-  offline scanning failed. `ocrAssets.test.ts` checks the route is a RegExp.
+  offline scanning failed. `ocrAssets.build.test.ts` checks the route is a RegExp.
 
 ### Data and sync
 
@@ -509,9 +508,10 @@ npm ci --prefix .github/firebase-cli
   "entered by" go through `sharing.namesFor` (cached per car, re-read for an
   unseen uid), never a `members()` call in a screen effect. A screen reload
   after a share sync needs rows written, not just a share synced.
-- **Emulator tests: every file under `src/data/firebase/` runs in CI.** The
-  sharing rules have their own file (`sharingRules.test.ts`) and an
-  end-to-end two-person flow (`sharing.test.ts`). Run the spike-style checks
+- **Emulator tests are the `*.emulator.test.ts` files** (#97), the `rules`
+  Vitest project, run by `npm run test:rules` locally and in CI. The sharing
+  rules have their own file (`sharingRules.emulator.test.ts`) and an
+  end-to-end two-person flow (`sharing.emulator.test.ts`). Run the spike-style checks
   from the repo with an **absolute** rules path — a relative one silently
   loaded the app's own rules once and "proved" the wrong file.
 
@@ -602,13 +602,25 @@ npm ci --prefix .github/firebase-cli
 - **Fixtures are shared: `src/test/fixtures.ts`** (#97). `makeStore({ author,
   clock })`, `draft(overrides | odometer)` through the real gate, and
   `sharingFor(world, user | account)`; the emulator suites take
-  `describeWithEmulator`, `allowedUidsInRules` and `rulesEnvironment` from
-  `src/test/emulator.ts`. A file that needs other defaults says so in one line
+  `allowedUidsInRules` and `rulesEnvironment` from `src/test/emulator.ts`. A file that needs other defaults says so in one line
   — `const draft = draftWith({ date: new Date(2025, 0, 15) })` — rather than
   writing its own: copies drift, and one `makeStore()` had quietly made every
   fill-up "entered by owner". `fixtures.test.ts` fails on a second definition
   or a hand-built empty store. `src/test/` is test support, not app code: the
   SDK boundary skips it.
+- **Three test projects, chosen by file name** (#97; `vite.config.ts`,
+  guarded by `src/test/projects.test.ts`): `unit` (`npm test`), `build`
+  (`*.build.test.ts`, `npm run test:build`, which builds first) and `rules`
+  (`*.emulator.test.ts`, `npm run test:rules`). A file that reads `dist/` or
+  imports `test/emulator` must carry the matching name; every test file runs
+  in exactly one project. `build` and `rules` **fail** without their
+  prerequisite (`needsBuild.ts`, `needsEmulator.ts`) instead of skipping, so
+  `npm test` reports no skips and those two cannot pass by skipping. Workflows
+  run the npm scripts, never `vitest` with a path: a path is how the rules job
+  ran the pure `src/data/firebase/` tests twice. A global setup's error is
+  thrown through `prerequisiteError`, whose stack is the message — Vitest 5
+  crashed source-mapping a real one and printed the crash instead of the
+  reason.
 
 - **A boundary test reads imports through `src/test/imports.ts`, never its own
   pattern** (#93). `layering`, `storeBoundary`, `sdkBoundary` and
@@ -679,8 +691,9 @@ React runtime/types major versions and `vite.config.ts` being type-checked
 (it is in `tsconfig`'s `include`, and uses `defineConfig` from
 `vitest/config` so its `test` block type-checks).
 
-The build runs **before** the tests, because `manifest.test.ts` and
-`csp.test.ts` read `dist/` and would otherwise skip in silence. Merging deploys
+`npm run test:build` builds and then runs the `*.build.test.ts` files
+(`manifest`, `csp`, `ocrAssets`) against that build, in CI and in the deploy,
+whose artifact is that same tested build. Merging deploys
 automatically and smoke-tests the live site; three workflow runs per merge is
 intended ([docs/development.md](docs/development.md)).
 

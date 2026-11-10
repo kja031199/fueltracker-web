@@ -9,11 +9,30 @@ an AI assistant working in this repository, read
 ```bash
 npm install
 npm run dev        # vite dev server
-npm test           # vitest
+npm test           # vitest: the unit tests, which need nothing but Node
+npm run test:build # build, then test the built site in dist/
+npm run test:rules # the rules tests, on the Firestore emulator (see below)
 npm run lint       # oxlint: the two React hooks rules, nothing else
 npm run typecheck  # tsc --noEmit
 npm run build      # typecheck, then a production build
 ```
+
+The tests are three Vitest projects, and a file's **name** says which one it
+is in (#97):
+
+| Project | Files | Run with | Needs |
+|---|---|---|---|
+| `unit` | every other `*.test.ts(x)` | `npm test` | nothing but Node |
+| `build` | `*.build.test.ts` — they read `dist/` | `npm run test:build` | a build, which the script makes first |
+| `rules` | `*.emulator.test.ts` | `npm run test:rules` | the Firestore emulator, which the script starts; install its CLI once with `npm ci --prefix .github/firebase-cli` |
+
+The `build` and `rules` projects **fail** without what they need, with a
+message naming the script, rather than skipping: they used to skip in every
+normal run, and a test that always skips is barely different from one that was
+never written. Name a new test for what it needs — `src/test/projects.test.ts`
+fails on a file that reads `dist/` or imports `src/test/emulator.ts` without
+the matching name, and on one that runs in no project or in two. A single file
+runs on its own as usual: `npx vitest run src/ui/App.test.tsx`.
 
 Component tests opt into a DOM per file with a `@vitest-environment jsdom`
 docblock. The domain and storage suites stay on the node environment, which
@@ -129,8 +148,8 @@ directory; the probe never ships), serves it with **the headers from
    account and transaction numbers.
 
 It takes a couple of minutes, mostly scenario 4 waiting out the load bound. It
-is not in CI, by decision: CI covers the same ground through `csp.test.ts`,
-`ocr.test.ts` and `ocrAssets.test.ts`. **Run it after changing the scanner, the
+is not in CI, by decision: CI covers the same ground through `csp.build.test.ts`,
+`ocr.test.ts` and `ocrAssets.build.test.ts`. **Run it after changing the scanner, the
 CSP or the service worker.**
 
 ## Mutation testing
@@ -276,6 +295,7 @@ Recorded so a regression in the tests themselves is visible:
 | Equivalent, kept: `AppShell` moving focus on arrival as well — it always mounts on its loading screen, whose title takes the focus and is then replaced, leaving focus where the guard would have. The guard stays for the day the shell renders content first. | — |
 | Faster tests (#97), still catching: the timers not passed on / a write that schedules no sync / a failed write still scheduling one / the same invitations re-rendering / every focus syncing / invitations shown to an unverified address / decoding a receipt before its bound | 14 / 14 / 1 / 1 / 1 / 1 / 1 |
 | Shared fixtures (#97): `makeStore` ignoring its author / its clock / a number not read as the odometer / a file's defaults beating a test's changes / a refused fixture returned as null / a signed-in user shared as unverified / the guard missing an arrow-function copy / a copy planted back | 5 / 1 / 7 / 5 / 1 / 11 / 1 / 1 |
+| Test projects (#97): unit also running the emulator tests / rules running a directory again / rules without its prerequisite / build without its prerequisite / a blank emulator host accepted / an empty `dist/` accepted / the error stack left to Vitest / `npm test` running every project / `test:build` not building / `test:rules` running a directory / the CI rules job calling vitest on a path / CI building without testing the build / the deploy shipping an untested build / `csp.build.test.ts` renamed back / an emulator test named as a unit test / a pure test named as an emulator test | 4 / 4 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 2 / 1 / 2 / 1 / 1 / 1 |
 
 Equivalent, and kept as a backstop: `shape()` without its `hasAll`. Every
 required field is also read by a clause of its own, and reading a missing field

@@ -8,13 +8,12 @@ import { join } from 'node:path';
  *
  * Copied from `node_modules` at build time — never committed — under a path
  * that carries the installed tesseract.js version, so an upgrade can never be
- * served a stale cached core. Reads `dist/`, so it skips on a fresh clone and
- * runs in CI, which builds first (see `manifest.test.ts`).
+ * served a stale cached core. Reads `dist/`, so it is a `*.build.test.ts`
+ * file: `npm run test:build` builds, then runs it (#97).
  */
 const require = createRequire(import.meta.url);
 const version = (require('tesseract.js/package.json') as { version: string }).version;
 const assets = join(process.cwd(), 'dist', 'tesseract', version);
-const built = existsSync(join(process.cwd(), 'dist', 'index.html'));
 
 const COPIES: readonly (readonly [string, string])[] = [
   ['worker.min.js', require.resolve('tesseract.js/dist/worker.min.js')],
@@ -27,7 +26,7 @@ const COPIES: readonly (readonly [string, string])[] = [
   ['lang/eng.traineddata.gz', require.resolve('@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz')],
 ];
 
-describe.skipIf(!built)('the self-hosted reader in the build', () => {
+describe('the self-hosted reader in the build', () => {
   test.each(COPIES)('%s is shipped, byte for byte what is installed', (served, source) => {
     // Byte-identical, because the worker and the core must come from the same
     // release: a mismatch fails at scan time, on a phone, with no error the

@@ -1,20 +1,18 @@
 /**
  * Does `firestore.rules` actually keep people out of each other's data?
  *
- * ## Why this file is separate, and skipped by default
+ * ## Why this file is separate
  *
  * It needs the Firestore emulator running, which needs Java and a downloaded
- * emulator JAR. The other 645 assertions need nothing but Node, and that is
- * worth protecting — so this suite skips itself when the emulator is not there
- * rather than failing, and a dedicated CI job provides it.
+ * emulator JAR. The rest of the suite needs nothing but Node, and that is
+ * worth protecting — so the `*.emulator.test.ts` files are a project of their
+ * own (#97), which `npm test` does not run and a dedicated CI job does.
  *
- * Run it locally with:
+ * Run them locally with:
  *
  * ```
- * npx --yes firebase-tools emulators:exec --only firestore \
- *   "npx vitest run src/data/firebase/rules.test.ts"
- *
- * `firebase-tools`, not `firebase` — the latter is the SDK and has no binary.
+ * npm ci --prefix .github/firebase-cli
+ * npm run test:rules
  * ```
  *
  * ## Why it exists at all
@@ -30,7 +28,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { makeStore } from '../../test/fixtures';
-import { allowedUidsInRules, describeWithEmulator, rulesEnvironment } from '../../test/emulator';
+import { allowedUidsInRules, rulesEnvironment } from '../../test/emulator';
 import {
   assertFails,
   assertSucceeds,
@@ -76,7 +74,7 @@ const STRANGER = 'uid-that-is-not-on-the-allowlist';
 /** A second allowed account, when the deployment has one. */
 const SECOND = ALLOWED[1];
 
-describeWithEmulator('firestore.rules', () => {
+describe('firestore.rules', () => {
   let env: RulesTestEnvironment;
 
   beforeAll(async () => {

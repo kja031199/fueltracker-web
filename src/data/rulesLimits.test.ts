@@ -12,8 +12,8 @@ import type { Invite, Member, Membership } from './sharing';
  * They drifted once already, in the worst direction: the rules bounded text and
  * the client did not, so the account refused what the app had happily saved.
  * This reads the limits out of `firestore.rules` itself — the way
- * `rules.test.ts` reads the allowlist — so changing one side alone fails here,
- * without needing the emulator.
+ * `rules.emulator.test.ts` reads the allowlist — so changing one side alone
+ * fails here, without needing the emulator.
  */
 const RULES = readFileSync('firestore.rules', 'utf8');
 const LABELS = [...RULES.matchAll(/label\(request\.resource\.data\.(\w+),\s*(\d+)\)/g)].map(

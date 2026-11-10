@@ -93,13 +93,12 @@ jobs:
             exit 1
           fi
 
-      # Built before the tests, because the manifest tests read dist/ and would
-      # otherwise skip silently — the same ordering, for the same reason, as
-      # ci.yml. Merges to main are already gated on four required checks with no
-      # bypass actors, so this is belt-and-braces; it also makes a manual
-      # workflow_dispatch safe.
-      - name: Build
-        run: npx vite build
+      # Builds with the configuration above, then tests that build — the one
+      # this job hands on — the same way ci.yml does (#97). Merges to main are
+      # already gated on four required checks with no bypass actors, so this is
+      # belt-and-braces; it also makes a manual workflow_dispatch safe.
+      - name: Build, and test the build
+        run: npm run test:build
 
       - name: Test
         run: npm test

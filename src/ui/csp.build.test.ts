@@ -5,9 +5,10 @@ import { describe, expect, it } from 'vitest';
  * The Content-Security-Policy, and the one property of the build that makes a
  * strict one possible.
  *
- * Reads `dist/` and `firebase.json`, so it is in the same family as
- * `manifest.test.ts` — and the same reason the build runs **before** the tests
- * in CI, or these would silently skip.
+ * Reads `dist/` and `firebase.json`, so it is a `*.build.test.ts` file, like
+ * `manifest.build.test.ts`: it runs through `npm run test:build`, which builds
+ * first (#97). It used to fail with ENOENT on a fresh clone while the other
+ * two skipped; now none of them runs without a build.
  *
  * ## Why a test about HTML belongs with a test about headers
  *

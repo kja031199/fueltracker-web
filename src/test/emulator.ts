@@ -1,21 +1,15 @@
 /**
- * What the Firestore emulator suites share (#97): whether there is an
- * emulator, the accounts the deployed rules allow, and a test environment
- * over the real `firestore.rules`. It was copied into three files.
+ * What the Firestore emulator suites share (#97): the accounts the deployed
+ * rules allow, and a test environment over the real `firestore.rules`. It was
+ * copied into three files.
+ *
+ * Only the `*.emulator.test.ts` files import it, and they run only in the
+ * `rules` project, whose global setup (`needsEmulator.ts`) stops the run when
+ * no emulator is there — so nothing here has to cope with a missing one.
  */
 
 import { readFileSync } from 'node:fs';
-import { describe } from 'vitest';
 import { initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
-
-export const EMULATOR_HOST = process.env.FIRESTORE_EMULATOR_HOST;
-
-/**
- * `describe`, skipped where no emulator runs. Skipped rather than failed: a
- * checkout without the emulator must still get a green suite, or everyone
- * learns to ignore red. CI runs these in a job of their own.
- */
-export const describeWithEmulator = describe.skipIf(EMULATOR_HOST === undefined);
 
 /**
  * The accounts the deployed rules allow, read out of the rules file itself.
@@ -37,7 +31,7 @@ export function allowedUidsInRules(): string[] {
 
 /** A rules test environment over the real `firestore.rules`, on the running emulator. */
 export function rulesEnvironment(projectId: string): Promise<RulesTestEnvironment> {
-  const [host, port] = (EMULATOR_HOST ?? 'localhost:8080').split(':');
+  const [host, port] = (process.env.FIRESTORE_EMULATOR_HOST ?? '').split(':');
   return initializeTestEnvironment({
     projectId,
     firestore: { rules: readFileSync('firestore.rules', 'utf8'), host, port: Number(port) },

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { makeStore } from '../../test/fixtures';
-import { allowedUidsInRules, describeWithEmulator, rulesEnvironment } from '../../test/emulator';
+import { allowedUidsInRules, rulesEnvironment } from '../../test/emulator';
 import {
   assertFails,
   assertSucceeds,
@@ -61,7 +61,7 @@ async function fillUpFor(id: string, vehicleId: string, enteredBy: string | null
   return { ...fillUp, id, vehicleId, enteredBy, syncedAt: serverTimestamp() };
 }
 
-describeWithEmulator('sharing a car (#66)', () => {
+describe('sharing a car (#66)', () => {
   let env: RulesTestEnvironment;
 
   const as = (uid: string, email: string, verified = true) =>

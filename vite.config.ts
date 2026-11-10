@@ -4,7 +4,7 @@ import type { Plugin } from 'vite';
 // From vitest rather than vite: the same function, typed to know the `test`
 // block below. This file is type-checked now (#57); with vite's own
 // `defineConfig`, that block was an unknown property nobody was checking.
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
@@ -16,6 +16,11 @@ const base = process.env.PAGES_BASE ?? '/';
  * shipped site never contains the probe.
  */
 const probe = process.env.OCR_PROBE === '1';
+
+/** Tests that run against the Firestore emulator: the `rules` project. */
+const EMULATOR_TESTS = 'src/**/*.emulator.test.{ts,tsx}';
+/** Tests that read the built site in `dist/`: the `build` project. */
+const BUILD_TESTS = 'src/**/*.build.test.{ts,tsx}';
 
 /**
  * The receipt reader's files, served from this origin (#17).
@@ -195,7 +200,30 @@ export default defineConfig({
     // `@vitest-environment jsdom` docblock, so the cost is paid only where
     // it buys something.
     environment: 'node',
-    include: ['src/**/*.test.{ts,tsx}'],
     setupFiles: ['src/test/setup.ts'],
+    // Three groups, chosen by the file's name (#97). `src/test/projects.test.ts`
+    // holds every test file to exactly one, and holds the names to what the
+    // files need.
+    projects: [
+      {
+        // `npm test`: needs nothing but Node.
+        extends: true,
+        test: {
+          name: 'unit',
+          include: ['src/**/*.test.{ts,tsx}'],
+          exclude: [...configDefaults.exclude, EMULATOR_TESTS, BUILD_TESTS],
+        },
+      },
+      {
+        // `npm run test:rules`: the real `firestore.rules` on the emulator.
+        extends: true,
+        test: { name: 'rules', include: [EMULATOR_TESTS], globalSetup: ['src/test/needsEmulator.ts'] },
+      },
+      {
+        // `npm run test:build`: the built site in `dist/`, built just before.
+        extends: true,
+        test: { name: 'build', include: [BUILD_TESTS], globalSetup: ['src/test/needsBuild.ts'] },
+      },
+    ],
   },
 });
