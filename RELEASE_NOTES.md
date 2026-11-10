@@ -11,6 +11,16 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-10
 
+- **Sync messages write their numbers the way your browser does: "1.200
+  rows" in German.** Nothing else you see changes; the dashboard's words are
+  ready to be translated.
+  *Technical:* `domain/` now returns numbers for the KPIs, weekday insight,
+  chart summaries and showdown rows, and `ui/kpiText.ts`, `insightText.ts`,
+  `charts/chartSummary.ts`, `showdownText.ts` and `wording.ts` write the
+  sentences, byte for byte as before. `DisplayProvider` moved above
+  `FuelLogProvider` so `useSync`'s counts use the display locale. The third
+  of four steps on #94.
+  [#94](https://github.com/kja031199/fueltracker-web/issues/94) · [PR #141](https://github.com/kja031199/fueltracker-web/pull/141)
 - **Messages count properly: "1 fill-up", "3 rows were", never "fill-up(s)".**
   Backup, import and sync messages, the dashboard's missed-fill warning and
   "minutes ago" all agree with their numbers now.

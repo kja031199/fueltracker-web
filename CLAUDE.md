@@ -634,23 +634,38 @@ npm run test:build   # vite build, then the *.build.test.ts files
   else `currencyForLocale`). A `DisplayStyle` `{ locale, currency }` is passed
   to `currency`/`fuelPrice`/`costPerDistance`, its `locale` to
   `volume`/`distance`/`economy`/`formatDate`/`fillUpFacts`/`fillUpName`/
-  `describeSince`, and the whole style to `dashboardKPIs` and the weekday
-  insight. **Every default is `US_STYLE`, which reproduces the old output byte
+  `describeSince`, and the whole style to the UI phrasers (`kpiText`,
+  `insightText`, `computeShowdownForDisplay`). **Every default is `US_STYLE`, which reproduces the old output byte
   for byte** — the units rule — and `useDisplay()` without a provider is
   `US_STYLE`. Display only: nothing stored changes, and the currency converts
   nothing. A stored currency must pass `isCurrencyCode`, or `Intl` would throw
   on it. **Never `toLocaleDateString()` or a literal `'en-US'` outside
   `format.ts`** (`oneCopy.test.ts`): use `formatDate(ms, locale)` and
   `US_STYLE.locale`. The weekday insight's day names stay English because the
-  sentence is English; words move to the UI in #94's later parts.
+  sentence is English.
+- **`domain/` returns numbers; `ui/` writes the words** (#94 part C1). The
+  dashboard's KPIs (`dashboardKPIs` → `KPI { id, value, detail }`), the
+  weekday insight (`WeekdayInsight`), chart summaries (`summarizeSeries` →
+  `SeriesSummary`) and showdown rows (`{ id, left, right, winner }`) carry no
+  text. Their sentences live in `ui/kpiText.ts`, `ui/insightText.ts`,
+  `ui/charts/chartSummary.ts` and `ui/showdownText.ts`; the fill-up and
+  vehicle phrasing (`fillUpFacts`, `fillUpName`, `describeSince`,
+  `displayName`…) in `ui/wording.ts`. A showdown win that *looks* like a tie
+  once formatted is demoted by the UI's `looksEqual`, because only the UI
+  knows what is shown. Each phraser defaults to US units and `US_STYLE`,
+  reproducing the old strings byte for byte, so the old string tests moved
+  with them unchanged. Unit names, grade labels and metric names still live
+  in `domain/` until part C2.
 - **Counts go through `countOf(n, { one, other }, locale)`** (#94, `format.ts`):
   `# row was` / `# rows were`, the `#` written in the display locale. The form
   is chosen by **English** plural rules, because the words are English — the
   reader's rules would give "0 row was" in French. Put the whole agreeing
   phrase in each form ("…before it" / "…before them"), not a second ternary.
   No "(s)" and no `=== 1 ? '…'` ternary anywhere (`oneCopy.test.ts`).
-  `useSync`'s notes sit above the display provider, so their counts use US
-  digits until #94 moves those sentences to the screen.
+  **`DisplayProvider` wraps `FuelLogProvider`** in `App`, so `useSync` can
+  read `useDisplay()` and its notes count in the reader's locale ("1.200
+  rows"). It reads the locale through a ref so `run`, whose identity the sync
+  scheduler is keyed on, never changes with it.
 - **The selected car stays in `useAppData`** (#93 asked; kept on purpose).
   It is applied in the same `setShown` as that car's fill-ups (#88); held as
   UI state outside, it would change a render before them and bring back one

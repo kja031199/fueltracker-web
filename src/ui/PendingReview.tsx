@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
 import { useId, useState } from 'react';
-import { fillUpFacts, formatDate } from '../domain/format';
+import { formatDate } from '../domain/format';
+import { fillUpFacts } from './wording';
 import { FillUpSummary } from './FillUpSummary';
 import { totalCost } from '../domain/models';
 import { useFuelLog } from './fuelLog';

@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import { useId } from 'react';
 import type { AuthUser } from '../../data/auth';
-import { describeSince } from '../../domain/format';
+import { describeSince } from '../wording';
 import { useSyncStatus } from '../fuelLog';
 import { AccountId } from '../AccountId';
 import { useDisplay } from '../session';

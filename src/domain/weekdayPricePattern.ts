@@ -17,10 +17,7 @@
  */
 
 import type { FuelEntryStats } from './models';
-import type { DisplayStyle } from './format';
-import { US_STYLE, plainCurrency } from './format';
-import type { UnitPreferences } from './units';
-import { US, pricePerUnit, volume } from './units';
+import { US_STYLE } from './format';
 
 /** Average price per gallon for one day of the week. */
 export interface WeekdayPrice {
@@ -57,7 +54,7 @@ const FALLBACK_FULL = [
  */
 const REFERENCE_WEEK = Array.from({ length: 7 }, (_, i) => new Date(2025, 0, 5 + i));
 
-function weekdayNames(locale: string, width: 'short' | 'long'): string[] {
+export function weekdayNames(locale: string, width: 'short' | 'long'): string[] {
   try {
     const formatter = new Intl.DateTimeFormat(locale, { weekday: width });
     const names = REFERENCE_WEEK.map((date) => formatter.format(date));
@@ -175,15 +172,15 @@ export const MIN_FILLS_FOR_INSIGHT = 4;
 /** Below a one-cent spread the "pattern" is noise. */
 export const MIN_INSIGHT_SPREAD_CENTS = 1;
 
-export interface InsightOptions extends WeekdayOptions {
-  readonly units?: UnitPreferences;
-  /**
-   * The reader's locale and currency, for the amount (#94). The day names stay
-   * with `locale` — US English by default — because they sit inside an English
-   * sentence: "on Dienstags than Freitags" helps nobody. The sentence itself
-   * moves to the screen in a later part of #94.
-   */
-  readonly style?: DisplayStyle;
+/**
+ * The weekday pattern worth telling the reader about (#94: a value, not the
+ * sentence — `ui/insightText.ts` says it). Weekdays are in Calendar numbering
+ * (1 = Sunday … 7 = Saturday); the spread is canonical, per US gallon.
+ */
+export interface WeekdayInsight {
+  readonly cheapestWeekday: number;
+  readonly priciestWeekday: number;
+  readonly spreadPerGallon: number;
 }
 
 /**
@@ -191,8 +188,8 @@ export interface InsightOptions extends WeekdayOptions {
  * pattern is worth trusting: at least two distinct weekdays, a handful of fills
  * overall, and at least a one-cent spread.
  *
- * The spread is converted to the user's volume unit, so a metric reader is told
- * what they save per litre rather than per gallon.
+ * The spread is per US gallon; the screen converts it to the reader's volume
+ * unit, so a metric reader is told what they save per litre.
  *
  * ## One deliberate divergence from the Swift
  *
@@ -207,8 +204,8 @@ export interface InsightOptions extends WeekdayOptions {
  */
 export function weekdayPriceInsight(
   entries: readonly FuelEntryStats[],
-  options: InsightOptions = {},
-): string | null {
+  options: WeekdayOptions = {},
+): WeekdayInsight | null {
   const prices = weekdayPrices(entries, options);
   if (prices.length < 2 || entries.length < MIN_FILLS_FOR_INSIGHT) return null;
 
@@ -223,12 +220,5 @@ export function weekdayPriceInsight(
   if (!Number.isFinite(delta)) return null;
   if (!(delta * 100 >= MIN_INSIGHT_SPREAD_CENTS)) return null;
 
-  const units = options.units ?? US;
-  const locale = options.locale ?? US_STYLE.locale;
-  const fullNames = weekdayNames(locale, 'long');
-  const cheapName = fullNames[cheapest.weekday - 1] ?? '';
-  const priceyName = fullNames[priciest.weekday - 1] ?? '';
-  const unit = volume[units.volume];
-  const perUnitDelta = plainCurrency(pricePerUnit(delta, units.volume), options.style ?? { locale });
-  return `You pay about ${perUnitDelta}/${unit.abbreviation} less on ${cheapName}s than ${priceyName}s.`;
+  return { cheapestWeekday: cheapest.weekday, priciestWeekday: priciest.weekday, spreadPerGallon: delta };
 }

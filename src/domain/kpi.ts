@@ -1,17 +1,19 @@
 /**
  * The dashboard's headline stats, ported from `Shared/Statistics/KPI.swift`.
  *
- * A `KPI` is a **formatted** stat, not a number: the maths already happened in
- * `fuelStatistics.ts`, and this turns it into the three strings a card shows.
- * Keeping that step out of the view means the wording and the unit handling are
- * testable without rendering anything.
+ * A `KPI` is a **value**, not words (#94): which stat it is, its canonical
+ * number (miles, US gallons, US MPG, the amount as typed), and what its
+ * secondary line is about. The maths already happened in `fuelStatistics.ts`;
+ * the words, units and currency are the screen's (`ui/kpiText.ts`). It used
+ * to build the card's three strings here — "Total Spent", "Best: …", "/mo
+ * avg" — which put English in the domain layer.
  *
  * Two details carried over deliberately:
  *
- * - **`id` is stable across unit changes** while `title` is not. Switching to
- *   metric rewrites "Avg MPG" into "Avg L/100km", and a stable key is what lets
- *   the list update a card in place instead of tearing it down and building a
- *   new one.
+ * - **`id` is stable across unit changes**, while the title the screen builds
+ *   from it is not. Switching to metric rewrites "Avg MPG" into "Avg
+ *   L/100km", and a stable key is what lets the list update a card in place
+ *   instead of tearing it down and building a new one.
  * - **`value` may be `null`**, meaning "no data yet" — distinct from a
  *   formatted zero. A new vehicle has no economy, and showing "0.0 MPG" would
  *   be a claim rather than an absence.
@@ -22,124 +24,89 @@
 
 import type { FuelStatistics } from './fuelStatistics';
 import type { Metric } from './metric';
-import type { UnitPreferences } from './units';
-import { US, distance as distanceUnits, economy as economyUnits, volume as volumeUnits } from './units';
-import type { DisplayStyle } from './format';
-import {
-  US_STYLE,
-  costPerDistance,
-  currency,
-  distance,
-  economy,
-  fuelPrice,
-  volume,
-} from './format';
+
+/** The cards, in display order. */
+export const KPI_IDS = [
+  'avgEconomy',
+  'lastEconomy',
+  'totalSpent',
+  'costPerDistance',
+  'avgPrice',
+  'distanceTracked',
+  'fillUps',
+  'totalVolume',
+] as const;
+
+export type KpiId = (typeof KPI_IDS)[number];
+
+/** What a card's secondary line is about, with its canonical value. */
+export type KpiDetail =
+  | { readonly kind: 'bestEconomy'; readonly mpg: number }
+  | { readonly kind: 'monthlySpend'; readonly amount: number }
+  | { readonly kind: 'lastPrice'; readonly pricePerGallon: number }
+  | { readonly kind: 'milesPerFill'; readonly miles: number }
+  | { readonly kind: 'gallonsPerFill'; readonly gallons: number }
+  | { readonly kind: 'costPerFill'; readonly amount: number };
 
 export interface KPI {
-  readonly id: string;
-  readonly title: string;
-  /** `null` means "no data yet", which is not the same as a formatted zero. */
-  readonly value: string | null;
-  readonly detail: string | null;
+  readonly id: KpiId;
+  /**
+   * The canonical value: MPG, an amount, a price per gallon, a cost per mile,
+   * miles, a count, gallons. `null` means "no data yet", which is not the same
+   * as a zero.
+   */
+  readonly value: number | null;
+  readonly detail: KpiDetail | null;
   readonly metric: Metric;
 }
 
-/**
- * One spoken phrase combining title, value and detail, so a screen reader reads
- * the card as a single coherent stat rather than three disconnected fragments.
- */
-export function kpiAccessibilityLabel(kpi: KPI): string {
-  const parts = [kpi.title, kpi.value ?? 'no data yet'];
-  if (kpi.detail !== null) parts.push(kpi.detail);
-  return parts.join(', ');
-}
-
-/** The full KPI set for the dashboard, rendered in the given units. */
-export function dashboardKPIs(
-  stats: FuelStatistics,
-  units: UnitPreferences = US,
-  style: DisplayStyle = US_STYLE,
-): KPI[] {
-  const economySpec = economyUnits[units.economy];
-  const distanceSpec = distanceUnits[units.distance];
-  const volumeSpec = volumeUnits[units.volume];
-
-  // In the reader's locale and currency (#94); the default is unchanged.
-  const money = (value: number): string => currency(value, style);
-  const { locale } = style;
-
+/** The full KPI set for the dashboard, in canonical units. */
+export function dashboardKPIs(stats: FuelStatistics): KPI[] {
   return [
-    {
-      id: 'avgEconomy',
-      title: `Avg ${economySpec.abbreviation}`,
-      value: stats.averageMPG === null ? null : economy(stats.averageMPG, units.economy, locale),
-      detail: null,
-      metric: 'economy',
-    },
+    { id: 'avgEconomy', value: stats.averageMPG, detail: null, metric: 'economy' },
     {
       id: 'lastEconomy',
-      title: `Last ${economySpec.abbreviation}`,
-      value: stats.lastMPG === null ? null : economy(stats.lastMPG, units.economy, locale),
-      detail:
-        stats.bestMPG === null
-          ? null
-          : `Best: ${economy(stats.bestMPG, units.economy, locale) ?? '—'}`,
+      value: stats.lastMPG,
+      detail: stats.bestMPG === null ? null : { kind: 'bestEconomy', mpg: stats.bestMPG },
       metric: 'economy',
     },
     {
       id: 'totalSpent',
-      title: 'Total Spent',
-      value: money(stats.totalSpent),
+      value: stats.totalSpent,
       detail:
-        stats.averageMonthlySpend === null ? null : `${money(stats.averageMonthlySpend)}/mo avg`,
+        stats.averageMonthlySpend === null ? null : { kind: 'monthlySpend', amount: stats.averageMonthlySpend },
       metric: 'spending',
     },
-    {
-      id: 'costPerDistance',
-      title: `Cost per ${distanceSpec.singularNoun}`,
-      value: stats.costPerMile === null ? null : costPerDistance(stats.costPerMile, units.distance, style),
-      detail: null,
-      metric: 'spending',
-    },
+    { id: 'costPerDistance', value: stats.costPerMile, detail: null, metric: 'spending' },
     {
       id: 'avgPrice',
-      title: `Avg Price/${volumeSpec.abbreviation}`,
-      value:
-        stats.averagePricePerGallon === null
-          ? null
-          : fuelPrice(stats.averagePricePerGallon, units.volume, style),
+      value: stats.averagePricePerGallon,
       detail:
-        stats.lastPricePerGallon === null
-          ? null
-          : `Last: ${fuelPrice(stats.lastPricePerGallon, units.volume, style)}`,
+        stats.lastPricePerGallon === null ? null : { kind: 'lastPrice', pricePerGallon: stats.lastPricePerGallon },
       metric: 'price',
     },
     {
       id: 'distanceTracked',
-      title: `${distanceSpec.name} Tracked`,
-      value: distance(stats.milesTracked, units.distance, false, locale),
+      value: stats.milesTracked,
       detail:
         stats.averageMilesBetweenFillUps === null
           ? null
-          : `${distance(stats.averageMilesBetweenFillUps, units.distance, false, locale)} ${distanceSpec.abbreviation}/fill avg`,
+          : { kind: 'milesPerFill', miles: stats.averageMilesBetweenFillUps },
       metric: 'distance',
     },
     {
       id: 'fillUps',
-      title: 'Fill-Ups',
-      value: String(stats.fillUpCount),
+      value: stats.fillUpCount,
       detail:
         stats.averageGallonsPerFillUp === null
           ? null
-          : `${volume(stats.averageGallonsPerFillUp, units.volume, false, locale)} ${volumeSpec.abbreviation} avg`,
+          : { kind: 'gallonsPerFill', gallons: stats.averageGallonsPerFillUp },
       metric: 'distance',
     },
     {
       id: 'totalVolume',
-      title: `Total ${volumeSpec.name}`,
-      value: volume(stats.totalGallons, units.volume, false, locale),
-      detail:
-        stats.averageFillUpCost === null ? null : `${money(stats.averageFillUpCost)}/fill avg`,
+      value: stats.totalGallons,
+      detail: stats.averageFillUpCost === null ? null : { kind: 'costPerFill', amount: stats.averageFillUpCost },
       metric: 'price',
     },
   ];

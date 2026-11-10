@@ -1,5 +1,5 @@
 import type { FormEvent, ReactElement } from 'react';
-import { verifiedName } from '../domain/format';
+import { verifiedName } from './wording';
 import { useCallback, useEffect, useState } from 'react';
 import type { VehicleRecord } from '../data/records';
 import type { Invite, Member } from '../data/sharing';

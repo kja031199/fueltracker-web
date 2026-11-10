@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import { useState } from 'react';
 import type { VehicleRecord } from '../data/records';
-import { vehicleSubtitle } from '../domain/format';
+import { vehicleSubtitle } from './wording';
 import { useFuelLog } from './fuelLog';
 import { SharePanel } from './SharePanel';
 import { ConfirmButton } from './ConfirmButton';

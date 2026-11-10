@@ -10,7 +10,8 @@
  *
  * This is the load-bearing rule, and the whole units system rests on it.
  * Ranking happens on stored miles / US gallons / US MPG; only the strings and
- * the row titles change with the reader's unit choice. It matters most for
+ * the row titles — which the screen builds, `ui/showdownText.ts` (#94) —
+ * change with the reader's unit choice. It matters most for
  * economy: **L/100km is the reciprocal of MPG**, so a better vehicle shows a
  * *lower* number, and a comparison done on displayed values would hand every
  * economy row to the wrong vehicle for half the world.
@@ -26,10 +27,6 @@
 import type { FuelEntryStats, DateValuePoint } from './models';
 import { computeFuelStatistics } from './fuelStatistics';
 import type { Metric } from './metric';
-import type { UnitPreferences } from './units';
-import { US, distance as distanceUnits, economy as economyUnits, volume as volumeUnits } from './units';
-import type { CurrencyOptions } from './format';
-import { costPerDistance, currency, distance, economy, fuelPrice } from './format';
 
 /**
  * The outcome of one row.
@@ -54,14 +51,16 @@ export const SHOWDOWN_ROW_IDS = ['mpg', 'cpm', 'ppg', 'miles', 'spent', 'fills']
 
 export type ShowdownRowId = (typeof SHOWDOWN_ROW_IDS)[number];
 
-/** One row comparing a metric across two vehicles. */
+/**
+ * One row comparing a metric across two vehicles: canonical values (MPG, cost
+ * per mile, price per gallon, miles, amount, count), not words (#94).
+ */
 export interface ShowdownRow {
   readonly id: ShowdownRowId;
-  readonly title: string;
   readonly metric: Metric;
-  /** Formatted value, or `null` where the vehicle has no data for it. */
-  readonly left: string | null;
-  readonly right: string | null;
+  /** The canonical value, or `null` where the vehicle has no data for it. */
+  readonly left: number | null;
+  readonly right: number | null;
   readonly winner: Winner;
 }
 
@@ -104,70 +103,40 @@ export function decideWinner(
   return leftBetter ? 'left' : 'right';
 }
 
-/**
- * A spoken description of the row, stating the winner **in words**.
- *
- * The on-screen signal is colour, which a screen-reader user cannot hear and a
- * colour-blind reader may not be able to see — so the verdict has to exist as
- * text as well, not only as a highlight.
- */
-export function showdownRowLabel(
-  row: ShowdownRow,
-  leftName: string,
-  rightName: string,
-): string {
-  const left = row.left ?? 'no data';
-  const right = row.right ?? 'no data';
-  let label = `${row.title}. ${leftName}: ${left}. ${rightName}: ${right}.`;
-  if (row.winner === 'left') label += ` ${leftName} wins.`;
-  else if (row.winner === 'right') label += ` ${rightName} wins.`;
-  else if (row.winner === 'tie') label += ' Tie.';
-  return label;
-}
-
-export interface ShowdownOptions extends CurrencyOptions {
-  readonly units?: UnitPreferences;
+export interface ShowdownOptions {
+  /**
+   * Whether the screen would show two values of a row identically. If it would,
+   * the gap is too small to see, and highlighting one side as the winner over a
+   * difference the reader cannot read ("$3.000" vs "$3.000") is just confusing —
+   * so the row is a tie. The screen knows its own formatting, so it says
+   * (`ui/showdownText.ts`); without it, only `decideWinner` decides.
+   */
+  readonly looksEqual?: (id: ShowdownRowId, left: number, right: number) => boolean;
 }
 
 interface ContestSpec {
   readonly id: ShowdownRowId;
-  readonly title: string;
   readonly metric: Metric;
   readonly left: number | null;
   readonly right: number | null;
   readonly lowerIsBetter: boolean;
-  readonly format: (value: number) => string | null;
 }
 
-function contest(spec: ContestSpec): ShowdownRow {
-  const leftText = spec.left === null ? null : spec.format(spec.left);
-  const rightText = spec.right === null ? null : spec.format(spec.right);
+function contest(spec: ContestSpec, options: ShowdownOptions): ShowdownRow {
   let winner = decideWinner(spec.left, spec.right, spec.lowerIsBetter);
-  // If both sides render to the same text, the gap is too small to see.
-  // Highlighting one as the winner over a difference the reader cannot read
-  // (e.g. "$3.000" vs "$3.000") is just confusing, so call it a tie.
-  if ((winner === 'left' || winner === 'right') && leftText === rightText) {
+  if (
+    (winner === 'left' || winner === 'right') &&
+    spec.left !== null &&
+    spec.right !== null &&
+    options.looksEqual?.(spec.id, spec.left, spec.right) === true
+  ) {
     winner = 'tie';
   }
-  return {
-    id: spec.id,
-    title: spec.title,
-    metric: spec.metric,
-    left: leftText,
-    right: rightText,
-    winner,
-  };
+  return { id: spec.id, metric: spec.metric, left: spec.left, right: spec.right, winner };
 }
 
-function info(
-  id: ShowdownRowId,
-  title: string,
-  metric: Metric,
-  left: number,
-  right: number,
-  format: (value: number) => string,
-): ShowdownRow {
-  return { id, title, metric, left: format(left), right: format(right), winner: 'notContested' };
+function info(id: ShowdownRowId, metric: Metric, left: number, right: number): ShowdownRow {
+  return { id, metric, left, right, winner: 'notContested' };
 }
 
 export function computeVehicleShowdown(
@@ -177,69 +146,22 @@ export function computeVehicleShowdown(
   rightEntries: readonly FuelEntryStats[],
   options: ShowdownOptions = {},
 ): VehicleShowdown {
-  const units = options.units ?? US;
-  // Spread-if-present rather than passing `undefined` through: the project
-  // compiles with `exactOptionalPropertyTypes`, where an explicit `undefined`
-  // is not the same as an absent key.
-  const money: CurrencyOptions = {
-    ...(options.locale !== undefined ? { locale: options.locale } : {}),
-    ...(options.currency !== undefined ? { currency: options.currency } : {}),
-  };
-
   const left = computeFuelStatistics(leftEntries);
   const right = computeFuelStatistics(rightEntries);
 
-  const volumeSpec = volumeUnits[units.volume];
-  const distanceSpec = distanceUnits[units.distance];
-  const economySpec = economyUnits[units.economy];
-
   const rows: ShowdownRow[] = [
-    contest({
-      id: 'mpg',
-      title: `Avg ${economySpec.abbreviation}`,
-      metric: 'economy',
-      left: left.averageMPG,
-      right: right.averageMPG,
-      // Canonical MPG: higher is better regardless of how it will be displayed.
-      lowerIsBetter: false,
-      format: (value) => economy(value, units.economy),
-    }),
-    contest({
-      id: 'cpm',
-      title: `Cost per ${distanceSpec.singularNoun}`,
-      metric: 'spending',
-      left: left.costPerMile,
-      right: right.costPerMile,
-      lowerIsBetter: true,
-      format: (value) => costPerDistance(value, units.distance, money),
-    }),
-    contest({
-      id: 'ppg',
-      title: `Avg Price/${volumeSpec.abbreviation}`,
-      metric: 'price',
-      left: left.averagePricePerGallon,
-      right: right.averagePricePerGallon,
-      lowerIsBetter: true,
-      format: (value) => fuelPrice(value, units.volume, money),
-    }),
+    // Canonical MPG: higher is better regardless of how it will be displayed.
+    contest({ id: 'mpg', metric: 'economy', left: left.averageMPG, right: right.averageMPG, lowerIsBetter: false }, options),
+    contest({ id: 'cpm', metric: 'spending', left: left.costPerMile, right: right.costPerMile, lowerIsBetter: true }, options),
+    contest(
+      { id: 'ppg', metric: 'price', left: left.averagePricePerGallon, right: right.averagePricePerGallon, lowerIsBetter: true },
+      options,
+    ),
     // Informational — lower is not inherently "better" here (it can just mean
     // less driving), so these have no winner.
-    info(
-      'miles',
-      `${distanceSpec.name} Tracked`,
-      'distance',
-      left.milesTracked,
-      right.milesTracked,
-      (value) => distance(value, units.distance),
-    ),
-    info('spent', 'Total Spent', 'spending', left.totalSpent, right.totalSpent, (value) =>
-      currency(value, money),
-    ),
-    // Truncating, not rounding — matching the Swift's `Int($0)`. The value is
-    // already a whole count; truncation just refuses to invent a 5th fill-up.
-    info('fills', 'Fill-Ups', 'distance', left.fillUpCount, right.fillUpCount, (value) =>
-      String(Math.trunc(value)),
-    ),
+    info('miles', 'distance', left.milesTracked, right.milesTracked),
+    info('spent', 'spending', left.totalSpent, right.totalSpent),
+    info('fills', 'distance', left.fillUpCount, right.fillUpCount),
   ];
 
   return {

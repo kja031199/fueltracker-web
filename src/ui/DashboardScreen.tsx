@@ -2,7 +2,9 @@ import type { ReactElement } from 'react';
 import { useId, useMemo, useState } from 'react';
 import { toStats } from '../data/records';
 import { computeFuelStatistics } from '../domain/fuelStatistics';
-import { dashboardKPIs, kpiAccessibilityLabel } from '../domain/kpi';
+import { dashboardKPIs } from '../domain/kpi';
+import { kpiText } from './kpiText';
+import { insightText } from './insightText';
 import { hueFor } from '../domain/metric';
 import { cutoffFrom, DASHBOARD_TIME_RANGES } from '../domain/dashboardTimeRange';
 import type { DashboardTimeRange } from '../domain/dashboardTimeRange';
@@ -58,10 +60,17 @@ export function DashboardScreen(): ReactElement {
     () => computeFuelStatistics(toStats(fillUps), { from: cutoff }),
     [fillUps, cutoff],
   );
-  const kpis = useMemo(() => dashboardKPIs(stats, units, style), [stats, units, style]);
+  // Values from the domain, words from `kpiText` (#94).
+  const kpis = useMemo(
+    () => dashboardKPIs(stats).map((kpi) => ({ ...kpiText(kpi, units, style), id: kpi.id, metric: kpi.metric })),
+    [stats, units, style],
+  );
   // Mapped once, not once per use (#88).
   const inRangeStats = useMemo(() => toStats(inRange), [inRange]);
-  const insight = useMemo(() => weekdayPriceInsight(inRangeStats, { units, style }), [inRangeStats, units, style]);
+  const insight = useMemo(() => {
+    const found = weekdayPriceInsight(inRangeStats);
+    return found === null ? null : insightText(found, units, style);
+  }, [inRangeStats, units, style]);
   const weekdays = useMemo(() => weekdayPrices(inRangeStats), [inRangeStats]);
   const cheapest = useMemo(() => cheapestWeekday(inRangeStats), [inRangeStats]);
 
@@ -145,7 +154,7 @@ export function DashboardScreen(): ReactElement {
               // The card is labelled as one phrase rather than three separate
               // texts, so a screen reader reads a coherent stat instead of
               // "Avg MPG", "40.0", "Best: 42.0" as unrelated fragments.
-              <li className="card" key={kpi.id} aria-label={kpiAccessibilityLabel(kpi)}>
+              <li className="card" key={kpi.id} aria-label={kpi.label}>
                 <span className="card__title" aria-hidden="true">
                   {kpi.title}
                 </span>

@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import type { DateValuePoint } from '../../domain/models';
 import { downsampled } from '../../domain/models';
-import { chartSummary } from '../../domain/chartAccessibility';
+import { chartSummary } from './chartSummary';
 import type { Metric } from '../../domain/metric';
 import { hueFor } from '../../domain/metric';
 import { formatDate } from '../../domain/format';

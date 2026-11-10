@@ -34,6 +34,7 @@ import { createSyncScheduler } from './syncScheduler';
 import type { SchedulerTimers } from './syncScheduler';
 import { accountPreference, numberCodec, useAccountPreference } from './preferences';
 import { countOf } from '../domain/format';
+import { useDisplay } from './session';
 
 /**
  * When a sync last worked — an **account** preference (#55). Browser-wide, it
@@ -98,6 +99,11 @@ export function useSync(
   // The latest callback, without making every new one restart the scheduler.
   const sharesSeen = useRef(onShares);
   sharesSeen.current = onShares;
+  // The reader's locale for the counts in the notes (#94). Read through a ref,
+  // so it never changes `run`, whose identity the scheduler is keyed on.
+  const display = useDisplay().style.locale;
+  const locale = useRef(display);
+  locale.current = display;
   const run = useCallback(async () => {
     if (remote === null) return;
     setSyncing(true);
@@ -134,11 +140,11 @@ export function useSync(
       // passed shape and then failed the draft gate on its numbers.
       const unusable = invalid + pulledRejected;
       if (unusable > 0) {
-        notes.push(`${countOf(unusable, { one: '# row from your account was', other: '# rows from your account were' })} unusable and skipped`);
+        notes.push(`${countOf(unusable, { one: '# row from your account was', other: '# rows from your account were' }, locale.current)} unusable and skipped`);
       }
       if (receiptsOmitted > 0) {
         notes.push(
-          `${countOf(receiptsOmitted, { one: '# receipt photo was', other: '# receipt photos were' })} too large to sync and stayed on this device`,
+          `${countOf(receiptsOmitted, { one: '# receipt photo was', other: '# receipt photos were' }, locale.current)} too large to sync and stayed on this device`,
         );
       }
       if (unsendable > 0) {
@@ -146,16 +152,16 @@ export function useSync(
         // not fix itself, and the rows are only on this device until it is
         // dealt with.
         notes.push(
-          `${countOf(unsendable, { one: '# row', other: '# rows' })} could not be uploaded and stay on this device only`,
+          `${countOf(unsendable, { one: '# row', other: '# rows' }, locale.current)} could not be uploaded and stay on this device only`,
         );
       }
       if (repaired > 0) {
         notes.push(
-          `${countOf(repaired, { one: '# row had text longer than your account accepts and was shortened so it', other: '# rows had text longer than your account accepts and were shortened so they' })} could sync`,
+          `${countOf(repaired, { one: '# row had text longer than your account accepts and was shortened so it', other: '# rows had text longer than your account accepts and were shortened so they' }, locale.current)} could sync`,
         );
       }
       if (skippedNewerSchema > 0) {
-        notes.push(`${countOf(skippedNewerSchema, { one: '# row was', other: '# rows were' })} written by a newer version and left alone`);
+        notes.push(`${countOf(skippedNewerSchema, { one: '# row was', other: '# rows were' }, locale.current)} written by a newer version and left alone`);
       }
       if (unbeatable > 0) {
         // Said plainly because the consequence is specific and otherwise
@@ -164,7 +170,7 @@ export function useSync(
           countOf(unbeatable, {
             one: '# row is dated far in the future, probably by a device with a wrong clock — changes you make to it here may not stick until its clock is fixed',
             other: '# rows are dated far in the future, probably by a device with a wrong clock — changes you make to them here may not stick until its clock is fixed',
-          }),
+          }, locale.current),
         );
       }
       // Shared cars (#66). An ended share is said by name: a car vanishing
@@ -193,7 +199,7 @@ export function useSync(
         );
       }
       if (all.shares.failed.length > 0) {
-        notes.push(`${countOf(all.shares.failed.length, { one: '# shared car', other: '# shared cars' })} could not be reached and will be retried`);
+        notes.push(`${countOf(all.shares.failed.length, { one: '# shared car', other: '# shared cars' }, locale.current)} could not be reached and will be retried`);
       }
       setMessage(notes.length === 0 ? null : `Synced. ${notes.join('; ')}.`);
 

@@ -10,7 +10,7 @@ import type { FuelTrackerStore } from '../data/store';
 import type { SharingSync } from '../data/shareSync';
 import type { Invite, Member, Membership } from '../data/sharing';
 import { ShareClash } from '../data/sharing';
-import { verifiedName } from '../domain/format';
+import { verifiedName } from './wording';
 import type { SharingView } from './fuelLogTypes';
 
 /** What a fuel log with no account to share through offers: nothing, and every action refuses. */
