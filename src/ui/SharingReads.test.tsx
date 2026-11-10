@@ -61,15 +61,19 @@ function sharingFor(world: InMemorySharingWorld, account: Account): SharingSync 
   };
 }
 
-async function settle(): Promise<void> {
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  });
+/**
+ * After a sync, the sharing lists are re-read; this waits for that read —
+ * counted by the world — and lets React apply it. Not a sleep (#97).
+ */
+async function refreshed(world: InMemorySharingWorld, after: number): Promise<void> {
+  await waitFor(() => expect(world.reads.invitesForMe).toBeGreaterThan(after));
+  await act(async () => {});
 }
 
 interface Mounted {
   readonly log: () => FuelLog;
   readonly status: () => SyncStatus;
+  readonly world: InMemorySharingWorld;
 }
 
 /** The app's provider for `account`, showing the fill-up list, once the mount sync has settled. */
@@ -86,6 +90,7 @@ async function mount(
     status = useSyncStatus();
     return null;
   }
+  const before = world.reads.invitesForMe;
   render(
     <FuelLogProvider store={store} remote={world.remoteFor(account.uid)} uid={account.uid} sharing={sharing}>
       <Probe />
@@ -94,15 +99,16 @@ async function mount(
   );
   await waitFor(() => expect(status!.lastSyncedAt).not.toBeNull());
   await waitFor(() => expect(status!.syncing).toBe(false));
-  await settle();
-  return { log: () => log!, status: () => status! };
+  await refreshed(world, before);
+  return { log: () => log!, status: () => status!, world };
 }
 
 async function syncAgain(mounted: Mounted): Promise<void> {
+  const before = mounted.world.reads.invitesForMe;
   await act(async () => {
     await mounted.status().syncNow();
   });
-  await settle();
+  await refreshed(mounted.world, before);
 }
 
 describe('a sync that changes nothing (#89)', () => {

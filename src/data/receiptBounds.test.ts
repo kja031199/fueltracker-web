@@ -52,16 +52,15 @@ describe('base64ToBytes', () => {
     // teaches people to re-run rather than to read, and this one is load-bearing
     // — it is the only assertion standing between a hand-edited backup and a
     // 300 MB allocation.
+    //
+    // Twice the bound is enough to prove the refusal (#97): the payload used to
+    // be 400 MB of text, which cost seconds and memory to build and proved
+    // nothing the spy does not — the refusal is decided from the length.
     const decode = vi.spyOn(globalThis, 'atob');
     try {
-      // 400 MB of base64 is ~300 MB of bytes.
-      const huge = base64OfLength(300 * 1024 * 1024);
-      const started = Date.now();
+      const huge = base64OfLength(MAX_RECEIPT_BYTES * 2);
       expect(base64ToBytes(huge, MAX_RECEIPT_BYTES)).toBeNull();
       expect(decode).not.toHaveBeenCalled();
-      // Kept as a backstop, generously: a decode of this payload would not
-      // finish inside ten seconds, and the spy above is the real assertion.
-      expect(Date.now() - started).toBeLessThan(10_000);
     } finally {
       decode.mockRestore();
     }

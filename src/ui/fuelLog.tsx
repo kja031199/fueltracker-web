@@ -43,6 +43,7 @@ import { parseBackupFile } from '../data/backupFormat';
 import { useBackupNudge } from './backupNudge';
 import type { SyncStatus } from './useSync';
 import { useSync } from './useSync';
+import type { SchedulerTimers } from './syncScheduler';
 import { useSharingView } from './useSharingView';
 import type { BackupStatus, FileImport, FuelLog, ReceiveResult } from './fuelLogTypes';
 
@@ -61,6 +62,8 @@ export interface FuelLogProviderProps {
   readonly uid: string | null;
   /** Cars shared with and by this account (#66). Omitted where nothing syncs. */
   readonly sharing?: SharingSync | null;
+  /** Test seam (#97): the sync scheduler's timers, so a test fires the save-sync itself. */
+  readonly syncTimers?: SchedulerTimers;
   readonly children: ReactNode;
 }
 
@@ -70,6 +73,7 @@ export function FuelLogProvider({
   syncState,
   uid,
   sharing = null,
+  syncTimers,
   children,
 }: FuelLogProviderProps): ReactElement {
   const data = useAppData(store);
@@ -78,7 +82,16 @@ export function FuelLogProvider({
   // view is built after the sync.
   const sharesRead = useRef<(memberships: readonly Membership[]) => void>(() => {});
   const onShares = useCallback((memberships: readonly Membership[]) => sharesRead.current(memberships), []);
-  const sync = useSync(store, remote, data.reload, syncState, uid, remote === null ? null : sharing, onShares);
+  const sync = useSync(
+    store,
+    remote,
+    data.reload,
+    syncState,
+    uid,
+    remote === null ? null : sharing,
+    onShares,
+    syncTimers,
+  );
   const sharingView = useSharingView(
     remote === null ? null : sharing,
     uid,

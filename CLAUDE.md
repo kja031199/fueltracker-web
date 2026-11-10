@@ -625,6 +625,16 @@ npm ci --prefix .github/firebase-cli
   a blanket `vi.useFakeTimers()` leaves `findBy*`/`waitFor` polling a faked
   `setTimeout` that never fires and the test **hangs** instead of failing. Fake
   only what the code uses, and install fake timers *before* the render.
+- **No test waits out the save-sync delay, or sleeps to prove nothing
+  happened** (#97). Pass `syncTimers={manualTimers()}` (`src/test/manualTimers.ts`)
+  to `App` or `FuelLogProvider`: a write's sync is then `timers.fire()`d when
+  the test chooses, and "no sync was scheduled" is `timers.pending() === 0`,
+  counted rather than slept past. The rule for the rest: wait for something
+  definite — a read counted (`world.reads`, a remote's own counter), a
+  `popstate`/`hashchange` event, the last-synced time written, or a positive
+  control (one sync on purpose, then exactly that many reads). A sleep passes
+  on a slow machine for the wrong reason. `FuelLog.test.tsx` went from 22 s to
+  about 1 s this way.
 - **`userEvent.setup()` replaces `navigator.clipboard`**, so stub the clipboard
   *after* calling it or the spy silently records nothing.
 - **Component tests opt into a DOM** with a `@vitest-environment jsdom`

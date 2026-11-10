@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StubAuthProvider, type AuthUser } from '../data/auth';
 import { InMemoryRepository } from '../data/repository';
@@ -182,7 +182,10 @@ describe('sharing a car', () => {
     const unverified = person(world, { ...SAM, emailVerified: false });
     open(world, unverified);
     await screen.findByRole('navigation', { name: /sections/i });
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // The invitations have been asked for — the moment one would appear —
+    // waited for by the read itself, not by a sleep (#97).
+    await waitFor(() => expect(world.reads.invitesForMe).toBeGreaterThan(0), WAIT);
+    await act(async () => {});
     expect(screen.queryByRole('region', { name: /invitations/i })).not.toBeInTheDocument();
   });
 });
@@ -206,7 +209,10 @@ describe('who logged what', () => {
     await kylesCivic(world, kyle);
     open(world, kyle, 'fillups');
     await screen.findByText(/10,000|10000/, {}, WAIT);
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // The sync has read who the car is shared with — after which a name
+    // would show — waited for by the read, not by a sleep (#97).
+    await waitFor(() => expect(world.reads.memberships).toBeGreaterThan(0), WAIT);
+    await act(async () => {});
     expect(screen.queryByText(/entered by/i)).not.toBeInTheDocument();
   });
 });

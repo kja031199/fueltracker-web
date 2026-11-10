@@ -11,7 +11,7 @@ import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { FuelLogProvider, useBackupStatus, useFuelLog, useSyncStatus, type BackupStatus, type FuelLog } from './fuelLog';
 import { toJsonBackup } from '../data/backupFormat';
 import { loadBackupState } from './backupNudge';
-import { SAVE_SYNC_DELAY_MS } from './syncScheduler';
+import { manualTimers, type ManualTimers } from '../test/manualTimers';
 import { InMemorySharingWorld } from '../data/sharing';
 import type { SharingSync } from '../data/shareSync';
 import { LEDGER_UNREADABLE } from './syncMessages';
@@ -54,12 +54,17 @@ interface Harness {
   readonly log: () => FuelLog;
   /** The backup reminder, and the log object itself rather than a copy of it. */
   readonly seen: () => { readonly backup: BackupStatus; readonly raw: FuelLog };
+  /** The sync scheduler's timers, held by the test (#97). */
+  readonly timers: ManualTimers;
+  /** A write has scheduled its sync: run it now, rather than wait 1.5 seconds for it. */
+  readonly synced: () => Promise<void>;
 }
 
 async function mount(store: FuelTrackerStore = makeStore()): Promise<Harness> {
   const remote = new InMemoryRemoteStore();
+  const timers = manualTimers();
   const wrapper = ({ children }: { children: ReactNode }): ReactNode => (
-    <FuelLogProvider store={store} remote={remote} uid="u1">
+    <FuelLogProvider store={store} remote={remote} uid="u1" syncTimers={timers}>
       {children}
     </FuelLogProvider>
   );
@@ -71,7 +76,14 @@ async function mount(store: FuelTrackerStore = makeStore()): Promise<Harness> {
   // The mount sync, so later counts start from a settled remote.
   await waitFor(() => expect(remote.pullLog.length).toBeGreaterThan(0));
   await waitFor(() => expect(result.current.sync.syncing).toBe(false));
-  return { store, remote, log: () => result.current, seen: () => result.current };
+  const synced = async (): Promise<void> => {
+    expect(timers.pending(), 'a write should have scheduled a sync').toBeGreaterThan(0);
+    await act(async () => {
+      timers.fire();
+    });
+    await waitFor(() => expect(result.current.sync.syncing).toBe(false));
+  };
+  return { store, remote, log: () => result.current, seen: () => result.current, timers, synced };
 }
 
 /** The remote's copy of one row, by id, or undefined. Reads without counting as a sync. */
@@ -89,89 +101,92 @@ async function tombstoned(remote: InMemoryRemoteStore, id: string): Promise<bool
   return row !== undefined && typeof row['deletedAt'] === 'number';
 }
 
-const SYNC_WINDOW = { timeout: SAVE_SYNC_DELAY_MS + 3000 };
-
 describe('every write reaches the account without anyone remembering to ask', () => {
   test('addVehicle', async () => {
-    const { remote, log } = await mount();
+    const { remote, log, synced } = await mount();
     let id = '';
     await act(async () => {
       id = (await log().addVehicle({ name: 'Civic' })).id;
     });
     expect(log().vehicles.map((v) => v.id)).toContain(id); // refreshed
-    await waitFor(async () => expect(await remoteRow(remote, id)).toBeDefined(), SYNC_WINDOW);
+    await synced();
+    await waitFor(async () => expect(await remoteRow(remote, id)).toBeDefined());
   });
 
   test('removeVehicle', async () => {
-    const { store, remote, log } = await mount();
+    const { store, remote, log, synced } = await mount();
     const vehicle = await store.addVehicle({ name: 'Civic' });
     await act(async () => {
       await log().removeVehicle(vehicle.id);
     });
     expect(log().vehicles).toHaveLength(0);
-    await waitFor(async () => expect(await tombstoned(remote, vehicle.id)).toBe(true), SYNC_WINDOW);
+    await synced();
+    await waitFor(async () => expect(await tombstoned(remote, vehicle.id)).toBe(true));
   });
 
   test('addFillUp', async () => {
-    const { store, remote, log } = await mount();
+    const { store, remote, log, synced } = await mount();
     const vehicle = await store.addVehicle({ name: 'Civic' });
     let id = '';
     await act(async () => {
       id = (await log().addFillUp(draft(1000), vehicle.id)).id;
     });
     expect(log().fillUpCount).toBe(1);
-    await waitFor(async () => expect(await remoteRow(remote, id)).toBeDefined(), SYNC_WINDOW);
+    await synced();
+    await waitFor(async () => expect(await remoteRow(remote, id)).toBeDefined());
   });
 
   test('updateFillUp', async () => {
-    const { store, remote, log } = await mount();
+    const { store, remote, log, synced } = await mount();
     const vehicle = await store.addVehicle({ name: 'Civic' });
     const entry = await store.addFillUp(draft(1000), vehicle.id);
     await act(async () => {
       await log().updateFillUp(entry.id, draft(1234));
     });
+    await synced();
     await waitFor(
-      async () => expect((await remoteRow(remote, entry.id))?.['odometer']).toBe(1234),
-      SYNC_WINDOW,
-    );
+      async () => expect((await remoteRow(remote, entry.id))?.['odometer']).toBe(1234));
   });
 
   test('removeFillUp', async () => {
-    const { store, remote, log } = await mount();
+    const { store, remote, log, synced } = await mount();
     const vehicle = await store.addVehicle({ name: 'Civic' });
     const entry = await store.addFillUp(draft(1000), vehicle.id);
     await act(async () => {
       await log().removeFillUp(entry.id);
     });
     expect(log().fillUpCount).toBe(0);
-    await waitFor(async () => expect(await tombstoned(remote, entry.id)).toBe(true), SYNC_WINDOW);
+    await synced();
+    await waitFor(async () => expect(await tombstoned(remote, entry.id)).toBe(true));
   });
 
   test('importBackup', async () => {
     const source = makeStore();
     const vehicle = await source.addVehicle({ name: 'Imported' });
     const snapshot = await source.exportSnapshot();
-    const { remote, log } = await mount();
+    const { remote, log, synced } = await mount();
     await act(async () => {
       const summary = await log().importBackup(snapshot);
       expect(summary.vehiclesWritten).toBe(1);
     });
     expect(log().vehicles.map((v) => v.id)).toContain(vehicle.id);
-    await waitFor(async () => expect(await remoteRow(remote, vehicle.id)).toBeDefined(), SYNC_WINDOW);
+    await synced();
+    await waitFor(async () => expect(await remoteRow(remote, vehicle.id)).toBeDefined());
   });
 
   test('importFile', async () => {
     const source = makeStore();
     const vehicle = await source.addVehicle({ name: 'Imported' });
     const file = new File([toJsonBackup(await source.exportSnapshot())], 'backup.json');
-    const { remote, log } = await mount();
+    const { remote, log, synced } = await mount();
     await act(async () => {
       const result = await log().importFile(file);
       expect(result.summary?.vehiclesWritten).toBe(1);
       expect(result.problems).toEqual([]);
     });
     expect(log().vehicles.map((v) => v.id)).toContain(vehicle.id);
-    await waitFor(async () => expect(await remoteRow(remote, vehicle.id)).toBeDefined(), SYNC_WINDOW);
+    await synced();
+    await waitFor(async () => expect(await remoteRow(remote, vehicle.id)).toBeDefined());
   });
 
   test('importFile reports a row the file could not be read for, and still imports the rest', async () => {
@@ -194,17 +209,18 @@ describe('every write reaches the account without anyone remembering to ask', ()
   }
 
   test('receiveSubmission', async () => {
-    const { store, remote, log } = await mount();
+    const { store, remote, log, synced } = await mount();
     const vehicle = await store.addVehicle({ name: 'Civic' });
     await act(async () => {
       expect(await log().receiveSubmission(sent(vehicle.id))).toBe('queued');
     });
     expect(log().pending.map((row) => row.id)).toEqual(['sub-1']); // refreshed
-    await waitFor(async () => expect(await remoteRow(remote, 'sub-1')).toBeDefined(), SYNC_WINDOW);
+    await synced();
+    await waitFor(async () => expect(await remoteRow(remote, 'sub-1')).toBeDefined());
   });
 
   test('approveSubmission', async () => {
-    const { store, remote, log } = await mount();
+    const { store, remote, log, synced } = await mount();
     const vehicle = await store.addVehicle({ name: 'Civic' });
     await store.receiveSubmission(sent(vehicle.id));
     let id = '';
@@ -213,19 +229,21 @@ describe('every write reaches the account without anyone remembering to ask', ()
     });
     expect(log().pending).toHaveLength(0);
     expect(log().fillUpCount).toBe(1);
-    await waitFor(async () => expect(await remoteRow(remote, id)).toBeDefined(), SYNC_WINDOW);
-    await waitFor(async () => expect(await tombstoned(remote, 'sub-1')).toBe(true), SYNC_WINDOW);
+    await synced();
+    await waitFor(async () => expect(await remoteRow(remote, id)).toBeDefined());
+    await waitFor(async () => expect(await tombstoned(remote, 'sub-1')).toBe(true));
   });
 
   test('rejectSubmission', async () => {
-    const { store, remote, log } = await mount();
+    const { store, remote, log, synced } = await mount();
     const vehicle = await store.addVehicle({ name: 'Civic' });
     await store.receiveSubmission(sent(vehicle.id));
     await act(async () => {
       await log().rejectSubmission('sub-1');
     });
     expect(log().pending).toHaveLength(0);
-    await waitFor(async () => expect(await tombstoned(remote, 'sub-1')).toBe(true), SYNC_WINDOW);
+    await synced();
+    await waitFor(async () => expect(await tombstoned(remote, 'sub-1')).toBe(true));
   });
 
   test('a car this device holds as shared with it is not yours to receive for, even before the lists catch up', async () => {
@@ -293,7 +311,7 @@ describe('a device that cannot read its share ledger (#77)', () => {
 
 describe('when a write does not happen', () => {
   test('a write that fails is reported, and neither refreshes nor syncs', async () => {
-    const { store, remote, log } = await mount();
+    const { store, remote, log, timers } = await mount();
     vi.spyOn(store, 'addVehicle').mockRejectedValue(new Error('disk full'));
     const vehicles = vi.spyOn(store, 'vehicles');
     const syncsBefore = remote.pullLog.length;
@@ -301,14 +319,15 @@ describe('when a write does not happen', () => {
     await act(async () => {
       await expect(log().addVehicle({ name: 'Civic' })).rejects.toThrow('disk full');
     });
-    await new Promise((resolve) => setTimeout(resolve, SAVE_SYNC_DELAY_MS + 500));
+    // Nothing was scheduled: counted, not slept on (#97).
+    expect(timers.pending()).toBe(0);
 
     expect(vehicles).not.toHaveBeenCalled();
     expect(remote.pullLog.length).toBe(syncsBefore);
   });
 
   test('a file that cannot be read imports nothing, says why, and neither refreshes nor syncs', async () => {
-    const { store, remote, log } = await mount();
+    const { store, remote, log, timers } = await mount();
     const importing = vi.spyOn(store, 'importBackup');
     const vehicles = vi.spyOn(store, 'vehicles');
     const syncsBefore = remote.pullLog.length;
@@ -317,7 +336,8 @@ describe('when a write does not happen', () => {
     await act(async () => {
       result = await log().importFile(new File(['{ not json'], 'backup.json'));
     });
-    await new Promise((resolve) => setTimeout(resolve, SAVE_SYNC_DELAY_MS + 500));
+    // Nothing was scheduled: counted, not slept on (#97).
+    expect(timers.pending()).toBe(0);
 
     expect(result).toEqual({ summary: null, problems: ['That file is not valid JSON.'] });
     expect(importing).not.toHaveBeenCalled();
@@ -328,7 +348,7 @@ describe('when a write does not happen', () => {
   test('opening a fill-up that has gone refreshes the list but syncs nothing', async () => {
     // Deleted on another device since the list was drawn: there is nothing
     // to send, only something to stop showing.
-    const { store, remote, log } = await mount();
+    const { store, remote, log, timers } = await mount();
     const vehicles = vi.spyOn(store, 'vehicles');
     const syncsBefore = remote.pullLog.length;
 
@@ -336,7 +356,8 @@ describe('when a write does not happen', () => {
     await act(async () => {
       found = await log().loadFillUp('no-such-id');
     });
-    await new Promise((resolve) => setTimeout(resolve, SAVE_SYNC_DELAY_MS + 500));
+    // Nothing was scheduled: counted, not slept on (#97).
+    expect(timers.pending()).toBe(0);
 
     expect(found).toBeUndefined();
     expect(vehicles).toHaveBeenCalled();
