@@ -71,13 +71,7 @@ export function describeOcrFailure(reason: OcrFailure, detail?: string): string 
   }
 }
 
-/**
- * Recognises text in an image.
- *
- * The worker is created and terminated per call. Keeping one alive would save a
- * second on a repeat scan and hold tens of megabytes resident for a screen
- * nobody may open again — the wrong trade on a phone.
- */
+/** A loaded tesseract worker: what `recognise` needs of one. */
 interface OcrWorker {
   recognize(image: unknown): Promise<{ data: { text: string; confidence: number } }>;
   terminate(): Promise<unknown>;
@@ -145,18 +139,94 @@ async function loadReader(): Promise<OcrWorker> {
 }
 
 /**
+ * How long a loaded reader is kept with nothing to read (#90).
+ *
+ * It used to be created and terminated for every scan, so the wasm core and
+ * the language data were set up again for each photo — about a second each on
+ * a phone, for somebody scanning a stack of receipts. Kept for good, it would
+ * hold tens of megabytes for a screen nobody may open again. So it is kept
+ * while scans keep coming, and dropped once none has for this long — or when
+ * the session ends (`releaseReader`).
+ */
+export const READER_IDLE_MS = 120_000;
+
+/** The reader being kept, and how many scans are using it right now. */
+interface Kept {
+  readonly worker: Promise<OcrWorker>;
+  idle: ReturnType<typeof setTimeout> | undefined;
+  busy: number;
+}
+
+let kept: Kept | null = null;
+
+/** Shuts a reader down, whenever it arrives; a reader that never loaded is fine. */
+function shutDown(reader: Kept): void {
+  void reader.worker.then((worker) => worker.terminate()).catch(() => {});
+}
+
+/** The kept reader, loading one if there is none, marked as in use. */
+function take(): Kept {
+  if (kept === null) {
+    // A reader that fails to load is not remembered: the scan that waited for
+    // it finishes as broken (`finished`), which lets it go, so the next scan
+    // tries again.
+    kept = { worker: loadReader(), idle: undefined, busy: 0 };
+  }
+  clearTimeout(kept.idle);
+  kept.idle = undefined;
+  kept.busy += 1;
+  return kept;
+}
+
+/**
+ * A scan is done with `reader`. A reader that failed on a photo is not trusted
+ * with the next one; a reader that was released, or replaced, is shut down
+ * once its last scan finishes; otherwise the idle window starts.
+ */
+function finished(reader: Kept, broken: boolean): void {
+  reader.busy -= 1;
+  if (broken && kept === reader) kept = null;
+  if (reader.busy > 0) return;
+  if (kept !== reader) {
+    shutDown(reader);
+    return;
+  }
+  reader.idle = setTimeout(() => {
+    if (kept !== reader || reader.busy > 0) return;
+    kept = null;
+    shutDown(reader);
+  }, READER_IDLE_MS);
+}
+
+/**
+ * Lets the kept reader go — on sign-out, or when the account changes. A scan
+ * still reading finishes first; the reader is shut down after it.
+ */
+export async function releaseReader(): Promise<void> {
+  const reader = kept;
+  kept = null;
+  if (reader === null) return;
+  clearTimeout(reader.idle);
+  reader.idle = undefined;
+  if (reader.busy === 0) await reader.worker.then((worker) => worker.terminate()).catch(() => {});
+}
+
+/**
  * Reads the text in an encoded image. **A `Blob` only**: tesseract.js turns an
  * `ImageBitmap` into zero bytes, which is how every real scan failed until
  * after #63.
  */
 export async function recognise(image: Blob): Promise<OcrResult> {
+  const reader = take();
   let worker: OcrWorker;
   try {
-    worker = await loadReader();
+    worker = await reader.worker;
   } catch (cause) {
+    finished(reader, true);
     return { ok: false, reason: 'unavailable', detail: detailOf(cause) };
   }
 
+  let broken = false;
   try {
     const { data } = await worker.recognize(image);
     const lines = data.text
@@ -166,8 +236,9 @@ export async function recognise(image: Blob): Promise<OcrResult> {
     if (lines.length === 0) return { ok: false, reason: 'no-text' };
     return { ok: true, lines, confidence: data.confidence };
   } catch (cause) {
+    broken = true;
     return { ok: false, reason: 'unreadable', detail: detailOf(cause) };
   } finally {
-    await worker.terminate().catch(() => {});
+    finished(reader, broken);
   }
 }

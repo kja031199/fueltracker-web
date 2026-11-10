@@ -47,6 +47,15 @@ Hosting at `fueltracker-899eb.web.app`.
   the store's clock type is in `syncClock.ts`.
 - `src/data/firebase/` — the **only** place the Firebase SDK is imported
   (`sdkBoundary.test.ts`, #93).
+- `src/bootstrap.ts` — **what loads when** (#90), wired by `main.tsx`: a shell
+  renders at once, the auth module loads next, and the Firestore modules
+  (`remoteStore`, `sharingRemote`, ~140 KB gzipped) only **on sign-in**,
+  alongside opening the account's database — so the sign-in screen never waits
+  for them. If they fail to load, the log opens locally without sync and the
+  next auth event retries. `boot` takes its loaders as arguments
+  (`bootstrap.test.ts`), and a test holds `main.tsx` to importing the
+  Firestore modules only inside `loadRemotes`. Don't add a static Firebase
+  import to `main.tsx` beyond `settings`.
 - `src/ui/` — React: screens, hooks, hand-drawn SVG charts (`charts/`).
   `App.tsx` gates on auth and holds per-browser preferences; `fuelLog.tsx`
   (`FuelLogProvider` / `useFuelLog`, `useSyncStatus` for sync status and
@@ -293,7 +302,15 @@ npm run test:build   # vite build, then the *.build.test.ts files
   jsDelivr. `script-src` needs `'wasm-unsafe-eval'`, and `worker-src` is
   `'self'`. **Its CSP failures happen inside a worker, so `cspWatch` cannot see
   them**: after touching the scanner, the CSP or the service worker, run
-  `node scripts/ocr-check/check.mjs`.
+  `node scripts/ocr-check/check.mjs`. Its probe (`scripts/ocr-check/probe.ts`)
+  is in `tsconfig.app.json`, so moving a module it imports fails the
+  typecheck — it was broken from #121 to #90 without anyone noticing.
+- **One OCR worker for a run of scans** (#90; `ocr.ts`): kept while scans keep
+  coming, terminated after `READER_IDLE_MS` (2 min) without one, and by
+  `releaseReader()` when the account closes (`bootstrap`'s `onAccountClosed`).
+  A worker that threw on a photo is dropped, not reused; a load that failed is
+  not remembered. Released mid-scan, it finishes that scan first. Tests
+  `releaseReader()` after each, since the worker outlives a call.
 - **tesseract.js reads a `Blob`, `File` or canvas, never an `ImageBitmap`.**
   Anything else falls through its loader to `new Uint8Array(image)`, which is
   zero bytes, and the read fails with "pix not read". That is how every real

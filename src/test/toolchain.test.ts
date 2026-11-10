@@ -108,7 +108,10 @@ describe('the type checker keeps test types out of app code (#97)', () => {
 
   test('the app project has no ambient types and no tests', () => {
     expect(compilerOptions('tsconfig.app.json')['types']).toEqual([]);
-    expect(json('tsconfig.app.json')['include']).toEqual(['src']);
+    // The OCR check's probe is browser code that imports the app's own
+    // modules; it is outside `src/`, and went unchecked until a move broke
+    // its imports and nothing noticed (#90).
+    expect(json('tsconfig.app.json')['include']).toEqual(['src', 'scripts/ocr-check/probe.ts']);
     expect(json('tsconfig.app.json')['exclude']).toEqual(
       expect.arrayContaining(['src/**/*.test.ts', 'src/**/*.test.tsx', 'src/test']),
     );
