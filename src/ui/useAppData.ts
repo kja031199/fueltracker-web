@@ -124,6 +124,12 @@ export function useAppData(store: FuelTrackerStore): AppData {
   /**
    * Shown once that car's fill-ups have been read, together with them — never
    * the new car with the old car's fill-ups (#88).
+   *
+   * The selection is a choice on screen, and it lives here, in the data hook,
+   * on purpose (#93 asked; kept). The selection and that car's fill-ups are
+   * applied in one `setShown`, and that is what keeps one car's name from
+   * showing over another's figures. Held outside, as UI state, it would change
+   * a render before its fill-ups arrive, and the flash would be back.
    */
   const selectVehicle = useCallback(
     (id: string) => {

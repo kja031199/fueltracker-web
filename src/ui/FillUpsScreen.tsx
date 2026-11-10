@@ -8,19 +8,13 @@ import type { DashboardTimeRange } from '../domain/dashboardTimeRange';
 import { FUEL_GRADES } from '../domain/fuelGrade';
 import type { FuelGrade } from '../domain/fuelGrade';
 import { fillUpFacts } from '../domain/format';
-import type { UnitPreferences } from '../domain/units';
-import { distance, volume } from '../domain/units';
 import { totalCost } from '../domain/models';
 import { FillUpForm } from './FillUpForm';
 import { useFuelLog } from './fuelLog';
 import { PendingReview } from './PendingReview';
 import { FillUpSummary } from './FillUpSummary';
 import { ConfirmButton } from './ConfirmButton';
-
-interface Props {
-  /** A display preference of this browser, not data, so still a prop. */
-  readonly units: UnitPreferences;
-}
+import { useUnits } from './session';
 
 /**
  * The fill-up list, its search and filter, and the add/edit form.
@@ -30,7 +24,8 @@ interface Props {
  * on the dashboard stays computed over the full history, so typing in the
  * search box can never change your reported MPG.
  */
-export function FillUpsScreen({ units }: Props): ReactElement {
+export function FillUpsScreen(): ReactElement {
+  const { units } = useUnits();
   // The selected vehicle's history, and the writes, from the fuel log (#56).
   const { selectedVehicleId: vehicleId, fillUps, loadFillUp, removeFillUp } = useFuelLog();
   const enteredByName = useEnteredByNames(vehicleId);
@@ -68,7 +63,7 @@ export function FillUpsScreen({ units }: Props): ReactElement {
   if (vehicleId === null) {
     return (
       <div>
-        <PendingReview units={units} />
+        <PendingReview />
         <p className="empty">Add a vehicle first — fill-ups belong to one.</p>
       </div>
     );
@@ -78,7 +73,6 @@ export function FillUpsScreen({ units }: Props): ReactElement {
     return (
       <FillUpForm
         vehicleId={vehicleId}
-        units={units}
         existing={fillUps}
         editing={editing}
         onSaved={async () => {
@@ -108,7 +102,7 @@ export function FillUpsScreen({ units }: Props): ReactElement {
 
   return (
     <div>
-      <PendingReview units={units} />
+      <PendingReview />
       <button className="button" type="button" onClick={() => setAdding(true)}>
         Log a fill-up
       </button>

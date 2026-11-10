@@ -1,19 +1,15 @@
 import type { ReactElement } from 'react';
 import type { UnitPreferences } from '../../domain/units';
 import { DISTANCE_UNITS, ECONOMY_UNITS, VOLUME_UNITS, distance, economy, volume } from '../../domain/units';
+import { useUnits } from '../session';
 
 /**
  * Settings → Units. Changing a unit changes only what is shown and what typed
  * numbers are read as; every stored value stays canonical, so nothing is
  * rewritten and nothing can be lost in a conversion.
  */
-export function UnitsSection({
-  units,
-  onChange,
-}: {
-  readonly units: UnitPreferences;
-  readonly onChange: (units: UnitPreferences) => void;
-}): ReactElement {
+export function UnitsSection(): ReactElement {
+  const { units, setUnits: onChange } = useUnits();
   return (
     <section className="card" aria-labelledby="units-heading">
       <h2 className="card__title" id="units-heading">

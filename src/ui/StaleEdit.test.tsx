@@ -18,8 +18,6 @@ import { saveHasOnboarded } from './onboarding';
  * meanwhile was written back as a new row.
  */
 
-const US = { volume: 'gallons', distance: 'miles', economy: 'mpg' } as const;
-
 function makeStore(): FuelTrackerStore {
   return new FuelTrackerStore({
     vehicles: new InMemoryRepository<VehicleRecord>(),
@@ -55,7 +53,6 @@ describe('saving an edit after the log changed underneath it (#83)', () => {
       <FuelLogProvider store={store} remote={null} uid="local">
         <FillUpForm
           vehicleId={b.id}
-          units={US}
           existing={[]}
           editing={editing}
           onSaved={async () => {

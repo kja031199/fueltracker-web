@@ -1,7 +1,7 @@
 /**
- * The fuel log's shape, as the screens see it (#56): what \`useFuelLog()\`,
- * \`useSyncStatus()\` and \`useBackupStatus()\` hand them. Its own file (#93) so
- * the provider in \`fuelLog.tsx\` is the provider and nothing else.
+ * The fuel log's shape, as the screens see it (#56): what `useFuelLog()`,
+ * `useSyncStatus()` and `useBackupStatus()` hand them. Its own file (#93) so
+ * the provider in `fuelLog.tsx` is the provider and nothing else.
  */
 
 import type { FillUpRecord, Snapshot, VehicleRecord } from '../data/records';

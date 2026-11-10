@@ -24,6 +24,14 @@ route of its own and is never corrected, or the link would be thrown away
 before anything read it. Leaving one replaces it in history, so Back does not
 open it a second time.
 
+A tab keeps what you were doing while another is shown (#93): a half-typed
+fill-up, the fill-ups filter, the dashboard's range. Each tab is mounted the
+first time it is shown and then kept, hidden, inside React's `<Activity>` —
+which keeps its state, pauses its effects, and takes it out of reach of the
+keyboard and screen readers. It used to be unmounted on every switch, which
+threw away exactly the half-typed fill-up the app refuses to auto-update
+over.
+
 ## Where a change goes
 
 Every screen reads the fuel log and writes to it through one context,

@@ -11,7 +11,6 @@ import {
   weekdayPriceInsight,
   weekdayPrices,
 } from '../domain/weekdayPricePattern';
-import type { UnitPreferences } from '../domain/units';
 import { distance as distanceUnits, economy as economyUnits, volume as volumeUnits } from '../domain/units';
 import { currency, distance, fuelPrice } from '../domain/format';
 import { mapValues } from '../domain/models';
@@ -19,11 +18,7 @@ import { MetricLineChart } from './charts/MetricLineChart';
 import { MonthlyBarChart } from './charts/MonthlyBarChart';
 import { WeekdayPriceChart } from './charts/WeekdayPriceChart';
 import { useFuelLog } from './fuelLog';
-
-interface Props {
-  /** A display preference of this browser, not data, so still a prop. */
-  readonly units: UnitPreferences;
-}
+import { useUnits } from './session';
 
 /**
  * The dashboard.
@@ -38,7 +33,8 @@ interface Props {
  * while the dashboard keeps reading the full history — the two look similar and
  * mean different things.
  */
-export function DashboardScreen({ units }: Props): ReactElement {
+export function DashboardScreen(): ReactElement {
+  const { units } = useUnits();
   // What to chart comes from the fuel log, like every other screen (#56).
   const { vehicles, selectedVehicleId, selectVehicle: onSelect, fillUps } = useFuelLog();
   const [range, setRange] = useState<DashboardTimeRange>('All');

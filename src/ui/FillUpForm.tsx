@@ -3,7 +3,6 @@ import { datetimeLocalValue } from '../domain/fillUpForm';
 import { FUEL_GRADES } from '../domain/fuelGrade';
 import type { FuelGrade } from '../domain/fuelGrade';
 import { currency, distance as formatDistance } from '../domain/format';
-import type { UnitPreferences } from '../domain/units';
 import { distance, pricePerGallonFrom, volume } from '../domain/units';
 import type { FillUpRecord, FillUpSummary } from '../data/records';
 import { TEXT_LIMITS } from '../domain/textLimits';
@@ -12,10 +11,10 @@ import { LINK_TEXT_LIMITS } from '../data/fillUpLink';
 import { useFillUpForm } from './useFillUpForm';
 import { ReceiptScanField } from './ReceiptScanField';
 import { DecimalField } from './DecimalField';
+import { useUnits } from './session';
 
 interface Props {
   readonly vehicleId: string;
-  readonly units: UnitPreferences;
   /** Existing fill-ups on this vehicle, for the odometer sanity check. */
   /** Only odometers are read from these, so summaries are enough. */
   readonly existing: readonly FillUpSummary[];
@@ -58,13 +57,13 @@ interface Props {
  */
 export function FillUpForm({
   vehicleId,
-  units,
   existing,
   editing,
   onSaved,
   onCancel,
   forLink,
 }: Props): ReactElement {
+  const { units } = useUnits();
   const {
     form,
     numericText,

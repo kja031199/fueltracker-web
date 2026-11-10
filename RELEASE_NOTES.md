@@ -9,6 +9,18 @@ request. Every pull request that closes an issue adds its note here — the
 "Release notes" check refuses one that does not
 ([how it works](docs/development.md#release-notes)).
 
+## 2026-11-10
+
+- **Switching tabs no longer loses what you were doing: a half-typed fill-up,
+  the fill-ups filter and the dashboard's range are all still there when you
+  come back.**
+  *Technical:* a visited tab is kept in React's `<Activity>` instead of being
+  unmounted; the tabs are one `TAB_TABLE` with a `Record<Tab, …>` of screens
+  in the new `AppShell.tsx`; units and the session are contexts
+  (`useUnits`, `useSession`) instead of props; the selected car stays in
+  `useAppData`, documented. The last part of tidying the interface code.
+  [#93](https://github.com/kja031199/fueltracker-web/issues/93) · [PR #129](https://github.com/kja031199/fueltracker-web/pull/129)
+
 ## 2026-11-09
 
 - **No change you'll see, except that a car's Share and Request panels no

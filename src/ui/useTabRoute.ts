@@ -26,8 +26,21 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-export const TABS = ['dashboard', 'fillups', 'vehicles', 'settings'] as const;
-export type Tab = (typeof TABS)[number];
+/**
+ * Every tab, in the order the bar shows them, with its label — written once
+ * (#93). The ids and the labels used to be two lists in two files, free to
+ * drift apart. The screens are a `Record<Tab, …>` in `AppShell`, so a tab
+ * without a screen is a type error too.
+ */
+export const TAB_TABLE = [
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'fillups', label: 'Fill-ups' },
+  { id: 'vehicles', label: 'Vehicles' },
+  { id: 'settings', label: 'Settings' },
+] as const;
+
+export type Tab = (typeof TAB_TABLE)[number]['id'];
+export const TABS: readonly Tab[] = TAB_TABLE.map((entry) => entry.id);
 
 const PREFIX = '#/';
 

@@ -1,38 +1,23 @@
 import type { ReactElement } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FuelTrackerStore } from '../data/store';
-import type { AuthProvider, AuthUser } from '../data/auth';
+import type { AuthProvider } from '../data/auth';
 import { StubAuthProvider } from '../data/auth';
 import type { RemoteStore } from '../data/remote';
 import type { SyncStateStore } from '../data/syncState';
 import type { SharingSync } from '../data/shareSync';
 import type { UnitPreferences } from '../domain/units';
-import { shouldOnboard } from '../domain/onboardingGate';
 import { clearActivity, forgetIdleTimeoutSetting, useIdleTimeout } from './idleTimeout';
 import { ADMIN_IDLE_MINUTES } from './adminSettings';
 import { applyPalette, preferredColorScheme, watchColorScheme } from './theme';
 import { loadUnitPreferences, saveUnitPreferences } from './unitSettings';
-import { HAS_ONBOARDED } from './onboarding';
-import { useAccountPreference } from './preferences';
 import { useAuth } from './useAuth';
-import { FuelLogProvider, useBackupStatus, useFuelLog, useSyncStatus } from './fuelLog';
+import { FuelLogProvider } from './fuelLog';
+import { AppShell } from './AppShell';
+import { SessionProvider, UnitsProvider } from './session';
 import type { Tab } from './useTabRoute';
-import { useRoute } from './useTabRoute';
-import { useServiceWorker } from './useServiceWorker';
-import { UpdateBanner } from './UpdateBanner';
-import { BackupBanner } from './BackupBanner';
 import { ScreenFrame } from './ScreenFrame';
-import { InvitationsBanner } from './InvitationsBanner';
 import { SignInScreen } from './SignInScreen';
-import { NoAccessScreen } from './NoAccessScreen';
-import { WelcomeScreen } from './WelcomeScreen';
-import { StorageErrorScreen } from './StorageErrorScreen';
-import { VehiclesScreen } from './VehiclesScreen';
-import { SettingsScreen } from './SettingsScreen';
-import { DashboardScreen } from './DashboardScreen';
-import { FillUpsScreen } from './FillUpsScreen';
-import { SubmitScreen } from './SubmitScreen';
-import { IncomingScreen } from './IncomingScreen';
 
 /**
  * The composition root (#56): **auth → this browser's preferences → the fuel
@@ -46,13 +31,6 @@ import { IncomingScreen } from './IncomingScreen';
  *   backup reminder), the route in the URL hash (`useRoute`) — a tab, or a
  *   fill-up link (#3) — and the screens.
  */
-
-const TAB_LABELS: readonly { readonly id: Tab; readonly label: string }[] = [
-  { id: 'dashboard', label: 'Dashboard' },
-  { id: 'fillups', label: 'Fill-ups' },
-  { id: 'vehicles', label: 'Vehicles' },
-  { id: 'settings', label: 'Settings' },
-];
 
 /**
  * A signed-in stub, used when no provider is passed.
@@ -144,10 +122,12 @@ export function App({
     return watchColorScheme((scheme) => applyPalette(scheme, root));
   }, []);
 
-  function changeUnits(next: UnitPreferences): void {
+  // Stable, so the units context changes only when the units do.
+  const changeUnits = useCallback((next: UnitPreferences): void => {
     setUnits(next);
     saveUnitPreferences(next);
-  }
+  }, []);
+  const signOut = useCallback(() => void authProvider.signOut(), [authProvider]);
 
   // The auth gate comes before everything, and `loading` is a state of its own
   // rather than being folded into "signed out". Firebase restores a persisted
@@ -187,169 +167,16 @@ export function App({
       sharing={sharing}
       {...(syncState === undefined ? {} : { syncState })}
     >
-      <AppShell
-        account={authState.user}
-        onSignOut={() => void authProvider.signOut()}
-        initialTab={initialTab}
-        units={units}
-        onUnitsChange={changeUnits}
-        idleMinutes={idleMinutes}
-        syncEnabled={remote !== null}
-      />
-    </FuelLogProvider>
-  );
-}
-
-interface AppShellProps {
-  readonly account: AuthUser;
-  readonly onSignOut: () => void;
-  readonly initialTab: Tab;
-  readonly units: UnitPreferences;
-  readonly onUnitsChange: (units: UnitPreferences) => void;
-  readonly idleMinutes: number;
-  readonly syncEnabled: boolean;
-}
-
-/** The signed-in app, inside the fuel log. */
-function AppShell({
-  account,
-  onSignOut,
-  initialTab,
-  units,
-  onUnitsChange,
-  idleMinutes,
-  syncEnabled,
-}: AppShellProps): ReactElement {
-  const log = useFuelLog();
-  const [route, setTab] = useRoute(initialTab);
-  const leaveLink = useCallback(() => setTab('dashboard', { replace: true }), [setTab]);
-  const showReceived = useCallback(() => setTab('fillups', { replace: true }), [setTab]);
-  // Account-scoped (#55): read for this uid, and re-read if it changes.
-  const [hasOnboarded, setHasOnboarded] = useAccountPreference(HAS_ONBOARDED, account.uid, false);
-  const backup = useBackupStatus();
-  const serviceWorker = useServiceWorker();
-
-  // Decided from loaded data, so a returning reader whose flag was cleared (a
-  // new browser profile, an imported backup) is not marched through a
-  // first-run flow over data they already have.
-  const onboarding = !log.loading && shouldOnboard(hasOnboarded, log.vehicles.length);
-
-  if (log.loading) {
-    return (
-      <ScreenFrame>
-        <p className="empty">Loading your fuel log…</p>
-      </ScreenFrame>
-    );
-  }
-
-  if (log.error !== null) return <StorageErrorScreen detail={log.error} />;
-
-  // Fill-up links (#3) come before the first-run screen: somebody asked to
-  // log a fill-up may have no cars of their own, and would otherwise be walked
-  // through setting up a log they do not want before seeing what they came for.
-  // Every screen goes through the refusal gate, which is the only part of the
-  // shell that reads sync status (#88): a sync re-renders the gate, and the
-  // screens it is handed come through unchanged.
-  const gated = (screen: ReactElement): ReactElement => (
-    <RefusalGate account={account} onSignOut={onSignOut}>
-      {screen}
-    </RefusalGate>
-  );
-
-  if (route.kind === 'submit') {
-    return gated(
-      <SubmitScreen
-        payload={route.payload}
-        accountName={account.displayName}
-        units={units}
-        onDone={leaveLink}
-      />,
-    );
-  }
-  if (route.kind === 'incoming') {
-    return gated(<IncomingScreen payload={route.payload} onReceived={showReceived} onDone={leaveLink} />);
-  }
-  const { tab } = route;
-
-  if (onboarding) return gated(<WelcomeScreen onStart={() => setHasOnboarded(true)} />);
-
-  return gated(
-    <ScreenFrame
-      before={
-        <>
-          <UpdateBanner state={serviceWorker} />
-          <BackupBanner reason={backup.reason} onBackUp={() => void log.saveBackup()} onDismiss={backup.snooze} />
-          <InvitationsBanner />
-        </>
-      }
-      after={
-        <nav className="tabs" aria-label="Sections">
-          {TAB_LABELS.map((entry) => (
-            <button
-              key={entry.id}
-              className="tabs__button"
-              type="button"
-              aria-current={tab === entry.id ? 'page' : undefined}
-              onClick={() => setTab(entry.id)}
-            >
-              {entry.label}
-            </button>
-          ))}
-        </nav>
-      }
-    >
-      {tab === 'vehicles' && <VehiclesScreen ownerName={account.displayName} />}
-      {tab === 'settings' && (
-        <SettingsScreen
-          units={units}
-          onChange={onUnitsChange}
-          account={account}
-          onSignOut={onSignOut}
+      <UnitsProvider units={units} setUnits={changeUnits}>
+        <SessionProvider
+          account={authState.user}
+          onSignOut={signOut}
+          syncEnabled={remote !== null}
           idleMinutes={idleMinutes}
-          syncEnabled={syncEnabled}
-        />
-      )}
-      {tab === 'dashboard' && <DashboardScreen units={units} />}
-      {tab === 'fillups' && <FillUpsScreen units={units} />}
-    </ScreenFrame>,
-  );
-}
-
-/**
- * The app, or — signed in, and the account said no (#41) — the no-access
- * screen instead. Shown instead of the app rather than beside it: the
- * first-run flow promises that a fuel log is kept in the reader's Google
- * account, and for this reader that is false — they would be logging
- * fill-ups that can never leave the device. A refusal does not clear on its
- * own, so this is not a flash during a slow network; `refused` is only set
- * for `permission-denied` and a successful sync clears it.
- *
- * Its own component (#88) so that sync status, which changes several times
- * per sync, re-renders only this: `children` are the same elements each time.
- */
-function RefusalGate({
-  account,
-  onSignOut,
-  children,
-}: {
-  readonly account: AppShellProps['account'];
-  readonly onSignOut: AppShellProps['onSignOut'];
-  readonly children: ReactElement;
-}): ReactElement {
-  const sync = useSyncStatus();
-  const log = useFuelLog();
-  if (!sync.refused) return children;
-  const hasLocalData = log.vehicles.length > 0 || log.fillUpCount > 0;
-  return (
-    <NoAccessScreen
-      account={account}
-      onRetry={() => void sync.syncNow()}
-      retrying={sync.syncing}
-      onSignOut={onSignOut}
-      // Offered only when there is something to lose. Somebody who had
-      // access, logged fill-ups and then lost it would otherwise have their
-      // own data stranded behind a Settings screen they cannot reach.
-      onExport={hasLocalData ? () => void log.saveBackup() : undefined}
-    />
+        >
+          <AppShell account={authState.user} onSignOut={signOut} initialTab={initialTab} />
+        </SessionProvider>
+      </UnitsProvider>
+    </FuelLogProvider>
   );
 }
