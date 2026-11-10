@@ -173,17 +173,19 @@ export function App({
     );
   }
 
+  // The display style is outside the fuel log, so the sync's notes are written
+  // in the reader's locale too (#94).
   return (
-    <FuelLogProvider
-      store={store}
-      remote={remote}
-      uid={authState.user.uid}
-      sharing={sharing}
-      {...(syncState === undefined ? {} : { syncState })}
-      {...(syncTimers === undefined ? {} : { syncTimers })}
-    >
-      <UnitsProvider units={units} setUnits={changeUnits}>
-        <DisplayProvider style={style} setCurrency={changeCurrency}>
+    <DisplayProvider style={style} setCurrency={changeCurrency}>
+      <FuelLogProvider
+        store={store}
+        remote={remote}
+        uid={authState.user.uid}
+        sharing={sharing}
+        {...(syncState === undefined ? {} : { syncState })}
+        {...(syncTimers === undefined ? {} : { syncTimers })}
+      >
+        <UnitsProvider units={units} setUnits={changeUnits}>
           <SessionProvider
             account={authState.user}
             onSignOut={signOut}
@@ -192,8 +194,8 @@ export function App({
           >
             <AppShell account={authState.user} onSignOut={signOut} initialTab={initialTab} />
           </SessionProvider>
-        </DisplayProvider>
-      </UnitsProvider>
-    </FuelLogProvider>
+        </UnitsProvider>
+      </FuelLogProvider>
+    </DisplayProvider>
   );
 }

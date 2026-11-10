@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import type { MonthlyTotal } from '../../domain/fuelStatistics';
-import { chartSummary } from '../../domain/chartAccessibility';
+import { chartSummary } from './chartSummary';
 import type { Metric } from '../../domain/metric';
 import { hueFor } from '../../domain/metric';
 import { useDisplay } from '../session';

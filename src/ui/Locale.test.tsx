@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { draftWith, makeStore } from '../test/fixtures';
 import type { FuelTrackerStore } from '../data/store';
+import { StubAuthProvider } from '../data/auth';
+import { InMemoryRemoteStore, type RawSnapshot } from '../data/remote';
 import { App } from './App';
 import { saveHasOnboarded } from './onboarding';
 
@@ -66,6 +68,33 @@ describe('a German browser (#94)', () => {
     expect(row).not.toBeNull();
     expect(within(row!).getByText(/^1\.234,56\s€$/)).toBeInTheDocument();
     expect(within(row!).getByText(/378,541 L/)).toBeInTheDocument();
+  });
+});
+
+describe('sync notes (#94)', () => {
+  /** An account holding 1,200 rows no fill-up could be built from. */
+  class GarbageRemote extends InMemoryRemoteStore {
+    override async pull(): Promise<RawSnapshot> {
+      const real = await super.pull();
+      return { ...real, fillUps: Array.from({ length: 1_200 }, (_, i) => ({ id: `bad-${i}`, gallons: 'lots' })) };
+    }
+  }
+
+  test('are counted in the reader’s locale', async () => {
+    browserLanguage('de-DE');
+    const user = { uid: 'u1', email: 'driver@example.com', displayName: 'Driver' };
+    saveHasOnboarded(user.uid);
+    render(
+      <App
+        store={makeStore()}
+        auth={new StubAuthProvider({ status: 'signedIn', user }, user)}
+        remote={new GarbageRemote()}
+        initialTab="settings"
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('1.200 rows from your account were unusable and skipped'),
+    );
   });
 });
 

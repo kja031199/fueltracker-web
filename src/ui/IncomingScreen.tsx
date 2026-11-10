@@ -1,7 +1,8 @@
 import type { ReactElement } from 'react';
 import { useMemo, useRef, useState } from 'react';
 import { decodeSubmission } from '../data/fillUpLink';
-import { fillUpFacts, formatDate } from '../domain/format';
+import { formatDate } from '../domain/format';
+import { fillUpFacts } from './wording';
 import { totalCost } from '../domain/models';
 import { FillUpSummary } from './FillUpSummary';
 import type { ReceiveResult } from './fuelLog';

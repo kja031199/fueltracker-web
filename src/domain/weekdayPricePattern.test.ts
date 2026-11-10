@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest';
 import type { FuelEntryStats } from './models';
-import { METRIC, US } from './units';
 import {
   MIN_FILLS_FOR_INSIGHT,
   cheapestWeekday,
@@ -93,24 +92,14 @@ describe('firstWeekdayForLocale', () => {
   });
 });
 
-describe('the insight headline', () => {
-  test('names the cheapest and priciest days with the spread', () => {
+describe('the insight: values, not words (#94)', () => {
+  test('names the cheapest and priciest weekdays, and the spread per gallon', () => {
     const insight = weekdayPriceInsight(TUESDAY_CHEAPER());
     expect(insight).not.toBeNull();
-    expect(insight).toContain('Tuesday');
-    expect(insight).toContain('Friday');
-    expect(insight).toContain('$0.11');
-    // The cheaper day is named first.
-    expect(insight!.indexOf('Tuesday')).toBeLessThan(insight!.indexOf('Friday'));
-  });
-
-  test('converts the spread into the reader volume unit', () => {
-    // The same 11¢/gallon gap is about 2.9¢/litre. Relabelling the unit without
-    // converting the number would overstate the saving by 3.8x.
-    const perGallon = weekdayPriceInsight(TUESDAY_CHEAPER(), { units: US });
-    const perLitre = weekdayPriceInsight(TUESDAY_CHEAPER(), { units: METRIC });
-    expect(perGallon).toContain('$0.11/gal');
-    expect(perLitre).toContain('$0.03/L');
+    // Calendar numbering: Tuesday is 3, Friday is 6.
+    expect(insight?.cheapestWeekday).toBe(3);
+    expect(insight?.priciestWeekday).toBe(6);
+    expect(insight?.spreadPerGallon).toBeCloseTo(0.11, 10);
   });
 });
 
@@ -277,10 +266,4 @@ describe('degenerate and hostile input', () => {
   });
 });
 
-describe('the insight\u2019s amount in the reader\u2019s currency (#94)', () => {
-  test('the spread follows the style, while the day names stay with the English sentence', () => {
-    const insight = weekdayPriceInsight(TUESDAY_CHEAPER(), { units: METRIC, style: { locale: 'de-DE', currency: 'EUR' } });
-    expect(insight).toContain('0,03\u00a0€/L');
-    expect(insight).toContain('Tuesday');
-  });
-});
+

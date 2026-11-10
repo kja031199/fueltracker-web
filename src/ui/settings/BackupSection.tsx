@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
 import { useId, useRef, useState } from 'react';
-import { countOf, describeSince } from '../../domain/format';
+import { countOf } from '../../domain/format';
+import { describeSince } from '../wording';
 import { useBackupStatus, useFuelLog } from '../fuelLog';
 import { useDisplay } from '../session';
 

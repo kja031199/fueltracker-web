@@ -318,6 +318,7 @@ Recorded so a regression in the tests themselves is visible:
 | The enforced CSP (#82): `connect-src` back to `*.googleapis.com` / `frame-src` back to `*.firebaseapp.com` / `'unsafe-inline'` back in `style-src` / Cloud Storage added to `connect-src` / another project as the auth domain / `'wasm-unsafe-eval'` dropped | 2 / 2 / 1 / 1 / 1 / 1 |
 | Locale and currency (#94, part A): the app ignoring the browser language / the currency default ignoring the locale / KPI money dropping the style / `volume` back to US English / `formatDate` ignoring its locale / a stored currency trusted as it is / month names back to US English / the currency picked but not saved / `displayLocale` accepting what `Intl` does not support / list dates back to the browser default / lower-case currency codes accepted / the weekday insight ignoring the style | 9 / 9 / 9 / 5 / 2 / 3 / 1 / 1 / 1 / 2 / 1 / 1 |
 | Plurals (#94, part B): the form chosen by the reader's locale / the count not in the locale / always plural / zero read as singular / the backup message back to "(s)" / the dashboard warning always plural / a sync note back to "(s)" / the CSP report back to "(s)" / `describeSince` hand-rolled again / the guard blind to hand-written ternaries | 1 / 2 / 11 / 2 / 2 / 1 / 2 / 3 / 1 / 1 |
+| Words out of the domain (#94, part C1): a KPI title reworded / a KPI detail reworded / the UI's `looksEqual` ignored / the domain ignoring `looksEqual` / insight day names in the display locale / chart trend words swapped / the domain's trend wrong / a sync note ignoring the locale / `DisplayProvider` back under the fuel log | 12 / 2 / 2 / 3 / 1 / 5 / 8 / 1 / 1 |
 
 Equivalent, and kept as a backstop: `shape()` without its `hasAll`. Every
 required field is also read by a clause of its own, and reading a missing field
@@ -330,6 +331,10 @@ carries no text, so there is nothing for it to shorten.
 Survives, and equivalent: dropping the array check from the link decoder — a
 JSON array cannot carry the version field, so it is refused as damaged either
 way.
+
+Survives, and equivalent: `useSync` never refreshing its locale ref. The
+display locale is read once, when `App` mounts, so the ref never sees a second
+value; the refresh is there for the day it can change without a remount.
 
 The first row is the one to understand before touching `firestore.rules`:
 identity-only rules — the version that asked "is this your tree?" and nothing
