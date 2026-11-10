@@ -6,8 +6,8 @@ import { StubAuthProvider, type AuthUser } from '../data/auth';
 import { InMemoryRepository } from '../data/repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
 import { FuelTrackerStore } from '../data/store';
-import { InMemoryRemoteStore } from '../data/remote';
-import { InMemorySharingWorld } from '../data/sharing';
+import { InMemoryRemoteStore } from '../data/testing/inMemoryRemote';
+import { InMemorySharingWorld } from '../data/testing/inMemorySharing';
 import type { SharingSync } from '../data/shareSync';
 import {
   LINK_TEXT_LIMITS,

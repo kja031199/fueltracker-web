@@ -4,15 +4,15 @@ import type { ReactElement } from 'react';
 import { act, render, waitFor } from '@testing-library/react';
 import { InMemoryRepository } from '../data/repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
-import { InMemoryRemoteStore } from '../data/remote';
+import { InMemoryRemoteStore } from '../data/testing/inMemoryRemote';
+import { InMemorySharingWorld } from '../data/testing/inMemorySharing';
+import { InMemoryShareLedger } from '../data/testing/inMemoryShareLedger';
 import { FuelTrackerStore } from '../data/store';
 import { FuelLogProvider, useFuelLog, useSyncStatus, type FuelLog } from './fuelLog';
 import type { SyncStatus } from './useSync';
 import { manualTimers } from '../test/manualTimers';
-import { InMemorySharingWorld } from '../data/sharing';
 import type { SharingSync } from '../data/shareSync';
 import { InMemorySyncState } from '../data/syncState';
-import { InMemoryShareLedger } from '../data/shareLedger';
 import type { FillUpSummary } from '../data/records';
 
 /**

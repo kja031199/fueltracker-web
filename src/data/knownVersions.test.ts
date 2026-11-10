@@ -4,7 +4,7 @@ import 'fake-indexeddb/auto';
 import Dexie from 'dexie';
 import { FuelTrackerDatabase } from './db';
 import { DexieSyncState } from './dexieState';
-import { InMemoryRemoteStore } from './remote';
+import { InMemoryRemoteStore } from './testing/inMemoryRemote';
 import { SCHEMA_VERSION, type VehicleRecord } from './records';
 import { syncOnce } from './sync';
 import { InMemorySyncState, type KnownUpdate, type SyncCursor, type SyncStateStore } from './syncState';

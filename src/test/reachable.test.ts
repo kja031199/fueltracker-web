@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { importsOf, sourcesUnder } from './imports';
 
@@ -68,7 +68,33 @@ export function staleKept(
   });
 }
 
-const PRODUCTION = sourcesUnder('src', false).filter((file) => !file.startsWith('src/test/'));
+/** Code for tests only: `src/test/`, and a `testing/` folder beside the code it stands in for. */
+export function isTestCode(file: string): boolean {
+  return file.startsWith('src/test/') || /(^|\/)testing\//.test(file);
+}
+
+const PRODUCTION = sourcesUnder('src', false).filter((file) => !isTestCode(file));
+
+/**
+ * In-memory stand-ins production really runs (#96): `main.tsx` keeps a
+ * signed-out device's data in `InMemoryRepository`s, and `useSync` falls back
+ * to `InMemorySyncState`. Every other `InMemory*` is a test double, and lives
+ * in a `testing/` folder.
+ */
+const PRODUCTION_IN_MEMORY: ReadonlyMap<string, string> = new Map([
+  ['InMemoryRepository', 'src/data/repository.ts'],
+  ['InMemorySyncState', 'src/data/syncState.ts'],
+]);
+
+/** The test doubles `file` declares: any `InMemory*` but the two production runs, there. */
+export function strayDoubles(file: string, declared: readonly string[]): string[] {
+  return declared.filter((name) => PRODUCTION_IN_MEMORY.get(name) !== file);
+}
+
+/** The `InMemory*` classes a source declares. */
+export function inMemoryClasses(source: string): string[] {
+  return [...source.matchAll(/\bclass\s+(InMemory\w*)/g)].map((match) => match[1]!);
+}
 
 describe('the walk', () => {
   test('follows the app’s imports, including the ones loaded later', () => {
@@ -87,6 +113,26 @@ describe('the walk', () => {
     };
     const reached = reachableFrom('src/a.ts', (file) => graph[file] ?? []);
     expect([...reached].sort()).toEqual(['src/a.ts']);
+  });
+
+  test('test code is src/test/ and testing/ folders, nothing else', () => {
+    expect(isTestCode('src/test/fixtures.ts')).toBe(true);
+    expect(isTestCode('src/data/testing/inMemoryRemote.ts')).toBe(true);
+    expect(isTestCode('src/data/remote.ts')).toBe(false);
+    expect(isTestCode('src/data/testingGround.ts')).toBe(false);
+    expect(isTestCode('src/data/latest/x.ts')).toBe(false);
+  });
+
+  test('finds the in-memory classes a file declares, exported or not', () => {
+    const source = 'export class InMemoryRemoteStore implements RemoteStore {}\nclass InMemoryScoped {}\nclass Other {}\n// class InMemoryNot';
+    expect(inMemoryClasses(source)).toEqual(['InMemoryRemoteStore', 'InMemoryScoped', 'InMemoryNot']);
+    expect(inMemoryClasses('const store = new InMemoryRepository();')).toEqual([]);
+  });
+
+  test('an in-memory class is allowed only where production runs it', () => {
+    expect(strayDoubles('src/data/repository.ts', ['InMemoryRepository'])).toEqual([]);
+    expect(strayDoubles('src/data/sharing.ts', ['InMemoryRepository'])).toEqual(['InMemoryRepository']);
+    expect(strayDoubles('src/data/remote.ts', ['InMemoryRemoteStore'])).toEqual(['InMemoryRemoteStore']);
   });
 
   test('a kept file leaves the list once it is used, or gone', () => {
@@ -109,5 +155,20 @@ describe('src/ (#96)', () => {
 
   test('every kept file still exists and is still unused', () => {
     expect(staleKept(KEPT.keys(), reached)).toEqual([]);
+  });
+
+  test('the app reaches no test code', () => {
+    expect([...reached].filter(isTestCode)).toEqual([]);
+  });
+
+  test.each(PRODUCTION)('%s declares no test double', (file) => {
+    expect(strayDoubles(file, inMemoryClasses(readFileSync(file, 'utf8')))).toEqual([]);
+  });
+
+  test('the two in-memory classes production runs are where it runs them from', () => {
+    for (const [name, file] of PRODUCTION_IN_MEMORY) {
+      expect(inMemoryClasses(readFileSync(file, 'utf8'))).toContain(name);
+      expect(reached.has(file)).toBe(true);
+    }
   });
 });

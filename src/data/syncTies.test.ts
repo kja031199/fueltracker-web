@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { draft, makeStore } from '../test/fixtures';
-import { InMemoryRemoteStore } from './remote';
+import { InMemoryRemoteStore } from './testing/inMemoryRemote';
 import type { FillUpRecord } from './records';
 import { FuelTrackerStore } from './store';
 import { syncOnce, tieWinner } from './sync';

@@ -4,8 +4,9 @@ import userEvent from '@testing-library/user-event';
 import { draftWith, makeStore, saveHasOnboarded } from '../test/fixtures';
 import type { FuelTrackerStore } from '../data/store';
 import { StubAuthProvider } from '../data/auth';
-import { InMemoryRemoteStore, type RawSnapshot } from '../data/remote';
+import { type RawSnapshot } from '../data/remote';
 import { App } from './App';
+import { InMemoryRemoteStore } from '../data/testing/inMemoryRemote';
 
 /**
  * Numbers, dates and money in the reader's own locale (#94).

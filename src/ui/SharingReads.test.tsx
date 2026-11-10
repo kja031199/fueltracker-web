@@ -2,11 +2,12 @@ import { describe, expect, test, vi } from 'vitest';
 import { draft, makeStore, sharingFor } from '../test/fixtures';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { FuelTrackerStore } from '../data/store';
-import { InMemorySharingWorld, type Account } from '../data/sharing';
+import { type Account } from '../data/sharing';
 import type { SharingSync } from '../data/shareSync';
 import { FuelLogProvider, useFuelLog, useSyncStatus, type FuelLog } from './fuelLog';
 import type { SyncStatus } from './useSync';
 import { FillUpsScreen } from './FillUpsScreen';
+import { InMemorySharingWorld } from '../data/testing/inMemorySharing';
 
 /**
  * Sharing reads on the free plan (#89), where reads are what runs out.

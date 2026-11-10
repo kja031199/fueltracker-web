@@ -2,7 +2,7 @@ import { beforeEach, expect, test } from 'vitest';
 import { makeStore, saveHasOnboarded } from '../test/fixtures';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { InMemoryRemoteStore } from '../data/remote';
+import { InMemoryRemoteStore } from '../data/testing/inMemoryRemote';
 import { StubAuthProvider } from '../data/auth';
 import { App } from './App';
 import { manualTimers } from '../test/manualTimers';

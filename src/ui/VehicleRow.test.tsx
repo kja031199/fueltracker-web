@@ -3,7 +3,7 @@ import { makeStore, saveHasOnboarded, sharingFor } from '../test/fixtures';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StubAuthProvider, type AuthUser } from '../data/auth';
-import { InMemorySharingWorld } from '../data/sharing';
+import { InMemorySharingWorld } from '../data/testing/inMemorySharing';
 import { App } from './App';
 
 /**

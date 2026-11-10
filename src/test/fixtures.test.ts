@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
-import { InMemorySharingWorld } from '../data/sharing';
+import { InMemorySharingWorld } from '../data/testing/inMemorySharing';
 import { MonotonicClock } from '../data/syncClock';
 import { DRAFT_DEFAULTS, draft, draftWith, makeStore, sharingFor } from './fixtures';
 import { sourcesUnder } from './imports';

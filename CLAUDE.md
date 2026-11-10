@@ -544,7 +544,7 @@ npm run test:build   # vite build, then the *.build.test.ts files
   the role, deliberately. `firestore.indexes.json` is deployed once by hand
   (docs/deploying.md); `withIndexFallback` reads the whole car meanwhile, and
   says so (`indexMissing` → one line in the sync notice, #89).
-- **Count sharing reads** (#89; `world.reads` in the in-memory world). The
+- **Count sharing reads** (#89; `world.reads` in `testing/inMemorySharing.ts`). The
   memberships are read once per sync, in `syncAll`, and handed to the screens
   (`shares.memberships`, `useSync`'s `onShares`). Don't add a
   `remote.memberships()` call to the sharing view; the ledger fills the list
@@ -765,9 +765,22 @@ npm run test:build   # vite build, then the *.build.test.ts files
   stubs the global `URL` to capture downloads.
 
 - **Tests never touch the network or a real device service.**
-  `StubAuthProvider` and `InMemoryRemoteStore` exist for this. The iOS original
-  paid for the lesson when an `LAContext` call turned every render test into a
+  `StubAuthProvider` and the fakes in `src/data/testing/` exist for this:
+  `InMemoryRemoteStore` (an account), `InMemorySharingWorld` (accounts and the
+  sharing rules between them) and `InMemoryShareLedger`. The iOS original paid
+  for the lesson when an `LAContext` call turned every render test into a
   round-trip to a system daemon.
+- **A test double lives in a `testing/` folder, never in a production module**
+  (#96; `reachable.test.ts`). They used to make `remote.ts` and `sharing.ts`
+  twice their size. The only `InMemory*` classes in production code are the
+  two production runs: `InMemoryRepository` (a signed-out device) and
+  `InMemorySyncState` (`useSync`'s fallback). **A fake reads the way the real
+  one does**, or the tests prove a different program: the member's scoped
+  pull returns the car's document on every pull and keeps a cursor of that
+  car's own (`pullCar`), exactly as `FirestoreScopedRemote.pull` does — it
+  once filtered the owner's incremental pull instead, returning the car only
+  when it changed. When you change a real remote's reads, change its fake and
+  pin the difference in `sharing.test.ts`.
 - **Testing Library cannot see vitest's fake timers** — it looks for *Jest*, so
   a blanket `vi.useFakeTimers()` leaves `findBy*`/`waitFor` polling a faked
   `setTimeout` that never fires and the test **hangs** instead of failing. Fake
