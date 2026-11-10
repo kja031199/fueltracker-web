@@ -3,17 +3,17 @@ import { draft, makeStore } from '../test/fixtures';
 import type { ReactNode } from 'react';
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import type { FillUpRecord } from '../data/records';
-import { InMemoryRemoteStore } from '../data/remote';
+import { InMemoryRemoteStore } from '../data/testing/inMemoryRemote';
+import { InMemorySharingWorld } from '../data/testing/inMemorySharing';
+import { InMemoryShareLedger } from '../data/testing/inMemoryShareLedger';
 import { FuelTrackerStore } from '../data/store';
 import { FuelLogProvider, useBackupStatus, useFuelLog, useSyncStatus, type BackupStatus, type FuelLog } from './fuelLog';
 import { toJsonBackup } from '../data/backupFormat';
 import { loadBackupState } from './backupNudge';
 import { manualTimers, type ManualTimers } from '../test/manualTimers';
-import { InMemorySharingWorld } from '../data/sharing';
 import type { SharingSync } from '../data/shareSync';
 import { LEDGER_UNREADABLE } from './syncMessages';
 import { InMemorySyncState } from '../data/syncState';
-import { InMemoryShareLedger } from '../data/shareLedger';
 
 /**
  * The one place a write happens (#56).

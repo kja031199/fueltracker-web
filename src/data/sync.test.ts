@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { InMemoryRepository } from './repository';
-import { InMemoryRemoteStore, emptySnapshot, sendableRows } from './remote';
+import { emptySnapshot, sendableRows } from './remote';
 import type { RawSnapshot, RemoteStore } from './remote';
 import { FuelTrackerStore } from './store';
 import { MonotonicClock } from './syncClock';
@@ -10,6 +10,7 @@ import { isRefusal, newerThanKnown, partitionBySchema, preserveLocalReceipts, sy
 import { InMemorySyncState } from './syncState';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import type { Snapshot } from './records';
+import { InMemoryRemoteStore } from './testing/inMemoryRemote';
 
 /**
  * A monotonic clock over a wall clock the test controls.

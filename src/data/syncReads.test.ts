@@ -3,12 +3,13 @@ import { draft, sharingFor } from '../test/fixtures';
 import { InMemoryRepository } from './repository';
 import type { FillUpRecord, PendingFillUpRecord, SyncFields, VehicleRecord } from './records';
 import { FuelTrackerStore } from './store';
-import { InMemorySharingWorld, type Account } from './sharing';
+import { type Account } from './sharing';
 import { syncAll } from './shareSync';
 import { syncOnce } from './sync';
 import { InMemorySyncState } from './syncState';
 import { MonotonicClock } from './syncClock';
 import { LocalView } from './localView';
+import { InMemorySharingWorld } from './testing/inMemorySharing';
 
 /**
  * Sync reads this device once, not once per step (#87).

@@ -16,18 +16,6 @@ export interface ShareLedger {
   save(list: readonly Membership[]): Promise<void>;
 }
 
-export class InMemoryShareLedger implements ShareLedger {
-  private list: Membership[] = [];
-
-  async load(): Promise<Membership[]> {
-    return [...this.list];
-  }
-
-  async save(list: readonly Membership[]): Promise<void> {
-    this.list = [...list];
-  }
-}
-
 /** A stored ledger, keeping only well-formed entries. Junk reads as none. */
 export function parseLedger(value: unknown): Membership[] {
   if (!Array.isArray(value)) return [];

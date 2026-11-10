@@ -18,7 +18,7 @@ import { openAccountStore } from './accountStore';
 import { FuelTrackerDatabase } from './db';
 import { dexieRepositories } from './dexieRepository';
 import { SCHEMA_VERSION, type FillUpRecord, type PendingFillUpRecord, type VehicleRecord } from './records';
-import { InMemoryRemoteStore } from './remote';
+import { InMemoryRemoteStore } from './testing/inMemoryRemote';
 import { InMemoryRepository } from './repository';
 import { FuelTrackerStore } from './store';
 import { type Repositories } from './repository';

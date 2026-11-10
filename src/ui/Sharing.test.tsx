@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { StubAuthProvider, type AuthUser } from '../data/auth';
 import type { VehicleRecord } from '../data/records';
 import { FuelTrackerStore } from '../data/store';
-import { InMemorySharingWorld } from '../data/sharing';
+import { InMemorySharingWorld } from '../data/testing/inMemorySharing';
 import type { SharingSync } from '../data/shareSync';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { App } from './App';

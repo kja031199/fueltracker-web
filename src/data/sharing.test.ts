@@ -1,18 +1,17 @@
 import { describe, expect, test } from 'vitest';
 import {
-  InMemorySharingWorld,
   MAX_EMAIL_LENGTH,
   Refused,
   inviteKey,
   membershipKey,
   normalizeEmail,
-  scopeSnapshot,
   type Account,
 } from './sharing';
 import { isRefusal } from './sync';
 import { parseLedger } from './shareLedger';
 import type { FillUpRecord, VehicleRecord } from './records';
 import { SCHEMA_VERSION } from './records';
+import { InMemorySharingWorld } from './testing/inMemorySharing';
 
 /**
  * The sharing vocabulary and the in-memory world (#66), directly. The world is
@@ -113,41 +112,6 @@ describe('Refused', () => {
     expect(refused.code).toBe('permission-denied');
     expect(isRefusal(refused)).toBe(true);
     expect(refused).toBeInstanceOf(Error);
-  });
-});
-
-describe('scopeSnapshot', () => {
-  const raw = {
-    vehicles: [vehicle('civic'), vehicle('truck'), null, 'junk', { name: 'no id' }],
-    fillUps: [fillUp('f1', 'civic', null), fillUp('t1', 'truck', null), null, 42, { id: 'x' }],
-    pendingFillUps: [{ id: 'p1', vehicleId: 'civic' }],
-    highWater: { vehicles: 7, fillUps: 9, pendingFillUps: 3 },
-  };
-
-  test('keeps the car and its fill-ups, and nothing else', () => {
-    const scoped = scopeSnapshot(raw, 'civic');
-    expect((scoped.vehicles as VehicleRecord[]).map((v) => v.id)).toEqual(['civic']);
-    expect((scoped.fillUps as FillUpRecord[]).map((f) => f.id)).toEqual(['f1']);
-  });
-
-  test('never carries submissions — they are the owner’s alone', () => {
-    expect(scopeSnapshot(raw, 'civic').pendingFillUps).toEqual([]);
-    expect(scopeSnapshot(raw, 'civic').highWater?.pendingFillUps).toBeNull();
-  });
-
-  test('keeps the account-wide marks for the collections it reads', () => {
-    expect(scopeSnapshot(raw, 'civic').highWater).toEqual({ vehicles: 7, fillUps: 9, pendingFillUps: null });
-  });
-
-  test('a pull with no marks stays without them', () => {
-    const { highWater: _marks, ...unmarked } = raw;
-    expect(scopeSnapshot(unmarked, 'civic').highWater).toBeUndefined();
-  });
-
-  test('an unknown car scopes to nothing', () => {
-    const scoped = scopeSnapshot(raw, 'nope');
-    expect(scoped.vehicles).toEqual([]);
-    expect(scoped.fillUps).toEqual([]);
   });
 });
 
@@ -328,6 +292,71 @@ describe('the in-memory world refuses what the rules refuse', () => {
       expect((raw.vehicles as VehicleRecord[]).map((v) => v.id)).toEqual(['civic']);
       expect((raw.fillUps as FillUpRecord[]).map((f) => f.id)).toEqual(['f1']);
       expect(raw.pendingFillUps).toEqual([]);
+    });
+
+    // As `FirestoreScopedRemote.pull` reads it (#96). The fake used to filter
+    // the owner's incremental pull, so the car came back only when it had
+    // changed and the cursor was the owner's whole account's.
+    test('returns the car on every pull, incremental or not', async () => {
+      const w = await joined();
+      const [membership] = await w.sharingFor(PARTNER).memberships();
+      const scoped = w.sharingFor(PARTNER).scoped(membership!);
+      const first = await scoped.pull(null);
+      const again = await scoped.pull(first.highWater ?? null);
+      expect((again.vehicles as VehicleRecord[]).map((v) => v.id)).toEqual(['civic']);
+      expect(again.fillUps).toEqual([]);
+    });
+
+    test('keeps a cursor of the car’s own: no vehicle mark, and its fill-ups’ newest stamp', async () => {
+      const w = await joined();
+      const [membership] = await w.sharingFor(PARTNER).memberships();
+      const scoped = w.sharingFor(PARTNER).scoped(membership!);
+      const before = (await scoped.pull(null)).highWater!;
+      expect(before.vehicles).toBeNull();
+      expect(before.pendingFillUps).toBeNull();
+
+      // The owner's other car moves the account's marks, not this car's.
+      await w.remoteFor(OWNER.uid).push({ vehicles: [], fillUps: [fillUp('t2', 'truck', OWNER.uid)], pendingFillUps: [] });
+      const quiet = await scoped.pull(before);
+      expect(quiet.fillUps).toEqual([]);
+      expect(quiet.highWater?.fillUps).toBeNull();
+
+      await w.remoteFor(OWNER.uid).push({ vehicles: [], fillUps: [fillUp('f2', 'civic', OWNER.uid)], pendingFillUps: [] });
+      const fresh = await scoped.pull(before);
+      expect((fresh.fillUps as FillUpRecord[]).map((row) => row.id)).toEqual(['f2']);
+      expect(fresh.highWater?.fillUps).toBeGreaterThan(before.fillUps ?? 0);
+    });
+
+    test('an unchanged car still comes back after other rows of the owner’s change', async () => {
+      const w = await joined();
+      const [membership] = await w.sharingFor(PARTNER).memberships();
+      const scoped = w.sharingFor(PARTNER).scoped(membership!);
+      const cursor = (await scoped.pull(null)).highWater!;
+      await w.remoteFor(OWNER.uid).push({ vehicles: [vehicle('van')], fillUps: [], pendingFillUps: [] });
+      const next = await scoped.pull(cursor);
+      expect((next.vehicles as VehicleRecord[]).map((v) => v.id)).toEqual(['civic']);
+    });
+
+    test('a cursor’s vehicle mark is ignored: the car is read whole', async () => {
+      // Production never filters the car by a mark; a cursor stored by an
+      // older build may still carry one.
+      const w = await joined();
+      const [membership] = await w.sharingFor(PARTNER).memberships();
+      const next = await w.sharingFor(PARTNER).scoped(membership!).pull({ vehicles: 1e15, fillUps: null, pendingFillUps: null });
+      expect((next.vehicles as VehicleRecord[]).map((v) => v.id)).toEqual(['civic']);
+    });
+
+    test('the car read on its own is offline when the account is', async () => {
+      const w = await world();
+      w.remoteFor(OWNER.uid).failPull = true;
+      expect(() => w.remoteFor(OWNER.uid).pullCar('civic')).toThrow('offline');
+    });
+
+    test('offline is offline, as the owner’s own pull is', async () => {
+      const w = await joined();
+      const [membership] = await w.sharingFor(PARTNER).memberships();
+      w.remoteFor(OWNER.uid).failPull = true;
+      await expect(w.sharingFor(PARTNER).scoped(membership!).pull(null)).rejects.toThrow('offline');
     });
 
     test('writes a fill-up entered by themselves', async () => {

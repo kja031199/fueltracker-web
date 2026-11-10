@@ -6,7 +6,7 @@ import { InMemoryRepository } from '../data/repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
 import { FuelTrackerStore } from '../data/store';
 import { StubAuthProvider } from '../data/auth';
-import { InMemoryRemoteStore } from '../data/remote';
+import { InMemoryRemoteStore } from '../data/testing/inMemoryRemote';
 import { App } from './App';
 
 const USER = { uid: 'u1', email: 'driver@example.com', displayName: 'Driver' };

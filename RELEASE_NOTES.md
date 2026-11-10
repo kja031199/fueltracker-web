@@ -11,6 +11,19 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-10
 
+- **Nothing you see changes.** The shared-car tests now read the way the
+  real app does, so they test the program you use.
+  *Technical:* the test doubles moved out of production modules into
+  `src/data/testing/` (`InMemoryRemoteStore`, `InMemorySharingWorld` and its
+  sharing and scoped remotes, `InMemoryShareLedger`), roughly halving
+  `remote.ts` and `sharing.ts`. The member's scoped pull now matches
+  `FirestoreScopedRemote.pull` — the car's document on every pull and a
+  cursor of that car's own — instead of filtering the owner's incremental
+  pull; `scopeSnapshot`, used only by the fake, is gone.
+  `reachable.test.ts` refuses an `InMemory*` class in a production module
+  other than the two production runs, and the app reaching any test code.
+  Closes #96.
+  [#96](https://github.com/kja031199/fueltracker-web/issues/96) · [PR #145](https://github.com/kja031199/fueltracker-web/pull/145)
 - **The weekday price chart starts the week where your calendar does: on
   Monday in Germany, on Sunday in the US.** Nothing else you see changes.
   *Technical:* dead code removed — the never-shown vehicle comparison,

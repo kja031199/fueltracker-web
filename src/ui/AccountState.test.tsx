@@ -4,7 +4,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StubAuthProvider } from '../data/auth';
 import type { RemoteStore } from '../data/remote';
-import { InMemoryRemoteStore } from '../data/remote';
+import { InMemoryRemoteStore } from '../data/testing/inMemoryRemote';
 import { FuelTrackerStore } from '../data/store';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { MINIMUM_ENTRIES_TO_PROMPT } from '../domain/exportReminder';

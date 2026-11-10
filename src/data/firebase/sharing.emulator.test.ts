@@ -8,7 +8,7 @@ import { FuelTrackerStore } from '../store';
 import type { Account } from '../sharing';
 import { syncAll, type SharingSync } from '../shareSync';
 import { InMemorySyncState } from '../syncState';
-import { InMemoryShareLedger } from '../shareLedger';
+import { InMemoryShareLedger } from '../testing/inMemoryShareLedger';
 import { MonotonicClock } from '../syncClock';
 import { makeFuelEntryDraft } from '../../domain/fuelEntryDraft';
 import { FirestoreRemoteStore } from './remoteStore';

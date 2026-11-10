@@ -3,8 +3,8 @@ import { describe, expect, test, vi } from 'vitest';
 import { boot, type BootDeps, type AppProps, type RemoteFactory } from './bootstrap';
 import { StubAuthProvider, type AuthState, type AuthUser } from './data/auth';
 import type { AccountStore } from './data/accountStore';
-import { InMemoryRemoteStore } from './data/remote';
-import { InMemorySharingWorld } from './data/sharing';
+import { InMemoryRemoteStore } from './data/testing/inMemoryRemote';
+import { InMemorySharingWorld } from './data/testing/inMemorySharing';
 import { makeStore } from './test/fixtures';
 
 /**
