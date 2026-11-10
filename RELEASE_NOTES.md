@@ -11,6 +11,18 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-10
 
+- **The site's content policy is now stricter: it talks only to the Google
+  services it uses and allows no inline styles.** It was checked on the live
+  site first, so nothing you do should change. This completes the security
+  hardening pass.
+  *Technical:* the report-only candidate from #136 is now the enforced
+  `Content-Security-Policy` — `connect-src` names `firestore`,
+  `identitytoolkit` and `securetoken.googleapis.com` instead of
+  `*.googleapis.com`, `frame-src` this project's auth domain instead of
+  `*.firebaseapp.com`, and `style-src` drops `'unsafe-inline'`. A run of
+  `docs/csp-check.md` on the live site recorded no violations.
+  `csp.build.test.ts` pins each directive exactly.
+  [#82](https://github.com/kja031199/fueltracker-web/issues/82) · [PR #138](https://github.com/kja031199/fueltracker-web/pull/138)
 - **The app opens faster, and scanning several receipts in a row is
   quicker.** The sign-in screen no longer waits for the sync code to download,
   and the receipt reader stays ready between scans instead of starting over
