@@ -10,6 +10,7 @@
  */
 
 import type { ReactElement } from 'react';
+import { useId } from 'react';
 import { ScreenFrame } from './ScreenFrame';
 
 interface Props {
@@ -17,10 +18,12 @@ interface Props {
 }
 
 export function WrongProjectScreen({ projectId }: Props): ReactElement {
+  // One base per rendering, so a component shown twice never repeats an id (#95).
+  const idBase = useId();
   return (
     <ScreenFrame>
-      <section className="card" aria-labelledby="wrong-project-heading">
-        <h2 className="card__title" id="wrong-project-heading">
+      <section className="card" aria-labelledby={`${idBase}-wrong-project-heading`}>
+        <h2 className="card__title" id={`${idBase}-wrong-project-heading`}>
           This development build is pointed at the production project
         </h2>
         <p className="stack-sm">

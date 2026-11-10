@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { describeSince } from '../../domain/format';
 import { useBackupStatus, useFuelLog } from '../fuelLog';
 
@@ -9,6 +9,8 @@ import { useBackupStatus, useFuelLog } from '../fuelLog';
  * backup is recorded for the reminder (#93), without this section asking.
  */
 export function BackupSection(): ReactElement {
+  // One base per rendering, so a component shown twice never repeats an id (#95).
+  const idBase = useId();
   const { saveBackup, exportCsv, importFile } = useFuelLog();
   const { lastBackupAt } = useBackupStatus();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -41,8 +43,8 @@ export function BackupSection(): ReactElement {
   }
 
   return (
-    <section className="card" aria-labelledby="backup-heading">
-      <h2 className="card__title" id="backup-heading">
+    <section className="card" aria-labelledby={`${idBase}-backup-heading`}>
+      <h2 className="card__title" id={`${idBase}-backup-heading`}>
         Backup and restore
       </h2>
 

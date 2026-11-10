@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react';
+import { useId } from 'react';
 import { useCopyToClipboard } from './useCopyToClipboard';
 
 /**
@@ -26,6 +27,8 @@ interface Props {
  * way, and a failed copy says so rather than claiming success.
  */
 export function LinkOut({ url, label }: Props): ReactElement {
+  // One base per rendering, so a component shown twice never repeats an id (#95).
+  const idBase = useId();
   const { state: copyState, copy } = useCopyToClipboard();
   const canShare = typeof navigator.share === 'function';
 
@@ -39,12 +42,12 @@ export function LinkOut({ url, label }: Props): ReactElement {
 
   return (
     <div className="field">
-      <label className="field__label" htmlFor="link-out">
+      <label className="field__label" htmlFor={`${idBase}-link-out`}>
         {label}
       </label>
       <textarea
         className="break-all"
-        id="link-out"
+        id={`${idBase}-link-out`}
         readOnly
         rows={3}
         value={url}

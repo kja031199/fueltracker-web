@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { datetimeLocalValue } from '../domain/fillUpForm';
 import { FUEL_GRADES } from '../domain/fuelGrade';
 import type { FuelGrade } from '../domain/fuelGrade';
@@ -22,6 +23,11 @@ interface Props {
   readonly editing: FillUpRecord | null;
   readonly onSaved: () => Promise<void>;
   readonly onCancel: () => void;
+  /**
+   * Put focus on the form's heading when it opens (#95) — where the form
+   * replaces the list it was opened from, so the button pressed is gone.
+   */
+  readonly focusHeading?: boolean;
   /**
    * Filling in a fill-up for someone else's car, to send back by link (#3):
    * the draft goes to `onDraft` and nothing is written here. A link carries
@@ -62,7 +68,14 @@ export function FillUpForm({
   onSaved,
   onCancel,
   forLink,
+  focusHeading = false,
 }: Props): ReactElement {
+  // One base per rendering, so a component shown twice never repeats an id (#95).
+  const idBase = useId();
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (focusHeading) heading.current?.focus();
+  }, [focusHeading]);
   const { units } = useUnits();
   const {
     form,
@@ -91,9 +104,9 @@ export function FillUpForm({
         event.preventDefault();
         void save();
       }}
-      aria-labelledby="fillup-form-heading"
+      aria-labelledby={`${idBase}-fillup-form-heading`}
     >
-      <h2 className="card__title" id="fillup-form-heading">
+      <h2 className="card__title" id={`${idBase}-fillup-form-heading`} ref={heading} tabIndex={-1}>
         {forLink?.title ?? (editing === null ? 'New fill-up' : 'Edit fill-up')}
       </h2>
 
@@ -102,11 +115,11 @@ export function FillUpForm({
       )}
 
       <div className="field">
-        <label className="field__label" htmlFor="fillup-date">
+        <label className="field__label" htmlFor={`${idBase}-fillup-date`}>
           Date
         </label>
         <input
-          id="fillup-date"
+          id={`${idBase}-fillup-date`}
           type="datetime-local"
           value={datetimeLocalValue(form.date)}
           onChange={(event) => {
@@ -117,17 +130,19 @@ export function FillUpForm({
       </div>
 
       <DecimalField
-        id="fillup-odometer"
+        id={`${idBase}-fillup-odometer`}
         label={`Odometer (${distanceSpec.abbreviation})`}
         value={numericText.odometer}
         onChange={(text) => typeNumber('odometer', text, distanceSpec.toMiles)}
-        describedBy={odometerWarning ? 'odometer-warning' : jump !== null ? 'odometer-gap-warning' : undefined}
+        describedBy={
+          odometerWarning ? `${idBase}-odometer-warning` : jump !== null ? `${idBase}-odometer-gap-warning` : undefined
+        }
       />
 
       {odometerWarning && previous !== null && (
         // A warning, not a block: this is usually a typo, but it can be a
         // replaced cluster or a correction, and the app cannot tell which.
-        <p className="warning" id="odometer-warning" role="status">
+        <p className="warning" id={`${idBase}-odometer-warning`} role="status">
           That is at or below the last reading (
           {formatDistance(previous, units.distance, true)}). Double-check before saving.
         </p>
@@ -137,7 +152,7 @@ export function FillUpForm({
         // A hint, not a block: a long trip between fill-ups is real. But one
         // that nobody logged — easy when two people share a car — stretches
         // the next MPG over two tanks, and this is the box that prevents it.
-        <p className="warning" id="odometer-gap-warning" role="status">
+        <p className="warning" id={`${idBase}-odometer-gap-warning`} role="status">
           That is {formatDistance(jump.distance, units.distance, true)} since the last fill-up — more
           than twice the usual {formatDistance(jump.usual, units.distance, true)}. If a fill-up was not
           logged, tick &ldquo;Missed logging a fill before this one&rdquo; so the economy is not
@@ -146,14 +161,14 @@ export function FillUpForm({
       )}
 
       <DecimalField
-        id="fillup-volume"
+        id={`${idBase}-fillup-volume`}
         label={volumeSpec.name}
         value={numericText.gallons}
         onChange={(text) => typeNumber('gallons', text, volumeSpec.toGallons)}
       />
 
       <DecimalField
-        id="fillup-price"
+        id={`${idBase}-fillup-price`}
         label={`Price per ${volumeSpec.singularNoun}`}
         value={numericText.price}
         onChange={(text) => typeNumber('price', text, (typed) => pricePerGallonFrom(typed, units.volume))}
@@ -169,12 +184,12 @@ export function FillUpForm({
       <div className="field field--inline">
         <input
           className="checkbox"
-          id="fillup-full"
+          id={`${idBase}-fillup-full`}
           type="checkbox"
           checked={form.isFullTank}
           onChange={(event) => update('isFullTank', event.target.checked)}
         />
-        <label className="field__label" htmlFor="fillup-full">
+        <label className="field__label" htmlFor={`${idBase}-fillup-full`}>
           Filled the tank completely
         </label>
       </div>
@@ -183,12 +198,12 @@ export function FillUpForm({
         <div className="field field--inline">
           <input
             className="checkbox"
-            id="fillup-missed"
+            id={`${idBase}-fillup-missed`}
             type="checkbox"
             checked={form.missedPreviousFillUp}
             onChange={(event) => update('missedPreviousFillUp', event.target.checked)}
           />
-          <label className="field__label" htmlFor="fillup-missed">
+          <label className="field__label" htmlFor={`${idBase}-fillup-missed`}>
             Missed logging a fill before this one
           </label>
         </div>
@@ -202,11 +217,11 @@ export function FillUpForm({
       </p>
 
       <div className="field">
-        <label className="field__label" htmlFor="fillup-grade">
+        <label className="field__label" htmlFor={`${idBase}-fillup-grade`}>
           Fuel grade
         </label>
         <select
-          id="fillup-grade"
+          id={`${idBase}-fillup-grade`}
           value={form.fuelGrade}
           onChange={(event) => update('fuelGrade', event.target.value as FuelGrade)}
         >
@@ -219,11 +234,11 @@ export function FillUpForm({
       </div>
 
       <div className="field">
-        <label className="field__label" htmlFor="fillup-station">
+        <label className="field__label" htmlFor={`${idBase}-fillup-station`}>
           Gas station (optional)
         </label>
         <input
-          id="fillup-station"
+          id={`${idBase}-fillup-station`}
           maxLength={forLink === undefined ? TEXT_LIMITS.station : LINK_TEXT_LIMITS.station}
           value={form.station}
           onChange={(event) => update('station', event.target.value)}
@@ -231,11 +246,11 @@ export function FillUpForm({
       </div>
 
       <div className="field">
-        <label className="field__label" htmlFor="fillup-notes">
+        <label className="field__label" htmlFor={`${idBase}-fillup-notes`}>
           Notes (optional)
         </label>
         <textarea
-          id="fillup-notes"
+          id={`${idBase}-fillup-notes`}
           maxLength={forLink === undefined ? TEXT_LIMITS.notes : LINK_TEXT_LIMITS.notes}
           rows={2}
           value={form.notes}

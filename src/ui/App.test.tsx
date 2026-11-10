@@ -92,7 +92,7 @@ describe('vehicles', () => {
     await store.addVehicle({ name: 'Old Car' });
     await renderPastOnboarding(store);
 
-    await user.click(await screen.findByRole('button', { name: /^delete$/i }));
+    await user.click(await screen.findByRole('button', { name: /^delete old car$/i }));
     // Nothing is gone yet — the confirmation names what will be lost.
     expect(await store.vehicles()).toHaveLength(1);
 
@@ -106,10 +106,10 @@ describe('vehicles', () => {
     await store.addVehicle({ name: 'Old Car' });
     await renderPastOnboarding(store);
 
-    await user.click(await screen.findByRole('button', { name: /^delete$/i }));
+    await user.click(await screen.findByRole('button', { name: /^delete old car$/i }));
     await user.click(screen.getByRole('button', { name: /keep/i }));
     expect(await store.vehicles()).toHaveLength(1);
-    expect(screen.getByRole('button', { name: /^delete$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^delete old car$/i })).toBeInTheDocument();
   });
 });
 

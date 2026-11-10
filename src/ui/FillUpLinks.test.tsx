@@ -114,7 +114,7 @@ describe('the owner asks', () => {
     const user = userEvent.setup();
     open({ store, initialTab: 'vehicles' });
 
-    await user.click(await screen.findByRole('button', { name: 'Request a fill-up' }));
+    await user.click(await screen.findByRole('button', { name: /^Request a fill-up for / }));
     const field = screen.getByLabelText(/fill-up request for civic/i) as HTMLTextAreaElement;
     expect(field.value.startsWith(`${window.location.origin}${window.location.pathname}#/submit/`)).toBe(true);
     expect(decodeRequest(payloadIn(/fill-up request for civic/i, '#/submit/'))).toEqual({
@@ -128,7 +128,7 @@ describe('the owner asks', () => {
     await store.addVehicle({ name: 'Civic' });
     const user = userEvent.setup();
     open({ store, initialTab: 'vehicles' });
-    await user.click(await screen.findByRole('button', { name: 'Request a fill-up' }));
+    await user.click(await screen.findByRole('button', { name: /^Request a fill-up for / }));
     await user.click(screen.getByRole('button', { name: 'Copy link' }));
     expect(await screen.findByText('Copied.')).toBeInTheDocument();
     expect(await navigator.clipboard.readText()).toBe(
@@ -142,7 +142,7 @@ describe('the owner asks', () => {
     const user = userEvent.setup();
     vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValue(new Error('denied'));
     open({ store, initialTab: 'vehicles' });
-    await user.click(await screen.findByRole('button', { name: 'Request a fill-up' }));
+    await user.click(await screen.findByRole('button', { name: /^Request a fill-up for / }));
     await user.click(screen.getByRole('button', { name: 'Copy link' }));
     expect(await screen.findByText(/would not copy it/i)).toBeInTheDocument();
     expect(screen.queryByText('Copied.')).not.toBeInTheDocument();
@@ -153,7 +153,7 @@ describe('the owner asks', () => {
     await store.addVehicle({ name: 'Civic' });
     const user = userEvent.setup();
     open({ store, initialTab: 'vehicles' });
-    await user.click(await screen.findByRole('button', { name: 'Request a fill-up' }));
+    await user.click(await screen.findByRole('button', { name: /^Request a fill-up for / }));
     expect(screen.queryByRole('button', { name: /share…/i })).not.toBeInTheDocument();
     cleanup();
 
@@ -161,7 +161,7 @@ describe('the owner asks', () => {
     Object.defineProperty(navigator, 'share', { value: share, configurable: true });
     try {
       open({ store, initialTab: 'vehicles' });
-      await user.click(await screen.findByRole('button', { name: 'Request a fill-up' }));
+      await user.click(await screen.findByRole('button', { name: /^Request a fill-up for / }));
       await user.click(screen.getByRole('button', { name: /share…/i }));
       expect(share).toHaveBeenCalledWith({
         title: 'Fill-up request for Civic',
@@ -190,10 +190,10 @@ describe('the owner asks', () => {
 
     const shared = (await screen.findByText(/shared with you by kyle/i, {}, WAIT)).closest('li');
     if (shared === null) throw new Error('no shared row');
-    expect(within(shared).queryByRole('button', { name: 'Request a fill-up' })).not.toBeInTheDocument();
+    expect(within(shared).queryByRole('button', { name: /^Request a fill-up for / })).not.toBeInTheDocument();
     const own = screen.getByText('Corolla').closest('li');
     if (own === null) throw new Error('no own row');
-    expect(within(own).getByRole('button', { name: 'Request a fill-up' })).toBeInTheDocument();
+    expect(within(own).getByRole('button', { name: /^Request a fill-up for / })).toBeInTheDocument();
   });
 });
 
@@ -388,7 +388,7 @@ describe('the owner reviews', () => {
     await store.receiveSubmission(submission(car.id));
     await store.removeVehicle(car.id);
     open({ store, initialTab: 'fillups' });
-    await screen.findByRole('heading', { name: /fill-ups/i }, WAIT);
+    await screen.findByRole('heading', { level: 2, name: /fill-ups/i }, WAIT);
     expect(screen.queryByRole('region', { name: /waiting for review/i })).not.toBeInTheDocument();
   });
 
@@ -518,7 +518,7 @@ describe('the whole round trip', () => {
     const car = await kyleStore.addVehicle({ name: 'Civic' });
 
     open({ store: kyleStore, initialTab: 'vehicles' });
-    await user.click(await screen.findByRole('button', { name: 'Request a fill-up' }));
+    await user.click(await screen.findByRole('button', { name: /^Request a fill-up for / }));
     const requestLink = (screen.getByLabelText(/fill-up request/i) as HTMLTextAreaElement).value;
     cleanup();
 

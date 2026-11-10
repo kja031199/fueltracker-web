@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react';
+import { useId } from 'react';
 import { useFuelLog } from './fuelLog';
 import { AddVehicleForm } from './AddVehicleForm';
 import { VehicleRow } from './VehicleRow';
@@ -9,6 +10,8 @@ import { useSession } from './session';
  * and a row per car that keeps its own one mode (#93).
  */
 export function VehiclesScreen(): ReactElement {
+  // One base per rendering, so a component shown twice never repeats an id (#95).
+  const idBase = useId();
   // The owner's name, for the fill-up request link (#3).
   const ownerName = useSession().account?.displayName ?? '';
   const { vehicles, selectedVehicleId, selectVehicle } = useFuelLog();
@@ -17,8 +20,8 @@ export function VehiclesScreen(): ReactElement {
     <div>
       <AddVehicleForm />
 
-      <section aria-labelledby="vehicles-heading">
-        <h2 className="card__title" id="vehicles-heading">
+      <section aria-labelledby={`${idBase}-vehicles-heading`}>
+        <h2 className="card__title" id={`${idBase}-vehicles-heading`}>
           Your vehicles
         </h2>
         {vehicles.length === 0 ? (

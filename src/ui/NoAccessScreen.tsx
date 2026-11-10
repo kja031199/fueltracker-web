@@ -33,6 +33,7 @@
  */
 
 import type { ReactElement } from 'react';
+import { useId } from 'react';
 import type { AuthUser } from '../data/auth';
 import { AccountId } from './AccountId';
 import { ScreenFrame } from './ScreenFrame';
@@ -58,12 +59,14 @@ export function NoAccessScreen({
   onSignOut,
   onExport,
 }: Props): ReactElement {
+  // One base per rendering, so a component shown twice never repeats an id (#95).
+  const idBase = useId();
   const name = account.email === '' ? account.displayName : account.email;
 
   return (
     <ScreenFrame>
-      <section className="card" aria-labelledby="no-access-heading">
-        <h2 className="card__title" id="no-access-heading">
+      <section className="card" aria-labelledby={`${idBase}-no-access-heading`}>
+        <h2 className="card__title" id={`${idBase}-no-access-heading`}>
           This account does not have access
         </h2>
         <p className="stack-sm">

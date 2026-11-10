@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { FillUpRecord } from '../data/records';
 import type { FillUpFilter } from '../domain/fillUpFilter';
 import { EMPTY_FILTER, applyFilter, isFilterActive } from '../domain/fillUpFilter';
@@ -7,7 +7,7 @@ import { DASHBOARD_TIME_RANGES } from '../domain/dashboardTimeRange';
 import type { DashboardTimeRange } from '../domain/dashboardTimeRange';
 import { FUEL_GRADES } from '../domain/fuelGrade';
 import type { FuelGrade } from '../domain/fuelGrade';
-import { fillUpFacts } from '../domain/format';
+import { fillUpFacts, fillUpName } from '../domain/format';
 import { totalCost } from '../domain/models';
 import { FillUpForm } from './FillUpForm';
 import { useFuelLog } from './fuelLog';
@@ -15,6 +15,7 @@ import { PendingReview } from './PendingReview';
 import { FillUpSummary } from './FillUpSummary';
 import { ConfirmButton } from './ConfirmButton';
 import { useUnits } from './session';
+import { useEnteredByNames } from './useEnteredByNames';
 
 /**
  * The fill-up list, its search and filter, and the add/edit form.
@@ -25,6 +26,8 @@ import { useUnits } from './session';
  * search box can never change your reported MPG.
  */
 export function FillUpsScreen(): ReactElement {
+  // One base per rendering, so a component shown twice never repeats an id (#95).
+  const idBase = useId();
   const { units } = useUnits();
   // The selected vehicle's history, and the writes, from the fuel log (#56).
   const { selectedVehicleId: vehicleId, fillUps, loadFillUp, removeFillUp } = useFuelLog();
@@ -36,6 +39,18 @@ export function FillUpsScreen(): ReactElement {
   const [editing, setEditing] = useState<FillUpRecord | null>(null);
   const [adding, setAdding] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+
+  // Closing the form puts focus on the list it returns to (#95), not on
+  // <body>: the button that opened it is gone with the form. Opening it is
+  // the form's own job (`focusHeading`).
+  const formOpen = adding || editing !== null;
+  const listHeading = useRef<HTMLHeadingElement>(null);
+  const shownOpen = useRef(formOpen);
+  useEffect(() => {
+    if (shownOpen.current === formOpen) return;
+    shownOpen.current = formOpen;
+    if (!formOpen) listHeading.current?.focus();
+  }, [formOpen]);
 
   const filterable = useMemo(
     () =>
@@ -73,6 +88,7 @@ export function FillUpsScreen(): ReactElement {
     return (
       <FillUpForm
         vehicleId={vehicleId}
+        focusHeading
         existing={fillUps}
         editing={editing}
         onSaved={async () => {
@@ -107,8 +123,8 @@ export function FillUpsScreen(): ReactElement {
         Log a fill-up
       </button>
 
-      <section className="card space-above" aria-labelledby="filter-heading">
-        <h2 className="card__title" id="filter-heading">
+      <section className="card space-above" aria-labelledby={`${idBase}-filter-heading`}>
+        <h2 className="card__title" id={`${idBase}-filter-heading`}>
           Search and filter
           {isFilterActive(filter) && (
             <span className="accent-blue"> · filters active</span>
@@ -116,11 +132,11 @@ export function FillUpsScreen(): ReactElement {
         </h2>
 
         <div className="field">
-          <label className="field__label" htmlFor="filter-search">
+          <label className="field__label" htmlFor={`${idBase}-filter-search`}>
             Search station or notes
           </label>
           <input
-            id="filter-search"
+            id={`${idBase}-filter-search`}
             type="search"
             value={filter.searchText}
             onChange={(event) => setFilter({ ...filter, searchText: event.target.value })}
@@ -128,11 +144,11 @@ export function FillUpsScreen(): ReactElement {
         </div>
 
         <div className="field">
-          <label className="field__label" htmlFor="filter-range">
+          <label className="field__label" htmlFor={`${idBase}-filter-range`}>
             Time range
           </label>
           <select
-            id="filter-range"
+            id={`${idBase}-filter-range`}
             value={filter.range}
             onChange={(event) =>
               setFilter({ ...filter, range: event.target.value as DashboardTimeRange })
@@ -147,11 +163,11 @@ export function FillUpsScreen(): ReactElement {
         </div>
 
         <div className="field">
-          <label className="field__label" htmlFor="filter-grade">
+          <label className="field__label" htmlFor={`${idBase}-filter-grade`}>
             Fuel grade
           </label>
           <select
-            id="filter-grade"
+            id={`${idBase}-filter-grade`}
             value={filter.fuelGrade ?? ''}
             onChange={(event) =>
               setFilter({
@@ -171,11 +187,11 @@ export function FillUpsScreen(): ReactElement {
 
         {stations.length > 0 && (
           <div className="field">
-            <label className="field__label" htmlFor="filter-station">
+            <label className="field__label" htmlFor={`${idBase}-filter-station`}>
               Station
             </label>
             <select
-              id="filter-station"
+              id={`${idBase}-filter-station`}
               value={filter.station ?? ''}
               onChange={(event) =>
                 setFilter({
@@ -205,8 +221,8 @@ export function FillUpsScreen(): ReactElement {
         )}
       </section>
 
-      <section aria-labelledby="fillups-heading">
-        <h2 className="card__title" id="fillups-heading">
+      <section aria-labelledby={`${idBase}-fillups-heading`}>
+        <h2 className="card__title" id={`${idBase}-fillups-heading`} ref={listHeading} tabIndex={-1}>
           {visible.length} of {fillUps.length} fill-ups
         </h2>
 
@@ -236,6 +252,7 @@ export function FillUpsScreen(): ReactElement {
                     className="button button--secondary"
                     type="button"
                     onClick={() => void edit(record.id)}
+                    aria-label={`Edit ${fillUpName(record, units)}`}
                   >
                     Edit
                   </button>
@@ -247,6 +264,7 @@ export function FillUpsScreen(): ReactElement {
                     label="Delete"
                     confirmLabel="Delete this fill-up"
                     cancelLabel="Keep"
+                    labelSuffix={fillUpName(record, units)}
                   />
                 </div>
               </li>
@@ -256,37 +274,4 @@ export function FillUpsScreen(): ReactElement {
       </section>
     </div>
   );
-}
-
-/**
- * Who each uid is, on a car that is shared (#66) — `null` on a car that is
- * not, where "entered by you" on every row would only be noise. The owner's
- * name comes from the membership; everyone else's from the car's members.
- */
-function useEnteredByNames(vehicleId: string | null): ReadonlyMap<string, string> | null {
-  const { sharing, me, fillUps } = useFuelLog();
-  // Kept with the car they are for, so another car's names are never shown.
-  const [names, setNames] = useState<{ readonly vehicleId: string; readonly names: ReadonlyMap<string, string> | null } | null>(null);
-  const { enabled, namesFor } = sharing;
-  // Who entered this car's fill-ups, as a stable key: the names are asked for
-  // again only when somebody new appears (#89), not after every sync.
-  const entered = useMemo(
-    () => [...new Set(fillUps.map((row) => row.enteredBy ?? ''))].sort().join('\n'),
-    [fillUps],
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!enabled || vehicleId === null || me === null) return;
-    void namesFor(vehicleId, entered.split('\n'))
-      .then((found) => {
-        if (!cancelled) setNames({ vehicleId, names: found });
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [enabled, namesFor, vehicleId, me, entered]);
-
-  return enabled && me !== null && names !== null && names.vehicleId === vehicleId ? names.names : null;
 }

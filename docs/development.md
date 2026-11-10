@@ -272,6 +272,8 @@ Recorded so a regression in the tests themselves is visible:
 | Split UI (#93): a car's year NaN for nonsense / two of a row's panels open at once / a panel button that never closes / Settings without its backup section / the size limit raised to 500 / a stale size allowance kept | 1 / 1 / 2 / 7 / 1 / 1 |
 | Tabs (#93): back to unmounting a tab on a switch / every tab mounted at once / a hidden tab left showing / units defaulting to other than US / a tab dropped from the table | 3 / 1 / 1 / 1 / 19 |
 | Tabs (#93): the `App.tsx` size allowance put back / the request link without the owner's name / the session ignoring a new idle period | 1 / 1 / 1 |
+| Accessibility (#95): chart rows keyed by label again / Edit without its fill-up / Delete without its row / Request without its car / the title not focusable / no focus after a tab switch / the page title never set / no focus on opening or closing the form / a fixed id back / the id check matching `data-id` | 1 / 4 / 14 / 6 / 1 / 1 / 2 / 1 each / 2 / 1 |
+| Equivalent, kept: `AppShell` moving focus on arrival as well — it always mounts on its loading screen, whose title takes the focus and is then replaced, leaving focus where the guard would have. The guard stays for the day the shell renders content first. | — |
 
 Equivalent, and kept as a backstop: `shape()` without its `hasAll`. Every
 required field is also read by a clause of its own, and reading a missing field

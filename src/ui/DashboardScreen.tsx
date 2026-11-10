@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { toStats } from '../data/records';
 import { computeFuelStatistics } from '../domain/fuelStatistics';
 import { dashboardKPIs, kpiAccessibilityLabel } from '../domain/kpi';
@@ -34,6 +34,8 @@ import { useUnits } from './session';
  * mean different things.
  */
 export function DashboardScreen(): ReactElement {
+  // One base per rendering, so a component shown twice never repeats an id (#95).
+  const idBase = useId();
   const { units } = useUnits();
   // What to chart comes from the fuel log, like every other screen (#56).
   const { vehicles, selectedVehicleId, selectVehicle: onSelect, fillUps } = useFuelLog();
@@ -87,11 +89,11 @@ export function DashboardScreen(): ReactElement {
     <div>
       {vehicles.length > 1 && (
         <div className="field">
-          <label className="field__label" htmlFor="dashboard-vehicle">
+          <label className="field__label" htmlFor={`${idBase}-dashboard-vehicle`}>
             Vehicle
           </label>
           <select
-            id="dashboard-vehicle"
+            id={`${idBase}-dashboard-vehicle`}
             value={selectedVehicleId}
             onChange={(event) => onSelect(event.target.value)}
           >
@@ -105,11 +107,11 @@ export function DashboardScreen(): ReactElement {
       )}
 
       <div className="field">
-        <label className="field__label" htmlFor="dashboard-range">
+        <label className="field__label" htmlFor={`${idBase}-dashboard-range`}>
           Time range
         </label>
         <select
-          id="dashboard-range"
+          id={`${idBase}-dashboard-range`}
           value={range}
           onChange={(event) => setRange(event.target.value as DashboardTimeRange)}
         >

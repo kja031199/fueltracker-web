@@ -11,6 +11,7 @@ import {
   distance,
   economy,
   fillUpFacts,
+  fillUpName,
   fuelPrice,
   numberFormat,
   plainCurrency,
@@ -359,5 +360,18 @@ describe('vehicleYear, the year typed when adding a car (#93: moved out of Vehic
     expect(vehicleYear('-5', now)).toBe(-5);
     expect(vehicleYear('0', now)).toBe(0);
     expect(vehicleYear('99999', now)).toBe(99999);
+  });
+});
+
+describe('fillUpName, which fill-up a row’s buttons are for (#95)', () => {
+  const entry = { date: new Date(2026, 0, 5, 9, 0).getTime(), odometer: 10_000 };
+
+  test('its date and its odometer reading, in the reader’s units', () => {
+    expect(fillUpName(entry, US)).toBe(`the fill-up of ${new Date(entry.date).toLocaleDateString()} at 10,000 mi`);
+    expect(fillUpName(entry, METRIC)).toMatch(/at 16,093\.4 km$/);
+  });
+
+  test('two on the same day are still told apart', () => {
+    expect(fillUpName({ ...entry, odometer: 10_250 }, US)).not.toBe(fillUpName(entry, US));
   });
 });

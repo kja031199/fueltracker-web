@@ -105,6 +105,16 @@ sync, in case it simply had not arrived yet), a car that is shared with you
 rather than yours, and a link you have already received — opening it twice,
 or after approving it, never adds it twice.
 
+## Moving around without seeing the screen (#95)
+
+Each repeated button says what it is for — "Edit the fill-up of 05/01/2026 at
+10,000 mi", "Request a fill-up for Civic" — so a screen reader tabbing through
+a list hears a list of choices, not "Edit, Delete, Edit, Delete". After a tab
+is chosen or a link is left, focus moves to the page title, which names where
+it landed, and the browser tab's title follows; opening and closing the
+fill-up form moves focus to its heading and back to the list. Every id comes
+from `useId`, so a component shown twice never repeats one.
+
 ## Contrast is enforced, not asserted
 
 The accent colours are not `orange` and `teal`. Stock palettes are tuned to look

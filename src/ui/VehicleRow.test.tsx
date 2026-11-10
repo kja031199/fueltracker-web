@@ -49,7 +49,7 @@ async function openWith(names: readonly string[]): Promise<void> {
       initialTab="vehicles"
     />,
   );
-  await screen.findAllByRole('button', { name: 'Request a fill-up' });
+  await screen.findAllByRole('button', { name: /^Request a fill-up for / });
 }
 
 /** The row for a car, by its name. */
@@ -68,14 +68,14 @@ describe('a car’s row does one thing at a time', () => {
     await openWith(['Civic']);
     const civic = (): ReturnType<typeof within> => within(row('Civic'));
 
-    await user.click(civic().getByRole('button', { name: 'Share' }));
-    expect(civic().getByRole('button', { name: 'Done sharing' })).toHaveAttribute('aria-expanded', 'true');
+    await user.click(civic().getByRole('button', { name: /^Share / }));
+    expect(civic().getByRole('button', { name: /^Done sharing / })).toHaveAttribute('aria-expanded', 'true');
     expect(civic().getByText(/Someone you share Civic with/)).toBeInTheDocument();
 
-    await user.click(civic().getByRole('button', { name: 'Request a fill-up' }));
-    expect(civic().getByRole('button', { name: 'Done' })).toHaveAttribute('aria-expanded', 'true');
-    expect(civic().getByRole('button', { name: 'Share' })).toHaveAttribute('aria-expanded', 'false');
-    expect(civic().queryByRole('button', { name: 'Done sharing' })).toBeNull();
+    await user.click(civic().getByRole('button', { name: /^Request a fill-up for / }));
+    expect(civic().getByRole('button', { name: /^Done with the request link/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(civic().getByRole('button', { name: /^Share / })).toHaveAttribute('aria-expanded', 'false');
+    expect(civic().queryByRole('button', { name: /^Done sharing / })).toBeNull();
     expect(civic().queryByText(/Someone you share Civic with/)).toBeNull();
   });
 
@@ -83,9 +83,9 @@ describe('a car’s row does one thing at a time', () => {
     const user = userEvent.setup();
     await openWith(['Civic']);
     const civic = within(row('Civic'));
-    await user.click(civic.getByRole('button', { name: 'Request a fill-up' }));
-    await user.click(civic.getByRole('button', { name: 'Done' }));
-    expect(civic.getByRole('button', { name: 'Request a fill-up' })).toHaveAttribute('aria-expanded', 'false');
+    await user.click(civic.getByRole('button', { name: /^Request a fill-up for / }));
+    await user.click(civic.getByRole('button', { name: /^Done with the request link/ }));
+    expect(civic.getByRole('button', { name: /^Request a fill-up for / })).toHaveAttribute('aria-expanded', 'false');
   });
 
   test('asking to delete hides the other actions, and Keep brings them back', async () => {
@@ -93,21 +93,21 @@ describe('a car’s row does one thing at a time', () => {
     await openWith(['Civic']);
     const civic = within(row('Civic'));
 
-    await user.click(civic.getByRole('button', { name: 'Delete' }));
+    await user.click(civic.getByRole('button', { name: /^Delete (?!the fill-up)/ }));
     expect(civic.getByRole('button', { name: /Delete Civic and its fill-ups/ })).toBeInTheDocument();
-    expect(civic.queryByRole('button', { name: 'Request a fill-up' })).toBeNull();
+    expect(civic.queryByRole('button', { name: /^Request a fill-up for / })).toBeNull();
 
     await user.click(civic.getByRole('button', { name: 'Keep' }));
-    expect(civic.getByRole('button', { name: 'Request a fill-up' })).toBeInTheDocument();
-    expect(civic.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+    expect(civic.getByRole('button', { name: /^Request a fill-up for / })).toBeInTheDocument();
+    expect(civic.getByRole('button', { name: /^Delete (?!the fill-up)/ })).toBeInTheDocument();
   });
 
   test('each car keeps its own mode', async () => {
     const user = userEvent.setup();
     await openWith(['Civic', 'Golf']);
-    await user.click(within(row('Civic')).getByRole('button', { name: 'Share' }));
-    await user.click(within(row('Golf')).getByRole('button', { name: 'Request a fill-up' }));
-    expect(within(row('Civic')).getByRole('button', { name: 'Done sharing' })).toBeInTheDocument();
-    expect(within(row('Golf')).getByRole('button', { name: 'Done' })).toBeInTheDocument();
+    await user.click(within(row('Civic')).getByRole('button', { name: /^Share / }));
+    await user.click(within(row('Golf')).getByRole('button', { name: /^Request a fill-up for / }));
+    expect(within(row('Civic')).getByRole('button', { name: /^Done sharing / })).toBeInTheDocument();
+    expect(within(row('Golf')).getByRole('button', { name: /^Done with the request link/ })).toBeInTheDocument();
   });
 });

@@ -11,6 +11,16 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-10
 
+- **Easier with a screen reader or a keyboard: each Edit, Delete, Share and
+  Request button now says which fill-up or car it is for, and choosing a tab
+  or opening the fill-up form moves focus to where you landed.** The browser
+  tab's title names the section too.
+  *Technical:* row buttons get `aria-label`s that start with their visible
+  word (`fillUpName`, `ConfirmButton`'s `labelSuffix`); `AppShell` focuses
+  the page title after a route change and `ScreenFrame` sets
+  `document.title`; every id comes from `useId`; chart tables are keyed by
+  position, so two readings on one day no longer share a key.
+  [#95](https://github.com/kja031199/fueltracker-web/issues/95) · [PR #130](https://github.com/kja031199/fueltracker-web/pull/130)
 - **Switching tabs no longer loses what you were doing: a half-typed fill-up,
   the fill-ups filter and the dashboard's range are all still there when you
   come back.**

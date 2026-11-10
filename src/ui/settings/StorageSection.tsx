@@ -1,10 +1,13 @@
 import type { ReactElement } from 'react';
+import { useId } from 'react';
 
 /** Settings → Where your data lives: the honest note about copies. */
 export function StorageSection(): ReactElement {
+  // One base per rendering, so a component shown twice never repeats an id (#95).
+  const idBase = useId();
   return (
-    <section className="card" aria-labelledby="storage-heading">
-      <h2 className="card__title" id="storage-heading">
+    <section className="card" aria-labelledby={`${idBase}-storage-heading`}>
+      <h2 className="card__title" id={`${idBase}-storage-heading`}>
         Where your data lives
       </h2>
       <p className="stack-sm">

@@ -80,7 +80,7 @@ describe('saving an edit after the log changed underneath it (#83)', () => {
     const user = userEvent.setup();
     render(<App store={store} initialTab="fillups" />);
 
-    await user.click(await screen.findByRole('button', { name: /^edit$/i }));
+    await user.click(await screen.findByRole('button', { name: /^edit the fill-up of /i }));
     const station = screen.getByLabelText(/gas station/i);
     await user.clear(station);
     await user.type(station, 'Costco');
@@ -102,7 +102,7 @@ describe('saving an edit after the log changed underneath it (#83)', () => {
     const user = userEvent.setup();
     render(<App store={store} initialTab="fillups" />);
 
-    await user.click(await screen.findByRole('button', { name: /^edit$/i }));
+    await user.click(await screen.findByRole('button', { name: /^edit the fill-up of /i }));
     await store.removeFillUp(created.id);
     await user.click(screen.getByRole('button', { name: /save changes/i }));
     await screen.findByRole('alert');

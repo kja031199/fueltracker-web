@@ -1,10 +1,13 @@
 import type { ReactElement } from 'react';
+import { useId } from 'react';
 
 /** Settings → Security: the administrator's inactivity sign-out (#70), and what it does not protect. */
 export function SecuritySection({ idleMinutes }: { readonly idleMinutes: number }): ReactElement {
+  // One base per rendering, so a component shown twice never repeats an id (#95).
+  const idBase = useId();
   return (
-    <section className="card" aria-labelledby="security-heading">
-      <h2 className="card__title" id="security-heading">
+    <section className="card" aria-labelledby={`${idBase}-security-heading`}>
+      <h2 className="card__title" id={`${idBase}-security-heading`}>
         Security
       </h2>
       {/* Stated, not offered (#70): the period is set for everyone by the

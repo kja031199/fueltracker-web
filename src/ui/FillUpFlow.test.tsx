@@ -126,7 +126,7 @@ describe('logging a fill-up', () => {
       await s.addFillUp(draft({ station: 'Shell' }), vehicleId);
     });
 
-    await user.click(await screen.findByRole('button', { name: /^edit$/i }));
+    await user.click(await screen.findByRole('button', { name: /^edit the fill-up of /i }));
     const station = screen.getByLabelText(/gas station/i);
     await user.clear(station);
     await user.type(station, 'Costco');
@@ -146,7 +146,7 @@ describe('logging a fill-up', () => {
       await s.addFillUp(draft(), vehicleId);
     });
 
-    await user.click(await screen.findByRole('button', { name: /^delete$/i }));
+    await user.click(await screen.findByRole('button', { name: /^delete the fill-up of /i }));
     const vehicles = await store.vehicles();
     expect(await store.fillUps(vehicles[0]!.id)).toHaveLength(1);
 
@@ -292,7 +292,7 @@ describe('the list holds summaries, and editing loads the whole row (#53)', () =
       id = (await s.addFillUp(draft({ receiptImageData: PHOTO }), vehicleId)).id;
     });
 
-    await user.click(await screen.findByRole('button', { name: /^edit$/i }));
+    await user.click(await screen.findByRole('button', { name: /^edit the fill-up of /i }));
     const station = await screen.findByLabelText(/gas station/i);
     await user.clear(station);
     await user.type(station, 'Costco');
