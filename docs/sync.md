@@ -546,7 +546,9 @@ A CSV cell is escaped for **two different readers**, and they want different
 things. RFC 4180 quoting is what makes the file parse; it does nothing about
 what a spreadsheet *executes*. Excel, LibreOffice and Google Sheets all treat a
 cell starting with `=`, `+`, `-`, `@`, a tab or a carriage return as a formula,
-and quoting does not help — `"=1+1"` is still evaluated. So a cell like that is
+and quoting does not help — `"=1+1"` is still evaluated. Whitespace in front of
+one hides nothing either, since some importers trim a cell before evaluating it
+(#82). So a cell like that is
 written with a leading apostrophe, which spreadsheets read as "this is text"
 and do not show. It matters because not all of this text is self-authored: a
 station name can come from OCR'd receipt text, from an imported file, or (once

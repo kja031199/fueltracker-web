@@ -177,11 +177,24 @@ If the workflow runs before step 1, GitHub creates `production` itself, with no
 branch restriction; deploys still work, but the gate is not there until steps
 2–4 are done.
 
-To set it up on a fork: generate a private key under Firebase console → Project
-settings → Service accounts, paste the whole JSON into the
-`FIREBASE_SERVICE_ACCOUNT` secret of the `production` environment (set up as in
-[The deploy environment](#the-deploy-environment-76)), add the four variables,
-and delete the downloaded file — it is a long-lived credential with deploy rights.
+To set it up on a fork, make a deploy account that can do exactly what the
+deploy does and nothing more (#82) — **not** the key under Firebase console →
+Project settings → Service accounts. That one belongs to the Firebase Admin SDK
+account, which can read and write every document and every user in the project:
+far more than a key that lives in a CI secret should carry.
+
+1. Google Cloud console, on the project → **IAM & Admin → Service accounts →
+   Create service account**, named `github-deploy`.
+2. Grant it three roles, and only these: **Firebase Hosting Admin**, **Firebase
+   Rules Admin** and **Service Usage Consumer**. (The shared-car index is
+   deployed by hand for this reason — see
+   [The shared-car index](#the-shared-car-index-is-deployed-by-hand-66).)
+3. On the new account → **Keys → Add key → JSON**.
+4. Paste the whole JSON into the `FIREBASE_SERVICE_ACCOUNT` secret of the
+   `production` environment (set up as in
+   [The deploy environment](#the-deploy-environment-76)), add the four
+   variables, and **delete the downloaded file** — it is a long-lived
+   credential with deploy rights.
 
 Hosting carries a **`predeploy` hook** that runs `npm run build`, so a deploy
 from a laptop cannot ship a `dist/` that does not match the source. (CI strips

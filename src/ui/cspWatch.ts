@@ -86,6 +86,13 @@ export interface CspViolation {
   readonly sample: string;
   /** How many times this exact directive-and-target pair fired. */
   readonly count: number;
+  /**
+   * Refused only by the report-only candidate (#82), not by the policy the
+   * live site enforces: what would break if the candidate were enforced, as
+   * opposed to what is broken now. Absent in logs written before it existed,
+   * which only ever held enforced refusals.
+   */
+  readonly reportOnly?: boolean;
 }
 
 /** Anything at all into a bounded string: these fields come from an event. */
@@ -104,18 +111,23 @@ function text(value: unknown, max: number): string {
  * Pure, so the interesting part is testable without a browser. The identity of
  * a violation is its **directive and target** — deliberately not its sample,
  * because inline-style violations carry a different sample almost every time
- * and are still one problem with one fix.
+ * and are still one problem with one fix. Which policy refused it is part of
+ * the identity too: the same refusal by both is two different findings.
  */
 export function recordViolation(
   list: readonly CspViolation[],
-  next: { directive: string; blockedURI: string; sample: string },
+  next: { directive: string; blockedURI: string; sample: string; disposition?: unknown },
 ): CspViolation[] {
   const directive = text(next.directive, 60) || 'unknown';
   const blockedURI = text(next.blockedURI, MAX_URI_LENGTH) || 'unknown';
   const sample = text(next.sample, MAX_SAMPLE_LENGTH);
+  // The browser's word for a report-only policy's refusal; anything else —
+  // missing, misspelt, `enforce` — is treated as the live policy refusing it.
+  const reportOnly = next.disposition === 'report';
 
   const at = list.findIndex(
-    (seen) => seen.directive === directive && seen.blockedURI === blockedURI,
+    (seen) =>
+      seen.directive === directive && seen.blockedURI === blockedURI && (seen.reportOnly === true) === reportOnly,
   );
   if (at !== -1) {
     const updated = [...list];
@@ -129,7 +141,7 @@ export function recordViolation(
   // them in whatever the reader was doing.
   if (list.length >= MAX_RECORDED_VIOLATIONS) return [...list];
 
-  return [...list, { directive, blockedURI, sample, count: 1 }];
+  return [...list, { directive, blockedURI, sample, count: 1, ...(reportOnly ? { reportOnly } : {}) }];
 }
 
 function isViolation(value: unknown): value is CspViolation {
@@ -139,7 +151,8 @@ function isViolation(value: unknown): value is CspViolation {
     typeof row['directive'] === 'string' &&
     typeof row['blockedURI'] === 'string' &&
     typeof row['sample'] === 'string' &&
-    typeof row['count'] === 'number'
+    typeof row['count'] === 'number' &&
+    (row['reportOnly'] === undefined || typeof row['reportOnly'] === 'boolean')
   );
 }
 
@@ -171,12 +184,15 @@ export function formatReport(list: readonly CspViolation[]): string {
     return 'No CSP violations recorded. (If the watcher was armed and the flows were run, the policy is clean.)';
   }
   const events = list.reduce((total, row) => total + row.count, 0);
+  const candidateOnly = list.filter((row) => row.reportOnly === true).length;
   const lines = list.map((row) => {
     const sample = row.sample === '' ? '' : `\n      sample: ${row.sample}`;
-    return `  ${row.directive}  ×${row.count}\n      blocked: ${row.blockedURI}${sample}`;
+    const which = row.reportOnly === true ? ' (report-only)' : '';
+    return `  ${row.directive}${which}  ×${row.count}\n      blocked: ${row.blockedURI}${sample}`;
   });
   return [
     `CSP violations: ${list.length} distinct, ${events} event(s).`,
+    `  ${list.length - candidateOnly} refused now, ${candidateOnly} only by the report-only candidate.`,
     ...lines,
   ].join('\n');
 }
@@ -201,6 +217,7 @@ export function installCspWatch(): void {
         directive: (detail['effectiveDirective'] ?? detail['violatedDirective']) as string,
         blockedURI: detail['blockedURI'] as string,
         sample: (detail['sample'] as string) || describeSource(detail),
+        disposition: detail['disposition'],
       }),
     );
   });

@@ -287,11 +287,17 @@ export const CSV_COLUMNS = [
  * apostrophe, and the reader takes exactly one off again. Without that, the
  * escape would not be reversible and an export/import cycle would quietly
  * rewrite somebody's data — a worse bug than the one this prevents.
+ *
+ * **Leading whitespace counts** (#82): some importers trim a cell and then
+ * evaluate what is left, so ` =1+1` is a formula too. Any run of whitespace
+ * (`\s`, so non-breaking and other Unicode spaces as well) before a trigger is
+ * guarded the same way, and ` 7-Eleven` — whitespace before ordinary text —
+ * is left alone.
  */
-const CSV_FORMULA_START = /^'*[=+\-@\t\r]/;
+const CSV_FORMULA_START = /^'*\s*[=+\-@\t\r]/;
 
 /** The same shape, once guarded: at least one apostrophe before the trigger. */
-const CSV_GUARDED_START = /^'+[=+\-@\t\r]/;
+const CSV_GUARDED_START = /^'+\s*[=+\-@\t\r]/;
 
 /**
  * Stops a spreadsheet executing the contents of a cell.

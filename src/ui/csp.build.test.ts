@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { PRODUCTION_PROJECT_ID } from '../data/firebase/settings';
 
 /**
  * The Content-Security-Policy, and the one property of the build that makes a
@@ -56,8 +57,13 @@ function policy(): Map<string, string> {
     raw,
     'the CSP must be served as Content-Security-Policy, not Report-Only: report-only blocks nothing',
   ).toBeDefined();
+  return parsePolicy(raw ?? '');
+}
+
+/** A policy's text as a directive → value map. */
+function parsePolicy(raw: string): Map<string, string> {
   const directives = new Map<string, string>();
-  for (const part of (raw ?? '').split(';')) {
+  for (const part of raw.split(';')) {
     const trimmed = part.trim();
     if (trimmed === '') continue;
     const space = trimmed.indexOf(' ');
@@ -83,6 +89,12 @@ describe('the built page stays compatible with a strict policy', () => {
       ([, body]) => (body ?? '').trim() !== '',
     );
     expect(inline).toHaveLength(0);
+  });
+
+  it('has no inline style attribute, which a policy without unsafe-inline would refuse (#82)', () => {
+    // React's `style` props are set through CSSOM, which CSP does not govern;
+    // a `style="…"` in the page's HTML is parsed, and is.
+    expect(html()).not.toMatch(/<[^>]+\sstyle=/);
   });
 
   it('loads its script from this origin', () => {
@@ -182,6 +194,70 @@ describe('the policy', () => {
     expect(policy().get('object-src')).toBe("'none'");
     expect(policy().get('frame-ancestors')).toBe("'none'");
     expect(policy().get('base-uri')).toBe("'self'");
+  });
+});
+
+/**
+ * The narrower policy, served **report-only** beside the enforced one until a
+ * run of [csp-check.md](../../docs/csp-check.md) on the live site comes back
+ * clean (#82). The enforced policy allows any `*.googleapis.com` — Cloud
+ * Storage among them, where anybody can host a bucket, so an exfiltration
+ * channel if an injection ever appeared — and any `*.firebaseapp.com`. This
+ * one names the hosts the bundled SDK actually contacts, and drops
+ * `'unsafe-inline'` from `style-src`.
+ */
+describe('the narrower candidate, report-only until checked live (#82)', () => {
+  function candidate(): Map<string, string> {
+    const raw = headers().get('Content-Security-Policy-Report-Only');
+    expect(raw, 'the candidate is served as Content-Security-Policy-Report-Only').toBeDefined();
+    return parsePolicy(raw ?? '');
+  }
+  const sources = (value: string | undefined): string[] => (value ?? '').split(/\s+/).filter((t) => t !== '');
+
+  it('names no wildcard host anywhere', () => {
+    for (const [directive, value] of candidate()) {
+      expect(value, directive).not.toMatch(/\*/);
+    }
+  });
+
+  it('connects only to Firestore, the identity toolkit and token refresh', () => {
+    expect(sources(candidate().get('connect-src')).sort()).toEqual(
+      [
+        "'self'",
+        'https://firestore.googleapis.com',
+        'https://identitytoolkit.googleapis.com',
+        'https://securetoken.googleapis.com',
+      ].sort(),
+    );
+  });
+
+  it('frames only this project’s auth domain and Google’s account chooser', () => {
+    expect(sources(candidate().get('frame-src')).sort()).toEqual(
+      [`https://${PRODUCTION_PROJECT_ID}.firebaseapp.com`, 'https://accounts.google.com'].sort(),
+    );
+  });
+
+  it('allows no inline style', () => {
+    expect(sources(candidate().get('style-src'))).toEqual(["'self'"]);
+  });
+
+  it('has the same directives as the enforced policy, and allows nothing it refuses', () => {
+    // Promoting it can only take permissions away: every source it names is
+    // one the enforced policy already allows, if only through a wildcard.
+    const enforced = policy();
+    const narrow = candidate();
+    expect([...narrow.keys()].sort()).toEqual([...enforced.keys()].sort());
+    for (const [directive, value] of narrow) {
+      const allowed = sources(enforced.get(directive));
+      for (const source of sources(value)) {
+        const covered = allowed.some(
+          (wide) =>
+            wide === source ||
+            (wide.startsWith('https://*.') && source.startsWith('https://') && source.endsWith(wide.slice('https://*'.length))),
+        );
+        expect(covered, `${directive} ${source}`).toBe(true);
+      }
+    }
   });
 });
 

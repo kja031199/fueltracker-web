@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { makeStore } from '../../test/fixtures';
-import { allowedUidsInRules, rulesEnvironment } from '../../test/emulator';
+import { allowedUidsInRules, rulesEnvironment, signedIn } from '../../test/emulator';
 import {
   assertFails,
   assertSucceeds,
@@ -65,7 +65,7 @@ describe('sharing a car (#66)', () => {
   let env: RulesTestEnvironment;
 
   const as = (uid: string, email: string, verified = true) =>
-    env.authenticatedContext(uid, { email, email_verified: verified }).firestore();
+    signedIn(env, uid, { email, email_verified: verified }).firestore();
   const owner = () => as(OWNER, OWNER_EMAIL);
   const partner = () => as(PARTNER, PARTNER_EMAIL);
   const stranger = () => as(STRANGER, 'stranger@example.com');

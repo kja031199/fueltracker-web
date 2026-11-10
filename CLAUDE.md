@@ -202,6 +202,12 @@ npm run test:build   # vite build, then the *.build.test.ts files
   deploy too.** Uids, not emails. `rules.emulator.test.ts` parses the list out of the
   rules file rather than copying it, and fails if the list is empty or still
   holds a placeholder. Steps: [docs/accounts.md](docs/accounts.md).
+- **`allowed()` also requires a Google sign-in** (#82):
+  `request.auth.token.firebase.sign_in_provider == 'google.com'`, after the uid
+  list (so `allowedUidsInRules`' regex still finds the list). The emulator's
+  default token claims `custom`, so **every rules-test context goes through
+  `signedIn(env, uid, claims)`** in `src/test/emulator.ts`, never
+  `env.authenticatedContext` directly — a bare one is refused like a stranger.
 - **The merge stamp is bounded in the rules** (#79): `updatedAt` at most
   `maxAheadMs()` ahead of `request.time`, never below the stored document's,
   and every number `finite()` (`is number` accepts NaN and the infinities).
@@ -266,13 +272,23 @@ npm run test:build   # vite build, then the *.build.test.ts files
   Firebase Auth injects to host its auth iframe: the live check refused sign-in
   twice without it. `script-src 'self'` holds for everything else only because
   the built page has no inline script, which the same file enforces.
+- **A narrower candidate is served report-only** beside it (#82):
+  `Content-Security-Policy-Report-Only` with exact hosts (`firestore`,
+  `identitytoolkit`, `securetoken.googleapis.com`; frame-src this project's
+  `firebaseapp.com` and `accounts.google.com`) and `style-src 'self'`.
+  `csp.build.test.ts` holds it to no wildcard and to allowing nothing the
+  enforced policy refuses. It is promoted only after a clean live check; the
+  watcher marks its refusals `(report-only)` (`disposition === 'report'`) so a
+  report tells "would break" from "is broken".
 - **Changing the policy needs the live check**, not reasoning: the deployed
   origin and the auth domain are unreachable from here, and
   signing in needs a real Google account. `cspWatch.ts` collects the evidence
   when armed from the console, and `docs/csp-check.md` is the recipe.
 - **The OCR reader is self-hosted** (#17). It lives in `tesseract/<version>/`,
   copied from `node_modules` by the `tesseractAssets` plugin in `vite.config.ts`.
-  It is **not precached**, but cached at runtime on first scan. Pass **all
+  It is **not precached**, but cached at runtime on first scan. The dev
+  middleware tests a path with `Object.hasOwn`, not `in` (#82): `in` matched
+  `constructor` and threw (`src/test/tesseractAssets.test.ts`). Pass **all
   three** paths to `createWorker`, because a missing one silently falls back to
   jsDelivr. `script-src` needs `'wasm-unsafe-eval'`, and `worker-src` is
   `'self'`. **Its CSP failures happen inside a worker, so `cspWatch` cannot see
