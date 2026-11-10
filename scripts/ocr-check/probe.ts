@@ -9,9 +9,9 @@
  * Built only when `OCR_PROBE=1` — see `scripts/ocr-check/check.mjs`. Nothing
  * here ships.
  */
-import { recognise } from '../../src/ui/ocr';
+import { recognise, releaseReader } from '../../src/ui/ocr';
 import { importReceiptPhoto } from '../../src/ui/importReceipt';
-import { prepareImage } from '../../src/data/receiptImage';
+import { prepareImage } from '../../src/ui/receiptImage';
 
 /** A plain receipt, drawn rather than committed as a binary fixture. */
 async function receipt(type = 'image/png'): Promise<Blob> {
@@ -39,10 +39,17 @@ declare global {
     runImportFrom: (url: string) => Promise<unknown>;
     readFrom: (url: string) => Promise<unknown>;
     swReady: () => Promise<boolean>;
+    releaseReader: () => Promise<void>;
   }
 }
 
 window.runOcr = async () => recognise(await receipt());
+
+/**
+ * Drops the reader the app keeps between scans (#90), so the next scan loads
+ * one afresh — which is what the offline scenario has to prove it can do.
+ */
+window.releaseReader = releaseReader;
 
 /** What a scan suggests, without the photo bytes, so it crosses `evaluate`. */
 async function suggest(photo: Blob): Promise<unknown> {

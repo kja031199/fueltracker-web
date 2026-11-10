@@ -11,6 +11,18 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-10
 
+- **The app opens faster, and scanning several receipts in a row is
+  quicker.** The sign-in screen no longer waits for the sync code to download,
+  and the receipt reader stays ready between scans instead of starting over
+  for each photo.
+  *Technical:* startup moved to `bootstrap.ts`: a shell renders at once, auth
+  loads next, and the Firestore modules (~140 KB gzipped) only on sign-in,
+  alongside opening the database; if they fail to load, the log opens without
+  sync and the next auth event retries. The OCR worker is kept between scans,
+  terminated after 2 minutes idle or when the account closes, and dropped if
+  it fails on a photo. The OCR browser check's probe, broken since a module
+  moved, is fixed and now type-checked.
+  [#90](https://github.com/kja031199/fueltracker-web/issues/90) · [PR #137](https://github.com/kja031199/fueltracker-web/pull/137)
 - **No change you'll see: the database accepts only a Google sign-in, and a
   stricter content policy is on trial before it is switched on.** The first
   step of a security hardening pass.

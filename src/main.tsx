@@ -5,13 +5,12 @@
  * Everything above it talks to `AuthProvider` and `RemoteStore`, which is what
  * keeps the test suite free of network code — see the header of `data/auth.ts`.
  *
- * ## The store is opened *after* the account is known
+ * ## What loads when is `bootstrap.ts`
  *
- * It used to be a module constant, which is how local data came to be shared
- * between everyone who signed in on a device — the leak described at length in
- * `data/accountStore.ts`. The database is now named after the uid, so it cannot
- * be opened until auth has resolved, and it is closed and reopened when the
- * signed-in account changes.
+ * The shell renders at once, auth loads next, and the Firestore modules only
+ * on sign-in (#90); the database is opened only once the account is known.
+ * `boot` takes the loaders as arguments so that order is tested; this file
+ * hands it the real ones.
  *
  * ## A missing config is a supported state
  *
@@ -31,18 +30,12 @@
 import { StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { App } from './ui/App';
-import { InMemoryRepository } from './data/repository';
-import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './data/records';
-import { FuelTrackerStore } from './data/store';
-import type { AccountStore } from './data/accountStore';
 import { openSignedInAccount } from './data/accountStore';
-import type { AuthProvider, AuthState } from './data/auth';
 import { StubAuthProvider } from './data/auth';
-import type { RemoteStore } from './data/remote';
-import type { SyncStateStore } from './data/syncState';
-import type { SharingSync } from './data/shareSync';
 import { developmentUsesProduction, readSettings } from './data/firebase/settings';
+import { boot, emptyStore, type AppProps, type RemoteFactory } from './bootstrap';
 import { installCspWatch } from './ui/cspWatch';
+import { releaseReader } from './ui/ocr';
 import { WrongProjectScreen } from './ui/WrongProjectScreen';
 import { ScreenFrame } from './ui/ScreenFrame';
 import './ui/styles.css';
@@ -56,30 +49,7 @@ const container = document.getElementById('root');
 if (container === null) throw new Error('missing #root');
 const root: Root = createRoot(container);
 
-/**
- * A store backed by nothing, for the signed-out render.
- *
- * `App` gates on auth before showing any data, but `useAppData` still mounts
- * and reads once. Handing it an empty in-memory store keeps that read harmless
- * and — the point — means **no IndexedDB database is opened before we know
- * whose it is**.
- */
-function emptyStore(): FuelTrackerStore {
-  return new FuelTrackerStore({
-    vehicles: new InMemoryRepository<VehicleRecord>(),
-    fillUps: new InMemoryRepository<FillUpRecord>(),
-    pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
-  });
-}
-
-function render(
-  auth: AuthProvider,
-  store: FuelTrackerStore,
-  remote: RemoteStore | null,
-  configured: boolean,
-  syncState?: SyncStateStore,
-  sharing?: SharingSync,
-): void {
+function renderApp({ auth, store, remote, configured, syncState, sharing }: AppProps): void {
   root.render(
     <StrictMode>
       <App
@@ -102,13 +72,18 @@ function renderOpening(): void {
   );
 }
 
-async function start(): Promise<void> {
+function start(): void {
   const settings = readSettings(import.meta.env as unknown as Record<string, string | undefined>);
 
   if (settings === null) {
     // No backend in this build. Render the sign-in screen in its unconfigured
     // state, which explains what to do, rather than a dead button.
-    render(new StubAuthProvider({ status: 'signedOut', error: null }), emptyStore(), null, false);
+    renderApp({
+      auth: new StubAuthProvider({ status: 'signedOut', error: null }),
+      store: emptyStore(),
+      remote: null,
+      configured: false,
+    });
     return;
   }
 
@@ -122,84 +97,38 @@ async function start(): Promise<void> {
     return;
   }
 
-  // Bound after the null check so the narrowing survives into `apply` below,
-  // which is a closure created before it runs.
+  // Bound after the null check so the narrowing survives into the closures.
   const config = settings;
 
-  // Imported lazily so the Firebase SDK stays out of the initial chunk.
-  const [{ FirebaseAuthProvider }, { FirestoreRemoteStore }, { FirestoreSharingRemote }] = await Promise.all([
-    import('./data/firebase/authProvider'),
-    import('./data/firebase/remoteStore'),
-    import('./data/firebase/sharingRemote'),
-  ]);
-
-  const auth = new FirebaseAuthProvider(config);
-
-  // Both stores are cached per uid. `onAuthStateChanged` fires on token refresh
-  // as well as on sign-in, and rebuilding them each time would reopen the
-  // database and hand React new prop identities, which would refire the sync
-  // effect and spend quota re-reading the account for nothing.
-  let open: {
-    readonly uid: string;
-    readonly account: AccountStore;
-    readonly remote: RemoteStore;
-    /** Cars shared with and by this account (#66). */
-    readonly sharing: SharingSync;
-  } | null =
-    null;
-  // Guards against two auth events being handled concurrently: opening a
-  // database is asynchronous, and the later event must win.
-  let generation = 0;
-
-  async function apply(state: AuthState): Promise<void> {
-    const mine = ++generation;
-
-    if (state.status !== 'signedIn') {
-      open?.account.close();
-      open = null;
-      render(auth, emptyStore(), null, true);
-      return;
-    }
-
-    const { uid } = state.user;
-    if (open?.uid === uid) {
-      render(auth, open.account.store, open.remote, true, open.account.syncState, open.sharing);
-      return;
-    }
-
-    open?.account.close();
-    open = null;
-    renderOpening();
-
-    const account = await openSignedInAccount(uid);
-
-    if (mine !== generation) {
-      // Another auth event overtook this one while the database was opening.
-      account.close();
-      return;
-    }
-
-    const { user } = state;
-    open = {
-      uid,
-      account,
-      remote: new FirestoreRemoteStore(config, uid),
-      sharing: {
-        ...account.sharingState,
-        remote: FirestoreSharingRemote.forAccount(config, {
+  // Each module is imported lazily, so the Firebase SDK stays out of the
+  // initial chunk — and the Firestore one out of the sign-in screen's path.
+  void boot({
+    loadAuth: async () => {
+      const { FirebaseAuthProvider } = await import('./data/firebase/authProvider');
+      return new FirebaseAuthProvider(config);
+    },
+    loadRemotes: async (): Promise<RemoteFactory> => {
+      const [{ FirestoreRemoteStore }, { FirestoreSharingRemote }] = await Promise.all([
+        import('./data/firebase/remoteStore'),
+        import('./data/firebase/sharingRemote'),
+      ]);
+      return (uid, user) => ({
+        remote: new FirestoreRemoteStore(config, uid),
+        sharingRemote: FirestoreSharingRemote.forAccount(config, {
           uid,
           name: user.displayName,
           email: user.email,
           emailVerified: user.emailVerified === true,
         }),
-      },
-    };
-    render(auth, account.store, open.remote, true, account.syncState, open.sharing);
-  }
-
-  auth.subscribe((state: AuthState) => {
-    void apply(state);
+      });
+    },
+    openAccount: openSignedInAccount,
+    view: { opening: renderOpening, app: renderApp },
+    // The receipt reader holds the last photo's pixels; it goes with the session.
+    onAccountClosed: () => {
+      void releaseReader();
+    },
   });
 }
 
-void start();
+start();

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 /**
  * Where the receipt reader comes from (#17).
@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 const createWorker = vi.fn();
 vi.mock('tesseract.js', () => ({ createWorker }));
 
-const { READER_LOAD_TIMEOUT_MS, describeOcrFailure, recognise } = await import('./ocr');
+const { READER_IDLE_MS, READER_LOAD_TIMEOUT_MS, describeOcrFailure, recognise, releaseReader } = await import('./ocr');
 
 function workerReturning(text: string, confidence = 90) {
   return {
@@ -23,6 +23,12 @@ function workerReturning(text: string, confidence = 90) {
 
 beforeEach(() => {
   createWorker.mockReset();
+});
+
+// The reader is kept between scans now (#90): each test starts without one.
+afterEach(async () => {
+  await releaseReader();
+  vi.useRealTimers();
 });
 
 describe('the reader is loaded from this origin', () => {
@@ -75,7 +81,7 @@ describe('what it reports, unchanged', () => {
     expect(await recognise(new Blob(['x']))).toEqual({ ok: false, reason: 'no-text' });
   });
 
-  test('the worker is always shut down, even when reading fails', async () => {
+  test('a worker that failed on a photo is shut down, not kept for the next', async () => {
     const worker = workerReturning('');
     worker.recognize.mockRejectedValue(new Error('boom'));
     createWorker.mockResolvedValue(worker);
@@ -214,3 +220,120 @@ describe('what each failure tells the reader', () => {
   });
 });
 
+describe('one reader for a run of scans (#90)', () => {
+  /**
+   * The worker used to be created and terminated for every scan, so the wasm
+   * core and the language data were set up again for each photo — about a
+   * second each on a phone. Keeping one for good would hold tens of megabytes
+   * for a screen nobody may open again. So it is kept while scans keep coming,
+   * dropped after `READER_IDLE_MS` without one, and dropped on sign-out.
+   */
+  const photo = (): Blob => new Blob(['x']);
+
+  test('two scans in a row create one worker, and keep it', async () => {
+    const worker = workerReturning('TOTAL 41.23');
+    createWorker.mockResolvedValue(worker);
+    expect((await recognise(photo())).ok).toBe(true);
+    expect((await recognise(photo())).ok).toBe(true);
+    expect(createWorker).toHaveBeenCalledTimes(1);
+    expect(worker.recognize).toHaveBeenCalledTimes(2);
+    expect(worker.terminate).not.toHaveBeenCalled();
+  });
+
+  test('two scans started together share the one load', async () => {
+    createWorker.mockResolvedValue(workerReturning('TOTAL 41.23'));
+    const both = await Promise.all([recognise(photo()), recognise(photo())]);
+    expect(both.every((result) => result.ok)).toBe(true);
+    expect(createWorker).toHaveBeenCalledTimes(1);
+  });
+
+  test('it is shut down once nothing has been scanned for the idle window', async () => {
+    vi.useFakeTimers();
+    const first = workerReturning('TOTAL 41.23');
+    createWorker.mockResolvedValueOnce(first);
+    await recognise(photo());
+
+    await vi.advanceTimersByTimeAsync(READER_IDLE_MS - 1);
+    expect(first.terminate).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(first.terminate).toHaveBeenCalledTimes(1);
+
+    // The next scan loads a fresh one.
+    const second = workerReturning('TOTAL 9.99');
+    createWorker.mockResolvedValueOnce(second);
+    await recognise(photo());
+    expect(createWorker).toHaveBeenCalledTimes(2);
+    expect(second.recognize).toHaveBeenCalledTimes(1);
+  });
+
+  test('a scan inside the window starts the window again', async () => {
+    vi.useFakeTimers();
+    const worker = workerReturning('TOTAL 41.23');
+    createWorker.mockResolvedValue(worker);
+    await recognise(photo());
+    await vi.advanceTimersByTimeAsync(READER_IDLE_MS - 1000);
+    await recognise(photo());
+    await vi.advanceTimersByTimeAsync(READER_IDLE_MS - 1000);
+    expect(worker.terminate).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(worker.terminate).toHaveBeenCalledTimes(1);
+    expect(createWorker).toHaveBeenCalledTimes(1);
+  });
+
+  test('a photo with no text does not cost the worker', async () => {
+    const worker = workerReturning('   ');
+    createWorker.mockResolvedValue(worker);
+    await recognise(photo());
+    await recognise(photo());
+    expect(createWorker).toHaveBeenCalledTimes(1);
+    expect(worker.terminate).not.toHaveBeenCalled();
+  });
+
+  test('after a worker fails on a photo, the next scan gets a fresh one', async () => {
+    const broken = workerReturning('');
+    broken.recognize.mockRejectedValue(new Error('boom'));
+    const fresh = workerReturning('TOTAL 41.23');
+    createWorker.mockResolvedValueOnce(broken).mockResolvedValueOnce(fresh);
+    expect((await recognise(photo())).ok).toBe(false);
+    expect((await recognise(photo())).ok).toBe(true);
+    expect(broken.terminate).toHaveBeenCalledTimes(1);
+    expect(fresh.terminate).not.toHaveBeenCalled();
+  });
+
+  test('a reader that failed to load is not remembered: the next scan tries again', async () => {
+    createWorker.mockRejectedValueOnce(new Error('NetworkError')).mockResolvedValueOnce(workerReturning('TOTAL 41.23'));
+    expect(await recognise(photo())).toMatchObject({ ok: false, reason: 'unavailable' });
+    expect((await recognise(photo())).ok).toBe(true);
+    expect(createWorker).toHaveBeenCalledTimes(2);
+  });
+
+  test('releasing it — on sign-out — shuts it down, and twice is harmless', async () => {
+    const worker = workerReturning('TOTAL 41.23');
+    createWorker.mockResolvedValue(worker);
+    await recognise(photo());
+    await releaseReader();
+    await releaseReader();
+    expect(worker.terminate).toHaveBeenCalledTimes(1);
+    await recognise(photo());
+    expect(createWorker).toHaveBeenCalledTimes(2);
+  });
+
+  test('released while a scan is reading, it finishes that scan and then shuts down', async () => {
+    let finish: (value: { data: { text: string; confidence: number } }) => void = () => {};
+    const worker = workerReturning('');
+    worker.recognize.mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
+    createWorker.mockResolvedValue(worker);
+    const scanning = recognise(photo());
+    await vi.waitFor(() => expect(worker.recognize).toHaveBeenCalled());
+    await releaseReader();
+    expect(worker.terminate).not.toHaveBeenCalled();
+    finish({ data: { text: 'TOTAL 41.23', confidence: 88 } });
+    expect((await scanning).ok).toBe(true);
+    expect(worker.terminate).toHaveBeenCalledTimes(1);
+  });
+
+  test('with nothing loaded, releasing does nothing', async () => {
+    await releaseReader();
+    expect(createWorker).not.toHaveBeenCalled();
+  });
+});

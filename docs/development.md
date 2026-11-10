@@ -158,6 +158,10 @@ directory; the probe never ships), serves it with **the headers from
    how to diagnose the parser. **Never commit a real receipt**: card digits,
    account and transaction numbers.
 
+The probe is type-checked with the app (`tsconfig.app.json`), so a module
+it imports cannot move without `npm run typecheck` saying so. It once did,
+silently, and the check could not even build for a while (#90).
+
 It takes a couple of minutes, mostly scenario 4 waiting out the load bound. It
 is not in CI, by decision: CI covers the same ground through `csp.build.test.ts`,
 `ocr.test.ts` and `ocrAssets.build.test.ts`. **Run it after changing the scanner, the
@@ -310,6 +314,7 @@ Recorded so a regression in the tests themselves is visible:
 | Isolation and types (#97): spies not restored / globals not unstubbed / env not unstubbed / `globals` off, so no automatic unmount / the `dom` project on Node / `unit` also taking the `.tsx` tests / `.dom.test.ts` files in no project / a docblock planted back / a hand `cleanup` planted back / a hand restore planted back / a prototype assigned again / app code given Node types / app code given test globals / tests left in the app project / `typecheck` checking nothing / `build` checking nothing / `npm test` leaving out `dom` | 2 / 2 / 2 / 2 / 1 / 31 / 7 / 1 / 1 / 1 / 1 / 3 / 3 / 1 / 1 / 1 / 1 |
 | Verified identities (#81): receiving on open again (no confirm step) / Ignore that queues / no double-press guard at all (each alone is covered by the other) / the incoming name shown as fact / rows back to the chosen name / `verifiedName` dropping the email / the email shown twice / the owner without "(owner)" / a nameless owner shown blank / the Share panel by name only / the request's owner name as fact / the name field's disclosure detached / the send-back disclosure removed / the request warning removed / "(unverified)" removed from the queue / a nameless submitter marked unverified | 2 / 1 / 1 / 2 / 2 / 7 / 1 / 3 / 1 / 1 / 2 / 1 / 1 / 1 / 1 / 1 |
 | Hardening, part 1 (#82): CSV whitespace not guarded / its guard not undone / report-only folded into enforced / the disposition not read from the event / the report not marking report-only / an unknown disposition read as report-only / the dev server back to `in` / the candidate with `*.googleapis.com` / with inline style / with `*.firebaseapp.com` frames / allowing what the enforced policy refuses / the candidate header removed / the provider pin removed (emulator) / a provider denylist instead of the pin (emulator) | 9 / 3 / 2 / 1 / 1 / 3 / 6 / 2 / 1 / 2 / 2 / 5 / 6 / 4 |
+| Startup and the reader (#90): Firestore requested at boot / no shell before auth / Firestore loaded on every sign-in / a failed load remembered / no local-only fallback / a token refresh reopening everything / a local-only account never retrying / an overtaken account shown / session resources kept on sign-out / `main.tsx` loading Firestore with auth / the worker terminated after every scan / the idle window not restarted / a broken worker reused / a failed reader load remembered (its first guard was redundant and removed) / release killing a scan in progress / the worker never released when idle | 4 / 3 / 1 / 2 / 2 / 1 / 1 / 1 / 2 / 2 / 5 / 1 / 2 / 1 / 1 / 2 |
 
 Equivalent, and kept as a backstop: `shape()` without its `hasAll`. Every
 required field is also read by a clause of its own, and reading a missing field

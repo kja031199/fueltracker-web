@@ -178,6 +178,9 @@ await scenario('offline', PRODUCTION_CSP, async ({ page, context, failures, cons
     console.log('      caches after the online scan:', JSON.stringify(cached).replace(/http:[^"]*?(?=\/(tesseract|assets|index))/g, ''));
   }
   await context.setOffline(true);
+  // The app keeps its reader between scans (#90); without letting it go, the
+  // offline scan would reuse the loaded one and prove nothing about the cache.
+  await page.evaluate(() => window.releaseReader());
   const offline = await scan(page);
   report(
     '3. after one scan, scans again offline',
