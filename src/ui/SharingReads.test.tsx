@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import { draft, makeStore, sharingFor } from '../test/fixtures';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { FuelTrackerStore } from '../data/store';
 import { InMemorySharingWorld, type Account } from '../data/sharing';
 import type { SharingSync } from '../data/shareSync';
@@ -109,6 +109,24 @@ describe('a sync that changes nothing (#89)', () => {
   });
 });
 
+describe('who the owner is, on a car shared with you (#81)', () => {
+  test('marked as the owner by being the owner, with or without a name', async () => {
+    for (const ownerName of ['Sam', '  ']) {
+      const world = new InMemorySharingWorld();
+      const owner = makeStore({ author: THEM.uid });
+      const car = await owner.addVehicle({ name: 'Jazz' });
+      await world.remoteFor(THEM.uid).push(await owner.exportSnapshot());
+      await world.sharingFor(ME).accept(await world.sharingFor({ ...THEM, name: ownerName }).invite(car, ME.email));
+
+      const mounted = await mount(world, ME, makeStore({ author: ME.uid }));
+      const names = await mounted.log().sharing.namesFor(car.id, [THEM.uid, ME.uid]);
+      expect(names?.get(THEM.uid)).toBe(ownerName.trim() === '' ? 'the owner' : 'Sam (owner)');
+      expect(names?.get(ME.uid)).toBe('you');
+      cleanup();
+    }
+  });
+});
+
 describe('the cars shared with you, as the screens see them (#89)', () => {
   test('come from what the sync read — a share it would not record is still listed, so it can be left', async () => {
     const world = new InMemorySharingWorld();
@@ -147,7 +165,8 @@ describe('who entered each fill-up (#89)', () => {
     await world.sharingFor(THEM).accept(await world.sharingFor(ME).invite(car, THEM.email));
     const names = await sharing.namesFor(car.id, [ME.uid, THEM.uid]);
     expect(world.reads.members).toBe(1);
-    expect(names?.get(THEM.uid)).toBe('Sam');
+    // With the email Google verified, not the chosen name alone (#81).
+    expect(names?.get(THEM.uid)).toBe(`Sam (${THEM.email})`);
     expect(names?.get(ME.uid)).toBe('you');
 
     // Known now: no more reads.

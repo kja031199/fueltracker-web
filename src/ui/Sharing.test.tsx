@@ -167,8 +167,41 @@ describe('who logged what', () => {
     await sam.sharing.remote.accept(invite);
     open(world, sam, 'fillups');
 
-    expect(await screen.findByText(/entered by kyle/i, {}, WAIT)).toBeInTheDocument();
+    expect(await screen.findByText(/entered by kyle \(owner\)/i, {}, WAIT)).toBeInTheDocument();
   });
+
+  test('a member who calls themselves the owner is shown with their own verified email (#81)', async () => {
+    const world = new InMemorySharingWorld();
+    const kyle = person(world, KYLE);
+    // Sam's chosen name is the owner's. Only the email is Google's.
+    const impostor = person(world, { ...SAM, displayName: 'Kyle' });
+    const car = await kylesCivic(world, kyle);
+    const invite = await world.sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true }).invite(car, SAM.email);
+    await impostor.sharing.remote.accept(invite);
+    // A fill-up the member logged on the shared car, already in the owner's account.
+    const [mine] = await kyle.store.fillUps(car.id);
+    const whole = mine === undefined ? undefined : await kyle.store.fillUp(mine.id);
+    if (whole === undefined) throw new Error('no fill-up');
+    await kyle.store.importBackup({
+      vehicles: [],
+      fillUps: [{ ...whole, id: 'by-sam', odometer: 10_300, enteredBy: SAM.uid, updatedAt: Date.now() }],
+      pendingFillUps: [],
+    });
+    await world.remoteFor(KYLE.uid).push(await kyle.store.exportSnapshot());
+
+    open(world, kyle, 'fillups');
+    expect(await screen.findByText(/entered by kyle \(sam@example\.com\)/i, {}, WAIT)).toBeInTheDocument();
+    expect(screen.getByText(/entered by you/i)).toBeInTheDocument();
+    const said = screen.getAllByText(/^entered by/i).map((line) => line.textContent?.trim());
+    expect(said).not.toContain('Entered by Kyle');
+    cleanup();
+    window.history.replaceState(null, '', '/');
+
+    // On the member's own device, the owner's rows are marked as the owner's.
+    open(world, impostor, 'fillups');
+    expect(await screen.findByText(/entered by kyle \(owner\)/i, {}, WAIT)).toBeInTheDocument();
+    expect(screen.getByText(/entered by you/i)).toBeInTheDocument();
+  }, 15_000);
 
   test('on a car nobody shares, rows do not say "entered by you"', async () => {
     const world = new InMemorySharingWorld();
@@ -196,9 +229,10 @@ describe('ending it', () => {
     open(world, kyle);
 
     await user.click(await screen.findByRole('button', { name: /^Share / }));
-    expect(await screen.findByText(/shared with/i, { selector: 'span' })).toHaveTextContent('Sam');
-    await user.click(screen.getByRole('button', { name: /remove sam/i }));
-    expect(await screen.findByText(/sam no longer has civic/i)).toBeInTheDocument();
+    // Who they are, by the email Google verified, not only the name they chose (#81).
+    expect(await screen.findByText(/shared with/i, { selector: 'span' })).toHaveTextContent(/^Shared with Sam \(sam@example\.com\)$/);
+    await user.click(screen.getByRole('button', { name: /remove sam \(sam@example\.com\)/i }));
+    expect(await screen.findByText(/sam \(sam@example\.com\) no longer has civic/i)).toBeInTheDocument();
     expect(world.isMember(KYLE.uid, car.id, SAM.uid)).toBe(false);
   });
 

@@ -59,7 +59,7 @@ export function PendingReview(): ReactElement | null {
             <li className="list-row" key={row.id}>
               <FillUpSummary
                 title={car?.name ?? 'A deleted car'}
-                subtitle={`from ${row.submitterName || 'someone'} · ${new Date(row.date).toLocaleDateString()}`}
+                subtitle={`${fromWhom(row.submitterName)} · ${new Date(row.date).toLocaleDateString()}`}
                 facts={[...fillUpFacts(row, units), ...(row.station === '' ? [] : [row.station])]}
                 notes={row.notes}
                 cost={totalCost(row)}
@@ -98,4 +98,13 @@ export function PendingReview(): ReactElement | null {
       </ul>
     </section>
   );
+}
+
+/**
+ * Who sent a fill-up, as the link says (#81): the name is whatever the
+ * submitter typed, so it is marked as unverified rather than shown as a fact.
+ */
+function fromWhom(submitterName: string): string {
+  const name = submitterName.trim();
+  return name === '' ? 'from someone' : `from ${name} (unverified)`;
 }

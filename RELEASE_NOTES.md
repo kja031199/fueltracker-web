@@ -11,6 +11,17 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-10
 
+- **Opening a fill-up link now shows you the fill-up and waits for you to queue
+  it, and on a shared car you can see each person's email, so nobody can pass
+  as someone else.** Names a link carries are marked as what the sender says,
+  and the person filling one in is told the link carries their name and notes.
+  *Technical:* `IncomingScreen` receives only on **Queue for review** (with
+  **Ignore**); "entered by" and the Share panel use `verifiedName` — the
+  member's verified email beside their chosen name — and the owner is
+  "Name (owner)" by uid; "says they are …" on the request and incoming
+  screens and "(unverified)" in the review list. `lastEditedBy` and signed
+  request links were declined.
+  [#81](https://github.com/kja031199/fueltracker-web/issues/81) · [PR #135](https://github.com/kja031199/fueltracker-web/pull/135)
 - **No change you'll see: each test now starts clean on its own, and app code
   can no longer use names that exist only in tests.** The last step of tidying
   the tests.

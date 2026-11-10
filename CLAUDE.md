@@ -492,6 +492,14 @@ npm run test:build   # vite build, then the *.build.test.ts files
   the device's ledger as well as the lists in state, which load
   asynchronously. `IncomingScreen` answers "no such car" only after a fresh
   `syncNow()` (which waits for any running sync and then runs its own).
+- **An incoming link queues nothing until the owner says so** (#81).
+  `IncomingScreen` decodes and shows it; only **Queue for review** calls
+  `receiveSubmission`, once (a ref and a disabled button — each alone is
+  enough, together they are the test's mutant). Never receive in an effect on
+  mount: that let anyone who knew a car id fill the review list. **Names in a
+  link are claims**: "says they are …" on the request and incoming screens,
+  "(unverified)" in `PendingReview`. The submit screen tells the sender what
+  the link carries, at the name field (`aria-describedby`) and beside the link.
 - **Link routes are never corrected to the dashboard** (`parseRoute`), and
   they render **before** the first-run screen. Leaving one uses
   `choose(tab, { replace: true })` so Back does not reopen it — or re-receive
@@ -506,7 +514,13 @@ npm run test:build   # vite build, then the *.build.test.ts files
   `remote.memberships()` call to the sharing view; the ledger fills the list
   only until the first sync has answered, then the sync's list wins. Names for
   "entered by" go through `sharing.namesFor` (cached per car, re-read for an
-  unseen uid), never a `members()` call in a screen effect. A screen reload
+  unseen uid), never a `members()` call in a screen effect. **They are
+  verified identities** (#81): a member by `verifiedName` (`domain/format.ts`:
+  "Sam (sam@example.com)" — the email the rules force to be theirs), the owner
+  as "Kyle (owner)" by uid, yourself as "you". A chosen name never stands
+  alone for a sharer; `displayName` is for greetings, not identity.
+  `lastEditedBy`, an owner-side `enteredBy` rule and signed request links were
+  declined (#81) — say so if a change seems to need them. A screen reload
   after a share sync needs rows written, not just a share synced.
 - **Emulator tests are the `*.emulator.test.ts` files** (#97), the `rules`
   Vitest project, run by `npm run test:rules` locally and in CI. The sharing

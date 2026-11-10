@@ -24,6 +24,15 @@ route of its own and is never corrected, or the link would be thrown away
 before anything read it. Leaving one replaces it in history, so Back does not
 open it a second time.
 
+Opening an incoming fill-up link **shows** the fill-up — car, date, figures,
+station, notes — and queues nothing until the owner presses **Queue for
+review**; **Ignore** leaves it (#81). Names a link carries are whatever its
+author typed, so they are shown as claims: "Someone who says they are Sam sent
+you this fill-up", "Someone who says they are Kyle asked you…", and "from Sam
+(unverified)" in the review list. The person filling one in is told, by the
+name field and again beside the finished link, that the link carries their
+name, the fill-up and any notes as plain text to whoever they send it to.
+
 A tab keeps what you were doing while another is shown (#93): a half-typed
 fill-up, the fill-ups filter, the dashboard's range. Each tab is mounted the
 first time it is shown and then kept, hidden, inside React's `<Activity>` —
