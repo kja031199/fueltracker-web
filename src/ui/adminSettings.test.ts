@@ -17,8 +17,9 @@ async function adminMinutes(raw: string | undefined): Promise<number> {
   return ADMIN_IDLE_MINUTES;
 }
 
+// The env stubs are put back by the config (`unstubEnvs`); the module cache
+// is not, and the next case must import the module afresh.
 afterEach(() => {
-  vi.unstubAllEnvs();
   vi.resetModules();
 });
 

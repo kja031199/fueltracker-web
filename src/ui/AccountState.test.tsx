@@ -1,5 +1,4 @@
-// @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { makeStore } from '../test/fixtures';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -57,8 +56,6 @@ beforeEach(() => {
   Object.defineProperty(URL, 'createObjectURL', { value: vi.fn(() => 'blob:x'), writable: true });
   Object.defineProperty(URL, 'revokeObjectURL', { value: vi.fn(), writable: true });
 });
-
-afterEach(cleanup);
 
 describe('one browser, two accounts', () => {
   test("A's backup does not silence B's reminder", async () => {

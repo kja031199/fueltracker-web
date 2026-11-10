@@ -1,7 +1,6 @@
-// @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { beforeEach, describe, expect, test } from 'vitest';
 import { makeStore } from '../test/fixtures';
-import { cleanup, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FuelTrackerStore } from '../data/store';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
@@ -35,8 +34,6 @@ beforeEach(() => {
   localStorage.clear();
   saveHasOnboarded('local');
 });
-
-afterEach(cleanup);
 
 describe('the missed fill-up hint', () => {
   test('appears for a jump of more than twice the usual distance, and says by how much', async () => {

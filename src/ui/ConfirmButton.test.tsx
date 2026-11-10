@@ -1,12 +1,9 @@
-// @vitest-environment jsdom
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConfirmButton, type ConfirmButtonProps } from './ConfirmButton';
 
 /** The one confirm-then-act pair (#93): three hand-written copies before. */
-
-afterEach(cleanup);
 
 function setUp(overrides: Partial<ConfirmButtonProps> = {}) {
   const props = {

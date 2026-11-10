@@ -1,14 +1,11 @@
-// @vitest-environment jsdom
-import { afterEach, describe, expect, test } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { describe, expect, test } from 'vitest';
+import { render, screen, within } from '@testing-library/react';
 import type { DateValuePoint } from '../../domain/models';
 import type { MonthlyTotal } from '../../domain/fuelStatistics';
 import type { WeekdayPrice } from '../../domain/weekdayPricePattern';
 import { MetricLineChart } from './MetricLineChart';
 import { MonthlyBarChart } from './MonthlyBarChart';
 import { WeekdayPriceChart } from './WeekdayPriceChart';
-
-afterEach(cleanup);
 
 const whole = (value: number): string => value.toFixed(0);
 

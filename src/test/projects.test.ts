@@ -7,9 +7,13 @@ import { buildMissing, emulatorMissing, prerequisiteError } from './prerequisite
 /**
  * Which tests run where (#97).
  *
- * The suite is three groups, as Vitest projects:
+ * The suite is four groups, as Vitest projects:
  *
- * - **unit**, `npm test`: everything that needs nothing but Node.
+ * - **unit** and **dom**, together `npm test`: everything that needs nothing
+ *   but Node. `dom` is the files that need a browser DOM — every `*.test.tsx`
+ *   and the `*.dom.test.ts` files — and runs them on jsdom; `unit` runs the
+ *   rest on Node, which starts faster. The project picks the environment,
+ *   not a docblock in each file.
  * - **rules**, `npm run test:rules`: the `*.emulator.test.ts` files, run
  *   against the real `firestore.rules` on the Firestore emulator.
  * - **build**, `npm run test:build`: the `*.build.test.ts` files, which read
@@ -28,6 +32,7 @@ interface ProjectTest {
   readonly include: readonly string[];
   readonly exclude: readonly string[];
   readonly globalSetup: readonly string[];
+  readonly environment: string;
 }
 
 function projects(): ProjectTest[] {
@@ -37,6 +42,7 @@ function projects(): ProjectTest[] {
       readonly include?: readonly string[];
       readonly exclude?: readonly string[];
       readonly globalSetup?: string | readonly string[];
+      readonly environment?: string;
     };
   }[];
   return listed.map(({ test: project = {} }) => ({
@@ -49,6 +55,8 @@ function projects(): ProjectTest[] {
         : typeof project.globalSetup === 'string'
           ? [project.globalSetup]
           : project.globalSetup,
+    // `extends: true`: a project without its own environment takes the root's.
+    environment: project.environment ?? config.test?.environment ?? '',
   }));
 }
 
@@ -77,9 +85,14 @@ const USES_EMULATOR = /from '(?:\.\.\/)+test\/emulator'|from '\.\/emulator'/;
 const READS_BUILD = /['"`]dist['"`/]/;
 const THIS_FILE = join('src', 'test', 'projects.test.ts');
 
-describe('the three test projects', () => {
-  test('are unit, rules and build', () => {
-    expect(projects().map(({ name }) => name)).toEqual(['unit', 'rules', 'build']);
+describe('the four test projects', () => {
+  test('are unit, dom, rules and build', () => {
+    expect(projects().map(({ name }) => name)).toEqual(['unit', 'dom', 'rules', 'build']);
+  });
+
+  test('each chooses its environment: jsdom only where a DOM is needed', () => {
+    const environment = Object.fromEntries(projects().map(({ name, environment }) => [name, environment]));
+    expect(environment).toEqual({ unit: 'node', dom: 'jsdom', rules: 'node', build: 'node' });
   });
 
   test('there are test files to check, so a passing suite means something', () => {
@@ -95,7 +108,8 @@ describe('the three test projects', () => {
   test('a file is classified by its name', () => {
     expect(projectsOf('src/data/firebase/rules.emulator.test.ts')).toEqual(['rules']);
     expect(projectsOf('src/ui/csp.build.test.ts')).toEqual(['build']);
-    expect(projectsOf('src/ui/App.test.tsx')).toEqual(['unit']);
+    expect(projectsOf('src/ui/App.test.tsx')).toEqual(['dom']);
+    expect(projectsOf('src/ui/importReceipt.dom.test.ts')).toEqual(['dom']);
     expect(projectsOf('src/data/firebase/settings.test.ts')).toEqual(['unit']);
   });
 
@@ -103,6 +117,7 @@ describe('the three test projects', () => {
     // `npm test` must work on a fresh clone with nothing running.
     const setup = Object.fromEntries(projects().map(({ name, globalSetup }) => [name, globalSetup]));
     expect(setup.unit).toEqual([]);
+    expect(setup.dom).toEqual([]);
     expect(setup.rules).toEqual(['src/test/needsEmulator.ts']);
     expect(setup.build).toEqual(['src/test/needsBuild.ts']);
   });
@@ -137,14 +152,66 @@ describe('a test file is named for what it needs', () => {
   });
 });
 
+/** A per-file environment: the project chooses it now. */
+const DOCBLOCK = /@vitest-environment\b/;
+/** Unmounting by hand: Testing Library does it after every test. */
+const HAND_CLEANUP = /afterEach\(\s*(?:cleanup|\(\)\s*=>\s*cleanup\(\))\s*\)/;
+/** Restoring by hand: `restoreMocks`, `unstubGlobals` and `unstubEnvs` do it. */
+const HAND_RESTORE = /\bvi\.(?:restoreAllMocks|unstubAllGlobals|unstubAllEnvs)\(/;
+/**
+ * Writing to a prototype directly — nothing puts that back. `vi.spyOn` on the
+ * prototype is restored before the next test.
+ */
+const PROTOTYPE_WRITE = /\.prototype(?:\s+as\s|\.\w+\s*=[^=])/;
+
+describe('isolation is the config’s job, not each file’s', () => {
+  const sources = testFiles()
+    .filter((file) => file !== THIS_FILE)
+    .map((file) => ({ file, text: readFileSync(file, 'utf8') }));
+
+  test('the config restores spies, globals and env before every test', () => {
+    expect(config.test?.restoreMocks).toBe(true);
+    expect(config.test?.unstubGlobals).toBe(true);
+    expect(config.test?.unstubEnvs).toBe(true);
+    // Testing Library registers its own after-each cleanup only when it finds
+    // a global `afterEach` as it loads, which is what `globals` provides.
+    expect(config.test?.globals).toBe(true);
+  });
+
+  test('the detectors find what they are meant to', () => {
+    expect(DOCBLOCK.test('// @vitest-environment jsdom')).toBe(true);
+    expect(HAND_CLEANUP.test('afterEach(cleanup);')).toBe(true);
+    expect(HAND_CLEANUP.test('  afterEach(() => cleanup());')).toBe(true);
+    expect(HAND_RESTORE.test('afterEach(() => vi.restoreAllMocks());')).toBe(true);
+    expect(HAND_RESTORE.test('  vi.unstubAllGlobals();')).toBe(true);
+    expect(HAND_RESTORE.test('  vi.unstubAllEnvs();')).toBe(true);
+    expect(
+      PROTOTYPE_WRITE.test('const proto = HTMLCanvasElement.prototype as unknown as Record<string, unknown>;'),
+    ).toBe(true);
+    expect(PROTOTYPE_WRITE.test('HTMLCanvasElement.prototype.toBlob = () => {};')).toBe(true);
+    // Spying is restored; reading and comparing are not writes.
+    expect(PROTOTYPE_WRITE.test("vi.spyOn(Storage.prototype, 'getItem')")).toBe(false);
+    expect(PROTOTYPE_WRITE.test('const click = HTMLAnchorElement.prototype.click;')).toBe(false);
+    expect(PROTOTYPE_WRITE.test('expect(Foo.prototype.bar === baz)')).toBe(false);
+  });
+
+  test.each(sources.map(({ file }) => file))('%s', (file) => {
+    const text = sources.find((source) => source.file === file)?.text ?? '';
+    expect(DOCBLOCK.test(text), 'chooses its own environment').toBe(false);
+    expect(HAND_CLEANUP.test(text), 'unmounts by hand').toBe(false);
+    expect(HAND_RESTORE.test(text), 'restores mocks, globals or env by hand').toBe(false);
+    expect(PROTOTYPE_WRITE.test(text), 'writes to a prototype instead of spying on it').toBe(false);
+  });
+});
+
 describe('the npm scripts run one project each', () => {
   const scripts = (
     JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> }
   ).scripts;
 
-  test('npm test runs the unit project, and needs nothing running', () => {
-    expect(scripts.test).toBe('vitest run --project unit');
-    expect(scripts['test:watch']).toBe('vitest --project unit');
+  test('npm test runs the unit and dom projects, and needs nothing running', () => {
+    expect(scripts.test).toBe('vitest run --project unit --project dom');
+    expect(scripts['test:watch']).toBe('vitest --project unit --project dom');
   });
 
   test('test:build builds first, so it never reads a stale dist/', () => {

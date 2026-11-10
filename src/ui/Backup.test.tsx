@@ -1,5 +1,4 @@
-// @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { draftWith, makeStore } from '../test/fixtures';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -22,7 +21,6 @@ function captureDownloads(): { name: string; text: string }[] {
     },
     revokeObjectURL: () => {},
   });
-  const click = HTMLAnchorElement.prototype.click;
   vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
     const blob = blobs.get(this.href);
     if (blob !== undefined) {
@@ -30,7 +28,6 @@ function captureDownloads(): { name: string; text: string }[] {
       void blob.text().then((text) => captured.push({ name: this.download, text }));
     }
   });
-  void click;
   return captured;
 }
 
@@ -41,11 +38,6 @@ async function renderSettings(store: FuelTrackerStore): Promise<void> {
 }
 
 beforeEach(() => localStorage.clear());
-afterEach(() => {
-  cleanup();
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
-});
 
 describe('exporting', () => {
   test('offers a complete JSON backup and says what is in it', async () => {

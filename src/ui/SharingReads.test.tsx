@@ -1,7 +1,6 @@
-// @vitest-environment jsdom
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { draft, makeStore, sharingFor } from '../test/fixtures';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { FuelTrackerStore } from '../data/store';
 import { InMemorySharingWorld, type Account } from '../data/sharing';
 import type { SharingSync } from '../data/shareSync';
@@ -16,8 +15,6 @@ import { FillUpsScreen } from './FillUpsScreen';
  * once more for the screens — and the fill-up list asked who a car is shared
  * with again, even for a car nobody shares.
  */
-
-afterEach(cleanup);
 
 const ME: Account = { uid: 'u1', name: 'Kyle', email: 'kyle@example.com', emailVerified: true };
 const THEM: Account = { uid: 'u2', name: 'Sam', email: 'sam@example.com', emailVerified: true };

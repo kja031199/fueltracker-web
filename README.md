@@ -32,7 +32,7 @@ The rewrite is not a port of the UI. SwiftUI does not run on the web and SwiftDa
 ```bash
 npm install
 npm run dev        # vite dev server
-npm test           # vitest: the unit tests, which need nothing but Node
+npm test           # vitest: the unit and DOM tests, which need nothing but Node
 npm run test:build # build, then test the built site in dist/
 npm run test:rules # the rules tests, on the Firestore emulator (see below)
 npm run lint       # oxlint: the two React hooks rules, nothing else

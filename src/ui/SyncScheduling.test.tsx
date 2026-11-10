@@ -1,7 +1,6 @@
-// @vitest-environment jsdom
-import { afterEach, beforeEach, expect, test } from 'vitest';
+import { beforeEach, expect, test } from 'vitest';
 import { makeStore } from '../test/fixtures';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { InMemoryRemoteStore } from '../data/remote';
 import { StubAuthProvider } from '../data/auth';
@@ -11,7 +10,6 @@ import { manualTimers } from '../test/manualTimers';
 
 /** Sync timing as the app actually wires it (#52). */
 beforeEach(() => localStorage.clear());
-afterEach(cleanup);
 
 function signedIn(): StubAuthProvider {
   return new StubAuthProvider({ status: 'signedIn', user: { uid: 'u1', email: 'a@example.com', displayName: 'A' } });

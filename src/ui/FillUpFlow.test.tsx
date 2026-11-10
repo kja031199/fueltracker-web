@@ -1,7 +1,6 @@
-// @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { beforeEach, describe, expect, test } from 'vitest';
 import { draftWith, makeStore } from '../test/fixtures';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { InMemoryRepository } from '../data/repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
@@ -25,7 +24,6 @@ async function setUp(
 }
 
 beforeEach(() => localStorage.clear());
-afterEach(cleanup);
 
 describe('logging a fill-up', () => {
   test('saves what was typed and shows it in the list', async () => {

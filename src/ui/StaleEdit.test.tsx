@@ -1,7 +1,6 @@
-// @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { beforeEach, describe, expect, test } from 'vitest';
 import { draftWith, makeStore } from '../test/fixtures';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
 import { FillUpForm } from './FillUpForm';
@@ -21,7 +20,6 @@ beforeEach(() => {
   localStorage.clear();
   saveHasOnboarded('local');
 });
-afterEach(cleanup);
 
 describe('saving an edit after the log changed underneath it (#83)', () => {
   test('a fill-up stays on its own car when another car is the one selected', async () => {

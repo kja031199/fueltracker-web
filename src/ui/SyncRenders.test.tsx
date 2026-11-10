@@ -1,7 +1,6 @@
-// @vitest-environment jsdom
-import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { beforeEach, expect, test, vi } from 'vitest';
 import { makeStore } from '../test/fixtures';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { InMemoryRemoteStore, type PullCursor, type RawSnapshot } from '../data/remote';
 import { StubAuthProvider } from '../data/auth';
 import { App } from './App';
@@ -29,7 +28,6 @@ vi.mock('./DashboardScreen', async (original) => {
 });
 
 beforeEach(() => localStorage.clear());
-afterEach(cleanup);
 
 /** An account whose first read waits until the test lets it through. */
 class HeldRemote extends InMemoryRemoteStore {

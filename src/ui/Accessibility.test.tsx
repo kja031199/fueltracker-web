@@ -1,8 +1,7 @@
-// @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { makeStore } from '../test/fixtures';
 import { readFileSync } from 'node:fs';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FuelTrackerStore } from '../data/store';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
@@ -57,7 +56,6 @@ beforeEach(() => {
   window.history.replaceState(null, '', '/');
   document.title = 'FuelTracker';
 });
-afterEach(cleanup);
 
 describe('a repeated button says which row it is for', () => {
   test('each fill-up’s Edit and Delete name the fill-up', async () => {

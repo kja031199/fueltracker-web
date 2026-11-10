@@ -1,7 +1,6 @@
-// @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { makeStore } from '../test/fixtures';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { FuelTrackerStore } from '../data/store';
 import { StubAuthProvider } from '../data/auth';
 import { ACTIVITY_STORAGE_KEY } from './idleTimeout';
@@ -37,8 +36,6 @@ beforeEach(() => {
   localStorage.clear();
   saveHasOnboarded(USER.uid);
 });
-
-afterEach(cleanup);
 
 describe('Settings', () => {
   test('states the period, and offers no way to change it or turn it off', async () => {

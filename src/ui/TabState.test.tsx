@@ -1,7 +1,6 @@
-// @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { beforeEach, describe, expect, test } from 'vitest';
 import { makeStore } from '../test/fixtures';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FuelTrackerStore } from '../data/store';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
@@ -43,7 +42,6 @@ beforeEach(() => {
   localStorage.clear();
   window.history.replaceState(null, '', '/');
 });
-afterEach(cleanup);
 
 describe('a tab keeps its state while another is shown', () => {
   test('a half-typed fill-up is still there, as typed', async () => {
