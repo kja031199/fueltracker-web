@@ -20,6 +20,37 @@ import { InMemoryShareLedger } from '../data/shareLedger';
 import type { AuthUser } from '../data/auth';
 import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
+import { HAS_ONBOARDED } from '../ui/onboarding';
+import { writePreference } from '../ui/preferences';
+
+let submissions = 0;
+
+/**
+ * A fill-up someone else sent by link, queued through the one door that
+ * production has for it, `receiveSubmission` (#96; `store.submitFillUp` was a
+ * second, test-only door). Each is a fresh link, a millisecond after the last,
+ * so a later call sorts first in the review queue. Text only, as a link is.
+ */
+export async function submitted(
+  store: FuelTrackerStore,
+  draftValue: FuelEntryDraft,
+  vehicleId: string,
+  submitterName: string,
+): Promise<PendingFillUpRecord> {
+  submissions += 1;
+  const id = `submission-${submissions}`;
+  const outcome = await store.receiveSubmission({
+    id,
+    vehicleId,
+    submitterName,
+    submittedAt: 1_700_000_000_000 + submissions,
+    draft: draftValue,
+  });
+  if (outcome !== 'queued') throw new Error(`fixture submission was ${outcome}`);
+  const row = (await store.pendingFillUps()).find((pending) => pending.id === id);
+  if (row === undefined) throw new Error('fixture submission was not queued');
+  return row;
+}
 
 /** A store over empty in-memory repositories. */
 export function makeStore(options: { readonly author?: string; readonly clock?: MonotonicClock } = {}): FuelTrackerStore {
@@ -91,4 +122,14 @@ export function sharingFor(world: InMemorySharingWorld, who: AuthUser | Account)
     },
     ledger: new InMemoryShareLedger(),
   };
+}
+
+/**
+ * Marks `uid` as welcomed, so a rendered `App` opens on its screens rather
+ * than the first-run welcome. Production sets the flag through
+ * `useAccountPreference` when the welcome is finished (#96: this used to sit in
+ * `ui/onboarding.ts`, where only tests called it).
+ */
+export function saveHasOnboarded(uid: string | null): void {
+  writePreference(HAS_ONBOARDED, true, uid);
 }

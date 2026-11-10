@@ -2,12 +2,11 @@
  * Number formatting for display, ported from `Shared/Support/Formatters.swift`.
  *
  * **Only the helpers with callers.** Upstream's `Format` enum has a dozen; this
- * file carries the six the ported domain modules actually use — `plainCurrency`
- * for the weekday insight, and `currency` / `economy` / `fuelPrice` /
- * `costPerDistance` / `distance` for the vehicle showdown's rows. The rest
- * (`volume`, `compactMiles`, `odometer`, …) describe screens that do not exist
- * here yet and port in Phase 3 with the views that call them. Untested
- * formatters with no callers are exactly the dead weight this phase avoids.
+ * file carries the ones the screens use — money (`currency`, `plainCurrency`,
+ * `fuelPrice`, `costPerDistance`), measures (`volume`, `distance`,
+ * `economy`), `formatDate` and `countOf` — all in the reader's display locale
+ * (#94). The rest (`compactMiles`, `odometer`, …) were never needed here, and
+ * untested formatters with no callers are dead weight.
  *
  * ## The unit-aware half
  *

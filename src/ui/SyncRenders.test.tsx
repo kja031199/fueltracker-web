@@ -1,10 +1,9 @@
 import { beforeEach, expect, test, vi } from 'vitest';
-import { makeStore } from '../test/fixtures';
+import { makeStore, saveHasOnboarded } from '../test/fixtures';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { InMemoryRemoteStore, type PullCursor, type RawSnapshot } from '../data/remote';
 import { StubAuthProvider } from '../data/auth';
 import { App } from './App';
-import { saveHasOnboarded } from './onboarding';
 
 /**
  * A sync that changes nothing re-renders no screen (#88).

@@ -44,19 +44,6 @@ import type { FillUpRecord, PendingFillUpRecord, VehicleRecord, Snapshot } from 
 import { tombstoneFillUp, tombstonePending } from './tombstone';
 import { isFiniteNumber, isRecord, textOr } from './guards';
 
-/**
- * Text bounds, set well beyond plausible human input rather than tightly.
- *
- * The entry form does not currently limit these fields, so a bound tight
- * enough to be "correct" would reject data the app itself accepted yesterday.
- * These are here to stop a document being inflated to the 1 MiB cap, not to
- * enforce a style guide.
- */
-// Derived from the shared table rather than restated, so the rules, the forms,
-// the draft gate and this cannot disagree again (#50).
-export const MAX_NAME_LENGTH = TEXT_LIMITS.station;
-export const MAX_NOTES_LENGTH = TEXT_LIMITS.notes;
-
 // Re-exported rather than redefined: the id rule outgrew a length check once
 // it turned out an id is also a Firestore document name (#26), and it lives in
 // `recordId.ts` so the import path can apply exactly the same one.

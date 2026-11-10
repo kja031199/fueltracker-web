@@ -1,11 +1,10 @@
 import { beforeEach, expect, test } from 'vitest';
-import { makeStore } from '../test/fixtures';
+import { makeStore, saveHasOnboarded } from '../test/fixtures';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { InMemoryRemoteStore } from '../data/remote';
 import { StubAuthProvider } from '../data/auth';
 import { App } from './App';
-import { saveHasOnboarded } from './onboarding';
 import { manualTimers } from '../test/manualTimers';
 
 /** Sync timing as the app actually wires it (#52). */

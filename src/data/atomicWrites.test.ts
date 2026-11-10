@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, test } from 'vitest';
-import { draftWith } from '../test/fixtures';
+import { draftWith, submitted } from '../test/fixtures';
 import 'fake-indexeddb/auto';
 import Dexie from 'dexie';
 import { openAccountStore } from './accountStore';
@@ -276,8 +276,8 @@ describe('removing a car (#85)', () => {
     const { store } = await make();
     const car = await store.addVehicle({ name: 'Civic' });
     const other = await store.addVehicle({ name: 'Jazz' });
-    await store.submitFillUp(draft(), car.id, 'Sam');
-    const kept = await store.submitFillUp(draft(), other.id, 'Alex');
+    await submitted(store, draft(), car.id, 'Sam');
+    const kept = await submitted(store, draft(), other.id, 'Alex');
 
     await store.removeVehicle(car.id);
 
@@ -294,7 +294,7 @@ describe('removing a car (#85)', () => {
     const setup = new FuelTrackerStore(repos);
     const car = await setup.addVehicle({ name: 'Civic' });
     for (let i = 0; i < 5; i += 1) await setup.addFillUp(draft(10_000 + i), car.id);
-    await setup.submitFillUp(draft(), car.id, 'Sam');
+    await submitted(setup, draft(), car.id, 'Sam');
 
     // The fill-ups' tombstones are written first; the car's own write fails.
     const broken = new FuelTrackerStore(breaking(repos, 'vehicles'));
@@ -357,7 +357,7 @@ describe('approving a submission (#85)', () => {
     const { repos } = await dexieStore();
     const setup = new FuelTrackerStore(repos);
     const car = await setup.addVehicle({ name: 'Civic' });
-    const pending = await setup.submitFillUp(draft(), car.id, 'Sam');
+    const pending = await submitted(setup, draft(), car.id, 'Sam');
 
     const broken = new FuelTrackerStore(breaking(repos, 'pendingFillUps'));
     await expect(broken.approvePendingFillUp(pending.id)).rejects.toThrow('disk full');

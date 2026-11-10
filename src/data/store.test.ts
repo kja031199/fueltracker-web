@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, test } from 'vitest';
-import { draftWith, makeStore } from '../test/fixtures';
+import { draftWith, makeStore, submitted } from '../test/fixtures';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { computeFuelStatistics } from '../domain/fuelStatistics';
 import { InMemoryRepository } from './repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records';
 import { SCHEMA_VERSION } from './records';
 import { MonotonicClock } from './syncClock';
-import { FuelTrackerStore, toStats } from './store';
+import { FuelTrackerStore } from './store';
+import { toStats } from './records';
+import { pendingFromDraft } from './recordMapping';
 import { TEXT_LIMITS } from '../domain/textLimits';
 import { StaleEdit } from './staleEdit';
 
@@ -201,7 +203,7 @@ describe('fill-ups go through the draft, and only through the draft', () => {
 describe('pending submissions', () => {
   test('submit then approve produces a real fill-up and clears the queue', async () => {
     const vehicle = await store.addVehicle({ name: 'Car' });
-    const pending = await store.submitFillUp(draft({ station: 'Shell' }), vehicle.id, 'Sam');
+    const pending = await submitted(store, draft({ station: 'Shell' }), vehicle.id, 'Sam');
     expect(await store.pendingFillUps()).toHaveLength(1);
     expect(pending.submitterName).toBe('Sam');
 
@@ -262,7 +264,7 @@ describe('pending submissions', () => {
 
   test('rejecting removes it without creating a fill-up', async () => {
     const vehicle = await store.addVehicle({ name: 'Car' });
-    const pending = await store.submitFillUp(draft(), vehicle.id, 'Sam');
+    const pending = await submitted(store, draft(), vehicle.id, 'Sam');
     await store.rejectPendingFillUp(pending.id);
     expect(await store.pendingFillUps()).toHaveLength(0);
     expect(await store.fillUps(vehicle.id)).toHaveLength(0);
@@ -270,8 +272,8 @@ describe('pending submissions', () => {
 
   test('lists submissions newest first', async () => {
     const vehicle = await store.addVehicle({ name: 'Car' });
-    await store.submitFillUp(draft(), vehicle.id, 'First');
-    await store.submitFillUp(draft(), vehicle.id, 'Second');
+    await submitted(store, draft(), vehicle.id, 'First');
+    await submitted(store, draft(), vehicle.id, 'Second');
     expect((await store.pendingFillUps()).map((p) => p.submitterName))
       .toEqual(['Second', 'First']);
   });
@@ -372,14 +374,23 @@ describe('deleting leaves a tombstone, not a copy of the row', () => {
   test('rejecting a submission does not keep the submitter', async () => {
     // The one record here written by somebody else. Keeping their name and
     // their note after a rejection is the worst version of this bug.
-    const vehicle = await store.addVehicle({ name: 'Civic' });
-    const pending = await store.submitFillUp(
-      draft({ station: 'Costco', notes: 'filled it for you', receiptImageData: RECEIPT }),
-      vehicle.id,
-      'Sam',
+    // With a photo, which no link carries: a row like this arrives by sync,
+    // from an older build, and has to be scrubbed all the same.
+    const pendingFillUps = new InMemoryRepository<PendingFillUpRecord>([
+      pendingFromDraft(draft({ station: 'Costco', notes: 'filled it for you', receiptImageData: RECEIPT }), {
+        id: 'p1',
+        vehicleId: 'v1',
+        updatedAt: 500,
+        submittedAt: 500,
+        submitterName: 'Sam',
+      }),
+    ]);
+    const store = new FuelTrackerStore(
+      { vehicles: new InMemoryRepository<VehicleRecord>(), fillUps: new InMemoryRepository<FillUpRecord>(), pendingFillUps },
+      testClock(),
     );
 
-    await store.rejectPendingFillUp(pending.id);
+    await store.rejectPendingFillUp('p1');
 
     const row = (await store.exportSnapshot()).pendingFillUps[0];
     expect(row?.deletedAt).not.toBeNull();
@@ -484,7 +495,8 @@ describe('text is bounded on every write (#50)', () => {
 
   test('a submitter name is shortened to its limit', async () => {
     const store = makeStore({ clock: testClock() });
-    const pending = await store.submitFillUp(draft(), 'v1', long(TEXT_LIMITS.submitterName));
+    const car = await store.addVehicle({ name: 'Civic' });
+    const pending = await submitted(store, draft(), car.id, long(TEXT_LIMITS.submitterName));
     expect(pending.submitterName).toHaveLength(TEXT_LIMITS.submitterName);
   });
 });

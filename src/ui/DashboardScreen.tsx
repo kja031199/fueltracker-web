@@ -10,6 +10,7 @@ import { cutoffFrom, DASHBOARD_TIME_RANGES } from '../domain/dashboardTimeRange'
 import type { DashboardTimeRange } from '../domain/dashboardTimeRange';
 import {
   cheapestWeekday,
+  firstWeekdayForLocale,
   weekdayPriceInsight,
   weekdayPrices,
 } from '../domain/weekdayPricePattern';
@@ -72,7 +73,12 @@ export function DashboardScreen(): ReactElement {
     const found = weekdayPriceInsight(inRangeStats);
     return found === null ? null : insightText(found, units, style);
   }, [inRangeStats, units, style]);
-  const weekdays = useMemo(() => weekdayPrices(inRangeStats), [inRangeStats]);
+  // The week starts where the reader's calendar starts it: Sunday in the US,
+  // Monday in Germany (#96 found this computed and never used).
+  const weekdays = useMemo(
+    () => weekdayPrices(inRangeStats, { firstWeekday: firstWeekdayForLocale(locale) }),
+    [inRangeStats, locale],
+  );
   const cheapest = useMemo(() => cheapestWeekday(inRangeStats), [inRangeStats]);
 
   const economySpec = economyUnits[units.economy];

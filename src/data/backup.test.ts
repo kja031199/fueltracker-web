@@ -5,9 +5,10 @@ import { parseJsonBackup, toJsonBackup } from './backupFormat';
 import { backupFilename, exportSnapshot, importBackup } from './backup';
 import { InMemoryRepository } from './repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records';
-import { FuelTrackerStore, toStats } from './store';
+import { FuelTrackerStore } from './store';
+import { toStats } from './records';
 import type { Repositories } from './repository';
-import { seedDemoData } from './demoData';
+import { seedDemoData } from '../test/demoData';
 import { TEXT_LIMITS } from '../domain/textLimits';
 import { SCHEMA_VERSION } from './records';
 

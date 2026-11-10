@@ -311,15 +311,3 @@ export function parsePump(rawLines: readonly string[]): PumpReading {
 
   return { ...reading };
 }
-
-/**
- * Field-wise overlay so a live scan keeps the best values seen so far instead
- * of flickering as OCR results come and go.
- */
-export function mergePumpReadings(current: PumpReading, next: PumpReading): PumpReading {
-  return {
-    gallons: next.gallons ?? current.gallons,
-    pricePerGallon: next.pricePerGallon ?? current.pricePerGallon,
-    totalCost: next.totalCost ?? current.totalCost,
-  };
-}

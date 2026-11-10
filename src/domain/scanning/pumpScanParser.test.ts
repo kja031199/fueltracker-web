@@ -4,7 +4,6 @@ import {
   MAX_TRIPLE_CANDIDATES,
   isCompleteReading,
   isEmptyReading,
-  mergePumpReadings,
   parsePump,
 } from './pumpScanParser';
 
@@ -131,34 +130,6 @@ describe('noise and out-of-range input', () => {
     // The pattern takes at most three fraction digits, so "3.4999" yields
     // 3.499 followed by a stray "9" that belongs to no band.
     expect(parsePump(['PRICE/GAL 3.4999']).pricePerGallon).toBe(3.499);
-  });
-});
-
-describe('merging frames', () => {
-  test('keeps the best values seen across frames', () => {
-    const first = mergePumpReadings(EMPTY_PUMP_READING, {
-      gallons: 8.712, pricePerGallon: null, totalCost: null,
-    });
-    expect(first.gallons).toBe(8.712);
-
-    const second = mergePumpReadings(first, {
-      gallons: null, pricePerGallon: 3.499, totalCost: null,
-    });
-    expect(second.gallons).toBe(8.712);
-    expect(second.pricePerGallon).toBe(3.499);
-    expect(isCompleteReading(second)).toBe(true);
-  });
-
-  test('a new value wins over an older one for the same field', () => {
-    const merged = mergePumpReadings(
-      { gallons: 8.712, pricePerGallon: null, totalCost: null },
-      { gallons: 9.001, pricePerGallon: null, totalCost: null },
-    );
-    expect(merged.gallons).toBe(9.001);
-  });
-
-  test('merging two empty readings stays empty', () => {
-    expect(isEmptyReading(mergePumpReadings(EMPTY_PUMP_READING, EMPTY_PUMP_READING))).toBe(true);
   });
 });
 

@@ -81,11 +81,6 @@ export function backupPromptReason(
   return null;
 }
 
-/** Convenience for callers that only need the yes/no. */
-export function isBackupDue(state: BackupState, fillUpCount: number, now: number): boolean {
-  return backupPromptReason(state, fillUpCount, now) !== null;
-}
-
 /** The state to record once a backup has actually been written. */
 export function afterBackup(fillUpCount: number, now: number): BackupState {
   return { lastExportAt: now, fillUpsAtLastExport: fillUpCount, snoozedUntil: null };

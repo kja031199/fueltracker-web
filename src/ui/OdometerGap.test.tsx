@@ -1,11 +1,10 @@
 import { beforeEach, describe, expect, test } from 'vitest';
-import { makeStore } from '../test/fixtures';
+import { makeStore, saveHasOnboarded } from '../test/fixtures';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FuelTrackerStore } from '../data/store';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { App } from './App';
-import { saveHasOnboarded } from './onboarding';
 
 /**
  * "Did somebody forget to log a fill-up?" in the form (#66): a warning, never a

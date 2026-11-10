@@ -1,11 +1,10 @@
 import { beforeEach, describe, expect, test } from 'vitest';
-import { makeStore, sharingFor } from '../test/fixtures';
+import { makeStore, saveHasOnboarded, sharingFor } from '../test/fixtures';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StubAuthProvider, type AuthUser } from '../data/auth';
 import { InMemorySharingWorld } from '../data/sharing';
 import { App } from './App';
-import { saveHasOnboarded } from './onboarding';
 
 /**
  * A car's row does one thing at a time (#93). The screen kept four ids — which

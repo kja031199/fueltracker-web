@@ -117,15 +117,3 @@ export function hasIdleTimedOut(minutes: number, lastActivityAt: number, now: nu
   const since = lastActivityFrom(lastActivityAt, now);
   return now - since >= normalizeIdleMinutes(minutes) * MINUTE_MS;
 }
-
-/**
- * Milliseconds left before the timeout fires, or `0` if it already has.
- *
- * Never negative. `setTimeout` treats a negative delay as zero anyway, but
- * returning one invites arithmetic elsewhere that reads as "time left".
- */
-export function msUntilIdleTimeout(minutes: number, lastActivityAt: number, now: number): number {
-  const since = lastActivityFrom(lastActivityAt, now);
-  const deadline = since + normalizeIdleMinutes(minutes) * MINUTE_MS;
-  return Math.max(0, deadline - now);
-}

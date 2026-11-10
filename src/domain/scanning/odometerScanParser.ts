@@ -10,6 +10,9 @@
  *
  * Like the pump parser, this is **US-only by design**: the plausible range is
  * in miles.
+ *
+ * **Nothing calls this yet, on purpose** (#96): it is kept for odometer
+ * scanning, #143, and listed as kept in `src/test/reachable.test.ts`.
  */
 
 /** How the candidate sits against the vehicle's recorded history. */

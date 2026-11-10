@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { InMemoryRepository } from './repository';
-import { InMemoryRemoteStore, emptySnapshot, rowsToPush, sendableRows } from './remote';
+import { InMemoryRemoteStore, emptySnapshot, sendableRows } from './remote';
 import type { RawSnapshot, RemoteStore } from './remote';
 import { FuelTrackerStore } from './store';
 import { MonotonicClock } from './syncClock';
 import { SCHEMA_VERSION, type FillUpRecord, type VehicleRecord } from './records';
 import { validateSnapshot } from './recordValidation';
-import { isRefusal, partitionBySchema, preserveLocalReceipts, syncOnce } from './sync';
+import { isRefusal, newerThanKnown, partitionBySchema, preserveLocalReceipts, syncOnce } from './sync';
 import { InMemorySyncState } from './syncState';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import type { Snapshot } from './records';
@@ -94,25 +94,32 @@ async function pulled(remote: InMemoryRemoteStore): Promise<Snapshot> {
   return validateSnapshot(await remote.pull()).snapshot;
 }
 
-describe('rowsToPush', () => {
-  it('sends a row the remote has never seen', () => {
-    expect(rowsToPush([vehicle()], [])).toHaveLength(1);
+describe('newerThanKnown', () => {
+  // What a push sends: rows newer than the version the account is known to
+  // hold (it replaced `rowsToPush`, which compared against a full pull, #96).
+  const known = (updatedAt: number) => ({ 'vehicles/v1': updatedAt });
+
+  it('sends a row the account is not known to hold', () => {
+    expect(newerThanKnown('vehicles', [vehicle({ id: 'v1' })], {})).toHaveLength(1);
   });
 
-  it('sends a row the remote holds an older copy of', () => {
-    const pushed = rowsToPush([vehicle({ updatedAt: 200 })], [vehicle({ updatedAt: 100 })]);
-    expect(pushed).toHaveLength(1);
+  it('sends a row the account holds an older copy of', () => {
+    expect(newerThanKnown('vehicles', [vehicle({ id: 'v1', updatedAt: 200 })], known(100))).toHaveLength(1);
   });
 
   it('spends no write when both sides already agree', () => {
     // Equal, not greater. Re-writing an identical row would burn a quota write
     // to change nothing, and the free tier's daily write budget is the thing
     // that runs out first.
-    expect(rowsToPush([vehicle({ updatedAt: 100 })], [vehicle({ updatedAt: 100 })])).toEqual([]);
+    expect(newerThanKnown('vehicles', [vehicle({ id: 'v1', updatedAt: 100 })], known(100))).toEqual([]);
   });
 
-  it('does not send a row the remote holds a newer copy of', () => {
-    expect(rowsToPush([vehicle({ updatedAt: 100 })], [vehicle({ updatedAt: 200 })])).toEqual([]);
+  it('does not send a row the account holds a newer copy of', () => {
+    expect(newerThanKnown('vehicles', [vehicle({ id: 'v1', updatedAt: 100 })], known(200))).toEqual([]);
+  });
+
+  it('keys by collection, so a fill-up with a vehicle’s id is its own row', () => {
+    expect(newerThanKnown('fillUps', [vehicle({ id: 'v1', updatedAt: 100 })], known(200))).toHaveLength(1);
   });
 });
 
@@ -596,8 +603,8 @@ describe('syncOnce', () => {
       //   2. it syncs to the account,
       //   3. this device edits the same row afterwards,
       //   4. this device pulls — and its own edit is overwritten, because the
-      //      skewed row still compares as newer. rowsToPush then declines to
-      //      push the edit, since local is no longer greater than remote.
+      //      skewed row still compares as newer. The push then declines to
+      //      send the edit, since local is no longer newer than the account.
       // The edit did not conflict, did not warn, and did not come back.
       const clock = fakeClock();
       const { store, repos: r } = storeWith(clock);

@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { makeStore } from '../test/fixtures';
+import { makeStore, saveHasOnboarded } from '../test/fixtures';
 import { readFileSync } from 'node:fs';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FuelTrackerStore } from '../data/store';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { App } from './App';
-import { saveHasOnboarded } from './onboarding';
 import { LinkOut } from './LinkOut';
 import { MetricLineChart } from './charts/MetricLineChart';
 import { sourcesUnder } from '../test/imports';

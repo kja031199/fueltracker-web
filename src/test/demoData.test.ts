@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest';
-import { makeStore } from '../test/fixtures';
+import { makeStore } from './fixtures';
 import { computeFuelStatistics } from '../domain/fuelStatistics';
-import { FuelTrackerStore, toStats } from './store';
+import { FuelTrackerStore } from '../data/store';
+import { toStats } from '../data/records';
 import { seedDemoData } from './demoData';
 
 const ANCHOR = new Date(2025, 5, 15);

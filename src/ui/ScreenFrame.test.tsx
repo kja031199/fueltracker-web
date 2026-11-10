@@ -1,11 +1,10 @@
 import { beforeEach, describe, expect, test } from 'vitest';
-import { makeStore } from '../test/fixtures';
+import { makeStore, saveHasOnboarded } from '../test/fixtures';
 import type { ReactElement } from 'react';
 import { render, screen } from '@testing-library/react';
 import { StubAuthProvider } from '../data/auth';
 import type { PushSummary, RawSnapshot, RemoteStore } from '../data/remote';
 import { App } from './App';
-import { saveHasOnboarded } from './onboarding';
 import { StorageErrorScreen } from './StorageErrorScreen';
 import { WrongProjectScreen } from './WrongProjectScreen';
 import { LinkScreen } from './LinkScreen';

@@ -11,6 +11,19 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-10
 
+- **The weekday price chart starts the week where your calendar does: on
+  Monday in Germany, on Sunday in the US.** Nothing else you see changes.
+  *Technical:* dead code removed — the never-shown vehicle comparison,
+  `store.submitFillUp` (tests now queue through `receiveSubmission`),
+  `rowsToPush`, two test-only length constants, a re-export, and three unused
+  domain helpers. `firstWeekdayForLocale`, computed and never called, now
+  orders the chart. The odometer parser is kept for
+  [#143](https://github.com/kja031199/fueltracker-web/issues/143);
+  `saveHasOnboarded` and the demo history moved to `src/test/`; misplaced doc
+  comments fixed. `src/test/reachable.test.ts` walks the imports from
+  `main.tsx` and refuses a production file nothing reaches. Part one of two on
+  #96.
+  [#96](https://github.com/kja031199/fueltracker-web/issues/96) · [PR #144](https://github.com/kja031199/fueltracker-web/pull/144)
 - **The weekday price chart names days in your browser's language ("Di"
   for Tuesday in German), like the dates beside it.** A date the app cannot
   read now shows "—" instead of "Invalid Date". Everything else reads as
