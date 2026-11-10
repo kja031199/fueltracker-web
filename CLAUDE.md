@@ -643,6 +643,14 @@ npm run test:build   # vite build, then the *.build.test.ts files
   `format.ts`** (`oneCopy.test.ts`): use `formatDate(ms, locale)` and
   `US_STYLE.locale`. The weekday insight's day names stay English because the
   sentence is English; words move to the UI in #94's later parts.
+- **Counts go through `countOf(n, { one, other }, locale)`** (#94, `format.ts`):
+  `# row was` / `# rows were`, the `#` written in the display locale. The form
+  is chosen by **English** plural rules, because the words are English — the
+  reader's rules would give "0 row was" in French. Put the whole agreeing
+  phrase in each form ("…before it" / "…before them"), not a second ternary.
+  No "(s)" and no `=== 1 ? '…'` ternary anywhere (`oneCopy.test.ts`).
+  `useSync`'s notes sit above the display provider, so their counts use US
+  digits until #94 moves those sentences to the screen.
 - **The selected car stays in `useAppData`** (#93 asked; kept on purpose).
   It is applied in the same `setShown` as that car's fill-ups (#88); held as
   UI state outside, it would change a render before them and bring back one

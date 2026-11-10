@@ -528,6 +528,6 @@ describe('what a shared car’s sync says (#84)', () => {
 
     open(world, sam, 'settings');
 
-    expect(await screen.findByText(/receipt photo\(s\) were too large to sync/i, {}, WAIT)).toBeInTheDocument();
+    expect(await screen.findByText(/1 receipt photo was too large to sync/i, {}, WAIT)).toBeInTheDocument();
   }, 15_000);
 });

@@ -12,7 +12,7 @@ import {
   weekdayPrices,
 } from '../domain/weekdayPricePattern';
 import { distance as distanceUnits, economy as economyUnits, volume as volumeUnits } from '../domain/units';
-import { currency, distance, fuelPrice, numberFormat } from '../domain/format';
+import { countOf, currency, distance, fuelPrice, numberFormat } from '../domain/format';
 import { mapValues } from '../domain/models';
 import { MetricLineChart } from './charts/MetricLineChart';
 import { MonthlyBarChart } from './charts/MonthlyBarChart';
@@ -222,10 +222,15 @@ export function DashboardScreen(): ReactElement {
 
           {stats.suspectSegmentIds.size > 0 && (
             <p className="warning space-above">
-              {stats.suspectSegmentIds.size} fill-up
-              {stats.suspectSegmentIds.size === 1 ? ' looks' : 's look'} like a fill-up went
-              unlogged before {stats.suspectSegmentIds.size === 1 ? 'it' : 'them'} — the economy
-              reads far higher than usual. Marking &ldquo;missed logging a fill&rdquo; on that entry
+              {countOf(
+                stats.suspectSegmentIds.size,
+                {
+                  one: '# fill-up looks like a fill-up went unlogged before it',
+                  other: '# fill-ups look like a fill-up went unlogged before them',
+                },
+                locale,
+              )}{' '}
+              — the economy reads far higher than usual. Marking &ldquo;missed logging a fill&rdquo; on that entry
               keeps it out of your averages.
             </p>
           )}

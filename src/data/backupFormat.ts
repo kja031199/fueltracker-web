@@ -24,6 +24,7 @@
 
 import type { FillUpRecord, Snapshot } from './records';
 import { SCHEMA_VERSION } from './records';
+import { countOf } from '../domain/format';
 import { MAX_RECEIPT_BYTES } from '../domain/fuelEntryDraft';
 import { totalCost } from '../domain/models';
 import { validateFillUp, validatePending, validateVehicle } from './recordValidation';
@@ -238,7 +239,7 @@ export function parseJsonBackup(text: string): ParseResult<Snapshot> {
   );
   if (tooNew > 0) {
     skipped.push(
-      `${tooNew === 1 ? '1 row was' : `${tooNew} rows were`} written by a newer version of FuelTracker and ` +
+      `${countOf(tooNew, { one: '# row was', other: '# rows were' })} written by a newer version of FuelTracker and ` +
         'skipped. Update the app, then import this file again.',
     );
   }

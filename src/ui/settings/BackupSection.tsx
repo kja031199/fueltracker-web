@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { useId, useRef, useState } from 'react';
-import { describeSince } from '../../domain/format';
+import { countOf, describeSince } from '../../domain/format';
 import { useBackupStatus, useFuelLog } from '../fuelLog';
 import { useDisplay } from '../session';
 
@@ -15,6 +15,8 @@ export function BackupSection(): ReactElement {
   const { saveBackup, exportCsv, importFile } = useFuelLog();
   const { lastBackupAt } = useBackupStatus();
   const { locale } = useDisplay().style;
+  const fillUps = (n: number): string => countOf(n, { one: '# fill-up', other: '# fill-ups' }, locale);
+  const vehicles = (n: number): string => countOf(n, { one: '# vehicle', other: '# vehicles' }, locale);
   const fileInput = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [problems, setProblems] = useState<readonly string[]>([]);
@@ -23,14 +25,14 @@ export function BackupSection(): ReactElement {
     const saved = await saveBackup();
     setProblems([]);
     setStatus(
-      `Saved a backup of ${saved.vehicles} vehicle(s) and ${saved.fillUps} fill-up(s).`,
+      `Saved a backup of ${vehicles(saved.vehicles)} and ${fillUps(saved.fillUps)}.`,
     );
   }
 
   async function exportSpreadsheet(): Promise<void> {
     const count = await exportCsv();
     setProblems([]);
-    setStatus(`Saved ${count} fill-up(s) as CSV.`);
+    setStatus(`Saved ${fillUps(count)} as CSV.`);
   }
 
   async function chooseFile(file: File): Promise<void> {
@@ -38,8 +40,8 @@ export function BackupSection(): ReactElement {
     setStatus(
       summary === null
         ? null
-        : `Imported ${summary.fillUpsWritten} fill-up(s) and ${summary.vehiclesWritten} vehicle(s). ` +
-            `${summary.skippedOlder} row(s) were already up to date.`,
+        : `Imported ${fillUps(summary.fillUpsWritten)} and ${vehicles(summary.vehiclesWritten)}. ` +
+            `${countOf(summary.skippedOlder, { one: '# row was', other: '# rows were' }, locale)} already up to date.`,
     );
     setProblems(found);
   }
@@ -95,7 +97,7 @@ export function BackupSection(): ReactElement {
 
       {problems.length > 0 && (
         <div className="warning space-above">
-          <strong>{problems.length} row(s) could not be imported:</strong>
+          <strong>{countOf(problems.length, { one: '# row', other: '# rows' }, locale)} could not be imported:</strong>
           <ul className="indent-list">
             {problems.slice(0, 10).map((problem) => (
               <li key={problem}>{problem}</li>

@@ -50,7 +50,7 @@ describe('exporting', () => {
 
     await user.click(screen.getByRole('button', { name: /export backup \(json\)/i }));
 
-    expect(await screen.findByRole('status')).toHaveTextContent(/1 vehicle\(s\) and 1 fill-up\(s\)/);
+    expect(await screen.findByRole('status')).toHaveTextContent(/a backup of 1 vehicle and 1 fill-up\./);
     await waitFor(() => expect(captured).toHaveLength(1));
     expect(captured[0]!.name).toMatch(/^fueltracker-\d{4}-\d{2}-\d{2}\.json$/);
     expect(captured[0]!.text).toContain('fueltracker-backup');
@@ -119,7 +119,7 @@ describe('importing', () => {
     await waitFor(async () => expect(await target.vehicles()).toHaveLength(1));
     const restored = await target.vehicles();
     expect(await target.fillUps(restored[0]!.id)).toHaveLength(1);
-    expect(await screen.findByRole('status')).toHaveTextContent(/imported 1 fill-up\(s\)/i);
+    expect(await screen.findByRole('status')).toHaveTextContent(/imported 1 fill-up and/i);
   });
 
   test('a file that is not a backup is refused with a reason', async () => {
@@ -143,7 +143,7 @@ describe('importing', () => {
       'f2,v1,2025-01-20T00:00:00Z,10400,0,3.5\n';
     await importFile(user, new File([csv], 'export.csv', { type: 'text/csv' }));
 
-    expect(await screen.findByText(/1 row\(s\) could not be imported/i)).toBeInTheDocument();
+    expect(await screen.findByText(/1 row could not be imported/i)).toBeInTheDocument();
     expect(screen.getByText(/positive numbers/i)).toBeInTheDocument();
     // ...and the good row still landed.
     await waitFor(async () => expect(await store.fillUps('v1')).toHaveLength(1));

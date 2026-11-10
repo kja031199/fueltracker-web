@@ -168,7 +168,14 @@ describe('formatReport', () => {
       { directive: 'connect-src', blockedURI: 'https://a.example/x', sample: '', count: 9 },
     ]);
     expect(report).toMatch(/1 distinct/i);
-    expect(report).toMatch(/9/);
+    expect(report).toMatch(/9 events\./);
+  });
+
+  test('one event is one event, not "event(s)" (#94)', () => {
+    const report = formatReport([
+      { directive: 'connect-src', blockedURI: 'https://a.example/x', sample: '', count: 1 },
+    ]);
+    expect(report).toMatch(/1 distinct, 1 event\./);
   });
 });
 

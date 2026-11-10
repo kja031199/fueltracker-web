@@ -235,7 +235,17 @@ describe('the dashboard', () => {
       await store.addFillUp(draft({ date: new Date(2025, 1, 1), odometer: 14_800 }), vehicleId);
     }, 'dashboard');
 
-    expect(await screen.findByText(/looks like a fill-up went unlogged/i)).toBeInTheDocument();
+    expect(await screen.findByText(/^1 fill-up looks like a fill-up went unlogged before it/i)).toBeInTheDocument();
+  });
+
+  test('two suspect gaps are said in the plural (#94)', async () => {
+    await setUp(async (store, vehicleId) => {
+      // Two 4,000-mile jumps among 400-mile fills.
+      for (const [day, odometer] of [[1, 10_000], [11, 10_400], [21, 10_800], [31, 14_800], [41, 15_200], [51, 19_200]] as const) {
+        await store.addFillUp(draft({ date: new Date(2025, 0, day), odometer }), vehicleId);
+      }
+    }, 'dashboard');
+    expect(await screen.findByText(/^2 fill-ups look like a fill-up went unlogged before them/i)).toBeInTheDocument();
   });
 });
 

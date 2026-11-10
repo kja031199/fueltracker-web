@@ -48,6 +48,7 @@ import {
   storageKey,
   writePreference,
 } from './preferences';
+import { countOf } from '../domain/format';
 
 /** Set to `on` to start recording. Absent or anything else means off. */
 const WATCHING = browserPreference('cspWatch', flagCodec('on'));
@@ -191,7 +192,7 @@ export function formatReport(list: readonly CspViolation[]): string {
     return `  ${row.directive}${which}  ×${row.count}\n      blocked: ${row.blockedURI}${sample}`;
   });
   return [
-    `CSP violations: ${list.length} distinct, ${events} event(s).`,
+    `CSP violations: ${list.length} distinct, ${countOf(events, { one: '# event', other: '# events' })}.`,
     `  ${list.length - candidateOnly} refused now, ${candidateOnly} only by the report-only candidate.`,
     ...lines,
   ].join('\n');
