@@ -114,6 +114,37 @@ describe('recordViolation', () => {
   });
 });
 
+describe('report-only violations (#82)', () => {
+  const one = { directive: 'connect-src', blockedURI: 'https://a.example/x', sample: '' };
+
+  test('are told apart from enforced ones, and counted separately', () => {
+    let list = recordViolation([], one);
+    list = recordViolation(list, { ...one, disposition: 'report' });
+    list = recordViolation(list, { ...one, disposition: 'report' });
+    expect(list).toHaveLength(2);
+    expect(list.map((row) => [row.reportOnly === true, row.count])).toEqual([
+      [false, 1],
+      [true, 2],
+    ]);
+  });
+
+  test('anything but "report" is an enforced refusal', () => {
+    for (const disposition of ['enforce', '', 'REPORT', undefined]) {
+      const [row] = recordViolation([], { ...one, disposition });
+      expect(row?.reportOnly === true, String(disposition)).toBe(false);
+    }
+  });
+
+  test('the report says which is which, and what each means', () => {
+    const report = formatReport(
+      recordViolation(recordViolation([], one), { ...one, directive: 'style-src', disposition: 'report' }),
+    );
+    expect(report).toMatch(/style-src \(report-only\)\s+×1/);
+    expect(report).toMatch(/connect-src\s+×1/);
+    expect(report).toMatch(/1 refused now, 1 only by the report-only candidate/i);
+  });
+});
+
 describe('formatReport', () => {
   test('says plainly when there is nothing, which is the answer we hope for', () => {
     // This string is what gets pasted back, so "nothing was blocked" has to be
@@ -159,6 +190,14 @@ describe('installCspWatch', () => {
     expect(stored).toHaveLength(1);
     expect(stored[0]?.directive).toBe('connect-src');
     expect(stored[0]?.blockedURI).toBe('https://blocked.example/thing');
+  });
+
+  test('records whether the refusal came from the report-only candidate (#82)', () => {
+    localStorage.setItem(CSP_WATCH_FLAG, 'on');
+    installCspWatch();
+    document.dispatchEvent(violation({ disposition: 'report' }));
+    document.dispatchEvent(violation({ disposition: 'enforce' }));
+    expect(loadViolations().map((row) => row.reportOnly === true)).toEqual([true, false]);
   });
 
   test('keeps what an earlier page load recorded, so a reload does not reset it', () => {

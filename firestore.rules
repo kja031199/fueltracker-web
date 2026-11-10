@@ -69,11 +69,18 @@ service cloud.firestore {
     // The cost, stated: adding somebody is a deploy of this file, and their
     // uid only exists once they have signed in and been refused once.
     // `docs/accounts.md` has the steps.
+    //
+    // **Signed in with Google, and nothing else** (#82). The uid list makes
+    // this moot today, but a second sign-in method switched on by mistake in
+    // the console — email links, anonymous — would mint tokens the uid check
+    // alone cannot tell apart from the real ones. The app only ever signs in
+    // with Google's popup, so its tokens always say `google.com`.
     function allowed() {
       return request.auth != null && request.auth.uid in [
         'Vz0Y9I7XU0TX6L1yvfzw8BJnIfG2',
         'h2VnTaHnwnWWF4gtPvXTQcJcGAC2'
-      ];
+      ]
+        && request.auth.token.firebase.sign_in_provider == 'google.com';
     }
 
     // A member of `owner`'s car `vehicleId` (#66): an allowlisted account with

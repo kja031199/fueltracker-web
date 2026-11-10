@@ -77,7 +77,9 @@ function tesseractAssets(): Plugin {
         const prefix = `${base}${TESSERACT_ASSETS}`;
         const path = (request.url ?? '').split('?')[0] ?? '';
         const file = path.startsWith(prefix) ? path.slice(prefix.length) : null;
-        if (file === null || !(file in TESSERACT_FILES)) return next();
+        // Own keys only (#82): `in` also finds what every object inherits, so
+        // `/tesseract/<v>/constructor` reached `require.resolve(undefined)`.
+        if (file === null || !Object.hasOwn(TESSERACT_FILES, file)) return next();
         response.setHeader(
           'Content-Type',
           file.endsWith('.js') ? 'text/javascript' : 'application/octet-stream',

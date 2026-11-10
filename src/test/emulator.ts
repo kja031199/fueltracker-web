@@ -9,7 +9,12 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
+import {
+  initializeTestEnvironment,
+  type RulesTestContext,
+  type RulesTestEnvironment,
+  type TokenOptions,
+} from '@firebase/rules-unit-testing';
 
 /**
  * The accounts the deployed rules allow, read out of the rules file itself.
@@ -36,4 +41,15 @@ export function rulesEnvironment(projectId: string): Promise<RulesTestEnvironmen
     projectId,
     firestore: { rules: readFileSync('firestore.rules', 'utf8'), host, port: Number(port) },
   });
+}
+
+/**
+ * Signed in the way the app signs people in: with Google (#82).
+ *
+ * The rules accept only a Google sign-in, and the emulator's default token
+ * claims a `custom` provider — so every context goes through here, and a test
+ * that wants another provider says so in `claims`.
+ */
+export function signedIn(env: RulesTestEnvironment, uid: string, claims: TokenOptions = {}): RulesTestContext {
+  return env.authenticatedContext(uid, { firebase: { sign_in_provider: 'google.com' }, ...claims });
 }

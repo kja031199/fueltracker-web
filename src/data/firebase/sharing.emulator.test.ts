@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
-import { allowedUidsInRules, rulesEnvironment } from '../../test/emulator';
+import { allowedUidsInRules, rulesEnvironment, signedIn } from '../../test/emulator';
 import type { RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { doc, setDoc, type Firestore } from 'firebase/firestore';
 import { InMemoryRepository } from '../repository';
@@ -76,8 +76,7 @@ describe('sharing through the real rules', () => {
   });
 
   function device(account: Account) {
-    const db = env
-      .authenticatedContext(account.uid, { email: account.email, email_verified: account.emailVerified })
+    const db = signedIn(env, account.uid, { email: account.email, email_verified: account.emailVerified })
       .firestore() as unknown as Firestore;
     const clock = new MonotonicClock();
     const store = new FuelTrackerStore(

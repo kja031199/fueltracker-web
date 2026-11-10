@@ -28,11 +28,12 @@
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { makeStore } from '../../test/fixtures';
-import { allowedUidsInRules, rulesEnvironment } from '../../test/emulator';
+import { allowedUidsInRules, rulesEnvironment, signedIn } from '../../test/emulator';
 import {
   assertFails,
   assertSucceeds,
   type RulesTestEnvironment,
+  type TokenOptions,
 } from '@firebase/rules-unit-testing';
 import {
   Bytes,
@@ -86,14 +87,14 @@ describe('firestore.rules', () => {
   });
 
   it('lets someone read their own fill-up', async () => {
-    const db = env.authenticatedContext(OWNER).firestore();
+    const db = signedIn(env, OWNER).firestore();
     await assertSucceeds(getDoc(doc(db, `users/${OWNER}/fillUps/f1`)));
   });
 
   it('reads nobody\'s account document itself, the owner\'s included (#92)', async () => {
     // The app reads only what is under it. A rule that allowed this covered a
     // document that is never written, and was one more rule to keep right.
-    const db = env.authenticatedContext(OWNER).firestore();
+    const db = signedIn(env, OWNER).firestore();
     await assertFails(getDoc(doc(db, `users/${OWNER}`)));
   });
 
@@ -104,19 +105,37 @@ describe('firestore.rules', () => {
     // be reconciled, and letting one in means the read path meets it later.
     // The positive case now lives in "the shape of what gets written", against
     // records the app actually produces.
-    const db = env.authenticatedContext(OWNER).firestore();
+    const db = signedIn(env, OWNER).firestore();
     await assertFails(setDoc(doc(db, `users/${OWNER}/fillUps/f1`), { gallons: 10 }));
   });
 
   it('refuses to let one person read another person’s fill-up', async () => {
     // The whole point of the file.
-    const db = env.authenticatedContext(STRANGER).firestore();
+    const db = signedIn(env, STRANGER).firestore();
     await assertFails(getDoc(doc(db, `users/${OWNER}/fillUps/f1`)));
   });
 
   it('refuses to let one person write into another person’s log', async () => {
-    const db = env.authenticatedContext(STRANGER).firestore();
+    const db = signedIn(env, STRANGER).firestore();
     await assertFails(setDoc(doc(db, `users/${OWNER}/fillUps/f1`), { gallons: 999 }));
+  });
+
+  it.each(['password', 'anonymous', 'custom', 'phone', 'github.com'] as const)(
+    'refuses an allowlisted uid signed in with %s, not Google (#82)',
+    async (provider) => {
+      // The allowlist is by uid, so today this is moot — but an extra sign-in
+      // method enabled by mistake would mint tokens the uid check alone
+      // cannot tell apart. The rules accept Google's and nothing else.
+      const db = signedIn(env, OWNER, { firebase: { sign_in_provider: provider } }).firestore();
+      await assertFails(getDoc(doc(db, `users/${OWNER}/fillUps/f1`)));
+    },
+  );
+
+  it('refuses a token that names no provider at all', async () => {
+    // Not a token Firebase would mint, which is the point: the rule must refuse
+    // it rather than read a missing field as a match.
+    const db = signedIn(env, OWNER, { firebase: {} } as unknown as TokenOptions).firestore();
+    await assertFails(getDoc(doc(db, `users/${OWNER}/fillUps/f1`)));
   });
 
   it('refuses an unauthenticated read', async () => {
@@ -132,7 +151,7 @@ describe('firestore.rules', () => {
     // so the only thing that can refuse it is `request.auth.uid == uid`. That
     // keeps per-account scoping independently proven now that a second rule
     // guards the door.
-    const db = env.authenticatedContext(OWNER).firestore();
+    const db = signedIn(env, OWNER).firestore();
     await assertFails(getDoc(doc(db, `users/${OWNER}-evil-twin/fillUps/f1`)));
   });
 
@@ -150,12 +169,12 @@ describe('firestore.rules', () => {
      */
 
     it('refuses an account that is not on it, even in its own tree', async () => {
-      const db = env.authenticatedContext(STRANGER).firestore();
+      const db = signedIn(env, STRANGER).firestore();
       await assertFails(getDoc(doc(db, `users/${STRANGER}/fillUps/f1`)));
     });
 
     it('refuses that account a write to its own tree as well', async () => {
-      const db = env.authenticatedContext(STRANGER).firestore();
+      const db = signedIn(env, STRANGER).firestore();
       await assertFails(
         setDoc(doc(db, `users/${STRANGER}/vehicles/v1`), {
           id: 'v1',
@@ -180,7 +199,7 @@ describe('firestore.rules', () => {
         // The strongest form of the scoping assertion, and only possible with
         // two entries: both parties are through the door, so the allowlist
         // cannot be what refuses this — only `request.auth.uid == uid` can.
-        const db = env.authenticatedContext(SECOND!).firestore();
+        const db = signedIn(env, SECOND!).firestore();
         await assertFails(getDoc(doc(db, `users/${OWNER}/fillUps/f1`)));
         await assertFails(
           setDoc(doc(db, `users/${OWNER}/vehicles/v1`), {
@@ -199,7 +218,7 @@ describe('firestore.rules', () => {
     );
 
     it.runIf(SECOND !== undefined)('lets the second allowed account use its own tree', async () => {
-      const db = env.authenticatedContext(SECOND!).firestore();
+      const db = signedIn(env, SECOND!).firestore();
       await assertSucceeds(getDoc(doc(db, `users/${SECOND}/fillUps/f1`)));
     });
 
@@ -225,7 +244,7 @@ describe('firestore.rules', () => {
   it('applies the same rule to every collection under a user', async () => {
     // The layout exists so one rule covers all three collections, now and for
     // anything added later. This checks that claim rather than assuming it.
-    const stranger = env.authenticatedContext(STRANGER).firestore();
+    const stranger = signedIn(env, STRANGER).firestore();
     await assertFails(getDoc(doc(stranger, `users/${OWNER}/vehicles/v1`)));
     await assertFails(getDoc(doc(stranger, `users/${OWNER}/pendingFillUps/p1`)));
   });
@@ -233,7 +252,7 @@ describe('firestore.rules', () => {
   it('denies a collection outside the users tree', async () => {
     // Nothing matches it, and Firestore's default is deny — but "I believe the
     // default is deny" is exactly the kind of belief that should be measured.
-    const db = env.authenticatedContext(OWNER).firestore();
+    const db = signedIn(env, OWNER).firestore();
     await assertFails(getDoc(doc(db, 'anythingElse/x')));
   });
 
@@ -241,7 +260,7 @@ describe('firestore.rules', () => {
     // The rules name three collections. Anything else under a user's own tree
     // is still denied, so a stray write cannot invent a place to put data the
     // read path knows nothing about.
-    const db = env.authenticatedContext(OWNER).firestore();
+    const db = signedIn(env, OWNER).firestore();
     await assertFails(setDoc(doc(db, `users/${OWNER}/somethingElse/x`), { id: 'x' }));
   });
 
@@ -304,19 +323,19 @@ describe('firestore.rules', () => {
 
     it('accepts a vehicle exactly as the app writes it', async () => {
       const { vehicle } = await realRecords();
-      const db = env.authenticatedContext(OWNER).firestore();
+      const db = signedIn(env, OWNER).firestore();
       await assertSucceeds(setDoc(doc(db, `users/${OWNER}/vehicles/${vehicle.id}`), { ...vehicle, syncedAt: serverTimestamp() }));
     });
 
     it('accepts a fill-up exactly as the app writes it', async () => {
       const { fillUp } = await realRecords();
-      const db = env.authenticatedContext(OWNER).firestore();
+      const db = signedIn(env, OWNER).firestore();
       await assertSucceeds(setDoc(doc(db, `users/${OWNER}/fillUps/${fillUp.id}`), forWire(fillUp)));
     });
 
     it('accepts a tombstone, which carries no usable measurements', async () => {
       const { tombstone } = await realRecords();
-      const db = env.authenticatedContext(OWNER).firestore();
+      const db = signedIn(env, OWNER).firestore();
       await assertSucceeds(
         setDoc(doc(db, `users/${OWNER}/fillUps/${tombstone.id}`), forWire(tombstone)),
       );
@@ -324,7 +343,7 @@ describe('firestore.rules', () => {
 
     it('accepts a submission exactly as the app writes it', async () => {
       const { pending } = await realRecords();
-      const db = env.authenticatedContext(OWNER).firestore();
+      const db = signedIn(env, OWNER).firestore();
       await assertSucceeds(
         setDoc(doc(db, `users/${OWNER}/pendingFillUps/${pending.id}`), forWire(pending)),
       );
@@ -334,7 +353,7 @@ describe('firestore.rules', () => {
       // A row stored under the wrong name is a row a merge would reconcile
       // against the wrong history.
       const { fillUp } = await realRecords();
-      const db = env.authenticatedContext(OWNER).firestore();
+      const db = signedIn(env, OWNER).firestore();
       await assertFails(setDoc(doc(db, `users/${OWNER}/fillUps/some-other-id`), forWire(fillUp)));
     });
 
@@ -347,7 +366,7 @@ describe('firestore.rules', () => {
       // unwritable, and the reserved names (`.`, `..`, `__…__`) are refused by
       // the database itself.
       const { fillUp } = await realRecords();
-      const db = env.authenticatedContext(OWNER).firestore();
+      const db = signedIn(env, OWNER).firestore();
       await assertFails(
         setDoc(doc(db, `users/${OWNER}/fillUps/legal-name`), { ...forWire(fillUp), id: 'a/b' }),
       );
@@ -357,7 +376,7 @@ describe('firestore.rules', () => {
       // This is the quota protection: without it, a junk field can be inflated
       // to the 1 MiB document cap.
       const { fillUp } = await realRecords();
-      const db = env.authenticatedContext(OWNER).firestore();
+      const db = signedIn(env, OWNER).firestore();
       await assertFails(
         setDoc(doc(db, `users/${OWNER}/fillUps/${fillUp.id}`), {
           ...forWire(fillUp),
@@ -370,7 +389,7 @@ describe('firestore.rules', () => {
       const { fillUp } = await realRecords();
       const partial = { ...forWire(fillUp) } as Record<string, unknown>;
       delete partial.odometer;
-      const db = env.authenticatedContext(OWNER).firestore();
+      const db = signedIn(env, OWNER).firestore();
       await assertFails(setDoc(doc(db, `users/${OWNER}/fillUps/${fillUp.id}`), partial));
     });
 
@@ -383,7 +402,7 @@ describe('firestore.rules', () => {
       ['a non-string station', { station: 42 }],
     ])('refuses %s', async (_label, override) => {
       const { fillUp } = await realRecords();
-      const db = env.authenticatedContext(OWNER).firestore();
+      const db = signedIn(env, OWNER).firestore();
       await assertFails(
         setDoc(doc(db, `users/${OWNER}/fillUps/${fillUp.id}`), { ...forWire(fillUp), ...override }),
       );
@@ -391,7 +410,7 @@ describe('firestore.rules', () => {
 
     it('refuses notes longer than the bound', async () => {
       const { fillUp } = await realRecords();
-      const db = env.authenticatedContext(OWNER).firestore();
+      const db = signedIn(env, OWNER).firestore();
       await assertFails(
         setDoc(doc(db, `users/${OWNER}/fillUps/${fillUp.id}`), {
           ...forWire(fillUp),
@@ -405,7 +424,7 @@ describe('firestore.rules', () => {
       // attempting this, so reaching the rule means something other than the
       // app is writing.
       const { fillUp } = await realRecords();
-      const db = env.authenticatedContext(OWNER).firestore();
+      const db = signedIn(env, OWNER).firestore();
       await assertFails(
         setDoc(doc(db, `users/${OWNER}/fillUps/${fillUp.id}`), {
           ...forWire(fillUp),
@@ -417,7 +436,7 @@ describe('firestore.rules', () => {
     it('still refuses all of that in someone else’s tree', async () => {
       // Shape validation must not have accidentally become the only check.
       const { fillUp } = await realRecords();
-      const db = env.authenticatedContext(STRANGER).firestore();
+      const db = signedIn(env, STRANGER).firestore();
       await assertFails(setDoc(doc(db, `users/${OWNER}/fillUps/${fillUp.id}`), forWire(fillUp)));
     });
   });
@@ -432,7 +451,7 @@ describe('firestore.rules', () => {
      * authenticated instance.
      */
     function emulatorRemote(): FirestoreRemoteStore {
-      return FirestoreRemoteStore.over(env.authenticatedContext(OWNER).firestore() as unknown as Firestore, OWNER);
+      return FirestoreRemoteStore.over(signedIn(env, OWNER).firestore() as unknown as Firestore, OWNER);
     }
 
     it('uploads every row, shortened to what the rules accept', async () => {
@@ -449,7 +468,7 @@ describe('firestore.rules', () => {
       const result = await syncOnce(store, emulatorRemote(), new InMemorySyncState());
 
       expect(result.ok).toBe(true);
-      const db = env.authenticatedContext(OWNER).firestore();
+      const db = signedIn(env, OWNER).firestore();
       const fillUps = (await getDocs(collection(db, 'users', OWNER, 'fillUps'))).docs.map((d) => d.data());
       expect(fillUps).toHaveLength(2);
       expect(fillUps.map((row) => (row['station'] as string).length).sort()).toEqual([0, 200]);
@@ -470,7 +489,7 @@ describe('firestore.rules', () => {
       const result = await syncOnce(store, emulatorRemote(), new InMemorySyncState());
 
       expect(result.ok && result.outcome.pushed.written).toBe(521);
-      const db = env.authenticatedContext(OWNER).firestore();
+      const db = signedIn(env, OWNER).firestore();
       expect((await getDocs(collection(db, 'users', OWNER, 'fillUps'))).size).toBe(520);
     }, 30_000);
 
@@ -496,7 +515,7 @@ describe('firestore.rules', () => {
       const result = await syncOnce(store, emulatorRemote(), new InMemorySyncState());
 
       expect(result.ok).toBe(true);
-      const db = env.authenticatedContext(OWNER).firestore();
+      const db = signedIn(env, OWNER).firestore();
       const stored = (await getDoc(doc(db, 'users', OWNER, 'fillUps', 'f1'))).data();
       expect((stored?.['station'] as string).length).toBe(200);
       expect((stored?.['notes'] as string).length).toBe(4000);
@@ -523,7 +542,7 @@ describe('firestore.rules', () => {
       // copy of the app is refused instead, keeps the change on its device,
       // and sends it once it updates.
       const row = await aFillUp();
-      const db = env.authenticatedContext(OWNER).firestore();
+      const db = signedIn(env, OWNER).firestore();
       const { syncedAt: _omitted, ...unstamped } = wire(row);
       await assertFails(setDoc(doc(db, `users/${OWNER}/fillUps/${row.id}`), unstamped));
     });
@@ -532,7 +551,7 @@ describe('firestore.rules', () => {
       // A client-supplied time could sit below another device's cursor and
       // never be read. Only the server's own clock is trusted.
       const row = await aFillUp();
-      const db = env.authenticatedContext(OWNER).firestore();
+      const db = signedIn(env, OWNER).firestore();
       await assertFails(
         setDoc(doc(db, `users/${OWNER}/fillUps/${row.id}`), { ...wire(row), syncedAt: Timestamp.fromMillis(0) }),
       );
@@ -540,12 +559,12 @@ describe('firestore.rules', () => {
 
     it('accepts the server stamp', async () => {
       const row = await aFillUp();
-      const db = env.authenticatedContext(OWNER).firestore();
+      const db = signedIn(env, OWNER).firestore();
       await assertSucceeds(setDoc(doc(db, `users/${OWNER}/fillUps/${row.id}`), wire(row)));
     });
 
     it('refuses an incremental read of somebody else’s tree', async () => {
-      const db = env.authenticatedContext(STRANGER).firestore();
+      const db = signedIn(env, STRANGER).firestore();
       await assertFails(
         getDocs(query(collection(db, `users/${OWNER}/fillUps`), where('syncedAt', '>', Timestamp.fromMillis(0)))),
       );
@@ -554,7 +573,7 @@ describe('firestore.rules', () => {
     it('the real remote reads back only what changed since its cursor', async () => {
       await env.clearFirestore();
       const remote = FirestoreRemoteStore.over(
-        env.authenticatedContext(OWNER).firestore() as unknown as Firestore,
+        signedIn(env, OWNER).firestore() as unknown as Firestore,
         OWNER,
       );
       const first = await aFillUp();
@@ -578,7 +597,7 @@ describe('firestore.rules', () => {
     it('two syncs through the real remote: the second downloads nothing new', async () => {
       await env.clearFirestore();
       const remote = FirestoreRemoteStore.over(
-        env.authenticatedContext(OWNER).firestore() as unknown as Firestore,
+        signedIn(env, OWNER).firestore() as unknown as Firestore,
         OWNER,
       );
       const store = makeStore();
@@ -614,7 +633,7 @@ describe('firestore.rules', () => {
     }
 
     function ownDb() {
-      return env.authenticatedContext(OWNER).firestore();
+      return signedIn(env, OWNER).firestore();
     }
 
     it('refuses a stamp a year ahead — the lock in #79', async () => {

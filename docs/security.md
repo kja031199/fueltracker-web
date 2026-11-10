@@ -38,6 +38,21 @@ and a test asserts it is the *only* one. That does mean Google can serve
 arbitrary script to this page, which is already true of anybody using Firebase
 Auth's popup flow: there is no supported way to run it without that script.
 
+**A narrower policy is on trial** (#82), served as
+`Content-Security-Policy-Report-Only` beside the enforced one until a run of
+[csp-check.md](csp-check.md) on the live site comes back clean. The enforced
+policy allows any `*.googleapis.com` — Cloud Storage among them, where anybody
+can host a bucket, which would be an exfiltration channel if an injection ever
+appeared — and any `*.firebaseapp.com`. The candidate names what the bundled
+Firebase SDK actually contacts (`firestore`, `identitytoolkit` and
+`securetoken.googleapis.com`), frames only this project's auth domain and
+Google's account chooser, and drops `'unsafe-inline'` from `style-src`: React's
+`style` props go through CSSOM, which CSP does not govern, and the built page
+has no `style=` attribute (a test checks). `csp.build.test.ts` holds the
+candidate to allowing nothing the enforced policy refuses, so promoting it can
+only take permissions away. Once the live check is clean, it replaces the
+enforced policy.
+
 The collector that produced the evidence lives in `src/ui/cspWatch.ts` and
 records nothing until somebody arms it. It stays, because the next change to
 the policy needs the same check: this one cannot be reasoned about from a
@@ -128,7 +143,41 @@ for three reasons together:
 Revisit when `firebase` publishes a release that moves off the affected
 `@grpc/grpc-js`.
 
+The four, for the record, so they are not re-triaged each time `npm audit
+--omit=dev` shows them (#82): `@grpc/grpc-js` 1.9.16 against
+[GHSA-m9gg-hp2v-232j](https://github.com/advisories/GHSA-m9gg-hp2v-232j) and
+[GHSA-f596-whhp-79r4](https://github.com/advisories/GHSA-f596-whhp-79r4)
+(affected `<= 1.13.5`), counted again through `@firebase/firestore`,
+`@firebase/firestore-compat` and `firebase`. The built chunks were grepped
+again: the only `grpc` in them is a Firestore setting's name,
+`grpcFlowControlWindow`, not the library. **An `overrides` entry forcing
+`@grpc/grpc-js >= 1.13.6` was considered and not added**: it would run
+Firestore's Node transport — used here only by the rules tests — on a version
+`@firebase/firestore` was never released against, to silence advisories about
+a server this project does not run.
+
 **Tried and rejected:** `vite-plugin-pwa` 1 → 2, on the theory that it would
 pull a newer workbox and clear eight findings at once. It does not — 2.0.0
 depends on the same `workbox-build` 7.4.1. A major version bump with no security
 benefit is risk paid for nothing, so it was reverted.
+
+## Known gaps, accepted for now (#82)
+
+**No per-account quota.** The rules bound every *document* — its fields, its
+text, a receipt to 700 KB — but not how *many* an account may write. An
+allowlisted person, or a member of a shared car, can create as many fill-ups,
+receipts or invitations as they like, and spend the owner's free-plan quota
+doing it. The allowlist is what keeps this theoretical: everybody who can
+write at all was let in by name. Invitations have deterministic ids
+(`owner__car__email`), so the same invitation cannot be made twice, but one per
+address is still unbounded. The next steps, if the allowlist ever grows past
+people who are trusted: a cap enforced through deterministic ids (say, invites
+per car), and App Check, which proves a request came from this app.
+
+**`exifr` reads untrusted files on the main thread.** It parses the photo
+somebody picks, to suggest a date, and has had no release in years. It is
+loaded lazily, only for a photo, and only its `mini` build; what it parses
+never reaches the database. The decompression-bomb gap this shares with image
+decoding is written down in `src/ui/receiptImage.ts`. Replacing it, or moving
+the parse into a worker so a hostile file can only stall that, is the change to
+make when this code is next touched.

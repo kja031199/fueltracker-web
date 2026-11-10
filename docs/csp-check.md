@@ -90,6 +90,11 @@ kind of work once.
 
 ### 3. Report
 
+While a **report-only candidate** is being tried (#82), its refusals are
+recorded too and marked `(report-only)`: those are what *would* break if it
+were enforced, while the unmarked ones are refused on the live site right now.
+The first line of the report counts each.
+
 ```js
 __fuelTrackerCsp.report()
 ```
@@ -135,5 +140,7 @@ header may be served **alongside** the enforced one — that is how a stricter
 candidate gets tested. `src/ui/csp.build.test.ts` requires the enforcing header to be
 present, so it cannot be quietly replaced by a report-only one again.
 
-The obvious next tightening is dropping `'unsafe-inline'` from `style-src`,
-which the app's inline `style` attributes currently require.
+**On trial now** (#82): exact hosts in place of `*.googleapis.com` and
+`*.firebaseapp.com`, and `style-src 'self'` without `'unsafe-inline'`, served
+as the report-only candidate. A clean run of the flows above — no
+`(report-only)` lines — is what promotes it to the enforced policy.

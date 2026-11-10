@@ -11,6 +11,19 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-10
 
+- **No change you'll see: the database accepts only a Google sign-in, and a
+  stricter content policy is on trial before it is switched on.** The first
+  step of a security hardening pass.
+  *Technical:* `allowed()` in `firestore.rules` now also requires
+  `sign_in_provider == 'google.com'` (emulator tests for five other
+  providers). A narrower CSP — exact Google hosts instead of
+  `*.googleapis.com`/`*.firebaseapp.com`, no `'unsafe-inline'` styles — is
+  served report-only beside the enforced one, and the CSP watcher marks its
+  refusals. A CSV cell with whitespace before `=`, `+`, `-` or `@` is now
+  guarded too; the dev server's reader route uses `Object.hasOwn`. Docs: the
+  fork deploy key is the least-privilege account, and the quota, `exifr` and
+  `npm audit` gaps are written down.
+  [#82](https://github.com/kja031199/fueltracker-web/issues/82) · [PR #136](https://github.com/kja031199/fueltracker-web/pull/136)
 - **Opening a fill-up link now shows you the fill-up and waits for you to queue
   it, and on a shared car you can see each person's email, so nobody can pass
   as someone else.** Names a link carries are marked as what the sender says,

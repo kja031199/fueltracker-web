@@ -348,6 +348,24 @@ describe('CSV is escaped for the spreadsheet as well as for the parser', () => {
     expect(cell.startsWith("'")).toBe(true);
   });
 
+  test.each([
+    ['a space before =', ' =HYPERLINK("http://evil.example","click")'],
+    ['spaces before +', '   +1+1'],
+    ['a space before -', ' -1+1'],
+    ['a space before @', ' @SUM(A1)'],
+    ['a non-breaking space before =', '\u00a0=1+1'],
+    ['a newline before =', '\n=1+1'],
+  ])('neutralises a formula behind leading whitespace: %s (#82)', (_label, station) => {
+    // Some importers trim a cell and then evaluate what is left, so blank
+    // space in front of a formula character hides nothing.
+    expect(cellOf(fillUp('f1', { station }), 'station').startsWith("'")).toBe(true);
+  });
+
+  test('leaves leading space in front of ordinary text alone', () => {
+    expect(cellOf(fillUp('f1', { station: ' Shell' }), 'station')).toBe(' Shell');
+    expect(cellOf(fillUp('f1', { station: '  7-Eleven' }), 'station')).toBe('  7-Eleven');
+  });
+
   test('neutralises it in the notes as well, not just the station', () => {
     const cell = cellOf(fillUp('f1', { notes: '=1+1' }), 'notes');
     expect(cell.startsWith("'")).toBe(true);
@@ -365,6 +383,9 @@ describe('CSV is escaped for the spreadsheet as well as for the parser', () => {
     ['an apostrophe of its own', "'round the corner"],
     ['an apostrophe in front of a formula', "'=1+1"],
     ['two apostrophes in front of a formula', "''=1+1"],
+    ['a space in front of a formula', ' =1+1'],
+    ['an apostrophe, then a space, then a formula', "' =1+1"],
+    ['a space in front of a dash', ' - topped up'],
   ])('round-trips %s unchanged', (_label, station) => {
     // The escape has to be reversible or an export/import cycle corrupts
     // somebody's data — which would be a worse bug than the one being fixed.
