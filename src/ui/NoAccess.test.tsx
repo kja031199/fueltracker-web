@@ -1,7 +1,6 @@
-// @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { makeStore } from '../test/fixtures';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StubAuthProvider } from '../data/auth';
 import type { PushSummary, RawSnapshot, RemoteStore } from '../data/remote';
@@ -66,8 +65,6 @@ function signedIn(): StubAuthProvider {
 beforeEach(() => {
   localStorage.clear();
 });
-
-afterEach(cleanup);
 
 describe('a signed-in account that is not on the allowlist', () => {
   test('is told so, instead of being welcomed', async () => {

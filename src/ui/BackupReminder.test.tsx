@@ -1,7 +1,6 @@
-// @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { makeStore } from '../test/fixtures';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FuelTrackerStore } from '../data/store';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
@@ -40,8 +39,6 @@ beforeEach(() => {
   Object.defineProperty(URL, 'createObjectURL', { value: vi.fn(() => 'blob:x'), writable: true });
   Object.defineProperty(URL, 'revokeObjectURL', { value: vi.fn(), writable: true });
 });
-
-afterEach(cleanup);
 
 describe('the backup reminder', () => {
   test('is not shown to someone with barely any data', async () => {

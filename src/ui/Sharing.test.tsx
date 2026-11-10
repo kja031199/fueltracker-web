@@ -1,5 +1,4 @@
-// @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { beforeEach, describe, expect, test } from 'vitest';
 import { makeStore, sharingFor } from '../test/fixtures';
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -59,8 +58,6 @@ beforeEach(() => {
   localStorage.clear();
   window.history.replaceState(null, '', '/');
 });
-
-afterEach(cleanup);
 
 describe('sharing a car', () => {
   test('the owner invites from the Vehicles screen, and is told what it exposes', async () => {

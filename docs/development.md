@@ -9,20 +9,21 @@ an AI assistant working in this repository, read
 ```bash
 npm install
 npm run dev        # vite dev server
-npm test           # vitest: the unit tests, which need nothing but Node
+npm test           # vitest: the unit and DOM tests, which need nothing but Node
 npm run test:build # build, then test the built site in dist/
 npm run test:rules # the rules tests, on the Firestore emulator (see below)
 npm run lint       # oxlint: the two React hooks rules, nothing else
-npm run typecheck  # tsc --noEmit
+npm run typecheck  # tsc -b: the app and the tests, as two projects
 npm run build      # typecheck, then a production build
 ```
 
-The tests are three Vitest projects, and a file's **name** says which one it
+The tests are four Vitest projects, and a file's **name** says which one it
 is in (#97):
 
 | Project | Files | Run with | Needs |
 |---|---|---|---|
-| `unit` | every other `*.test.ts(x)` | `npm test` | nothing but Node |
+| `unit` | every other `*.test.ts`, on Node | `npm test` | nothing but Node |
+| `dom` | every `*.test.tsx`, and `*.dom.test.ts`, on jsdom | `npm test` | nothing but Node |
 | `build` | `*.build.test.ts` — they read `dist/` | `npm run test:build` | a build, which the script makes first |
 | `rules` | `*.emulator.test.ts` | `npm run test:rules` | the Firestore emulator, which the script starts; install its CLI once with `npm ci --prefix .github/firebase-cli` |
 
@@ -34,10 +35,20 @@ fails on a file that reads `dist/` or imports `src/test/emulator.ts` without
 the matching name, and on one that runs in no project or in two. A single file
 runs on its own as usual: `npx vitest run src/ui/App.test.tsx`.
 
-Component tests opt into a DOM per file with a `@vitest-environment jsdom`
-docblock. The domain and storage suites stay on the node environment, which
-starts faster and needs nothing a browser provides — the cost of a DOM is paid
-only where it buys something.
+The project chooses the environment: component tests get jsdom from `dom`,
+and the domain and storage suites stay on Node in `unit`, which starts faster
+and needs nothing a browser provides — the cost of a DOM is paid only where it
+buys something. No file sets its own with a `@vitest-environment` docblock.
+
+Each test starts clean without asking: the config restores spies, stubbed
+globals and stubbed env before every test (`restoreMocks`, `unstubGlobals`,
+`unstubEnvs`), and Testing Library unmounts after every test.
+`src/test/isolation.test.tsx` proves it, and `projects.test.ts` refuses the
+hand-written versions — and a write to a prototype, which nothing restores;
+spy on it instead.
+
+The type checker has two projects (`tsconfig.app.json`, `tsconfig.test.json`),
+so app code cannot use test globals or Node's `process`.
 
 ## Automated checks
 
@@ -296,6 +307,7 @@ Recorded so a regression in the tests themselves is visible:
 | Faster tests (#97), still catching: the timers not passed on / a write that schedules no sync / a failed write still scheduling one / the same invitations re-rendering / every focus syncing / invitations shown to an unverified address / decoding a receipt before its bound | 14 / 14 / 1 / 1 / 1 / 1 / 1 |
 | Shared fixtures (#97): `makeStore` ignoring its author / its clock / a number not read as the odometer / a file's defaults beating a test's changes / a refused fixture returned as null / a signed-in user shared as unverified / the guard missing an arrow-function copy / a copy planted back | 5 / 1 / 7 / 5 / 1 / 11 / 1 / 1 |
 | Test projects (#97): unit also running the emulator tests / rules running a directory again / rules without its prerequisite / build without its prerequisite / a blank emulator host accepted / an empty `dist/` accepted / the error stack left to Vitest / `npm test` running every project / `test:build` not building / `test:rules` running a directory / the CI rules job calling vitest on a path / CI building without testing the build / the deploy shipping an untested build / `csp.build.test.ts` renamed back / an emulator test named as a unit test / a pure test named as an emulator test | 4 / 4 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 2 / 1 / 2 / 1 / 1 / 1 |
+| Isolation and types (#97): spies not restored / globals not unstubbed / env not unstubbed / `globals` off, so no automatic unmount / the `dom` project on Node / `unit` also taking the `.tsx` tests / `.dom.test.ts` files in no project / a docblock planted back / a hand `cleanup` planted back / a hand restore planted back / a prototype assigned again / app code given Node types / app code given test globals / tests left in the app project / `typecheck` checking nothing / `build` checking nothing / `npm test` leaving out `dom` | 2 / 2 / 2 / 2 / 1 / 31 / 7 / 1 / 1 / 1 / 1 / 3 / 3 / 1 / 1 / 1 / 1 |
 
 Equivalent, and kept as a backstop: `shape()` without its `hasAll`. Every
 required field is also read by a clause of its own, and reading a missing field

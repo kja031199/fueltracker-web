@@ -1,8 +1,7 @@
-// @vitest-environment jsdom
-import { afterEach, describe, expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { draft, makeStore } from '../test/fixtures';
 import type { ReactElement } from 'react';
-import { act, cleanup, render, waitFor } from '@testing-library/react';
+import { act, render, waitFor } from '@testing-library/react';
 import { InMemoryRepository } from '../data/repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
 import { InMemoryRemoteStore } from '../data/remote';
@@ -26,8 +25,6 @@ import type { FillUpSummary } from '../data/records';
  * that follows a save. About ten commits of the whole tree per fill-up, and
  * for a moment the selected car and the fill-ups shown were different cars'.
  */
-
-afterEach(cleanup);
 
 /**
  * Lets React apply what has already resolved. Not a sleep (#97): every test

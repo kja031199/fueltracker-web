@@ -1,8 +1,7 @@
-// @vitest-environment jsdom
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { draft, makeStore } from '../test/fixtures';
 import type { ReactNode } from 'react';
-import { act, cleanup, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import type { FillUpRecord } from '../data/records';
 import { InMemoryRemoteStore } from '../data/remote';
 import { FuelTrackerStore } from '../data/store';
@@ -24,8 +23,6 @@ import { InMemoryShareLedger } from '../data/shareLedger';
  * where somebody remembered. These pin it once, for every action, at the
  * context — which is the only thing a screen can now write through.
  */
-
-afterEach(cleanup);
 
 interface Harness {
   readonly store: FuelTrackerStore;

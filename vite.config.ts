@@ -17,6 +17,8 @@ const base = process.env.PAGES_BASE ?? '/';
  */
 const probe = process.env.OCR_PROBE === '1';
 
+/** `.ts` tests that need a browser DOM: with every `.tsx` test, the `dom` project. */
+const DOM_TESTS = 'src/**/*.dom.test.ts';
 /** Tests that run against the Firestore emulator: the `rules` project. */
 const EMULATOR_TESTS = 'src/**/*.emulator.test.{ts,tsx}';
 /** Tests that read the built site in `dist/`: the `build` project. */
@@ -194,23 +196,39 @@ export default defineConfig({
     },
   },
   test: {
+    // Also what makes Testing Library unmount after every test: it registers
+    // that cleanup only when it finds a global `afterEach` as it loads.
     globals: true,
-    // Node by default: the domain and data suites need no DOM and start
-    // faster without one. Component tests opt in per file with a
-    // `@vitest-environment jsdom` docblock, so the cost is paid only where
-    // it buys something.
+    // One test's spies, stubbed globals and stubbed env never reach the next
+    // (#97). These used to be restored by hand, in some files and not others.
+    restoreMocks: true,
+    unstubGlobals: true,
+    unstubEnvs: true,
+    // Node unless a project says otherwise: the domain and data suites need no
+    // DOM and start faster without one.
     environment: 'node',
     setupFiles: ['src/test/setup.ts'],
-    // Three groups, chosen by the file's name (#97). `src/test/projects.test.ts`
+    // Four groups, chosen by the file's name (#97). `src/test/projects.test.ts`
     // holds every test file to exactly one, and holds the names to what the
-    // files need.
+    // files need. The project chooses the environment, not each file.
     projects: [
       {
-        // `npm test`: needs nothing but Node.
+        // `npm test`, with `dom`: needs nothing but Node.
         extends: true,
         test: {
           name: 'unit',
-          include: ['src/**/*.test.{ts,tsx}'],
+          include: ['src/**/*.test.ts'],
+          exclude: [...configDefaults.exclude, DOM_TESTS, EMULATOR_TESTS, BUILD_TESTS],
+        },
+      },
+      {
+        // `npm test`, with `unit`: the components, and the few `.ts` files
+        // that need a browser DOM, on jsdom.
+        extends: true,
+        test: {
+          name: 'dom',
+          environment: 'jsdom',
+          include: ['src/**/*.test.tsx', DOM_TESTS],
           exclude: [...configDefaults.exclude, EMULATOR_TESTS, BUILD_TESTS],
         },
       },

@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { importReceiptPhoto } from './importReceipt';
 import type { OcrResult } from './ocr';
@@ -12,9 +11,14 @@ function stubImagePipeline(): void {
   vi.stubGlobal('createImageBitmap', async () =>
     ({ width: 1200, height: 1600, close: () => {} }) as unknown as ImageBitmap,
   );
-  const proto = HTMLCanvasElement.prototype as unknown as Record<string, unknown>;
-  proto['getContext'] = () => ({ drawImage: () => {} });
-  proto['toBlob'] = (cb: (b: Blob | null) => void) => cb(new Blob([new Uint8Array([1, 2, 3])]));
+  // Spied on, not assigned: the config restores spies before every test, and
+  // an assignment to the prototype was never put back (#97).
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
+    () => ({ drawImage: () => {} }) as unknown as CanvasRenderingContext2D,
+  );
+  vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((cb) =>
+    cb(new Blob([new Uint8Array([1, 2, 3])])),
+  );
 }
 
 const photo = (): Blob => new Blob([new Uint8Array(2048)], { type: 'image/jpeg' });
@@ -33,7 +37,6 @@ const ocr = (lines: string[]): (() => Promise<OcrResult>) =>
   async () => ({ ok: true, lines, confidence: 90 });
 
 beforeEach(() => {
-  vi.unstubAllGlobals();
   stubImagePipeline();
 });
 
@@ -198,11 +201,10 @@ describe('a browser that will not encode the reading copy', () => {
     // canvas that size can exceed what a phone allows. Better a plain message
     // than the reader being called with no image at all.
     let encodes = 0;
-    const proto = HTMLCanvasElement.prototype as unknown as Record<string, unknown>;
-    proto['toBlob'] = (cb: (b: Blob | null) => void) => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((cb) => {
       encodes += 1;
       cb(encodes === 1 ? new Blob([new Uint8Array([1, 2, 3])]) : null);
-    };
+    });
     let called = false;
 
     const outcome = await importReceiptPhoto(photo(), {

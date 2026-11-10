@@ -1,7 +1,6 @@
-// @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { beforeEach, describe, expect, test } from 'vitest';
 import { makeStore, sharingFor } from '../test/fixtures';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StubAuthProvider, type AuthUser } from '../data/auth';
 import { InMemorySharingWorld } from '../data/sharing';
@@ -42,7 +41,6 @@ function row(name: string): HTMLElement {
 }
 
 beforeEach(() => localStorage.clear());
-afterEach(cleanup);
 
 describe('a car’s row does one thing at a time', () => {
   test('opening the request link closes the sharing panel', async () => {

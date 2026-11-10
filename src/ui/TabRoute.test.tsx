@@ -1,7 +1,6 @@
-// @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { beforeEach, describe, expect, test } from 'vitest';
 import { makeStore } from '../test/fixtures';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
 import { saveHasOnboarded } from './onboarding';
@@ -45,8 +44,6 @@ beforeEach(() => {
   saveHasOnboarded('local');
   window.history.replaceState(null, '', '/');
 });
-
-afterEach(cleanup);
 
 describe('the tab is in the address', () => {
   test('choosing a tab puts it in the hash', async () => {

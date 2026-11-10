@@ -1,6 +1,5 @@
-// @vitest-environment jsdom
-import { afterEach, describe, expect, test } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { describe, expect, test } from 'vitest';
+import { render, screen } from '@testing-library/react';
 import { WrongProjectScreen } from './WrongProjectScreen';
 
 /**
@@ -11,8 +10,6 @@ import { WrongProjectScreen } from './WrongProjectScreen';
  * behind it was started.
  */
 describe('WrongProjectScreen', () => {
-  afterEach(cleanup);
-
   test('says the build is pointed at production and names the project', () => {
     render(<WrongProjectScreen projectId="fueltracker-899eb" />);
     expect(

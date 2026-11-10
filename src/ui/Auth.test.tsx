@@ -1,7 +1,6 @@
-// @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { makeStore } from '../test/fixtures';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { InMemoryRepository } from '../data/repository';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from '../data/records';
@@ -15,8 +14,6 @@ const USER = { uid: 'u1', email: 'driver@example.com', displayName: 'Driver' };
 beforeEach(() => {
   localStorage.clear();
 });
-
-afterEach(cleanup);
 
 describe('the sign-in gate', () => {
   test('a restoring session shows neither the app nor the sign-in screen', () => {

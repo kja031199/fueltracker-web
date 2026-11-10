@@ -1,4 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 
 /**
@@ -74,12 +77,97 @@ describe('the app says what it is', () => {
 });
 
 describe('the type checker sees the build config', () => {
-  test('vite.config.ts is in tsconfig include', () => {
+  test('vite.config.ts is in the test project include', () => {
     // Outside `include`, `tsc` never read it: its `test` block was an unknown
     // property to vite's own types, and nothing noticed. A type error planted
     // there fails `npm run typecheck` only while this holds.
-    const include = json('tsconfig.json')['include'] as string[];
+    const include = json('tsconfig.test.json')['include'] as string[];
     expect(include).toContain('vite.config.ts');
+  });
+});
+
+/**
+ * App code gets no test or Node types (#97).
+ *
+ * One `tsconfig.json` used to give every file `vitest/globals`, `jest-dom`
+ * and `node`, so browser code could name `describe` or `process` and type-check
+ * — and then throw in the browser. Now there are two projects: `app` (the app,
+ * DOM types only) and `test` (the tests, `src/test/` and `vite.config.ts`,
+ * with the test and Node types), joined by references and checked by `tsc -b`.
+ */
+describe('the type checker keeps test types out of app code (#97)', () => {
+  const compilerOptions = (path: string): Record<string, unknown> =>
+    json(path)['compilerOptions'] as Record<string, unknown>;
+
+  test('tsconfig.json is just the two projects', () => {
+    expect(json('tsconfig.json')).toEqual({
+      files: [],
+      references: [{ path: './tsconfig.app.json' }, { path: './tsconfig.test.json' }],
+    });
+  });
+
+  test('the app project has no ambient types and no tests', () => {
+    expect(compilerOptions('tsconfig.app.json')['types']).toEqual([]);
+    expect(json('tsconfig.app.json')['include']).toEqual(['src']);
+    expect(json('tsconfig.app.json')['exclude']).toEqual(
+      expect.arrayContaining(['src/**/*.test.ts', 'src/**/*.test.tsx', 'src/test']),
+    );
+  });
+
+  test('the test project has the test and Node types', () => {
+    expect(compilerOptions('tsconfig.test.json')['types']).toEqual(
+      expect.arrayContaining(['vitest/globals', '@testing-library/jest-dom', 'node']),
+    );
+    expect(json('tsconfig.test.json')['extends']).toBe('./tsconfig.app.json');
+  });
+
+  test('typecheck and build check both projects', () => {
+    // `tsc --noEmit` on a root with `files: []` checks nothing at all.
+    const scripts = json('package.json')['scripts'] as Record<string, string>;
+    expect(scripts['typecheck']).toBe('tsc -b');
+    expect(scripts['build']).toBe('tsc -b && vite build');
+  });
+
+  /** Type-checks one file as app code; returns tsc's exit status and output. */
+  function checkAsApp(source: string): { status: number | null; output: string } {
+    const dir = mkdtempSync(join(tmpdir(), 'app-types-'));
+    try {
+      writeFileSync(join(dir, 'probe.ts'), source);
+      writeFileSync(
+        join(dir, 'tsconfig.json'),
+        JSON.stringify({
+          extends: join(process.cwd(), 'tsconfig.app.json'),
+          compilerOptions: { tsBuildInfoFile: join(dir, 'probe.tsbuildinfo') },
+          include: [],
+          files: [join(dir, 'probe.ts')],
+        }),
+      );
+      const run = spawnSync(join('node_modules', '.bin', 'tsc'), ['-p', join(dir, 'tsconfig.json')], {
+        encoding: 'utf8',
+      });
+      return { status: run.status, output: `${run.stdout}${run.stderr}` };
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  test('app code that names describe, expect or process does not type-check', { timeout: 60_000 }, () => {
+    const { status, output } = checkAsApp(
+      'export const a = typeof describe;\nexport const b = typeof expect;\nexport const c = process.env;\n',
+    );
+    expect(status).not.toBe(0);
+    expect(output).toMatch(/Cannot find name 'describe'/);
+    expect(output).toMatch(/Cannot find name 'expect'/);
+    expect(output).toMatch(/Cannot find name 'process'/);
+  });
+
+  test('while ordinary browser code does', { timeout: 60_000 }, () => {
+    // The control: without it, a probe that fails for any reason at all — a
+    // bad path, a missing binary — would pass the test above.
+    expect(checkAsApp('export const title: string = document.title;\n')).toEqual({
+      status: 0,
+      output: '',
+    });
   });
 });
 

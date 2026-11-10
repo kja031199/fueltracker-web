@@ -1,5 +1,4 @@
-// @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { beforeEach, describe, expect, test } from 'vitest';
 import { makeStore } from '../test/fixtures';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -12,8 +11,6 @@ import { saveHasOnboarded } from './onboarding';
 beforeEach(() => {
   localStorage.clear();
 });
-
-afterEach(cleanup);
 
 describe('first run', () => {
   test('a new reader is welcomed rather than dropped into an empty dashboard', async () => {

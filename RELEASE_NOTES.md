@@ -11,6 +11,19 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-10
 
+- **No change you'll see: each test now starts clean on its own, and app code
+  can no longer use names that exist only in tests.** The last step of tidying
+  the tests.
+  *Technical:* the config restores spies, stubbed globals and env before every
+  test (`restoreMocks`, `unstubGlobals`, `unstubEnvs`), replacing 25
+  hand-written `afterEach(cleanup)`s and the restores some files forgot — one
+  left a fake canvas on `HTMLCanvasElement.prototype`. A `dom` project runs
+  the component tests on jsdom, replacing 35 per-file docblocks. Two
+  TypeScript projects (`tsconfig.app.json`, `tsconfig.test.json`, `tsc -b`)
+  make `describe` or `process` in app code a type error. The suite takes about
+  23 s locally and 33 s in CI, from about 40 s; the rest is jsdom's per-file
+  setup.
+  [#97](https://github.com/kja031199/fueltracker-web/issues/97) · [PR #134](https://github.com/kja031199/fueltracker-web/pull/134)
 - **No change you'll see: the tests are split into three groups, each run on
   purpose.** The third step of tidying the tests.
   *Technical:* Vitest projects chosen by file name — `unit` (`npm test`),

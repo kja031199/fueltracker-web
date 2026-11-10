@@ -608,12 +608,16 @@ npm run test:build   # vite build, then the *.build.test.ts files
   fill-up "entered by owner". `fixtures.test.ts` fails on a second definition
   or a hand-built empty store. `src/test/` is test support, not app code: the
   SDK boundary skips it.
-- **Three test projects, chosen by file name** (#97; `vite.config.ts`,
-  guarded by `src/test/projects.test.ts`): `unit` (`npm test`), `build`
-  (`*.build.test.ts`, `npm run test:build`, which builds first) and `rules`
-  (`*.emulator.test.ts`, `npm run test:rules`). A file that reads `dist/` or
-  imports `test/emulator` must carry the matching name; every test file runs
-  in exactly one project. `build` and `rules` **fail** without their
+- **Four test projects, chosen by file name** (#97; `vite.config.ts`,
+  guarded by `src/test/projects.test.ts`): `unit` (Node) and `dom` (jsdom:
+  every `*.test.tsx` and the `*.dom.test.ts` files), together `npm test`;
+  `build` (`*.build.test.ts`, `npm run test:build`, which builds first) and
+  `rules` (`*.emulator.test.ts`, `npm run test:rules`). **The project chooses
+  the environment** — no `@vitest-environment` docblocks; a `.ts` test that
+  needs `document` is named `.dom.test.ts` (in `unit` it fails on the missing
+  global, so the mistake shows itself). A file that reads `dist/` or imports
+  `test/emulator` must carry the matching name; every test file runs in
+  exactly one project. `build` and `rules` **fail** without their
   prerequisite (`needsBuild.ts`, `needsEmulator.ts`) instead of skipping, so
   `npm test` reports no skips and those two cannot pass by skipping. Workflows
   run the npm scripts, never `vitest` with a path: a path is how the rules job
@@ -621,6 +625,17 @@ npm run test:build   # vite build, then the *.build.test.ts files
   thrown through `prerequisiteError`, whose stack is the message — Vitest 5
   crashed source-mapping a real one and printed the crash instead of the
   reason.
+- **Isolation is the config's job** (#97; `src/test/isolation.test.tsx`):
+  `restoreMocks`, `unstubGlobals` and `unstubEnvs` put spies, `vi.stubGlobal`
+  and `vi.stubEnv` back before every test, and Testing Library unmounts after
+  every test on its own (it registers that only because `globals` is on). So
+  no `afterEach(cleanup)`, no `vi.restoreAllMocks()` / `unstubAllGlobals()` /
+  `unstubAllEnvs()` by hand, and never assign to a prototype — `vi.spyOn` it,
+  which is restored; an assignment never was (`importReceipt` leaked a fake
+  canvas that way). `projects.test.ts` refuses all four. A spy made in
+  `beforeAll` or at module level is restored before the first test: make it
+  in `beforeEach` or the test. A mid-test `cleanup()` (re-rendering from
+  scratch inside one test) is still fine.
 
 - **A boundary test reads imports through `src/test/imports.ts`, never its own
   pattern** (#93). `layering`, `storeBoundary`, `sdkBoundary` and
@@ -660,8 +675,8 @@ npm run test:build   # vite build, then the *.build.test.ts files
   about 1 s this way.
 - **`userEvent.setup()` replaces `navigator.clipboard`**, so stub the clipboard
   *after* calling it or the spy silently records nothing.
-- **Component tests opt into a DOM** with a `@vitest-environment jsdom`
-  docblock. Domain and storage suites stay on node.
+- **Component tests get a DOM from their project** (`dom`), not a docblock;
+  domain and storage suites run on node in `unit`.
 
 ## Checks
 
@@ -688,8 +703,18 @@ API, and TypeScript 7 has none (it supports `<6.1`). A finding is fixed, or
 disabled on that line with the reason written next to it. It runs as a step in
 the "Typecheck, test & build" job. `toolchain.test.ts` pins the config, the
 React runtime/types major versions and `vite.config.ts` being type-checked
-(it is in `tsconfig`'s `include`, and uses `defineConfig` from
+(it is in `tsconfig.test.json`'s `include`, and uses `defineConfig` from
 `vitest/config` so its `test` block type-checks).
+
+**Two TypeScript projects** (#97), joined by references in `tsconfig.json`
+and checked by `tsc -b` (`npm run typecheck`, and the first half of
+`npm run build` — `tsc --noEmit` on that root would check nothing):
+`tsconfig.app.json` (the app: `types: []`, tests and `src/test/` excluded)
+and `tsconfig.test.json` (extends it; the tests, `src/test/` and
+`vite.config.ts`, with `vitest/globals`, `jest-dom` and `node`). App code that
+names `describe`, `expect` or `process` is a type error now —
+`toolchain.test.ts` type-checks a planted file to prove it, with a control
+that ordinary DOM code passes. Build info goes to `node_modules/.tmp/`.
 
 `npm run test:build` builds and then runs the `*.build.test.ts` files
 (`manifest`, `csp`, `ocrAssets`) against that build, in CI and in the deploy,

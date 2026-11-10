@@ -1,8 +1,7 @@
-// @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { beforeEach, describe, expect, test } from 'vitest';
 import { makeStore } from '../test/fixtures';
 import type { ReactElement } from 'react';
-import { cleanup, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { StubAuthProvider } from '../data/auth';
 import type { PushSummary, RawSnapshot, RemoteStore } from '../data/remote';
 import { App } from './App';
@@ -44,7 +43,6 @@ function expectTitleInMain(name: RegExp): void {
 }
 
 beforeEach(() => localStorage.clear());
-afterEach(cleanup);
 
 describe('one title per page, inside the main landmark', () => {
   const direct: [string, () => ReactElement][] = [

@@ -1,7 +1,6 @@
-// @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { beforeEach, describe, expect, test } from 'vitest';
 import { makeStore } from '../test/fixtures';
-import { cleanup, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { makeFuelEntryDraft } from '../domain/fuelEntryDraft';
 import { App } from './App';
@@ -16,7 +15,6 @@ import { saveHasOnboarded } from './onboarding';
  * perfectly computable.
  */
 beforeEach(() => localStorage.clear());
-afterEach(cleanup);
 
 const DAY = 86_400_000;
 

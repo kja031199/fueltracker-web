@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import {
@@ -23,7 +22,6 @@ const LAST = accountPreference('lastSyncedAt', numberCodec);
 const SEEN = accountPreference('hasOnboarded', flagCodec('true'));
 
 beforeEach(() => localStorage.clear());
-afterEach(() => vi.restoreAllMocks());
 
 describe('keys', () => {
   test('browser keys keep the names they always had, so existing settings survive', () => {
