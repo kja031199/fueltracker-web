@@ -10,7 +10,7 @@ import type { FuelTrackerStore } from '../data/store';
 import type { SharingSync } from '../data/shareSync';
 import type { Invite, Member, Membership } from '../data/sharing';
 import { ShareClash } from '../data/sharing';
-import { displayName } from '../domain/format';
+import { verifiedName } from '../domain/format';
 import type { SharingView } from './fuelLogTypes';
 
 /** What a fuel log with no account to share through offers: nothing, and every action refuses. */
@@ -119,8 +119,14 @@ export function useSharingView(
         }
         if (membership === undefined && known.members.length === 0) return null; // not shared
         const shown = new Map<string, string>();
-        for (const member of known.members) shown.set(member.uid, displayName(member));
-        if (membership !== undefined) shown.set(membership.ownerUid, membership.ownerName || 'its owner');
+        // Members by their verified email (#81): a chosen name alone let a
+        // member pass as the owner. The owner is marked by being the owner —
+        // their uid is the membership's — which no member's name can fake.
+        for (const member of known.members) shown.set(member.uid, verifiedName(member));
+        if (membership !== undefined) {
+          const ownerName = membership.ownerName.trim();
+          shown.set(membership.ownerUid, ownerName === '' ? 'the owner' : `${ownerName} (owner)`);
+        }
         shown.set(uid, 'you');
         return shown;
       },

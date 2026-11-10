@@ -218,6 +218,18 @@ so an existing car and its whole history can be shared as it is.
   can never overwrite somebody joining.
 - **The member's own account lists the shares** (`memberships`), so their
   other devices find the car too.
+- **"Entered by" shows who someone is, not only what they call themselves**
+  (#81). A display name is whatever a person typed, so a member who called
+  themselves after the owner made their rows read as the owner's. A member is
+  now shown with the email Google verified — "Entered by Sam (sam@example.com)"
+  — which the rules force to be their own; the owner is shown as "Kyle (owner)",
+  marked by being the account the car belongs to, which no member's name can
+  fake; and your own rows say "you". The Share panel lists members the same
+  way.
+- **What is not recorded** (#81, declined for now): who last *edited* a
+  fill-up — a member's edit of the owner's row keeps the owner's `enteredBy` —
+  and the rules still let the owner write any `enteredBy`. Both would need a
+  rules-stamped field; the owner can already change any row of their own car.
 
 **When it ends** — removed, left, or the owner deleted the car — the car is
 removed from the member's devices with no trace pushed anywhere: those rows

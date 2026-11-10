@@ -17,6 +17,7 @@ import {
   plainCurrency,
   vehicleSubtitle,
   vehicleYear,
+  verifiedName,
 } from './format';
 
 describe('currencyForLocale', () => {
@@ -307,6 +308,38 @@ describe('displayName, who a person is shown as (#93: four copies before)', () =
   test('trimmed, so stray spaces never reach a sentence', () => {
     expect(displayName({ name: '  Sam ', email: '' })).toBe('Sam');
     expect(displayName({ name: '', email: ' sam@example.com ' })).toBe('sam@example.com');
+  });
+});
+
+describe('verifiedName, a sharer as only they can be (#81)', () => {
+  // The name is whatever a person typed; the email is the one Google verified,
+  // which the rules force a member's to be. So the email is always shown, and
+  // a name never stands in for it.
+  test('the name they chose, with the email that says who they are', () => {
+    expect(verifiedName({ name: 'Sam', email: 'sam@example.com' })).toBe('Sam (sam@example.com)');
+  });
+
+  test('a member calling themselves the owner still shows their own email', () => {
+    expect(verifiedName({ name: 'Kyle', email: 'not.kyle@example.com' })).toBe('Kyle (not.kyle@example.com)');
+  });
+
+  test('just the email when the name is blank, only spaces, or the email again', () => {
+    expect(verifiedName({ name: '', email: 'sam@example.com' })).toBe('sam@example.com');
+    expect(verifiedName({ name: '   ', email: 'sam@example.com' })).toBe('sam@example.com');
+    expect(verifiedName({ name: 'Sam@Example.com', email: 'sam@example.com' })).toBe('sam@example.com');
+  });
+
+  test('a name that looks like someone else’s email does not hide the real one', () => {
+    expect(verifiedName({ name: 'kyle@example.com', email: 'sam@example.com' })).toBe(
+      'kyle@example.com (sam@example.com)',
+    );
+  });
+
+  test('trimmed, and the fallback when there is neither', () => {
+    expect(verifiedName({ name: '  Sam ', email: ' sam@example.com ' })).toBe('Sam (sam@example.com)');
+    expect(verifiedName({ name: 'Sam', email: '' })).toBe('Sam');
+    expect(verifiedName({ name: ' ', email: ' ' })).toBe('someone');
+    expect(verifiedName({ name: '', email: '' }, 'a member')).toBe('a member');
   });
 });
 

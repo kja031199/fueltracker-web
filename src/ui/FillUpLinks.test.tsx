@@ -80,6 +80,14 @@ function payloadIn(label: RegExp, marker: string): string {
   return payload;
 }
 
+/**
+ * The owner's say-so on an incoming link (#81): nothing is queued until they
+ * press Queue for review.
+ */
+async function queueIt(): Promise<void> {
+  await userEvent.setup().click(await screen.findByRole('button', { name: 'Queue for review' }, WAIT));
+}
+
 beforeEach(() => {
   localStorage.clear();
   saveHasOnboarded(KYLE.uid);
@@ -186,8 +194,12 @@ describe('the submitter answers', () => {
     const user = userEvent.setup();
     open({ store, user: SAM, hash: requestHash() });
 
-    expect(await screen.findByText(/kyle asked you to log a fill-up for/i)).toBeInTheDocument();
+    expect(await screen.findByText(/someone who says they are kyle asked you to log a fill-up for/i)).toBeInTheDocument();
     expect(screen.getByLabelText('Your name')).toHaveValue('Sam');
+    // What the link will carry, said before it is made (#81).
+    expect(screen.getByLabelText('Your name')).toHaveAccessibleDescription(
+      /carries this name, the fill-up and any notes.*to whoever you send it/i,
+    );
     await user.type(screen.getByLabelText(/odometer/i), '10300');
     await user.type(screen.getByLabelText('Gallons'), '9.5');
     await user.type(screen.getByLabelText(/price per gallon/i), '3.25');
@@ -195,6 +207,7 @@ describe('the submitter answers', () => {
     await user.click(screen.getByRole('button', { name: 'Create link' }));
 
     const decoded = decodeSubmission(payloadIn(/fill-up for civic/i, '#/incoming/'));
+    expect(screen.getByText(/carries your name, the fill-up and any notes/i)).toBeInTheDocument();
     expect(decoded.ok).toBe(true);
     if (!decoded.ok) return;
     expect(decoded.value).toMatchObject({ vehicleId: 'car-123', submitterName: 'Sam' });
@@ -203,6 +216,22 @@ describe('the submitter answers', () => {
     expect(await store.vehicles()).toHaveLength(0);
     expect(await store.fillUpCount()).toBe(0);
     expect(await store.pendingFillUps()).toHaveLength(0);
+  });
+
+  test('names in a request are shown as claims, as text, at their longest (#81)', async () => {
+    // Anyone can make a request link, naming anyone, for any car id.
+    const ownerName = `<img src=x onerror=alert(1)>Kyle ${'k'.repeat(LINK_TEXT_LIMITS.ownerName)}`;
+    const vehicleName = `<b>Civic</b>${'c'.repeat(LINK_TEXT_LIMITS.vehicleName)}`;
+    open({
+      store: makeStore({ author: SAM.uid }),
+      user: SAM,
+      hash: `#/submit/${encodeRequest({ vehicleId: 'car-123', vehicleName, ownerName })}`,
+    });
+    const asked = await screen.findByText(/someone who says they are/i);
+    expect(asked.textContent).toContain('<img src=x onerror=alert(1)>Kyle');
+    expect(asked.querySelector('img')).toBeNull();
+    expect(asked.querySelector('strong')?.textContent).toMatch(/^<b>Civic<\/b>c+$/);
+    expect(screen.getByText(/only fill this in if you know who sent it/i)).toBeInTheDocument();
   });
 
   test('a form in litres and kilometres still sends canonical gallons and miles', async () => {
@@ -286,14 +315,101 @@ describe('the owner reviews', () => {
     return { store, car };
   }
 
-  test('opening the link queues it and shows it waiting, without a history entry', async () => {
+  test('opening the link shows the fill-up and queues nothing until the owner says so (#81)', async () => {
+    const { store, car } = await kyleWithCivic();
+    open({ store, hash: `#/incoming/${encodeSubmission(submission(car.id))}` });
+
+    expect(await screen.findByRole('button', { name: 'Queue for review' }, WAIT)).toBeInTheDocument();
+    expect(screen.getByText(/someone who says they are sam sent you this fill-up/i)).toBeInTheDocument();
+    expect(screen.getByText('Civic')).toBeInTheDocument();
+    expect(screen.getByText(/shell/i)).toBeInTheDocument();
+    expect(screen.getByText('After the trip')).toBeInTheDocument();
+    // Opening it wrote nothing: not a pending row, not a fill-up.
+    expect(await store.pendingFillUps()).toHaveLength(0);
+    expect(await store.fillUpCount()).toBe(0);
+  });
+
+  test('Ignore leaves it unqueued and goes back to the app', async () => {
+    const { store, car } = await kyleWithCivic();
+    const user = userEvent.setup();
+    open({ store, hash: `#/incoming/${encodeSubmission(submission(car.id))}` });
+    await user.click(await screen.findByRole('button', { name: 'Ignore' }, WAIT));
+    expect(window.location.hash).toBe('#/dashboard');
+    expect(await store.pendingFillUps()).toHaveLength(0);
+  });
+
+  test('pressing Queue for review twice queues it once, with one receive', async () => {
+    const { store, car } = await kyleWithCivic();
+    // Held until both presses have landed: an in-memory store answers before
+    // the second click otherwise, and the guard would never be needed.
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const real = store.receiveSubmission.bind(store);
+    const receive = vi.spyOn(store, 'receiveSubmission').mockImplementation(async (sent) => {
+      await gate;
+      return real(sent);
+    });
+    const user = userEvent.setup();
+    open({ store, hash: `#/incoming/${encodeSubmission(submission(car.id))}` });
+    const button = await screen.findByRole('button', { name: 'Queue for review' }, WAIT);
+    await user.dblClick(button);
+    await user.click(button);
+    release();
+    await screen.findByRole('region', { name: /waiting for review \(1\)/i }, WAIT);
+    expect(receive).toHaveBeenCalledTimes(1);
+    expect(await store.pendingFillUps()).toHaveLength(1);
+  });
+
+  test('a submitter naming themselves the owner is shown only as a claim, as text', async () => {
+    const { store, car } = await kyleWithCivic();
+    const submitterName = `<script>x</script>Kyle (owner)${'k'.repeat(LINK_TEXT_LIMITS.submitterName)}`;
+    open({ store, hash: `#/incoming/${encodeSubmission(submission(car.id, { submitterName }))}` });
+    const from = await screen.findByText(/someone who says they are/i, {}, WAIT);
+    expect(from.textContent).toContain('<script>x</script>Kyle (owner)');
+    expect(from.querySelector('script')).toBeNull();
+  });
+
+  test('a link with no name, for a car not here, claims nothing and says so', async () => {
+    const { store } = await kyleWithCivic();
+    open({
+      store,
+      remote: new InMemoryRemoteStore(),
+      hash: `#/incoming/${encodeSubmission(submission('gone-car', { submitterName: '   ' }))}`,
+    });
+    expect(await screen.findByText('Someone sent you this fill-up.', {}, WAIT)).toBeInTheDocument();
+    expect(screen.getByText('A car not in your log')).toBeInTheDocument();
+    expect(screen.queryByText(/says they are/i)).not.toBeInTheDocument();
+  });
+
+  test('a queued fill-up with no name says "from someone", with nothing to verify', async () => {
+    const { store, car } = await kyleWithCivic();
+    await store.receiveSubmission(submission(car.id, { submitterName: '' }));
+    open({ store, initialTab: 'fillups' });
+    const review = await screen.findByRole('region', { name: /waiting for review \(1\)/i }, WAIT);
+    expect(within(review).getByText(/from someone/i)).toBeInTheDocument();
+    expect(within(review).queryByText(/unverified/i)).not.toBeInTheDocument();
+  });
+
+  test('storage that refuses the queued fill-up says so, and nothing is half-queued', async () => {
+    const { store, car } = await kyleWithCivic();
+    vi.spyOn(store, 'receiveSubmission').mockRejectedValue(new Error('quota'));
+    open({ store, hash: `#/incoming/${encodeSubmission(submission(car.id))}` });
+    await queueIt();
+    expect(await screen.findByRole('alert', {}, WAIT)).toHaveTextContent(/storage on this device refused it/i);
+    expect(screen.queryByRole('button', { name: 'Queue for review' })).not.toBeInTheDocument();
+  });
+
+  test('Queue for review queues it and shows it waiting, without a history entry', async () => {
     const { store, car } = await kyleWithCivic();
     const before = window.history.length;
     open({ store, hash: `#/incoming/${encodeSubmission(submission(car.id))}` });
+    await queueIt();
 
     const review = await screen.findByRole('region', { name: /waiting for review \(1\)/i }, WAIT);
     expect(within(review).getByText('Civic')).toBeInTheDocument();
-    expect(within(review).getByText(/from sam/i)).toBeInTheDocument();
+    expect(within(review).getByText(/from sam \(unverified\)/i)).toBeInTheDocument();
     expect(window.location.hash).toBe('#/fillups');
     expect(window.history.length).toBe(before);
     expect(await store.fillUpCount()).toBe(0);
@@ -305,6 +421,7 @@ describe('the owner reviews', () => {
     const timers = manualTimers();
     const user = userEvent.setup();
     open({ store, remote, hash: `#/incoming/${encodeSubmission(submission(car.id))}`, syncTimers: timers });
+    await queueIt();
 
     await user.click(await screen.findByRole('button', { name: /approve the fill-up from sam for civic/i }, WAIT));
     await waitFor(() => expect(screen.queryByRole('region', { name: /waiting for review/i })).not.toBeInTheDocument());
@@ -326,6 +443,7 @@ describe('the owner reviews', () => {
     const { store, car } = await kyleWithCivic();
     const user = userEvent.setup();
     open({ store, hash: `#/incoming/${encodeSubmission(submission(car.id))}` });
+    await queueIt();
     await user.click(await screen.findByRole('button', { name: /reject the fill-up from sam/i }, WAIT));
     await waitFor(() => expect(screen.queryByRole('region', { name: /waiting for review/i })).not.toBeInTheDocument());
     expect(await store.fillUpCount()).toBe(0);
@@ -336,11 +454,13 @@ describe('the owner reviews', () => {
     const { store, car } = await kyleWithCivic();
     const hash = `#/incoming/${encodeSubmission(submission(car.id))}`;
     open({ store, hash });
+    await queueIt();
     await screen.findByRole('region', { name: /waiting for review/i }, WAIT);
     cleanup();
 
     const user = userEvent.setup();
     open({ store, hash });
+    await queueIt();
     expect(await screen.findByRole('alert', {}, WAIT)).toHaveTextContent(/already received/i);
     expect(await store.pendingFillUps()).toHaveLength(1);
     await user.click(screen.getByRole('button', { name: 'Go to fill-ups' }));
@@ -352,6 +472,7 @@ describe('the owner reviews', () => {
     await store.receiveSubmission(submission(car.id));
     await store.approvePendingFillUp('sub-1');
     open({ store, hash: `#/incoming/${encodeSubmission(submission(car.id))}` });
+    await queueIt();
     expect(await screen.findByRole('alert', {}, WAIT)).toHaveTextContent(/already received/i);
     expect(await store.fillUpCount()).toBe(1);
   });
@@ -425,6 +546,7 @@ describe('the owner reviews', () => {
     const remote = new InMemoryRemoteStore(await elsewhere.exportSnapshot());
     const store = makeStore({ author: KYLE.uid });
     open({ store, remote, hash: `#/incoming/${encodeSubmission(submission(car.id))}` });
+    await queueIt();
     expect(await screen.findByRole('region', { name: /waiting for review \(1\)/i }, WAIT)).toBeInTheDocument();
   });
 
@@ -444,6 +566,7 @@ describe('the owner reviews', () => {
     const remote = new LateRemote();
     const store = makeStore({ author: KYLE.uid });
     open({ store, remote, hash: `#/incoming/${encodeSubmission(submission(car.id))}` });
+    await queueIt();
     expect(await screen.findByRole('region', { name: /waiting for review \(1\)/i }, WAIT)).toBeInTheDocument();
     expect(remote.pulls).toBeGreaterThanOrEqual(2);
   });
@@ -451,6 +574,7 @@ describe('the owner reviews', () => {
   test('a car that is in neither place is refused plainly', async () => {
     const { store } = await kyleWithCivic();
     open({ store, remote: new InMemoryRemoteStore(), hash: `#/incoming/${encodeSubmission(submission('gone-car'))}` });
+    await queueIt();
     expect(await screen.findByRole('alert', {}, WAIT)).toHaveTextContent(/not in your log/i);
     expect(await store.pendingFillUps()).toHaveLength(0);
   });
@@ -475,6 +599,7 @@ describe('the owner reviews', () => {
       sharing: sharingFor(world, SAM),
       hash: `#/incoming/${encodeSubmission(submission(civic.id, { submitterName: 'Alex' }))}`,
     });
+    await queueIt();
     expect(await screen.findByRole('alert', {}, WAIT)).toHaveTextContent(/shared with you, not one of yours/i);
     expect(await samStore.pendingFillUps()).toHaveLength(0);
   });
@@ -490,6 +615,7 @@ describe('the owner reviews', () => {
     const user = userEvent.setup();
     open({ store, hash });
     expect(await screen.findByRole('alert')).toHaveTextContent(message);
+    expect(screen.queryByRole('button', { name: 'Queue for review' })).not.toBeInTheDocument();
     expect(await store.pendingFillUps()).toHaveLength(0);
     await user.click(screen.getByRole('button', { name: 'Go to FuelTracker' }));
     expect(window.location.hash).toBe('#/dashboard');
@@ -516,6 +642,7 @@ describe('the whole round trip', () => {
     cleanup();
 
     open({ store: kyleStore, hash: submissionLink.slice(submissionLink.indexOf('#')) });
+    await queueIt();
     await user.click(await screen.findByRole('button', { name: /approve the fill-up from sam for civic/i }, WAIT));
     await waitFor(async () => expect(await kyleStore.fillUps(car.id)).toHaveLength(1));
   });

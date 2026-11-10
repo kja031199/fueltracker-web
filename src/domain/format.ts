@@ -238,6 +238,27 @@ export function displayName(
 }
 
 /**
+ * Who a person who shares a car is (#81): the name they chose, **with** the
+ * email Google verified — `Sam (sam@example.com)`.
+ *
+ * A name is whatever a person typed, so a member could call themselves the
+ * owner and their rows would read as the owner's. The email can't be chosen:
+ * the rules let a member join only with their own verified address. So it is
+ * always shown, and a name never stands in for it — not even one that looks
+ * like an email. Just the email when the name is blank or the same address.
+ */
+export function verifiedName(
+  person: { readonly name: string; readonly email: string },
+  fallback = 'someone',
+): string {
+  const name = person.name.trim();
+  const email = person.email.trim();
+  if (email === '') return name || fallback;
+  if (name === '' || name.toLowerCase() === email.toLowerCase()) return email;
+  return `${name} (${email})`;
+}
+
+/**
  * The grey line under a fill-up (#93): volume, distance and grade in the
  * reader's units, then what is unusual about it. "Missed previous" only where
  * asked — it is a fact about the reader's own log, which a fill-up sent by
