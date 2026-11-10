@@ -4,6 +4,7 @@ import type { UnitPreferences } from '../../domain/units';
 import { DISTANCE_UNITS, ECONOMY_UNITS, VOLUME_UNITS, distance, economy, volume } from '../../domain/units';
 import { CURRENCIES } from '../../domain/format';
 import { useDisplay, useUnits } from '../session';
+import { distanceWords, economyNames, volumeWords } from '../words';
 
 /**
  * Settings → Units and currency. Changing a unit changes only what is shown and
@@ -37,7 +38,7 @@ export function UnitsSection(): ReactElement {
         >
           {VOLUME_UNITS.map((unit) => (
             <option key={unit} value={unit}>
-              {volume[unit].name}
+              {volumeWords[unit].name}
             </option>
           ))}
         </select>
@@ -56,7 +57,7 @@ export function UnitsSection(): ReactElement {
         >
           {DISTANCE_UNITS.map((unit) => (
             <option key={unit} value={unit}>
-              {distance[unit].name}
+              {distanceWords[unit].name}
             </option>
           ))}
         </select>
@@ -75,7 +76,7 @@ export function UnitsSection(): ReactElement {
         >
           {ECONOMY_UNITS.map((unit) => (
             <option key={unit} value={unit}>
-              {economy[unit].name}
+              {economyNames[unit]}
             </option>
           ))}
         </select>

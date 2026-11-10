@@ -17,7 +17,7 @@ import {
 } from './accessiblePalette';
 import type { RGB } from './contrast';
 import { blend, contrastRatio, relativeLuminance, toCssRgb } from './contrast';
-import { METRICS, accessibilityName, hueFor } from './metric';
+import { METRICS, hueFor } from './metric';
 
 /**
  * WCAG 2.2 AA for body text. The palette targets a higher internal margin; this
@@ -198,16 +198,13 @@ describe('paletteCssVariables', () => {
 });
 
 describe('metric', () => {
-  test('every metric maps to a distinct hue and a spoken name', () => {
-    // The hue mapping is what carries "blue means fuel economy" across screens;
-    // the name is what a screen reader announces for a chart with no title.
+  test('every metric maps to a distinct hue', () => {
+    // The hue mapping is what carries "blue means fuel economy" across screens.
+    // (Its spoken name went in #94: every chart is given a title, so the
+    // fallback name was never read.)
     const hues = METRICS.map(hueFor);
     expect(new Set(hues).size).toBe(METRICS.length);
     expect(hues).toEqual(['blue', 'orange', 'purple', 'teal']);
-
-    const names = METRICS.map(accessibilityName);
-    expect(new Set(names).size).toBe(METRICS.length);
-    expect(names.every((name) => name.length > 0)).toBe(true);
   });
 
   /**

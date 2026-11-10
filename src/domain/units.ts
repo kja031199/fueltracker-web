@@ -26,9 +26,6 @@ export const ECONOMY_UNITS = ['mpg', 'litersPer100km', 'kmPerLiter'] as const;
 
 interface VolumeSpec {
   readonly abbreviation: string;
-  readonly name: string;
-  /** Singular noun for labels like "Price per Gallon" / "Price per Liter". */
-  readonly singularNoun: string;
   /** A canonical gallons value expressed in this unit. */
   readonly fromGallons: (gallons: number) => number;
   /** A value in this unit converted back to canonical gallons. */
@@ -38,15 +35,11 @@ interface VolumeSpec {
 export const volume: Record<VolumeUnit, VolumeSpec> = {
   gallons: {
     abbreviation: 'gal',
-    name: 'Gallons',
-    singularNoun: 'Gallon',
     fromGallons: (g) => g,
     toGallons: (v) => v,
   },
   liters: {
     abbreviation: 'L',
-    name: 'Liters',
-    singularNoun: 'Liter',
     fromGallons: (g) => g * LITERS_PER_GALLON,
     toGallons: (v) => v / LITERS_PER_GALLON,
   },
@@ -70,9 +63,6 @@ export function pricePerGallonFrom(price: number, unit: VolumeUnit): number {
 
 interface DistanceSpec {
   readonly abbreviation: string;
-  readonly name: string;
-  /** Singular noun for titles like "Cost per Mile" / "Cost per Kilometer". */
-  readonly singularNoun: string;
   readonly fromMiles: (miles: number) => number;
   readonly toMiles: (value: number) => number;
 }
@@ -80,15 +70,11 @@ interface DistanceSpec {
 export const distance: Record<DistanceUnit, DistanceSpec> = {
   miles: {
     abbreviation: 'mi',
-    name: 'Miles',
-    singularNoun: 'Mile',
     fromMiles: (m) => m,
     toMiles: (v) => v,
   },
   kilometers: {
     abbreviation: 'km',
-    name: 'Kilometers',
-    singularNoun: 'Kilometer',
     fromMiles: (m) => m * KILOMETERS_PER_MILE,
     toMiles: (v) => v / KILOMETERS_PER_MILE,
   },
@@ -96,7 +82,6 @@ export const distance: Record<DistanceUnit, DistanceSpec> = {
 
 interface EconomySpec {
   readonly abbreviation: string;
-  readonly name: string;
   /**
    * True when a larger number is better economy. False for L/100km, where less
    * fuel per distance — a smaller number — is better. Ranking itself is always
@@ -120,20 +105,17 @@ const definedMPG = (mpg: number): boolean => Number.isFinite(mpg) && mpg > 0;
 export const economy: Record<EconomyUnit, EconomySpec> = {
   mpg: {
     abbreviation: 'MPG',
-    name: 'Miles per gallon',
     higherIsBetter: true,
     fromMPG: (mpg) => (definedMPG(mpg) ? mpg : null),
   },
   litersPer100km: {
     abbreviation: 'L/100km',
-    name: 'Liters per 100 km',
     higherIsBetter: false,
     fromMPG: (mpg) =>
       definedMPG(mpg) ? (100 * LITERS_PER_GALLON) / (mpg * KILOMETERS_PER_MILE) : null,
   },
   kmPerLiter: {
     abbreviation: 'km/L',
-    name: 'Kilometers per liter',
     higherIsBetter: true,
     fromMPG: (mpg) => (definedMPG(mpg) ? mpg * (KILOMETERS_PER_MILE / LITERS_PER_GALLON) : null),
   },

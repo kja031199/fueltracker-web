@@ -6,6 +6,7 @@ import type { WeekdayPrice } from '../../domain/weekdayPricePattern';
 import { MetricLineChart } from './MetricLineChart';
 import { MonthlyBarChart } from './MonthlyBarChart';
 import { WeekdayPriceChart } from './WeekdayPriceChart';
+import { DisplayProvider } from '../session';
 
 const whole = (value: number): string => value.toFixed(0);
 
@@ -210,8 +211,8 @@ describe('a monthly bar chart', () => {
 
 describe('the weekday dot plot', () => {
   const prices: WeekdayPrice[] = [
-    { weekday: 3, symbol: 'Tue', averagePrice: 3.2, fillUpCount: 2 },
-    { weekday: 6, symbol: 'Fri', averagePrice: 3.45, fillUpCount: 2 },
+    { weekday: 3, averagePrice: 3.2, fillUpCount: 2 },
+    { weekday: 6, averagePrice: 3.45, fillUpCount: 2 },
   ];
 
   test('names the cheapest day in words, not only by dot size', () => {
@@ -220,6 +221,22 @@ describe('the weekday dot plot', () => {
     const table = screen.getByRole('table');
     expect(within(table).getByText(/cheapest day/i)).toBeInTheDocument();
     expect(within(table).getByRole('rowheader', { name: 'Tue' })).toBeInTheDocument();
+  });
+
+  test('names the days in the reader’s locale (#94)', () => {
+    render(
+      <DisplayProvider style={{ locale: 'de-DE', currency: 'EUR' }} setCurrency={() => {}}>
+        <WeekdayPriceChart prices={prices} cheapestWeekday={3} formatPrice={(v) => v.toFixed(3)} />
+      </DisplayProvider>,
+    );
+    const table = screen.getByRole('table');
+    expect(within(table).getByRole('rowheader', { name: 'Di' })).toBeInTheDocument();
+    expect(within(table).getByRole('rowheader', { name: 'Fr' })).toBeInTheDocument();
+  });
+
+  test('a weekday out of range is named as nothing rather than breaking the chart', () => {
+    render(<WeekdayPriceChart prices={[{ weekday: 9, averagePrice: 3, fillUpCount: 1 }]} cheapestWeekday={null} formatPrice={(v) => v.toFixed(3)} />);
+    expect(screen.getByRole('table')).toBeInTheDocument();
   });
 
   test('the axis is zoomed, so cent-level differences are visible', () => {

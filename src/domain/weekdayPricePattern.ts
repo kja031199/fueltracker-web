@@ -8,23 +8,21 @@
  *
  * This is the first ported module whose behaviour depends on calendar and
  * locale, which is where a port quietly diverges. Two things are therefore
- * explicit parameters rather than reads of an ambient global: the week's first
- * day, and the locale used for day names. Upstream reads `Calendar.current` and
- * `DateFormatter()`; here they are options with deterministic defaults, so a
- * test asserts a literal expected order instead of recomputing its own
+ * explicit rather than read from an ambient global: the week's first day is
+ * an option, and the day *names* are not here at all — this returns weekday
+ * numbers, and the UI names them (`ui/words.ts`, #94). Upstream reads
+ * `Calendar.current` and `DateFormatter()`; here the first day is an option
+ * with a deterministic default, so a test asserts a literal expected order instead of recomputing its own
  * expectation from the platform — which is the only way the assertion can catch
  * a numbering mistake rather than merely a rotation one.
  */
 
 import type { FuelEntryStats } from './models';
-import { US_STYLE } from './format';
 
 /** Average price per gallon for one day of the week. */
 export interface WeekdayPrice {
   /** Calendar weekday: **1 = Sunday … 7 = Saturday**, matching the Swift. */
   readonly weekday: number;
-  /** Localised short symbol for the chart axis, e.g. "Tue". */
-  readonly symbol: string;
   /** Simple mean of the price per gallon paid on this weekday. */
   readonly averagePrice: number;
   readonly fillUpCount: number;
@@ -37,32 +35,6 @@ export interface WeekdayOptions {
    * {@link firstWeekdayForLocale} to derive it.
    */
   readonly firstWeekday?: number;
-  /** BCP 47 tag for day names. Defaults to US English (`US_STYLE`). */
-  readonly locale?: string;
-}
-
-/** Defensive fallbacks; `Intl` always supplies these in practice. */
-const FALLBACK_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const FALLBACK_FULL = [
-  'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
-];
-
-/**
- * A week of real dates, Sunday first, used only as input to `Intl` so the day
- * names come from the platform rather than a hand-written table. 2025-01-05 is
- * a Sunday; the six days after it complete the week.
- */
-const REFERENCE_WEEK = Array.from({ length: 7 }, (_, i) => new Date(2025, 0, 5 + i));
-
-export function weekdayNames(locale: string, width: 'short' | 'long'): string[] {
-  try {
-    const formatter = new Intl.DateTimeFormat(locale, { weekday: width });
-    const names = REFERENCE_WEEK.map((date) => formatter.format(date));
-    if (names.every((name) => name.length > 0)) return names;
-  } catch {
-    // Fall through to the English fallback.
-  }
-  return width === 'short' ? [...FALLBACK_SHORT] : [...FALLBACK_FULL];
 }
 
 /**
@@ -104,7 +76,6 @@ export function weekdayPrices(
   options: WeekdayOptions = {},
 ): WeekdayPrice[] {
   const firstWeekday = options.firstWeekday ?? 1;
-  const symbols = weekdayNames(options.locale ?? US_STYLE.locale, 'short');
 
   const grouped = new Map<number, FuelEntryStats[]>();
   for (const entry of entries) {
@@ -125,7 +96,6 @@ export function weekdayPrices(
     const total = fills.reduce((sum, entry) => sum + entry.pricePerGallon, 0);
     result.push({
       weekday,
-      symbol: symbols[weekday - 1] ?? FALLBACK_SHORT[weekday - 1] ?? '',
       averagePrice: total / fills.length,
       fillUpCount: fills.length,
     });

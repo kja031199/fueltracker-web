@@ -277,9 +277,9 @@ describe('one display style: the reader\u2019s locale and currency (#94)', () =>
     expect(formatDate(may1, 'en-GB')).toBe('01/05/2026');
   });
 
-  test('a date that is not a number reads as it always did, rather than throwing', () => {
-    expect(formatDate(Number.NaN, 'de-DE')).toBe('Invalid Date');
-    expect(formatDate(Number.POSITIVE_INFINITY)).toBe('Invalid Date');
+  test('a date that is not a number reads as a dash, not as English or a throw (#94)', () => {
+    expect(formatDate(Number.NaN, 'de-DE')).toBe('—');
+    expect(formatDate(Number.POSITIVE_INFINITY)).toBe('—');
   });
 
   test('the browser\u2019s language is used when Intl knows it, and en-US when not', () => {

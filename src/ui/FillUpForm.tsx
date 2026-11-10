@@ -13,6 +13,7 @@ import { useFillUpForm } from './useFillUpForm';
 import { ReceiptScanField } from './ReceiptScanField';
 import { DecimalField } from './DecimalField';
 import { useDisplay, useUnits } from './session';
+import { gradeLabel, volumeWords } from './words';
 
 interface Props {
   readonly vehicleId: string;
@@ -163,14 +164,14 @@ export function FillUpForm({
 
       <DecimalField
         id={`${idBase}-fillup-volume`}
-        label={volumeSpec.name}
+        label={volumeWords[units.volume].name}
         value={numericText.gallons}
         onChange={(text) => typeNumber('gallons', text, volumeSpec.toGallons)}
       />
 
       <DecimalField
         id={`${idBase}-fillup-price`}
-        label={`Price per ${volumeSpec.singularNoun}`}
+        label={`Price per ${volumeWords[units.volume].noun}`}
         value={numericText.price}
         onChange={(text) => typeNumber('price', text, (typed) => pricePerGallonFrom(typed, units.volume))}
       />
@@ -228,7 +229,7 @@ export function FillUpForm({
         >
           {FUEL_GRADES.map((grade) => (
             <option key={grade} value={grade}>
-              {grade}
+              {gradeLabel(grade)}
             </option>
           ))}
         </select>

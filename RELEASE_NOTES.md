@@ -11,6 +11,17 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-10
 
+- **The weekday price chart names days in your browser's language ("Di"
+  for Tuesday in German), like the dates beside it.** A date the app cannot
+  read now shows "—" instead of "Invalid Date". Everything else reads as
+  before.
+  *Technical:* the last English left the domain layer: unit names and nouns,
+  weekday names, grade and range labels moved to `ui/words.ts`, the unused
+  metric names were deleted, and `WeekdayPrice` lost its `symbol`.
+  `src/test/domainWords.test.ts` reads every string literal in `domain/` and
+  refuses English, except the stored grade ids and the `'All'` range id. The
+  last of four steps on #94.
+  [#94](https://github.com/kja031199/fueltracker-web/issues/94) · [PR #142](https://github.com/kja031199/fueltracker-web/pull/142)
 - **Sync messages write their numbers the way your browser does: "1.200
   rows" in German.** Nothing else you see changes; the dashboard's words are
   ready to be translated.

@@ -283,10 +283,11 @@ const dateFormatters = new Map<string, Intl.DateTimeFormat>();
  * `01/05/2026` (#94). One cached `Intl.DateTimeFormat` per locale, like
  * `numberFormat`. With the default locale it prints exactly what
  * `toLocaleDateString('en-US')` does, and a time that is not a finite number
- * reads `Invalid Date`, as `toLocaleDateString` did, rather than throwing.
+ * reads `—` rather than throwing (`toLocaleDateString` said "Invalid Date",
+ * which is English and says nothing to a reader).
  */
 export function formatDate(at: number, locale = US_STYLE.locale): string {
-  if (!Number.isFinite(at)) return 'Invalid Date';
+  if (!Number.isFinite(at)) return '—';
   let formatter = dateFormatters.get(locale);
   if (formatter === undefined) {
     formatter = new Intl.DateTimeFormat(locale);

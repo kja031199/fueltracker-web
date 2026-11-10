@@ -1,5 +1,7 @@
 import type { ReactElement } from 'react';
 import type { WeekdayPrice } from '../../domain/weekdayPricePattern';
+import { useDisplay } from '../session';
+import { weekdayNames } from '../words';
 import { ChartFrame } from './ChartFrame';
 import { extentOf, niceTicks, plotBounds, scale } from './geometry';
 
@@ -27,6 +29,9 @@ export function WeekdayPriceChart({
   cheapestWeekday,
   formatPrice,
 }: Props): ReactElement {
+  // Day names in the reader's locale, like every other date part (#94).
+  const names = weekdayNames(useDisplay().style.locale, 'short');
+  const dayName = (weekday: number): string => names[weekday - 1] ?? '';
   const { x0, x1, y0, y1 } = plotBounds(AREA);
   const yExtent = extentOf(prices.map((price) => price.averagePrice));
   const slot = prices.length === 0 ? 0 : (x1 - x0) / prices.length;
@@ -37,7 +42,7 @@ export function WeekdayPriceChart({
       : `${prices.length} days, from ${formatPrice(yExtent.min)} to ${formatPrice(yExtent.max)}.`;
 
   const rows = prices.map((price) => ({
-    label: price.symbol,
+    label: dayName(price.weekday),
     value:
       price.weekday === cheapestWeekday
         ? `${formatPrice(price.averagePrice)} — cheapest day`
@@ -100,7 +105,7 @@ export function WeekdayPriceChart({
                     fontSize={8}
                     fill="var(--text-secondary)"
                   >
-                    {price.symbol}
+                    {dayName(price.weekday)}
                   </text>
                 </g>
               );
