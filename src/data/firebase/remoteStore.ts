@@ -144,7 +144,7 @@ export class FirestoreRemoteStore implements RemoteStore {
 
   /**
    * Over a Firestore instance that already exists — the emulator's, in
-   * `rules.test.ts`, so the real push and pull run against the real rules.
+   * `rules.emulator.test.ts`, so the real push and pull run against the real rules.
    */
   static over(db: Firestore, uid: string): FirestoreRemoteStore {
     return new FirestoreRemoteStore({ apiKey: '', authDomain: '', projectId: '', appId: '' }, uid, db);

@@ -132,7 +132,7 @@ __fuelTrackerCsp.clear()   // empties the log
 
 If a change is risky enough to want a report-only trial first, a report-only
 header may be served **alongside** the enforced one — that is how a stricter
-candidate gets tested. `src/ui/csp.test.ts` requires the enforcing header to be
+candidate gets tested. `src/ui/csp.build.test.ts` requires the enforcing header to be
 present, so it cannot be quietly replaced by a report-only one again.
 
 The obvious next tightening is dropping `'unsafe-inline'` from `style-src`,

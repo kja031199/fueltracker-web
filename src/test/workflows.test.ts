@@ -111,6 +111,12 @@ describe('the Firebase CLI is pinned and installed from a lockfile', () => {
 
   test('the workflows that need it install it from that lockfile', () => {
     const needed = ['deploy.yml', 'ci.yml'];
+    // `npm run test:rules` counts as running it: that script is the pinned
+    // binary (#97), which `projects.test.ts` asserts.
+    const rulesScript = (
+      JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> }
+    ).scripts['test:rules'];
+    expect(rulesScript).toMatch(/^\.github\/firebase-cli\/node_modules\/\.bin\/firebase /);
     for (const name of needed) {
       const text = readFileSync(`${WORKFLOW_DIR}/${name}`, 'utf8');
       if (!/firebase/.test(text)) continue;
@@ -118,7 +124,7 @@ describe('the Firebase CLI is pinned and installed from a lockfile', () => {
         /npm ci --prefix \.github\/firebase-cli/,
       );
       expect(text, `${name} should run the pinned binary`).toMatch(
-        /\.github\/firebase-cli\/node_modules\/\.bin\/firebase/,
+        /\.github\/firebase-cli\/node_modules\/\.bin\/firebase|\bnpm run test:rules\b/,
       );
     }
   });
@@ -356,6 +362,8 @@ describe('the deploy key never meets the build toolchain (#76)', () => {
     expect(build?.text).toMatch(/uses:\s*actions\/upload-artifact@/);
     expect(build?.text).toMatch(/path:\s*dist\/?\s*$/m);
     expect(build?.text).toMatch(/\bnpm test\b/);
+    // The build it uploads is the one `test:build` made and then tested.
+    expect(build?.text).toMatch(/\bnpm run test:build\b/);
     expect(keyJob?.text).toMatch(/uses:\s*actions\/download-artifact@/);
   });
 
@@ -390,6 +398,39 @@ function runBlock(step: string): string {
   }
   return block.join('\n');
 }
+
+/** One job's commands, every `run:` block joined. */
+function jobCommands(workflow: string, id: string): string {
+  const job = jobs().find((candidate) => candidate.workflow === workflow && candidate.id === id);
+  expect(job, `${workflow} has a ${id} job`).toBeDefined();
+  return stepsOf(job?.text ?? '').map(commands).join('\n');
+}
+
+describe('every test project runs in CI, through its npm script (#97)', () => {
+  test('the main check builds and tests the build, then runs the unit tests', () => {
+    const run = jobCommands('ci.yml', 'test');
+    expect(run).toMatch(/\bnpm run test:build\b/);
+    expect(run).toMatch(/\bnpm test\b/);
+  });
+
+  test('the rules check runs the rules project', () => {
+    expect(jobCommands('ci.yml', 'rules')).toMatch(/\bnpm run test:rules\b/);
+  });
+
+  test('the deploy tests the build it ships, and runs the unit tests', () => {
+    const run = jobCommands('deploy.yml', 'build');
+    expect(run).toMatch(/\bnpm run test:build\b/);
+    expect(run).toMatch(/\bnpm test\b/);
+  });
+
+  test('no workflow runs vitest itself, so a project cannot be left out by a path', () => {
+    // A path argument is how the rules job came to run the pure tests under
+    // src/data/firebase/ twice, and how a renamed file could fall out of a run.
+    for (const { workflow, id } of jobs()) {
+      expect(jobCommands(workflow, id), `${workflow} ${id}`).not.toMatch(/\bvitest\b/);
+    }
+  });
+});
 
 describe('text a pull request author wrote never becomes a command', () => {
   // A pull request's title, description and branch name are written by

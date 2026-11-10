@@ -58,13 +58,13 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      # Built **before** the tests, not after. A suite that passes while the app
-      # fails to build is a green check over something nobody can load — and
-      # the manifest tests read the built output, so running the build second
-      # would leave them silently skipping on every CI run, which is barely
-      # different from not having written them.
-      - name: Build
-        run: npx vite build
+      # Builds, then runs the `*.build.test.ts` files against that build (#97):
+      # the manifest, the CSP and the self-hosted reader. A suite that passes
+      # while the app fails to build is a green check over something nobody can
+      # load, so a failed build fails this step. The build project refuses to
+      # start without dist/, so these can no longer skip in silence.
+      - name: Build, and test the build
+        run: npm run test:build
 
       - name: Test
         run: npm test
@@ -76,9 +76,10 @@ jobs:
 
     # A separate job because it needs the Firestore emulator, which needs Java
     # and a downloaded JAR. The main suite needs nothing but Node and that is
-    # worth keeping, so `rules.test.ts` skips itself when the emulator is
-    # absent — which makes this job the only thing that actually runs those
-    # eight assertions.
+    # worth keeping, so the `*.emulator.test.ts` files are a Vitest project of
+    # their own (#97), which `npm test` does not run — this job is the only
+    # thing that runs them. The project refuses to start without an emulator,
+    # so it cannot pass by skipping.
     #
     # It reports a status unconditionally, like the others, so it is safe to
     # add to the required set — and it should be. `firestore.rules` is the
@@ -112,9 +113,10 @@ jobs:
 
       # Java is preinstalled on ubuntu-latest. The emulator JAR is fetched on
       # first run, which takes a few seconds.
+      #
+      # `npm run test:rules` is the pinned binary above running
+      # `emulators:exec --only firestore` around the rules project; the script
+      # is the one place that command is written, and
+      # `src/test/projects.test.ts` holds it to that.
       - name: Test rules against the emulator
-        run: >
-          .github/firebase-cli/node_modules/.bin/firebase emulators:exec
-          --only firestore
-          --project fueltracker-rules-test
-          "npx vitest run src/data/firebase/"
+        run: npm run test:rules

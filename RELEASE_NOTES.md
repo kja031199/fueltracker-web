@@ -11,6 +11,17 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-10
 
+- **No change you'll see: the tests are split into three groups, each run on
+  purpose.** The third step of tidying the tests.
+  *Technical:* Vitest projects chosen by file name — `unit` (`npm test`),
+  `build` (`*.build.test.ts`, `npm run test:build`, which builds first) and
+  `rules` (`*.emulator.test.ts`, `npm run test:rules` on the emulator). A
+  normal run no longer reports 84 skipped tests; `csp`, `manifest` and
+  `ocrAssets` now behave alike and never read a stale build; the rules job no
+  longer re-runs 44 pure tests. `build` and `rules` fail with a reason rather
+  than skip without their prerequisite. `projects.test.ts` holds every file to
+  one project and the workflows to the scripts.
+  [#97](https://github.com/kja031199/fueltracker-web/issues/97) · [PR #133](https://github.com/kja031199/fueltracker-web/pull/133)
 - **No change you'll see: the tests share one set of fixtures instead of
   copying them into every file.** The second step of tidying the tests.
   *Technical:* `src/test/fixtures.ts` (`makeStore`, `draft`/`draftWith`,

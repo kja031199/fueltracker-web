@@ -230,9 +230,9 @@ gone. Fill-ups the member logged **and synced**
 stay with the owner. One logged but not yet synced when access ends goes with
 the car, because there is nowhere left it may be sent.
 
-The rules are pinned on the emulator by `sharingRules.test.ts`, and the whole
+The rules are pinned on the emulator by `sharingRules.emulator.test.ts`, and the whole
 two-person flow — invite, accept, both logging, removal — runs end to end
-against the real rules in `sharing.test.ts`.
+against the real rules in `sharing.emulator.test.ts`.
 
 ## Local storage is separated by account
 

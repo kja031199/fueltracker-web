@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
-import { allowedUidsInRules, describeWithEmulator, rulesEnvironment } from '../../test/emulator';
+import { allowedUidsInRules, rulesEnvironment } from '../../test/emulator';
 import type { RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { doc, setDoc, type Firestore } from 'firebase/firestore';
 import { InMemoryRepository } from '../repository';
@@ -60,7 +60,7 @@ const [OWNER_UID, PARTNER_UID] = allowedUidsInRules();
 const OWNER: Account = { uid: OWNER_UID!, name: 'Kyle', email: 'kyle@example.com', emailVerified: true };
 const PARTNER: Account = { uid: PARTNER_UID!, name: 'Sam', email: 'sam@example.com', emailVerified: true };
 
-describeWithEmulator('sharing through the real rules', () => {
+describe('sharing through the real rules', () => {
   let env: RulesTestEnvironment;
 
   beforeAll(async () => {

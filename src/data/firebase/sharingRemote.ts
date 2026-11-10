@@ -1,7 +1,7 @@
 /**
  * Sharing a car, against Firestore (#66). The in-memory version, which the
  * rest of the suite uses, is in `../sharing.ts`; this one is exercised against
- * the real `firestore.rules` on the emulator in `sharing.test.ts`.
+ * the real `firestore.rules` on the emulator in `sharing.emulator.test.ts`.
  *
  * Every write here is one the rules check on their own — this class is a
  * convenience, not the boundary. A forged invitation, a join without one, a
