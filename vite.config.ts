@@ -8,7 +8,8 @@ import { configDefaults, defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
-const base = process.env.PAGES_BASE ?? '/';
+/** Served from the root of Firebase Hosting. */
+const base = '/';
 
 /**
  * `OCR_PROBE=1` adds the OCR browser check's probe page to the build (#17).
@@ -174,8 +175,6 @@ export default defineConfig({
       devOptions: { enabled: false },
     }),
   ],
-  // `/` on Firebase Hosting. `PAGES_BASE` is left over from GitHub Pages,
-  // which served from a repository subpath; nothing sets it any more.
   base,
   build: {
     rollupOptions: {
@@ -200,6 +199,14 @@ export default defineConfig({
     restoreMocks: true,
     unstubGlobals: true,
     unstubEnvs: true,
+    // `npm run test:coverage` (#99): reported in CI's job summary, never a
+    // threshold — a target makes the number the goal instead of the tests.
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{ts,tsx}', 'scripts/**/*.ts'],
+      exclude: ['**/*.test.{ts,tsx}', 'src/test/**', '**/testing/**', 'src/vite-env.d.ts'],
+      reporter: ['text-summary', 'json-summary'],
+    },
     // Node unless a project says otherwise: the domain and data suites need no
     // DOM and start faster without one.
     environment: 'node',

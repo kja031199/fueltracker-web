@@ -12,6 +12,7 @@ import {
   recoverInterrupted,
   loadSets,
   missingTests,
+  needsBuild,
   problemWith,
   problemWithSet,
   shellQuoted,
@@ -127,6 +128,28 @@ describe('a set', () => {
 
   test('names each mutation once', () => {
     expect(problemWithSet(set({ mutations: [mutation(), mutation()] }))).toMatch(/twice/);
+  });
+});
+
+describe('a mutation tested against the build', () => {
+  // The build project reads dist/, and without one it refuses to start —
+  // which exits non-zero, which would read as a kill. So the runner refuses
+  // to begin without a build instead (#99).
+  test.each([
+    [['--project', 'build', 'src/ui/csp.build.test.ts'], true],
+    [['src/test/bundleBudget.build.test.ts'], true],
+    [['--project', 'unit', '--project', 'dom'], false],
+    [['src/ui/build.ts', 'src/buildings.test.ts'], false],
+  ] as const)('%j needs a build: %s', (tests, expected) => {
+    expect(needsBuild(['npx', 'vitest', 'run', '--bail', '1', ...tests])).toBe(expected);
+  });
+
+  test('the weekly run builds before it mutates', () => {
+    const workflow = readFileSync('.github/workflows/mutation.yml', 'utf8');
+    const build = workflow.search(/run: npm run build\b/);
+    const mutate = workflow.search(/run: npm run mutate\b/);
+    expect(build).toBeGreaterThan(-1);
+    expect(build).toBeLessThan(mutate);
   });
 });
 

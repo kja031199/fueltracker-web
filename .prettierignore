@@ -13,5 +13,5 @@
 # Not ours, or not code.
 node_modules/
 .github/firebase-cli/node_modules/
-dist/
-coverage/
+/dist/
+/coverage/

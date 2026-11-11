@@ -11,6 +11,19 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-11
 
+- **Nothing you see changes, and the app can't quietly get bigger.** Each
+  part of the app that a browser downloads now has a size limit, checked on
+  every change.
+  *Technical:* the last of #99: a gzipped budget per chunk
+  (`bundleBudget.build.test.ts`); test coverage measured on every pull
+  request and shown in its summary, informational only; a pull request
+  template that copies CLAUDE.md's checklist (kept identical by a test);
+  Playwright pinned as a devDependency with `npm run check:ocr`;
+  `.git-blame-ignore-revs` for the Prettier reformat; `PAGES_BASE` removed.
+  The mutation runner now refuses to start when a selected mutation is tested
+  against a build that does not exist (which read as a kill), and the weekly
+  mutation run builds first.
+  [#99](https://github.com/kja031199/fueltracker-web/issues/99) · [PR #152](https://github.com/kja031199/fueltracker-web/pull/152)
 - **Nothing you see changes.** The code is now laid out the same way
   everywhere, by a tool rather than by hand.
   *Technical:* Prettier, configured to the style the code already used

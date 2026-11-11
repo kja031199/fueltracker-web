@@ -70,8 +70,14 @@ jobs:
       - name: Build, and test the build
         run: npm run test:build
 
-      - name: Test
-        run: npm test
+      # The same suite as `npm test`, measuring coverage while it runs (#99).
+      - name: Test, with coverage
+        run: npm run test:coverage
+
+      # Informational: the totals in the job summary, never a threshold. The
+      # script says so rather than failing if there is no summary to read.
+      - name: Coverage summary
+        run: node --experimental-strip-types scripts/coverage/summary.ts >> "$GITHUB_STEP_SUMMARY"
 
   rules:
     name: Firestore security rules

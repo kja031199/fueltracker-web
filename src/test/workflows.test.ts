@@ -437,7 +437,9 @@ describe('every test project runs in CI, through its npm script (#97)', () => {
   test('the main check builds and tests the build, then runs the unit tests', () => {
     const run = jobCommands('ci.yml', 'test');
     expect(run).toMatch(/\bnpm run test:build\b/);
-    expect(run).toMatch(/\bnpm test\b/);
+    // `test:coverage` is `npm test`'s projects with coverage on (#99);
+    // guardrails.test.ts holds the script to exactly that.
+    expect(run).toMatch(/\bnpm run test:coverage\b/);
   });
 
   test('the main check holds the code to its formatting (#99)', () => {

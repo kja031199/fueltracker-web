@@ -153,6 +153,18 @@ export function testCommand(set: MutationSet, mutation: Mutation): string[] {
   return ['npx', 'vitest', 'run', '--bail', '1', '--exclude', OWN_CHECK, ...tests];
 }
 
+/**
+ * Whether a mutation's tests read the built app: the `build` project, or a
+ * `*.build.test.ts` named outright. Those refuse to start without `dist/`, and
+ * a refusal exits non-zero — so without a build every such mutation would
+ * read as killed. The run checks for one first (#99).
+ */
+export function needsBuild(command: readonly string[]): boolean {
+  return command.some(
+    (word, i) => (word === 'build' && command[i - 1] === '--project') || /\.build\.test\.tsx?$/.test(word),
+  );
+}
+
 /** Whether the words on the command line ask for this mutation. None asks for all. */
 export function wanted(words: readonly string[], set: MutationSet, mutation: Mutation): boolean {
   if (words.length === 0) return true;
@@ -288,6 +300,16 @@ async function main(argv: readonly string[]): Promise<number> {
   if (emulator === undefined || emulator.trim() === '') {
     const [command, ...args] = insideEmulator(argv);
     return spawnSync(command!, args, { stdio: 'inherit' }).status ?? 1;
+  }
+
+  const needingBuild = sets.flatMap((set) =>
+    set.mutations.filter((mutation) => wanted(words, set, mutation) && needsBuild(testCommand(set, mutation))),
+  );
+  if (needingBuild.length > 0 && !existsSync('dist/index.html')) {
+    console.error(
+      `${needingBuild.length} of these mutations are tested against the build, and there is none: run \`npm run build\` first.`,
+    );
+    return 1;
   }
 
   // Whatever is mutated is put back, however the run ends.
