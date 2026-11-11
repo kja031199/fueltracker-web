@@ -22,26 +22,16 @@
 // import pipeline. It is served only to the check and never copied anywhere;
 // keep real receipts (card digits, account numbers) out of the repository.
 //
-// Needs Playwright and Chromium. Not a dependency of this repository; in a
-// fresh clone: `npm i --no-save playwright && npx playwright install chromium`.
+// Needs Chromium for the pinned Playwright, a devDependency (#99). Once, in a
+// fresh clone: `npx playwright install chromium`. Then `npm run check:ocr`.
 
-import { execFileSync, execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { extname, join, normalize } from 'node:path';
 
-function loadPlaywright() {
-  const require = createRequire(import.meta.url);
-  try {
-    return require('playwright');
-  } catch {
-    const global = execSync('npm root -g').toString().trim();
-    return require(join(global, 'playwright'));
-  }
-}
-const { chromium } = loadPlaywright();
+import { chromium } from 'playwright';
 
 const EXPECTED = ['GALLONS 10.512', 'TOTAL $41.23'];
 const photoArg = process.argv.indexOf('--photo');

@@ -1,0 +1,99 @@
+{
+  "title": "#99 Guardrails",
+  "mutations": [
+    {
+      "name": "the entry chunk over its budget",
+      "file": "src/test/bundleBudget.build.test.ts",
+      "from": "  entry: 160,",
+      "to": "  entry: 100,",
+      "tests": [
+        "--project",
+        "build",
+        "src/test/bundleBudget.build.test.ts"
+      ]
+    },
+    {
+      "name": "the entry chunk not found, so measured against nothing",
+      "file": "src/test/bundleBudget.build.test.ts",
+      "from": "/<script[^>]+src=\"[^\"]*\\/assets\\/([^\"]+\\.js)\"/",
+      "to": "/<script[^>]+data-never=\"([^\"]+\\.js)\"/",
+      "tests": [
+        "--project",
+        "build",
+        "src/test/bundleBudget.build.test.ts"
+      ]
+    },
+    {
+      "name": "the template missing a checklist item",
+      "file": ".github/pull_request_template.md",
+      "from": "- [ ] No secrets and no Firebase config in the diff.\n",
+      "to": "",
+      "tests": [
+        "src/test/guardrails.test.ts"
+      ]
+    },
+    {
+      "name": "the reformat back in git blame",
+      "file": ".git-blame-ignore-revs",
+      "from": "c6b8b462cfe391e748f4297ec93e9b7da5947402\n",
+      "to": "",
+      "tests": [
+        "src/test/guardrails.test.ts"
+      ]
+    },
+    {
+      "name": "Playwright found wherever it is installed again",
+      "file": "scripts/ocr-check/check.mjs",
+      "from": "import { chromium } from 'playwright';",
+      "to": "const { chromium } = await import(execFileSync('npm', ['root', '-g']).toString().trim() + '/playwright/index.js'); // npm root -g",
+      "tests": [
+        "src/test/guardrails.test.ts"
+      ]
+    },
+    {
+      "name": "PAGES_BASE read again",
+      "file": "vite.config.ts",
+      "from": "const base = '/';",
+      "to": "const base = process.env.PAGES_BASE ?? '/';",
+      "tests": [
+        "src/test/guardrails.test.ts"
+      ]
+    },
+    {
+      "name": "coverage turned into a gate",
+      "file": "vite.config.ts",
+      "from": "      reporter: ['text-summary', 'json-summary'],",
+      "to": "      reporter: ['text-summary', 'json-summary'],\n      thresholds: { lines: 90 },",
+      "tests": [
+        "src/test/guardrails.test.ts"
+      ]
+    },
+    {
+      "name": "a summary with a non-number total printed anyway",
+      "file": "scripts/coverage/summary.ts",
+      "from": "typeof pct === 'number' && Number.isFinite(pct)",
+      "to": "true",
+      "tests": [
+        "src/test/guardrails.test.ts"
+      ]
+    },
+    {
+      "name": "no mutation thought to need a build",
+      "file": "scripts/mutations/mutate.ts",
+      "from": "(word, i) => (word === 'build' && command[i - 1] === '--project') || /\\.build\\.test\\.tsx?$/.test(word),",
+      "to": "() => false,",
+      "tests": [
+        "src/test/mutations.test.ts"
+      ]
+    },
+    {
+      "name": "the weekly run mutating before it builds",
+      "file": ".github/workflows/mutation.yml",
+      "from": "      - name: Build\n        run: npm run build\n\n",
+      "to": "",
+      "tests": [
+        "src/test/mutations.test.ts"
+      ]
+    }
+  ]
+}

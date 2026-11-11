@@ -82,6 +82,28 @@ stand between a correct change and `main`.
 lockfile pins and fails if the lockfile and manifest disagree, instead of
 silently resolving a different tree.
 
+**Guardrails** (#99), each a choice:
+
+- **Coverage is reported, never enforced.** `npm run test:coverage` is the
+  main suite with V8 coverage over `src/` and `scripts/` (tests excluded); the
+  pull-request check runs it instead of plain `npm test` and prints the four
+  totals in its job summary (`scripts/coverage/summary.ts`). There is no
+  threshold on purpose: a target turns the number into the goal, and the
+  mutation record (above) is the measure of whether tests catch anything.
+- **A bundle budget**, gzipped, in `src/test/bundleBudget.build.test.ts`: the
+  entry chunk, the Firestore chunk (loaded after sign-in) and every other chunk
+  each have a ceiling about a tenth above what they measured. Raising one is a
+  decision for the pull request that needs it, recorded there with why.
+- **A pull request template**, `.github/pull_request_template.md`, whose
+  checklist is CLAUDE.md's "Before opening a pull request" word for word;
+  `guardrails.test.ts` keeps the two the same.
+- **Playwright is a pinned devDependency** for the OCR browser check
+  (`npm run check:ocr`), no longer installed on the fly or found globally.
+- **`git blame` skips the formatting commit**: `.git-blame-ignore-revs` (GitHub
+  reads it; locally `git config blame.ignoreRevsFile .git-blame-ignore-revs`).
+- **`PAGES_BASE` is gone**: the app is served from the root of Firebase Hosting
+  and nothing set it since GitHub Pages.
+
 **Formatting is Prettier's** (#99), set to the style the code already had —
 single quotes, 120 columns, trailing commas (`.prettierrc.json`) — over the
 TypeScript, JavaScript and CSS only (`.prettierignore` lists what is in, so
@@ -153,8 +175,8 @@ watcher both miss it. From #39 to #17 the live site's reader was refused on
 every scan, and nothing noticed. So scanning has a real-browser check:
 
 ```bash
-npm i --no-save playwright && npx playwright install chromium   # once, if not installed
-node scripts/ocr-check/check.mjs
+npx playwright install chromium   # once: the browser for the pinned Playwright
+npm run check:ocr
 ```
 
 It builds the app with a probe page added (`OCR_PROBE=1`, into a temporary
@@ -260,6 +282,12 @@ built, and the runner now refuses each:
 A run that is killed outright (no `finally`, no signal handler) leaves the
 original of the file it was changing in `scripts/mutations/.restore/`
 (gitignored); the next run puts it back before anything else.
+
+**Some mutations are tested against the build** — the CSP, the precache, the
+bundle budget — and those tests refuse to start without `dist/`, which would
+read as a kill. So `npm run build` first; the runner refuses to begin if a
+selected mutation needs a build and there is none, and the weekly workflow
+builds before it mutates.
 
 **Two runs keep the record honest:**
 

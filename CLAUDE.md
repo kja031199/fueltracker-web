@@ -115,6 +115,12 @@ full run and passed in isolation, because the worker was starved rather than the
 payload decoded. It spies on `atob` now, with a second test proving the spy sees
 a real decode.
 
+**Size and coverage** (#99): the gzipped bundle has a budget per chunk
+(`bundleBudget.build.test.ts`) — raise one only with a reason in the PR.
+Coverage is printed in the PR check's summary and is never a threshold.
+`.github/pull_request_template.md` copies the checklist below; change the
+checklist here and the template with it (`guardrails.test.ts`).
+
 **Formatting is Prettier's** (#99): run `npm run format` before committing;
 CI fails on `npm run format:check`. Only TS/JS/CSS are formatted — Markdown,
 JSON and `firestore.rules` are not. A reformat that moves code a mutation

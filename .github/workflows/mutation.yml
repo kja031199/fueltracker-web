@@ -46,6 +46,13 @@ jobs:
         with:
           firebase-cli: 'true'
 
+      # Some mutations are tested against the built app (the CSP, the
+      # precache, the bundle budget). Without a build those tests refuse to
+      # start, which would read as every one of them killed; the runner refuses
+      # to begin instead, so the build comes first.
+      - name: Build
+        run: npm run build
+
       # Starts one emulator and runs every mutation inside it. The survivors,
       # if any, are listed in the job summary.
       - name: Run every mutation
