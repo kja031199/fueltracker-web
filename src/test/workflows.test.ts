@@ -21,12 +21,32 @@ import { describe, expect, test } from 'vitest';
  */
 
 const WORKFLOW_DIR = '.github/workflows';
+const ACTIONS_DIR = '.github/actions';
 
-function workflows(): { name: string; text: string }[] {
-  return readdirSync(WORKFLOW_DIR)
-    .filter((name) => name.endsWith('.yml') || name.endsWith('.yaml'))
-    .map((name) => ({ name, text: readFileSync(`${WORKFLOW_DIR}/${name}`, 'utf8') }));
+/** The repository's own composite actions (#99), which run steps just as a workflow does. */
+function actions(): { name: string; text: string }[] {
+  return readdirSync(ACTIONS_DIR).map((dir) => ({
+    name: `actions/${dir}/action.yml`,
+    text: readFileSync(`${ACTIONS_DIR}/${dir}/action.yml`, 'utf8'),
+  }));
 }
+
+/**
+ * Every file that runs steps: the workflows, and the composite actions they
+ * call. A pin, an `npx` or a pull request's text inside an action is the same
+ * risk as one in a workflow, so every check below reads both.
+ */
+function workflows(): { name: string; text: string }[] {
+  return [
+    ...readdirSync(WORKFLOW_DIR)
+      .filter((name) => name.endsWith('.yml') || name.endsWith('.yaml'))
+      .map((name) => ({ name, text: readFileSync(`${WORKFLOW_DIR}/${name}`, 'utf8') })),
+    ...actions(),
+  ];
+}
+
+/** A `uses:` of an action in this repository: pinned by being in it. */
+const LOCAL_ACTION = /^(- )?uses:\s*\.\//;
 
 /** Every `uses:` line, with the workflow it came from. */
 function usesLines(): { workflow: string; line: string }[] {
@@ -35,6 +55,7 @@ function usesLines(): { workflow: string; line: string }[] {
       .split('\n')
       .map((line) => line.trim())
       .filter((line) => line.startsWith('uses:') || line.startsWith('- uses:'))
+      .filter((line) => !LOCAL_ACTION.test(line))
       .map((line) => ({ workflow: name, line })),
   );
 }
@@ -117,11 +138,15 @@ describe('the Firebase CLI is pinned and installed from a lockfile', () => {
       JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> }
     ).scripts['test:rules'];
     expect(rulesScript).toMatch(/^\.github\/firebase-cli\/node_modules\/\.bin\/firebase /);
+    // Installed directly, or through the setup action asked for it (#99),
+    // whose own steps install it from the lockfile.
+    const setup = readFileSync(`${ACTIONS_DIR}/setup/action.yml`, 'utf8');
+    expect(setup).toMatch(/npm ci --prefix \.github\/firebase-cli/);
     for (const name of needed) {
       const text = readFileSync(`${WORKFLOW_DIR}/${name}`, 'utf8');
       if (!/firebase/.test(text)) continue;
       expect(text, `${name} should install the pinned CLI`).toMatch(
-        /npm ci --prefix \.github\/firebase-cli/,
+        /npm ci --prefix \.github\/firebase-cli|uses:\s*\.\/\.github\/actions\/setup\s*\n\s+with:\s*\n\s+firebase-cli:\s*'true'/,
       );
       expect(text, `${name} should run the pinned binary`).toMatch(
         /\.github\/firebase-cli\/node_modules\/\.bin\/firebase|\bnpm run test:rules\b/,
@@ -336,6 +361,13 @@ describe('the deploy key never meets the build toolchain (#76)', () => {
     expect(keyJob?.text).toMatch(/^ {4}needs:\s*build\s*$/m);
   });
 
+  test('the key job uses no action of this repository, whose steps these checks cannot see', () => {
+    // The shared setup action (#99) runs `npm ci` with lifecycle scripts. In
+    // the key job it would undo #76, and every check here reads the job's own
+    // text — an action's steps are not in it.
+    expect(keySteps.some((step) => /uses:\s*\.\//.test(step))).toBe(false);
+  });
+
   test('the key job installs nothing with lifecycle scripts', () => {
     const installs = keySteps.filter((step) => /\bnpm (ci|install|i)\b/.test(commands(step)));
     expect(installs.length).toBeGreaterThan(0);
@@ -466,5 +498,63 @@ describe('the release-notes check (RELEASE_NOTES.md)', () => {
   test('hands it the title and description through the environment', () => {
     expect(text).toMatch(/PR_TITLE:\s*\$\{\{\s*github\.event\.pull_request\.title\s*\}\}/);
     expect(text).toMatch(/PR_BODY:\s*\$\{\{\s*github\.event\.pull_request\.body\s*\}\}/);
+  });
+});
+
+describe('one setup, one Node version, one build per merge (#99)', () => {
+  const nvmrc = readFileSync('.nvmrc', 'utf8').trim();
+  const manifest = JSON.parse(readFileSync('package.json', 'utf8')) as {
+    engines?: { node?: string };
+    devDependencies?: Record<string, string>;
+  };
+
+  test('.nvmrc names one major version, and is the only place it is written', () => {
+    expect(nvmrc).toMatch(/^\d+$/);
+    for (const { name, text } of workflows()) {
+      expect(text, `${name} writes a Node version of its own`).not.toMatch(/^\s*node-version:/m);
+      if (/actions\/setup-node@/.test(text)) expect(text, name).toMatch(/node-version-file:\s*\.nvmrc/);
+    }
+  });
+
+  test('package.json and the Node types agree with it', () => {
+    // Types for a newer Node accept APIs that do not exist where the code runs.
+    expect(manifest.engines?.node).toBe(`^${nvmrc}`);
+    expect(manifest.devDependencies?.['@types/node']).toMatch(new RegExp(`^\\^${nvmrc}\\.`));
+  });
+
+  test('the app is installed only through the setup action', () => {
+    // One copy of the setup, so a cache key or a version cannot drift between
+    // jobs. The deploy key job installs only the CLI, by its own prefix.
+    for (const { name, text } of workflows()) {
+      if (name.startsWith('actions/')) continue;
+      // Each command on its own: `npm ci && npm ci --prefix …` is two installs.
+      const installs = text
+        .split('\n')
+        .filter((line) => !line.trim().startsWith('#'))
+        .flatMap((line) => line.split(/&&|\|\||;|\|/))
+        .filter((command) => /\bnpm ci\b/.test(command));
+      for (const command of installs) expect(command, name).toMatch(/--prefix \.github\/firebase-cli/);
+    }
+  });
+
+  test('the setup caches both lockfiles and the emulator, and pins Java', () => {
+    const setup = readFileSync(`${ACTIONS_DIR}/setup/action.yml`, 'utf8');
+    expect(setup).toMatch(/cache-dependency-path:\s*\|\s*\n\s+package-lock\.json\s*\n\s+\.github\/firebase-cli\/package-lock\.json/);
+    expect(setup).toMatch(/path:\s*~\/\.cache\/firebase\/emulators/);
+    expect(setup).toMatch(/uses:\s*actions\/setup-java@[0-9a-f]{40}/);
+    expect(setup).toMatch(/java-version:\s*'\d+'/);
+  });
+
+  test('a merge to main is built and tested once: by the deploy that ships it', () => {
+    // ci.yml's checks gate the pull request; on the push that merges it, the
+    // deploy builds the tree, tests it and ships that build. Running the suite
+    // in ci.yml as well was the same work twice (#99).
+    const onPush = (name: string) => /^on:[\s\S]*?^\s+push:/m.test(readFileSync(`${WORKFLOW_DIR}/${name}`, 'utf8'));
+    const builders = jobs()
+      .filter(({ workflow }) => onPush(workflow))
+      .filter(({ workflow, id }) => /\bnpm (test|run test:build)\b/.test(jobCommands(workflow, id)))
+      .filter(({ text }) => !/^ {4}if:\s*github\.event_name\s*==\s*'pull_request'\s*$/m.test(text))
+      .map(({ workflow, id }) => `${workflow}:${id}`);
+    expect(builders).toEqual(['deploy.yml:build']);
   });
 });

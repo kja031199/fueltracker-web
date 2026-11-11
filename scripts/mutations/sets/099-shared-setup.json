@@ -1,0 +1,68 @@
+{
+  "title": "#99 Shared setup, one build per merge",
+  "tests": [
+    "src/test/workflows.test.ts"
+  ],
+  "mutations": [
+    {
+      "name": "the PR-only test job running on every push again",
+      "file": ".github/workflows/ci.yml",
+      "from": "    if: github.event_name == 'pull_request'\n",
+      "to": ""
+    },
+    {
+      "name": "the deploy key job using the shared setup action",
+      "file": ".github/workflows/deploy.yml",
+      "from": "      - name: Set up Node\n        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0\n        with:\n          node-version-file: .nvmrc\n          cache: npm\n          cache-dependency-path: .github/firebase-cli/package-lock.json\n",
+      "to": "      - name: Set up\n        uses: ./.github/actions/setup\n"
+    },
+    {
+      "name": "the npm cache keyed on the app lockfile only",
+      "file": ".github/actions/setup/action.yml",
+      "from": "          package-lock.json\n          .github/firebase-cli/package-lock.json\n",
+      "to": "          package-lock.json\n"
+    },
+    {
+      "name": "Java left to the runner image",
+      "file": ".github/actions/setup/action.yml",
+      "from": "      uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0\n",
+      "to": "      uses: actions/setup-java@v6\n"
+    },
+    {
+      "name": "the emulator not cached",
+      "file": ".github/actions/setup/action.yml",
+      "from": "        path: ~/.cache/firebase/emulators\n",
+      "to": "        path: ~/.npm\n"
+    },
+    {
+      "name": "a Node version written in a workflow again",
+      "file": ".github/workflows/release-notes.yml",
+      "from": "          node-version-file: .nvmrc\n",
+      "to": "          node-version: 22\n"
+    },
+    {
+      "name": "engines out of step with .nvmrc",
+      "file": "package.json",
+      "from": "\"node\": \"^22\"",
+      "to": "\"node\": \"^24\""
+    },
+    {
+      "name": "Node types for a newer Node",
+      "file": "package.json",
+      "from": "\"@types/node\": \"^22.20.5\"",
+      "to": "\"@types/node\": \"^26.6.2\""
+    },
+    {
+      "name": "a job installing the app itself",
+      "file": ".github/workflows/mutation.yml",
+      "from": "        uses: ./.github/actions/setup\n        with:\n          firebase-cli: 'true'\n",
+      "to": "        run: npm ci && npm ci --prefix .github/firebase-cli\n"
+    },
+    {
+      "name": "the setup action never installing the Firebase CLI",
+      "file": ".github/actions/setup/action.yml",
+      "from": "      run: npm ci --prefix .github/firebase-cli\n",
+      "to": "      run: echo skipped\n"
+    }
+  ]
+}

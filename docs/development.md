@@ -52,11 +52,16 @@ so app code cannot use test globals or Node's `process`.
 
 ## Automated checks
 
-Four checks run on every pull request and every push to `main`, and all four
-are required. None of them skip, so each always reports a status — which is
-what makes requiring them safe: a check that sometimes reports nothing cannot
-be required, because a pull request would wait forever for a result that never
+Four checks run on every pull request, and all four are required. None of
+them skip on a pull request, so each always reports a status — which is what
+makes requiring them safe: a check that sometimes reports nothing cannot be
+required, because a pull request would wait forever for a result that never
 comes.
+
+**On the push that merges a pull request**, *Typecheck, test & build* is
+skipped (it reports "skipped") and the deploy's `build` job builds that tree,
+tests it and ships that same build — so a merge is built once and tested once,
+not twice (#99). The rules check still runs on `main`.
 
 | Check | What fails it |
 |---|---|
@@ -76,6 +81,17 @@ stand between a correct change and `main`.
 `npm ci` is used rather than `npm install` — it installs exactly what the
 lockfile pins and fails if the lockfile and manifest disagree, instead of
 silently resolving a different tree.
+
+**One setup, in one place** (#99). Every job that runs app code uses
+`.github/actions/setup`: Node from `.nvmrc` — the one place the version is
+written (`engines.node` and `@types/node` follow it, so the types cannot
+promise APIs the runtime lacks) — then `npm ci`, with the npm cache keyed on
+**both** lockfiles. Asked for `firebase-cli: 'true'`, it also installs the
+pinned CLI, a pinned Java (Temurin) and restores the emulator JAR from a cache
+keyed on the CLI's lockfile, rather than downloading it every run. The deploy's
+key-holding job is the exception, on purpose: it installs only the CLI with
+`--ignore-scripts`, and `workflows.test.ts` can prove that only by reading the
+job's own steps, which an action would hide (#76).
 
 ## Release notes
 

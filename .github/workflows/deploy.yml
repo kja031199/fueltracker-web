@@ -66,14 +66,10 @@ jobs:
           # .git/config, where `npm ci` lifecycle scripts could read it (#46).
           persist-credentials: false
 
-      - name: Set up Node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install
-        run: npm ci
+      # Node from .nvmrc and the app from its lockfile (#99). This job holds no
+      # secret; the deploy job below does not use this action (see there).
+      - name: Set up
+        uses: ./.github/actions/setup
 
       # The trap this workflow exists to not fall into. Vite inlines VITE_* at
       # build time, so with these unset the build succeeds and produces a bundle
@@ -134,10 +130,13 @@ jobs:
         with:
           persist-credentials: false
 
+      # Not the shared setup action: it installs the app with lifecycle
+      # scripts, which this job must never run, and `workflows.test.ts` can
+      # only prove that by reading this job's own steps (#76, #99).
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: .github/firebase-cli/package-lock.json
 

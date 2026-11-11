@@ -119,7 +119,8 @@ a real decode.
 status. That shipped a broken typecheck to `main` once: redirect to a file and
 read `$?`.
 
-**Everything runs here**, unlike the Swift original — Node 22, the full suite,
+**Everything runs here**, unlike the Swift original — Node (the version in
+`.nvmrc`), the full suite,
 and the Firestore emulator. There is no excuse for an unverified assertion.
 Use the pinned CLI, which is what CI runs:
 
@@ -253,7 +254,16 @@ npm run mutate       # every recorded mutation killed (most of an hour)
   code** — CLI installed with `--ignore-scripts`, the `build` job's tested
   `dist/` downloaded, `predeploy` stripped into `firebase.ci.json` — and the key
   is written last. `workflows.test.ts` enforces each part. Don't add a build,
-  test or plain `npm ci` step to that job.
+  test or plain `npm ci` step to that job — **nor the shared setup action**
+  (`.github/actions/setup`, #99), whose steps those checks cannot see.
+- **CI setup lives in `.github/actions/setup`** (#99): Node from `.nvmrc` (the
+  only place the version is written; `engines.node` and `@types/node` follow
+  it), `npm ci`, npm cache on both lockfiles, and — with `firebase-cli: 'true'`
+  — the pinned CLI, pinned Java and the cached emulator. Every job that runs
+  app code uses it except the deploy key job. **A merge is built and tested
+  once**, by the deploy's `build` job: `ci.yml`'s test job runs on pull requests
+  only (`if: github.event_name == 'pull_request'`). `workflows.test.ts`
+  enforces all of it, composite actions included.
 - **The deploy toolchain is pinned** in `.github/firebase-cli/` with its own
   lockfile, and `src/test/workflows.test.ts` enforces that plus SHA-pinned
   actions. In *that* directory npm offers `firebase-tools@13.11.2` as the "fix"
