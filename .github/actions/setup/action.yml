@@ -1,0 +1,61 @@
+name: Set up the app
+description: >
+  Node from .nvmrc, the app's dependencies from its lockfile, and — when asked —
+  the pinned Firebase CLI with Java and a cached emulator (#99).
+
+# One copy of the setup every job that runs app code repeats (#99). Checkout
+# stays in each workflow: an action in the repository cannot run before the
+# repository is there, and `persist-credentials: false` belongs where the
+# checkout is.
+#
+# **Not for the deploy job that holds the key.** That job installs only the
+# CLI, with `--ignore-scripts`, and `src/test/workflows.test.ts` proves it by
+# reading the workflow's own steps — which a composite action would hide (#76).
+
+inputs:
+  firebase-cli:
+    description: Also install the pinned Firebase CLI, Java, and the cached emulator.
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    # `.nvmrc` is the one place the Node version is written. Both lockfiles key
+    # the npm cache, so the CLI's own tree (about 600 packages) is cached too.
+    - name: Set up Node
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version-file: .nvmrc
+        cache: npm
+        cache-dependency-path: |
+          package-lock.json
+          .github/firebase-cli/package-lock.json
+
+    - name: Install
+      shell: bash
+      run: npm ci
+
+    # Pinned, rather than whatever Java the runner image ships this month: the
+    # Firestore emulator is a JAR, and it is the security rules' only test bed.
+    - name: Set up Java for the emulator
+      if: inputs.firebase-cli == 'true'
+      uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+      with:
+        distribution: temurin
+        java-version: '21'
+
+    # The emulator JAR is otherwise downloaded on every run. Keyed on the CLI's
+    # lockfile: a new CLI may want a new emulator, and then it downloads once.
+    - name: Cache the Firestore emulator
+      if: inputs.firebase-cli == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/firebase/emulators
+        key: firebase-emulators-${{ runner.os }}-${{ hashFiles('.github/firebase-cli/package-lock.json') }}
+
+    # The same pinned CLI the deploy uses, from its own lockfile (#30).
+    - name: Install the pinned Firebase CLI
+      if: inputs.firebase-cli == 'true'
+      shell: bash
+      run: npm ci --prefix .github/firebase-cli

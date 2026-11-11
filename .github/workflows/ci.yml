@@ -25,6 +25,10 @@ permissions:
 jobs:
   test:
     name: Typecheck, test & build
+    # The gate on a pull request. On the push that merges it, the deploy builds
+    # that tree, tests it and ships that build — running the suite here too was
+    # the same work twice per merge (#99). Skipped, it still reports a status.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -36,17 +40,11 @@ jobs:
           # .git/config, where `npm ci` lifecycle scripts could read it (#46).
           persist-credentials: false
 
-      - name: Set up Node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 22
-          cache: npm
-
-      # `npm ci` installs exactly what package-lock.json pins and fails if the
-      # lockfile and manifest disagree — the right call for CI, unlike
-      # `npm install` which would silently resolve a different tree.
-      - name: Install
-        run: npm ci
+      # Node from .nvmrc and `npm ci` from the lockfile, in one shared action
+      # (#99). `npm ci` installs exactly what package-lock.json pins and fails
+      # if the lockfile and manifest disagree.
+      - name: Set up
+        uses: ./.github/actions/setup
 
       - name: Typecheck
         run: npm run typecheck
@@ -95,25 +93,16 @@ jobs:
           # .git/config, where `npm ci` lifecycle scripts could read it (#46).
           persist-credentials: false
 
-      - name: Set up Node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install
-        run: npm ci
-
-      # The same pinned CLI the deploy uses. Deliberately: this job runs on
+      # The app, plus the same pinned CLI the deploy uses, a pinned Java and
+      # the cached emulator JAR (#99). The CLI deliberately: this job runs on
       # every pull request, so the version that holds the credential on merge
       # is exercised here first — a broken pin fails a required check instead
       # of a deploy.
-      - name: Install the pinned Firebase CLI
-        run: npm ci --prefix .github/firebase-cli
+      - name: Set up, with the Firebase CLI
+        uses: ./.github/actions/setup
+        with:
+          firebase-cli: 'true'
 
-      # Java is preinstalled on ubuntu-latest. The emulator JAR is fetched on
-      # first run, which takes a few seconds.
-      #
       # `npm run test:rules` is the pinned binary above running
       # `emulators:exec --only firestore` around the rules project; the script
       # is the one place that command is written, and

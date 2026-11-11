@@ -11,6 +11,17 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-11
 
+- **Nothing you see changes.** Each change is now built and tested once on its
+  way to the live site instead of twice, so updates go out sooner.
+  *Technical:* one composite setup action (`.github/actions/setup`) for every
+  job that runs app code but the deploy key job: Node from `.nvmrc` (the one
+  place the version is written; `engines.node` and `@types/node@^22` follow
+  it), `npm ci`, the npm cache keyed on both lockfiles, and on request the
+  pinned Firebase CLI, a pinned Java and a cached emulator JAR. `ci.yml`'s
+  test job now runs on pull requests only; on a merge the deploy's build job
+  is the one build and test. `workflows.test.ts` reads composite actions too.
+  Part one of four on #99.
+  [#99](https://github.com/kja031199/fueltracker-web/issues/99) · [PR #147](https://github.com/kja031199/fueltracker-web/pull/147)
 - **Nothing you see changes.** The checks that guard your data — who can read
   it, what a sync may write, what a deleted entry keeps — are now re-tested
   every week by breaking each on purpose, so a test that quietly stops
