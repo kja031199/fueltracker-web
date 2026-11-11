@@ -11,6 +11,13 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-11
 
+- **Nothing you see changes.** The scanner that checks every change for leaked
+  passwords is up to date.
+  *Technical:* gitleaks bumped to its latest release, the first bump the weekly
+  pin check (#148) asked for. Its SHA-256 is the release's published checksum,
+  confirmed against a separate download; the new version scans the whole
+  history clean with the same options.
+  [#99](https://github.com/kja031199/fueltracker-web/issues/99) · [PR #149](https://github.com/kja031199/fueltracker-web/pull/149)
 - **Nothing you see changes.** The tools that check every change for leaked
   passwords and broken links are now checked weekly for newer releases, so
   they don't quietly age.
