@@ -1,0 +1,59 @@
+{
+  "title": "#88 Renders",
+  "mutations": [
+    {
+      "name": "app data fresh each render",
+      "file": "src/ui/useAppData.ts",
+      "from": "  return useMemo(() => ({ ...shown, selectVehicle, reload }), [shown, selectVehicle, reload]);",
+      "to": "  return { ...shown, selectVehicle, reload };"
+    },
+    {
+      "name": "sharing lists replaced when same",
+      "file": "src/ui/useSharingView.ts",
+      "from": "  return JSON.stringify(shown) === JSON.stringify(next) ? shown : next;",
+      "to": "  return next;"
+    },
+    {
+      "name": "shell reads sync status",
+      "file": "src/ui/AppShell.tsx",
+      "from": "  const log = useFuelLog();\n  const [route, setTab]",
+      "to": "  const log = useFuelLog();\n  useSyncStatus();\n  const [route, setTab]"
+    },
+    {
+      "name": "stale load shown",
+      "file": "src/ui/useAppData.ts",
+      "from": "        if (ticket < applied.current) return;\n        applied.current = ticket;\n        if (wanted",
+      "to": "        applied.current = ticket;\n        if (wanted"
+    },
+    {
+      "name": "selection shown before its fill-ups",
+      "file": "src/ui/useAppData.ts",
+      "from": "      wanted.current = id;\n      void load(id);",
+      "to": "      wanted.current = id;\n      setShown((current) => ({ ...current, selectedVehicleId: id }));\n      void load(id);"
+    },
+    {
+      "name": "formatter cache off",
+      "file": "src/domain/format.ts",
+      "from": "  let formatter = formatters.get(key);",
+      "to": "  let formatter: Intl.NumberFormat | undefined = undefined;"
+    },
+    {
+      "name": "cache key ignores options",
+      "file": "src/domain/format.ts",
+      "from": "  const key = `${locale}|${JSON.stringify(options)}`;",
+      "to": "  const key = locale;"
+    },
+    {
+      "name": "jump previous includes equal",
+      "file": "src/domain/odometerGap.ts",
+      "from": "    if (value >= odometer) break;",
+      "to": "    if (value > odometer) break;"
+    },
+    {
+      "name": "history memo stale",
+      "file": "src/ui/useFillUpForm.ts",
+      "from": "    [existing, editingId],",
+      "to": "    [editingId],"
+    }
+  ]
+}

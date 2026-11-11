@@ -1,0 +1,77 @@
+{
+  "title": "#93 Split UI",
+  "mutations": [
+    {
+      "name": "scan overwrites a typed price",
+      "file": "src/domain/fillUpForm.ts",
+      "from": "    pricePerGallon: form.pricePerGallon ?? scan.pricePerGallon,",
+      "to": "    pricePerGallon: scan.pricePerGallon ?? form.pricePerGallon,"
+    },
+    {
+      "name": "a typed zero read as blank",
+      "file": "src/domain/fillUpForm.ts",
+      "from": "    gallons: form.gallons ?? scan.gallons,",
+      "to": "    gallons: form.gallons || scan.gallons,"
+    },
+    {
+      "name": "scan date over a hand-set one",
+      "file": "src/domain/fillUpForm.ts",
+      "from": "scan.date !== null && !options.dateTouched",
+      "to": "scan.date !== null"
+    },
+    {
+      "name": "old photo kept",
+      "file": "src/domain/fillUpForm.ts",
+      "from": "    receiptImageData: scan.receiptImageData,",
+      "to": "    receiptImageData: form.receiptImageData ?? scan.receiptImageData,"
+    },
+    {
+      "name": "datetime-local unpadded",
+      "file": "src/domain/fillUpForm.ts",
+      "from": "const pad = (n: number): string => String(n).padStart(2, '0');",
+      "to": "const pad = (n: number): string => String(n);"
+    },
+    {
+      "name": "year NaN for nonsense",
+      "file": "src/domain/format.ts",
+      "from": "return Number.isFinite(parsed) ? parsed : now.getFullYear();",
+      "to": "return parsed;"
+    },
+    {
+      "name": "two panels open at once",
+      "file": "src/ui/VehicleRow.tsx",
+      "from": "{membership === undefined && mode === 'sharing' && <SharePanel",
+      "to": "{membership === undefined && (mode === 'sharing' || mode === 'requesting') && <SharePanel"
+    },
+    {
+      "name": "a panel button never closes",
+      "file": "src/ui/VehicleRow.tsx",
+      "from": "  const toggle = (next: VehicleRowMode): void => setMode((current) => (current === next ? 'idle' : next));",
+      "to": "  const toggle = (next: VehicleRowMode): void => setMode(next);"
+    },
+    {
+      "name": "backup section dropped",
+      "file": "src/ui/SettingsScreen.tsx",
+      "from": "      <BackupSection />\n",
+      "to": ""
+    },
+    {
+      "name": "form forgets the date was set",
+      "file": "src/ui/useFillUpForm.ts",
+      "from": "applyScan(current, suggestion, { dateTouched })",
+      "to": "applyScan(current, suggestion, { dateTouched: false })"
+    },
+    {
+      "name": "limit raised to 500",
+      "file": "src/test/fileSize.test.ts",
+      "from": "export const LIMIT = 300;",
+      "to": "export const LIMIT = 500;"
+    },
+    {
+      "name": "a stale allowance kept",
+      "file": "src/test/fileSize.test.ts",
+      "from": "export const ALLOWED: Readonly<Record<string, { readonly lines: number; readonly reason: string }>> = {",
+      "to": "export const ALLOWED: Readonly<Record<string, { readonly lines: number; readonly reason: string }>> = {\n  'src/ui/FillUpForm.tsx': { lines: 300, reason: 'stale allowance kept' },"
+    }
+  ]
+}

@@ -9,6 +9,23 @@ request. Every pull request that closes an issue adds its note here — the
 "Release notes" check refuses one that does not
 ([how it works](docs/development.md#release-notes)).
 
+## 2026-11-11
+
+- **Nothing you see changes.** The checks that guard your data — who can read
+  it, what a sync may write, what a deleted entry keeps — are now re-tested
+  every week by breaking each on purpose, so a test that quietly stops
+  protecting something is noticed.
+  *Technical:* 418 mutations recorded as data in `scripts/mutations/sets/`,
+  converted from each pull request's scripts since #77 and rebuilt for the
+  rules and data-boundary rows kept before it; `npm run mutate` runs them
+  inside one Firestore emulator and fails on a survivor, and
+  `mutation.yml` runs them weekly and on demand. `mutations.test.ts` fails a
+  pull request that leaves a recorded mutation stale. The run found one real
+  gap — a sync's shared view not refreshed after its merge went unnoticed —
+  now covered in `syncReads.test.ts`. Replaces the hand-counted table in
+  `docs/development.md`.
+  [#98](https://github.com/kja031199/fueltracker-web/issues/98) · [PR #146](https://github.com/kja031199/fueltracker-web/pull/146)
+
 ## 2026-11-10
 
 - **Nothing you see changes.** The shared-car tests now read the way the

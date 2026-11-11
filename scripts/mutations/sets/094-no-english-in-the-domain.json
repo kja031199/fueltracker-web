@@ -1,0 +1,105 @@
+{
+  "title": "#94 No English in the domain",
+  "tests": [
+    "src/ui/words.test.ts",
+    "src/test/domainWords.test.ts",
+    "src/ui/charts/Charts.test.tsx",
+    "src/ui/kpiText.test.ts",
+    "src/ui/insightText.test.ts",
+    "src/domain/format.test.ts",
+    "src/ui/Dashboard.test.tsx",
+    "src/ui/Locale.test.tsx"
+  ],
+  "mutations": [
+    {
+      "name": "a unit noun changed",
+      "file": "src/ui/words.ts",
+      "from": "  gallons: { name: 'Gallons', noun: 'Gallon' },",
+      "to": "  gallons: { name: 'Gallons', noun: 'gallon' },"
+    },
+    {
+      "name": "economy names swapped",
+      "file": "src/ui/words.ts",
+      "from": "  mpg: 'Miles per gallon',\n  litersPer100km: 'Liters per 100 km',",
+      "to": "  mpg: 'Liters per 100 km',\n  litersPer100km: 'Miles per gallon',"
+    },
+    {
+      "name": "a grade label changed",
+      "file": "src/ui/words.ts",
+      "from": "  Midgrade: 'Midgrade',",
+      "to": "  Midgrade: 'Mid-grade',"
+    },
+    {
+      "name": "the all-time label changed",
+      "file": "src/ui/words.ts",
+      "from": "  All: 'All time',",
+      "to": "  All: 'All',"
+    },
+    {
+      "name": "day names ignoring the locale",
+      "file": "src/ui/words.ts",
+      "from": "    const formatter = new Intl.DateTimeFormat(locale, { weekday: width });",
+      "to": "    const formatter = new Intl.DateTimeFormat('en-US', { weekday: width });"
+    },
+    {
+      "name": "the fallback shared, not copied",
+      "file": "src/ui/words.ts",
+      "from": "  return width === 'short' ? [...FALLBACK_SHORT] : [...FALLBACK_LONG];",
+      "to": "  return width === 'short' ? FALLBACK_SHORT : FALLBACK_LONG;"
+    },
+    {
+      "name": "an unknown weekday named",
+      "file": "src/ui/words.ts",
+      "from": "  return weekdayNames(locale, width)[weekday - 1] ?? '';",
+      "to": "  return weekdayNames(locale, width)[weekday - 1] ?? 'Sun';"
+    },
+    {
+      "name": "the weekday chart ignoring the display locale",
+      "file": "src/ui/charts/WeekdayPriceChart.tsx",
+      "from": "weekdayNames(useDisplay().style.locale, 'short')",
+      "to": "weekdayNames('en-US', 'short')"
+    },
+    {
+      "name": "an invalid date in English again",
+      "file": "src/domain/format.ts",
+      "from": "  if (!Number.isFinite(at)) return '—';",
+      "to": "  if (!Number.isFinite(at)) return 'Invalid Date';"
+    },
+    {
+      "name": "a unit name back in domain/",
+      "file": "src/domain/units.ts",
+      "from": "    abbreviation: 'gal',",
+      "to": "    abbreviation: 'gal',\n    name: 'Gallons',"
+    },
+    {
+      "name": "the guard blind to single words",
+      "file": "src/test/domainWords.test.ts",
+      "from": "const ENGLISH = /\\b[A-Z][a-z]{2,}\\b|\\b[A-Za-z]{2,}\\s+[A-Za-z]{2,}\\b/;",
+      "to": "const ENGLISH = /\\b[A-Za-z]{2,}\\s+[A-Za-z]{2,}\\b/;"
+    },
+    {
+      "name": "the reader not skipping line comments",
+      "file": "src/test/domainWords.test.ts",
+      "from": "      if (c === '/' && next === '/') {",
+      "to": "      if (false) {"
+    },
+    {
+      "name": "the reader not skipping regexes",
+      "file": "src/test/domainWords.test.ts",
+      "from": "      } else if (c === '/' && (previous === ''",
+      "to": "      } else if (false && (previous === ''"
+    },
+    {
+      "name": "the reader joining template parts",
+      "file": "src/test/domainWords.test.ts",
+      "from": "        found.push(text);\n        text = '';\n        i += 2;\n        code(1);",
+      "to": "        text += '';\n        i += 2;\n        code(1);"
+    },
+    {
+      "name": "the guard ignoring one-word literals",
+      "file": "src/test/domainWords.test.ts",
+      "from": "  return stringLiterals(source).filter((text) => ENGLISH.test(text) && !IDENTIFIERS.has(text));",
+      "to": "  return stringLiterals(source).filter((text) => ENGLISH.test(text) && !IDENTIFIERS.has(text) && text.includes(' '));"
+    }
+  ]
+}

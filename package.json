@@ -12,6 +12,8 @@
     "test:rules": ".github/firebase-cli/node_modules/.bin/firebase emulators:exec --only firestore --project fueltracker-rules-test \"vitest run --project rules\"",
     "test:watch": "vitest --project unit --project dom",
     "typecheck": "tsc -b",
+    "mutate": "node --experimental-strip-types scripts/mutations/mutate.ts",
+    "mutate:check": "node --experimental-strip-types scripts/mutations/mutate.ts --check",
     "lint": "oxlint -c .oxlintrc.json --deny-warnings src scripts vite.config.ts"
   },
   "devDependencies": {

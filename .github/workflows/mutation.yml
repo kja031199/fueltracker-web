@@ -1,0 +1,59 @@
+name: Mutation testing
+
+# Re-runs every recorded mutation (#98): each breaks one thing on purpose —
+# a rules clause, a validation check, a tombstone — and the tests must go red.
+# A test that has quietly stopped catching what it was written for shows up
+# here as a survivor, and the run fails.
+#
+# Weekly, and by hand from the Actions tab. **Not a required check, and not
+# on pull requests**: it takes most of an hour, and a pull request already
+# gets the fast half — `src/test/mutations.test.ts`, in the main suite, fails
+# the moment a change makes any recorded mutation stale. This is the slow
+# half: are they all still killed?
+
+on:
+  schedule:
+    # Mondays, 05:37 UTC: a quiet hour, off the top of the hour.
+    - cron: '37 5 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: mutation-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  mutate:
+    name: Every recorded mutation is killed
+    runs-on: ubuntu-latest
+    # About 420 mutations; most stop at their first failing test.
+    timeout-minutes: 150
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing after checkout needs git auth; keep the token out of
+          # .git/config, where `npm ci` lifecycle scripts could read it (#46).
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # The rules mutations run against the emulator, through the same pinned
+      # CLI the rules job and the deploy use.
+      - name: Install the pinned Firebase CLI
+        run: npm ci --prefix .github/firebase-cli
+
+      # Starts one emulator and runs every mutation inside it. The survivors,
+      # if any, are listed in the job summary.
+      - name: Run every mutation
+        run: npm run mutate

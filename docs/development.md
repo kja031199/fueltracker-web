@@ -172,174 +172,91 @@ CSP or the service worker.**
 Tests are checked by breaking the thing they guard on purpose and confirming
 the suite goes red — a test that cannot fail is decoration, and a security-rules
 test that cannot fail is worse, because it reads like proof. Required for
-`firestore.rules`, account separation, and anything guarding the data boundary.
+`firestore.rules`, account separation, and anything guarding the data boundary;
+expected for any change whose tests could pass without catching anything.
 
-Recorded so a regression in the tests themselves is visible:
+Every mutation is **recorded as data** in `scripts/mutations/sets/` (#98), one
+file per piece of work, and can be run again by anyone:
 
-| Mutation | Fails |
-|---|---|
-| Identity-only rules / wide-open rules | 13 / 20 |
-| Sign-in allowlist dropped from `owner()` | 2 |
-| Per-uid scoping dropped from `owner()` | 2 |
-| One shared database for all accounts | 6 |
-| Tombstone back to `{ ...row, deletedAt }` | 14 |
-| Tombstone keeping only its receipt | 7 |
-| `isScrubbed` always true / comparing `updatedAt` | 7 / 2 |
-| Tombstone exception dropped from `preserveLocalReceipts` | 1 |
-| `isStorableId` reduced to a non-empty check | 14 |
-| Id check dropped from validation / imports / push | 6 / 2 / 3 |
-| Id check **over**-refusing (any dot or underscore) | 4 |
-| CSV formula guard removed / made irreversible | 11 / 2 |
-| Idle timeout: a naive first implementation | 13 of 34 |
-| Backup reminder dismissing permanently instead of snoozing | 2 |
-| An action unpinned / its version comment dropped | 2 / 1 |
-| A binary's checksum check deleted / moved after `tar` / its pinned hash removed | 2 / 1 / 1 |
-| One `persist-credentials: false` deleted / set to `true` | 1 / 1 |
-| Text: draft gate / `addVehicle` / import left unbounded | 1 / 1 / 1 |
-| Text: a push refusal reported as `refused` again / sync skipping the repair / repair keeping the old `updatedAt` | 2 / 1 / 1 |
-| Text: push backstop ignoring text / unstorable `vehicleId` accepted on import / sent on push | 1 / 1 / 1 |
-| Text: `boundText` splitting an emoji / a client limit drifting from the rules / `maxLength` removed | 1 / 2 / 1 |
-| Date window: chain over windowed rows / dashboard filtering first (both the #51 bug) | 5 / 1 |
-| Sync: always a full read / push everything / one shared mark / mark moving backwards | 2 / 5 / 2 / 1 |
-| Sync: unstamped read leaving the mark null / full read not rebuilding `known` / clock observing only pulled rows | 1 / 1 / 1 |
-| Sync: cursor version ignored / no weekly reconcile / full reads timed by the merge clock / junk cursor accepted | 1 / 1 / 1 / 1 |
-| Sync timing: focus not throttled / saves not coalesced / a save mid-sync dropped / App not syncing after a save | 2 / 1 / 2 / 1 |
-| One decoder: file vehicles / fill-ups / submissions bypassing it / CSV refusals unreported | 5 / 12 / 2 / 3 |
-| One decoder: file receipts unbounded / dropped / a string flag read as true / garbled `deletedAt` accepted / domain importing data | 1 / 4 / 1 / 1 / 1 |
-| Local reads: fill-ups / count / vehicle removal back to a whole-table read | 3 / 2 / 1 |
-| Local reads: summaries keeping photo bytes / `hasReceipt` always false / edit form started from a list row | 1 / 1 / 1 |
-| Local reads: no re-read after a reload / `deletedAt` index missing / Dexie count including tombstones | 2 / 3 / 3 |
-| Local reads: per-vehicle read including tombstones (Dexie / in memory) | 1 / 5 |
-| OCR: `workerPath` / `langPath` left out (CDN default) / blob worker again / no load timeout / late worker left running | 1 / 1 / 1 / 2 / 1 |
-| OCR CSP: without `'wasm-unsafe-eval'` / with full `'unsafe-eval'` / CDN back / `blob:` workers back | 1 / 1 / 1 / 1 |
-| OCR build: reader precached / route back to a closure / wrong core variant / runtime route removed | 1 / 1 / 1 / 2 |
-| OCR input: reader handed the bitmap again / a read failure reported as unavailable / load detail dropped | 1 / 1 / 3 |
-| OCR input: detail not shown / detail unbounded / a failed encode of the reading copy ignored | 1 / 1 / 1 |
-| Fuel line: rung removed / labels winning over it / first of two disagreeing lines trusted | 7 / 6 / 1 |
-| Fuel line: two-decimal price / whole-number quantity / range check / lookbehind / lookahead dropped | 1 / 1 / 1 / 1 / 1 |
-| Sharing: email not lowercased / two @ accepted / accept without the address / member writes another car / forges enteredBy / scope keeps submissions | 6 / 2 / 1 / 1 / 2 / 1 |
-| Sharing sync: own sync copies shared cars / share sync pushes everything / removed car kept / left-elsewhere car kept / deleted car kept / ledger saved empty / ledger keeps ended shares | 4 / 4 / 4 / 3 / 1 / 5 / 1 |
-| Ties: edit beats deletion / local winner not re-stamped / no tie-break on merge | 3 / 3 / 3 |
-| Sharing store: forget leaves tombstones / edit loses who entered it / tombstone drops it / enteredBy length unchecked / shared car offered Delete | 3 / 3 / 3 / 2 / 4 |
-| Sharing rules (emulator): any allowlisted account reads any fill-up / joining without an invitation / member changes who entered it | 3 / 2 / 1 |
-| Missed fill-up hint: mean not median / at-least not more-than / two gaps enough / own reading not excluded / kept after ticking / beside the backwards warning | 1 / 2 / 1 / 1 / 1 / 1 |
-| Admin idle timeout: bad text / unset failing open / decimals accepted / no trim / overflow not held to a day / `>` at the boundary | 17 / 8 / 2 / 1 / 1 / 1 |
-| Admin idle timeout: module hard-coding 30 / App ignoring it / armed while signed out / legacy setting kept / legacy "off" honoured | 1 / 1 / 1 / 1 / 1 |
-| Admin idle timeout: Settings showing a fixed 30 / notice saying the reader chose it / deploy not passing the Variable | 1 / 1 / 1 |
-| Fuel log: an action bypassing `written` (remove fill-up / import) / no sync after writes / no refresh / a failed write syncing | 1 / 1 / 6 / 5 / 1 |
-| Fuel log: opening a vanished fill-up syncing / not refreshing / a screen importing the store again | 1 / 1 / 1 |
-| Tabs: hash ignored on load / choosing replaces history / no `hashchange` / correction pushing an entry / no correction | 2 / 1 / 2 / 1 / 3 |
-| Tabs: `parseTab` case-insensitive / prefix-matching / without the `#/` check | 1 / 1 / 1 |
-| Links (#3): length cap / base64url alphabet / fatal UTF-8 / version / kind / id checks / request car check | 3 / 1 / 1 / 3 / 4 / 2 / 3 |
-| Links: future date / ancient date / no clock slack / full-tank type / draft gate skipped / junk `submittedAt` kept | 1 / 1 / 1 / 1 / 6 / 3 |
-| Links: text unbounded in / out / a photo carried / "missed" carried | 1 / 1 / 1 / 1 |
-| Links: duplicates queued / tombstones forgotten / missing car queued / deleted car approved / sender's name unbounded | 4 / 2 / 2 / 1 / 1 |
-| Links: route corrected to the dashboard / multi-segment / case-insensitive / leaving adds history / onboarding first | 1 / 2 / 1 / 2 / 12 |
-| Links: request on every car / shared car received / ledger not consulted / no retry after a sync | 6 / 1 / 1 / 1 |
-| Links: Approve on a deleted car / refusal not shown / submitter's log written / one id for every visit / name not pre-filled / link form keeping the photo / keeping storage limits | 1 / 1 / 1 / 1 / 2 / 1 / 1 |
-| Toolchain: `@types/react` / `@types/react-dom` back to 18 / lint script removed / description reverted | 1 / 1 / 1 / 1 |
-| Toolchain: exhaustive-deps off / only a warning / a rule category on wholesale / `vite.config.ts` out of `include` | 1 / 1 / 1 / 1 |
-| Database: the `'fueltracker'` default name restored (caught by `tsc`, an unused `@ts-expect-error`) | 1 |
-| Account state: key ignoring the uid / unscoped value kept / adopted / empty uid / unbounded uid | 21 / 5 / 6 / 2 / 1 |
-| Account state: hook ignoring a uid change / setter keeping the first uid / App passing no uid for sync time / backup / onboarding | 1 / 1 / 1 / 5 / 9 |
-| Preferences: storage access unguarded / failed write reported stored / decoder throw uncaught / empty text read as 0 / browser keys renamed | 1 / 1 / 23 / 1 / 9 |
-| Storage boundary: detector reading comments as uses | 2 |
-| Sync (emulator): rules accepting any `syncedAt` / push unstamped / records carrying it / remote ignoring the cursor | 1 / 4 / 1 / 2 |
-| Date window: segments not windowed / boundary exclusive / invalid date as a window | 4 / 6 / 1 |
-| Date window: no anchor / anchor without odometer guard / cost per mile ignoring it / intervals ignoring it / suspect norm from the window | 1 / 1 / 1 / 1 / 1 |
-| Sign-in adopting the legacy database (the #44 behaviour) | 3 |
-| Sign-in copying legacy rows but keeping the original / deleting it uncopied | 2 / 2 |
-| Sign-in merely opening the legacy database / opening the wrong account's | 1 / 1 |
-| Dev guard: `dev` signal / hostname signal dropped | 1 / 8 |
-| Dev guard: always refusing / id not normalised / constant wrong | 2 / 1 / 1 |
-| Local-host check: unanchored `127.` / `includes('localhost')` / no lower-casing / `[::1]` dropped | 1 / 2 / 1 / 2 |
-| Page and manifest descriptions claiming "no account, no server" again | 1 / 1 |
-| Deploy key (#76): no environment / no `needs` / CLI without `--ignore-scripts` / `npm run build` in the key job / `--config` dropped / predeploy kept | 1 / 1 / 1 / 1 / 1 / 1 |
-| Deploy key: secret read in the build job / key written before `npm ci` / before the download | 8 / 1 / 1 |
-| Share ledger (#77): unreadable read as empty / failing closed only with the list unreachable too / reported as a refusal | 4 / 3 / 2 |
-| Share ledger: no save before pulling / that save's failure ignored / ended shares dropped before they are forgotten | 2 / 1 / 1 |
-| Id clash (#78): rules (emulator) / in-memory world / Accept unchecked / shown as a network error / no clash detection / held shares flagged too | 2 / 2 / 1 / 1 / 4 / 15 |
-| Id clash: recorded in the ledger / clashed shares synced / store ignoring tombstones / clash not reported | 1 / 3 / 1 / 1 |
-| Stale edit (#83): deleted fill-up not refused / written back / car gone not refused / saved under another car | 4 / 4 / 1 / 2 |
-| Stale edit: no refresh after it / refusal swallowed / generic message / form closes on it | 1 / 2 / 1 / 2 |
-| Local reads (#87): export two reads per table / merge reading every row / push re-reading the device / a view per remote | 8 / 7 / 7 / 5 |
-| Local reads: no refresh after the merge / after a re-stamp / after the repair / repair never run / car lookup stale | 1 / 1 / 2 / 2 / 1 |
-| Local reads: Dexie `listDeleted` returning live rows / `getMany` hiding tombstones (memory / Dexie) / forget missing deleted rows | 3 / 12 / 1 / 4 |
-| Merge stamp (#79): future bound removed / set to a day / no-going-backwards removed / equal stamp refused | 3 / 2 / 3 / 3 |
-| Merge stamp: `finite` reduced to `is number` / invite date unchecked / in-memory far-future / backwards / client bound at the adoption cap | 10 / 1 / 1 / 1 / 2 |
-| Revoking (#80): join leaving the invitation / joining a deleted car / `memberOf` ignoring deletion (all emulator) / accept in three writes | 1 / 1 / 2 / 5 |
-| Revoking: `removeMember` keeping the invitation / `endSharing` doing nothing / delete not ending sharing / in-memory: deletion ignored / deleted car accepted / invitation kept | 1 / 1 / 1 / 1 / 1 / 1 |
-| Shared-car results (#84): refused upload filed as unreachable / refused upload forgetting the car / outcomes dropped / notice ignoring shared cars / refusal not said | 2 / 2 / 2 / 1 / 1 |
-| Transactions (#85): no transaction from `dexieRepositories` / work on `db` tables rather than the transaction's / account store without it / Dexie `putMany` dropping a single row | 7 / 2 / 1 / 2 |
-| Transactions: car delete leaving submissions / car delete, forget, import, approve, receive, edit each not atomic / duplicate in a file kept by order / repair from the rows sync read | 3 / 1, 1, 3, 1, 1, 1 / 1 / 2 |
-| Validation (#86): newer backup rows imported / this version counted as newer / skipped silently / "1 rows" | 3 / 12 / 3 / 2 |
-| Validation: ledger ids unchecked / ledger names unbounded / tombstone keeping `date` / new deletion time / submission tombstones refused | 1 / 1 / 3 / 2 / 2 |
-| Validation: invite owner / car name, member name, read-back invite, read-back member unbounded (all emulator) | 1 / 1 / 1 / 1 / 1 |
-| Renders (#88): app data a fresh object / fuel log rebuilt on sync status / same sharing lists replaced / shell reading sync status | 3 / 3 / 1 / 1 |
-| Renders: a stale load shown over a newer one / a selection shown before its fill-ups / formatter cache off / cache key ignoring options / odometer check measuring from an equal reading | 1 / 1 / 2 / 14 / 2 |
-| Release notes: keywords only `closes` / title `(#N)` ignored / removed lines counted / `#12` matching `#123` / mentions counted / no word boundary / body interpolated into `run:` / `edited` not a trigger | 1 / 1 / 2 / 3 / 1 / 1 / 2 / 1 |
-| Release notes, the file: dates out of order / an impossible date / no *Technical* line / a link to the wrong number / an issue link labelled PR / an "Unreleased" heading / no user sentence | 1 / 1 / 1 / 1 / 1 / 2 / 1 |
-| Sharing reads (#89): memberships not handed to the screens / the view reading them again / reload after every share sync / names never cached / new uids ignored / a nobody's uid re-asked | 1 / 1 / 1 / 1 / 1 / 1 |
-| Sharing reads: index note removed / `indexMissing` not carried / fallback not told / invites not narrowed in memory / in Firestore (emulator) / `syncAll` handing back nothing | 1 / 2 / 1 / 1 / 2 / 2 |
-| Rules upkeep (#92): any one of the 26 bounds in `label()`/`sized()` raised by one / receipt bound / stamp bound / an inline `.size()` back / a fill-up key dropped / a junk vehicle key / `enteredBy` made required / `exists()` before `get()` | 1 each / 1 / 1 / 2 / 1 / 1 / 1 / 1 |
-| Rules upkeep, emulator: the users document readable / `liveCar` ignoring deletion | 1 / 4 |
-| Record mappings (#91): a measurement dropped / "missed previous" lost going in / coming back / the sender's name unbounded / `enteredBy` not kept / a link's place and photo kept / the import validating nothing / approval skipping the gate | 10 / 2 / 1 / 4 / 16 / 1 / 4 / 1 |
-| Dependencies (#91): `Repositories` back in `store.ts` (the store↔import cycle) / the clock type back in `store.ts` / the database or cursor naming a membership from `sharing.ts` | 1 / 1 / 1 each |
-| Sync wiring (#91): sync on a fresh clock / on the old shared default / the state optional again (caught by `tsc`, through `@ts-expect-error`) | 8 / 8 / 2 errors |
-| Store and replica (#91): a sync operation back on the store / the replica on its own clock / a file import given a tie-break | 1 / 9 / 2 |
-| Shared helpers (#91): the mark taken from the oldest stamp / writes unstamped (emulator) / batches after the first never committed (emulator) / `textOr` ignoring its limit / `isRecord` taking arrays / `numberOr` taking NaN / a copy of a helper defined again | 1 / 12 / 1 / 5 / 2 / 1 / 1 |
-| Words and pictures out of `data/` (#91): a refusal showing the SDK's cause / pull and push failures swapped / a refused upload said as a refused account / an unreadable ledger said as unreachable / the cause's detail dropped / canvas code back in `data/` | 1 / 2 / 1 / 1 / 1 / 1 |
-| Known versions (#91): the whole map written again / a full read replacing nothing / unreadable versions trusted / the cursor saved though the versions were not / Dexie's replace clearing every collection / a separator a key can contain / the cursor version not bumped / clearing a cursor leaving its versions / the in-memory replace ignored | 1 each |
-| Boundary tests (#93): the reader seeing single quotes only / no dynamic `import()` / no side-effect import / comments read as imports / relative paths left unresolved | 3 / 4 / 2 / 2 / 3 |
-| Boundary tests (#93): Firebase allowed in `domain/` / a package or a layer matched by prefix (`reactive`, `src/database`) / the store check on `.tsx` only / a stale allowance kept / the SDK's home matched by substring / `@firebase/*` missed | 1 / 1 each / 2 / 1 / 1 / 1 |
-| Boundary tests (#93), planted files the old tests passed: a double-quoted `data/` import in `domain/` / a dynamic store import from a `ui/` `.ts` helper / `firebase/firestore` in `ui/` / `react` in `domain/` / `data/` importing `ui/` / a dynamic import closing a cycle in `data/` | caught, each |
-| Backup recording (#93): `saveBackup` recording nothing / a CSV recorded as a backup / an unreadable file still imported / the CSV's skipped rows or the store's rejected rows dropped / an import bypassing `written` / backup status an input of the log | 5 / 2 / 2 / 1 each / 2 / 1 |
-| Backup recording (#93): the `.csv` extension case-sensitive / matched anywhere in the name / CSV skips lost in `parseBackupFile` / CSV with tombstones / Settings ignoring the last backup | 1 each |
-| One formula (#93): `totalCost` adding / the guard missing `gallons * price` / the guard reading `ui/` only / `pricePerUnit` multiplying / `pricePerGallonFrom` using the wrong factor / the form storing a per-litre price | 26 / 1 / 1 / 4 / 4 / 2 |
-| Pure logic out of components (#93): `describeSince` taking NaN / `vehicleSubtitle` keeping a year alone / `parseTypedNumber` taking Infinity / reading blank as 0 / `editableText` unrounded / `formFromRecord` losing the date | 1 each, 2 for the last |
-| Equivalent, kept for readability: `describeSince` without its clamp — a future time is a negative age, already under a minute, so it reads "just now" either way | — |
-| Shared patterns (#93): the first press acting / cancel doing nothing / confirm taking the first button's tone / the title outside `<main>` / the tab bar dropped / no clipboard claiming copied / a refusal claiming copied | 6 / 2 / 1 / 8 / 7 / 2 / 6 |
-| Shared patterns (#93): `displayName` untrimmed / "missed previous" always shown / each `oneCopy` guard narrowed (frame, clipboard, name, confirm) | 4 / 1 / 2, 2, 1, 1 |
-| Styles (#93): the guard counting every style as computed / reading one-line styles only / counting an interpolated template as fixed / a fixed inline style put back | 1 / 1 / 2 / 1 |
-| Text colours (#93): secondary back to #6C6C70 / text colours not painted / the stylesheet copy drifting / contrast measured on the card only | 2 / 6 / 1 / 1 |
-| Split UI (#93): a scan overwriting a typed price / a typed zero read as blank / the scan's date over a hand-set one / the old photo kept / the form forgetting the date was set by hand / `datetime-local` unpadded | 2 / 1 / 1 / 1 / 1 / 4 |
-| Split UI (#93): a car's year NaN for nonsense / two of a row's panels open at once / a panel button that never closes / Settings without its backup section / the size limit raised to 500 / a stale size allowance kept | 1 / 1 / 2 / 7 / 1 / 1 |
-| Tabs (#93): back to unmounting a tab on a switch / every tab mounted at once / a hidden tab left showing / units defaulting to other than US / a tab dropped from the table | 3 / 1 / 1 / 1 / 19 |
-| Tabs (#93): the `App.tsx` size allowance put back / the request link without the owner's name / the session ignoring a new idle period | 1 / 1 / 1 |
-| Accessibility (#95): chart rows keyed by label again / Edit without its fill-up / Delete without its row / Request without its car / the title not focusable / no focus after a tab switch / the page title never set / no focus on opening or closing the form / a fixed id back / the id check matching `data-id` | 1 / 4 / 14 / 6 / 1 / 1 / 2 / 1 each / 2 / 1 |
-| Equivalent, kept: `AppShell` moving focus on arrival as well — it always mounts on its loading screen, whose title takes the focus and is then replaced, leaving focus where the guard would have. The guard stays for the day the shell renders content first. | — |
-| Faster tests (#97), still catching: the timers not passed on / a write that schedules no sync / a failed write still scheduling one / the same invitations re-rendering / every focus syncing / invitations shown to an unverified address / decoding a receipt before its bound | 14 / 14 / 1 / 1 / 1 / 1 / 1 |
-| Shared fixtures (#97): `makeStore` ignoring its author / its clock / a number not read as the odometer / a file's defaults beating a test's changes / a refused fixture returned as null / a signed-in user shared as unverified / the guard missing an arrow-function copy / a copy planted back | 5 / 1 / 7 / 5 / 1 / 11 / 1 / 1 |
-| Test projects (#97): unit also running the emulator tests / rules running a directory again / rules without its prerequisite / build without its prerequisite / a blank emulator host accepted / an empty `dist/` accepted / the error stack left to Vitest / `npm test` running every project / `test:build` not building / `test:rules` running a directory / the CI rules job calling vitest on a path / CI building without testing the build / the deploy shipping an untested build / `csp.build.test.ts` renamed back / an emulator test named as a unit test / a pure test named as an emulator test | 4 / 4 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 2 / 1 / 2 / 1 / 1 / 1 |
-| Isolation and types (#97): spies not restored / globals not unstubbed / env not unstubbed / `globals` off, so no automatic unmount / the `dom` project on Node / `unit` also taking the `.tsx` tests / `.dom.test.ts` files in no project / a docblock planted back / a hand `cleanup` planted back / a hand restore planted back / a prototype assigned again / app code given Node types / app code given test globals / tests left in the app project / `typecheck` checking nothing / `build` checking nothing / `npm test` leaving out `dom` | 2 / 2 / 2 / 2 / 1 / 31 / 7 / 1 / 1 / 1 / 1 / 3 / 3 / 1 / 1 / 1 / 1 |
-| Verified identities (#81): receiving on open again (no confirm step) / Ignore that queues / no double-press guard at all (each alone is covered by the other) / the incoming name shown as fact / rows back to the chosen name / `verifiedName` dropping the email / the email shown twice / the owner without "(owner)" / a nameless owner shown blank / the Share panel by name only / the request's owner name as fact / the name field's disclosure detached / the send-back disclosure removed / the request warning removed / "(unverified)" removed from the queue / a nameless submitter marked unverified | 2 / 1 / 1 / 2 / 2 / 7 / 1 / 3 / 1 / 1 / 2 / 1 / 1 / 1 / 1 / 1 |
-| Hardening, part 1 (#82): CSV whitespace not guarded / its guard not undone / report-only folded into enforced / the disposition not read from the event / the report not marking report-only / an unknown disposition read as report-only / the dev server back to `in` / the candidate with `*.googleapis.com` / with inline style / with `*.firebaseapp.com` frames / allowing what the enforced policy refuses / the candidate header removed / the provider pin removed (emulator) / a provider denylist instead of the pin (emulator) | 9 / 3 / 2 / 1 / 1 / 3 / 6 / 2 / 1 / 2 / 2 / 5 / 6 / 4 |
-| Startup and the reader (#90): Firestore requested at boot / no shell before auth / Firestore loaded on every sign-in / a failed load remembered / no local-only fallback / a token refresh reopening everything / a local-only account never retrying / an overtaken account shown / session resources kept on sign-out / `main.tsx` loading Firestore with auth / the worker terminated after every scan / the idle window not restarted / a broken worker reused / a failed reader load remembered (its first guard was redundant and removed) / release killing a scan in progress / the worker never released when idle | 4 / 3 / 1 / 2 / 2 / 1 / 1 / 1 / 2 / 2 / 5 / 1 / 2 / 1 / 1 / 2 |
-| The enforced CSP (#82): `connect-src` back to `*.googleapis.com` / `frame-src` back to `*.firebaseapp.com` / `'unsafe-inline'` back in `style-src` / Cloud Storage added to `connect-src` / another project as the auth domain / `'wasm-unsafe-eval'` dropped | 2 / 2 / 1 / 1 / 1 / 1 |
-| Locale and currency (#94, part A): the app ignoring the browser language / the currency default ignoring the locale / KPI money dropping the style / `volume` back to US English / `formatDate` ignoring its locale / a stored currency trusted as it is / month names back to US English / the currency picked but not saved / `displayLocale` accepting what `Intl` does not support / list dates back to the browser default / lower-case currency codes accepted / the weekday insight ignoring the style | 9 / 9 / 9 / 5 / 2 / 3 / 1 / 1 / 1 / 2 / 1 / 1 |
-| Plurals (#94, part B): the form chosen by the reader's locale / the count not in the locale / always plural / zero read as singular / the backup message back to "(s)" / the dashboard warning always plural / a sync note back to "(s)" / the CSP report back to "(s)" / `describeSince` hand-rolled again / the guard blind to hand-written ternaries | 1 / 2 / 11 / 2 / 2 / 1 / 2 / 3 / 1 / 1 |
-| Words out of the domain (#94, part C1): a KPI title reworded / a KPI detail reworded / the UI's `looksEqual` ignored / the domain ignoring `looksEqual` / insight day names in the display locale / chart trend words swapped / the domain's trend wrong / a sync note ignoring the locale / `DisplayProvider` back under the fuel log | 12 / 2 / 2 / 3 / 1 / 5 / 8 / 1 / 1 |
-| No English in the domain (#94, part C2): a unit noun changed / economy names swapped / a grade label changed / the all-time label changed / day names ignoring the locale / the fallback day names shared, not copied / an unknown weekday named / the weekday chart ignoring the display locale / an invalid date in English again / a unit name back in `domain/` / the guard blind to single words / the literal reader not skipping line comments / not skipping regexes / joining template parts / the guard ignoring one-word literals | 1 / 1 / 1 / 1 / 3 / 1 / 6 / 1 / 2 / 1 / 3 / 7 / 1 / 1 / 2 |
-| Dead code (#96, part 1): the kept parser not listed / the walk one level deep / the walk blind to `.tsx` / a kept file allowed to be used / a kept file allowed to be gone / pushing rows the account already holds / the push ignoring the collection / the week always starting on Sunday / an orphan production file | 1 / 121 / 89 / 1 / 1 / 6 / 2 / 1 / 1 |
-| Test doubles (#96, part 2): the car only on a full pull / a vehicle mark for the car / every car's fill-ups / the car read while offline / the read ignoring its filter / the old scoped pull back / `testing/` folders counted as production / an allowed name allowed anywhere / a test double back in `remote.ts` / an allowed name in the wrong file / production importing a fake | 1 / 1 / 2 / 1 / 2 / 4 / 7 / 1 / 1 / 1 / 1 |
+```bash
+npm run mutate                 # every mutation, inside one Firestore emulator
+npm run mutate -- 079 sharing  # only the sets or mutations those words name
+npm run mutate:check           # no tests: does every mutation still apply?
+```
 
-Equivalent, and kept as a backstop: `shape()` without its `hasAll`. Every
-required field is also read by a clause of its own, and reading a missing field
-is an error, which refuses the write; `hasAll` would start to matter only for a
-field no other clause mentions.
+A mutation names a file, the exact text to replace (which must occur once —
+or no `from` at all, to replace the whole file, as the identity-only and
+wide-open rules do), what to put there instead, and optionally the tests that
+should catch it. Without `tests`, a rules mutation runs the `rules` project and
+anything else the main suite. Each run stops at the first failing test
+(`--bail 1`), so the runner reports **killed or not**, never counts: a count
+changes every time someone adds a test, and a recorded number nobody can
+re-derive is what this replaced.
 
-Equivalent, and kept for parity: the repair skipping tombstones. A tombstone
-carries no text, so there is nothing for it to shorten.
+```json
+{
+  "title": "#79 Merge stamp",
+  "mutations": [
+    {
+      "name": "future bound removed",
+      "file": "firestore.rules",
+      "from": "          && request.resource.data.updatedAt <= request.time.toMillis() + maxAheadMs()\n",
+      "to": ""
+    }
+  ]
+}
+```
 
-Survives, and equivalent: dropping the array check from the link decoder — a
-JSON array cannot carry the version field, so it is refused as damaged either
-way.
+**Recording one in a pull request:** add it to the set for that piece of work
+(a new file, `NNN-topic.json`, numbered by the issue), run
+`npm run mutate -- <its name>`, and see it killed. Every mutation that
+survived and was **equivalent** — no input could tell the two programs apart —
+is kept with `survives` and the reason; the runner reports it without failing.
+One that survived and was not equivalent is a missing test: write it.
 
-Survives, and equivalent: `useSync` never refreshing its locale ref. The
-display locale is read once, when `App` mounts, so the ref never sees a second
-value; the refresh is there for the day it can change without a remount.
+**What a kill has to mean.** Three things made "killed" lie while this was
+built, and the runner now refuses each:
 
-The first row is the one to understand before touching `firestore.rules`:
+- *The record's own check in the run.* `src/test/mutations.test.ts` fails for
+  every applied mutation (the mutated file no longer holds its `from`), so a
+  run of the whole suite "killed" everything. Every run excludes it.
+- *A dead emulator.* The emulator watched `firestore.rules` and died reloading
+  it on the first rules mutation; every rules mutation after it then "failed"
+  in a second, against nothing. The emulator now starts from
+  `scripts/mutations/firebase.json`, which names no rules file (the tests load
+  the rules themselves), and the runner checks it answers before and after
+  every mutation, stopping the run rather than counting a guess. A control —
+  a comment changed in the rules — survives the full rules suite.
+- *A test file that no longer exists.* Renamed files left in a `tests` list
+  quietly stopped running, and a list of nothing but missing files would make
+  vitest exit non-zero with nothing run. A missing test path is a stale record.
+
+A run that is killed outright (no `finally`, no signal handler) leaves the
+original of the file it was changing in `scripts/mutations/.restore/`
+(gitignored); the next run puts it back before anything else.
+
+**Two runs keep the record honest:**
+
+- **On every pull request**, `src/test/mutations.test.ts` (in `npm test`)
+  checks that each recorded mutation still applies — its text still occurs
+  exactly once. A change that moves code a mutation breaks fails there, at
+  once, and the mutation moves with the code. This takes a second.
+- **Weekly, and on demand**, `.github/workflows/mutation.yml` runs them all
+  (Actions → Mutation testing → Run workflow). A survivor fails that run and is
+  listed in its job summary. Not a required check: it takes most of an hour.
+
+**Where the record came from.** The sets for #77 onward were converted from
+the scripts each pull request used, re-pointed where the code had since moved,
+and the handful whose code is gone (the vehicle comparison deleted in #96, two
+file-rename tricks the format cannot express) were dropped. Before #77 only a
+table of hand counts was kept, with nothing to re-run; from it, the rules
+foundations (identity-only and wide-open rules, the allowlist and per-uid
+scoping in `owner()`, sharing, `syncedAt`) and the data-boundary rows
+(per-account databases and preference keys, tombstones, ids, the CSV guard)
+were rebuilt as `000-rules-foundations.json` and `000-data-boundary.json`. The
+other early rows — the OCR, toolchain and early UI ones — had no data and were
+retired; the table is in git history before #98.
+
+The first set is the one to understand before touching `firestore.rules`:
 identity-only rules — the version that asked "is this your tree?" and nothing
-else — still pass 13 fewer assertions than the current file, and wide-open
-rules pass 20 fewer.
+else — and wide-open rules must both fail the rules suite.

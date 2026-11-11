@@ -1,0 +1,174 @@
+{
+  "title": "#86 Validation",
+  "tests": [
+    "src/data/backupFormat.test.ts",
+    "src/data/sharing.test.ts",
+    "src/data/recordValidation.test.ts",
+    "src/data/sync.test.ts"
+  ],
+  "mutations": [
+    {
+      "name": "newer rows imported",
+      "file": "src/data/backupFormat.ts",
+      "from": "  return typeof version === 'number' && version > SCHEMA_VERSION;",
+      "to": "  return false;",
+      "tests": [
+        "src/data/backupFormat.test.ts",
+        "src/data/sharing.test.ts",
+        "src/data/recordValidation.test.ts",
+        "src/data/sync.test.ts"
+      ]
+    },
+    {
+      "name": "this version counted as newer",
+      "file": "src/data/backupFormat.ts",
+      "from": "  return typeof version === 'number' && version > SCHEMA_VERSION;",
+      "to": "  return typeof version === 'number' && version >= SCHEMA_VERSION;",
+      "tests": [
+        "src/data/backupFormat.test.ts",
+        "src/data/sharing.test.ts",
+        "src/data/recordValidation.test.ts",
+        "src/data/sync.test.ts"
+      ]
+    },
+    {
+      "name": "newer rows skipped silently",
+      "file": "src/data/backupFormat.ts",
+      "from": "  if (tooNew > 0) {\n    skipped.push(",
+      "to": "  if (tooNew < 0) {\n    skipped.push(",
+      "tests": [
+        "src/data/backupFormat.test.ts",
+        "src/data/sharing.test.ts",
+        "src/data/recordValidation.test.ts",
+        "src/data/sync.test.ts"
+      ]
+    },
+    {
+      "name": "singular wording",
+      "file": "src/data/backupFormat.ts",
+      "from": "countOf(tooNew, { one: '# row was', other: '# rows were' })",
+      "to": "`${tooNew} rows were`",
+      "tests": [
+        "src/data/backupFormat.test.ts",
+        "src/data/sharing.test.ts",
+        "src/data/recordValidation.test.ts",
+        "src/data/sync.test.ts"
+      ]
+    },
+    {
+      "name": "ledger ids unchecked",
+      "file": "src/data/shareLedger.ts",
+      "from": "    if (!isStorableId(raw.ownerUid) || !isStorableId(raw.vehicleId)) return [];",
+      "to": "    if (typeof raw.ownerUid !== 'string' || raw.ownerUid === '' || typeof raw.vehicleId !== 'string' || raw.vehicleId === '') return [];",
+      "tests": [
+        "src/data/backupFormat.test.ts",
+        "src/data/sharing.test.ts",
+        "src/data/recordValidation.test.ts",
+        "src/data/sync.test.ts"
+      ]
+    },
+    {
+      "name": "ledger names unbounded",
+      "file": "src/data/shareLedger.ts",
+      "from": "boundText(raw.ownerName, TEXT_LIMITS.ownerName)",
+      "to": "raw.ownerName",
+      "tests": [
+        "src/data/backupFormat.test.ts",
+        "src/data/sharing.test.ts",
+        "src/data/recordValidation.test.ts",
+        "src/data/sync.test.ts"
+      ]
+    },
+    {
+      "name": "validation tombstone keeps date",
+      "file": "src/data/recordValidation.ts",
+      "from": "  const built = build({ ...common, ...kept } as unknown as T, common.updatedAt);",
+      "to": "  const built = { ...build({ ...common, ...kept } as unknown as T, common.updatedAt), date: 7 } as T;",
+      "tests": [
+        "src/data/backupFormat.test.ts",
+        "src/data/sharing.test.ts",
+        "src/data/recordValidation.test.ts",
+        "src/data/sync.test.ts"
+      ]
+    },
+    {
+      "name": "tombstone takes a new deletion time",
+      "file": "src/data/recordValidation.ts",
+      "from": "  return { ...built, updatedAt: common.updatedAt, deletedAt: common.deletedAt };",
+      "to": "  return { ...built, updatedAt: common.updatedAt };",
+      "tests": [
+        "src/data/backupFormat.test.ts",
+        "src/data/sharing.test.ts",
+        "src/data/recordValidation.test.ts",
+        "src/data/sync.test.ts"
+      ]
+    },
+    {
+      "name": "pending tombstone branch removed",
+      "file": "src/data/recordValidation.ts",
+      "from": "  if (common.deletedAt !== null) {\n    return asTombstone(tombstonePending,",
+      "to": "  if (common.deletedAt === -1) {\n    return asTombstone(tombstonePending,",
+      "tests": [
+        "src/data/backupFormat.test.ts",
+        "src/data/sharing.test.ts",
+        "src/data/recordValidation.test.ts",
+        "src/data/sync.test.ts"
+      ]
+    },
+    {
+      "name": "invite owner name unbounded",
+      "file": "src/data/firebase/sharingRemote.ts",
+      "from": "      ownerName: boundText(this.me.name, TEXT_LIMITS.ownerName),",
+      "to": "      ownerName: this.me.name,",
+      "tests": [
+        "--project",
+        "fueltracker",
+        "src/data/firebase/sharing.emulator.test.ts"
+      ]
+    },
+    {
+      "name": "invite car name unbounded",
+      "file": "src/data/firebase/sharingRemote.ts",
+      "from": "      vehicleName: boundText(vehicle.name, TEXT_LIMITS.vehicleName),",
+      "to": "      vehicleName: vehicle.name,",
+      "tests": [
+        "--project",
+        "fueltracker",
+        "src/data/firebase/sharing.emulator.test.ts"
+      ]
+    },
+    {
+      "name": "member name unbounded",
+      "file": "src/data/firebase/sharingRemote.ts",
+      "from": "      name: boundText(this.me.name, TEXT_LIMITS.name),",
+      "to": "      name: this.me.name,",
+      "tests": [
+        "--project",
+        "fueltracker",
+        "src/data/firebase/sharing.emulator.test.ts"
+      ]
+    },
+    {
+      "name": "decoded invite unbounded",
+      "file": "src/data/firebase/sharingRemote.ts",
+      "from": "    ownerName: textOr(data['ownerName'], TEXT_LIMITS.ownerName),",
+      "to": "    ownerName: textOr(data['ownerName'], Number.MAX_SAFE_INTEGER),",
+      "tests": [
+        "--project",
+        "fueltracker",
+        "src/data/firebase/sharing.emulator.test.ts"
+      ]
+    },
+    {
+      "name": "decoded member unbounded",
+      "file": "src/data/firebase/sharingRemote.ts",
+      "from": "    name: textOr(data['name'], TEXT_LIMITS.name),",
+      "to": "    name: textOr(data['name'], Number.MAX_SAFE_INTEGER),",
+      "tests": [
+        "--project",
+        "fueltracker",
+        "src/data/firebase/sharing.emulator.test.ts"
+      ]
+    }
+  ]
+}

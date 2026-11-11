@@ -1,0 +1,66 @@
+{
+  "title": "#79 Merge stamp",
+  "tests": [
+    "--project",
+    "fueltracker",
+    "src/data/firebase/",
+    "src/data/rulesLimits.test.ts",
+    "src/data/shareSync.test.ts"
+  ],
+  "mutations": [
+    {
+      "name": "future bound removed",
+      "file": "firestore.rules",
+      "from": "          && request.resource.data.updatedAt <= request.time.toMillis() + maxAheadMs()\n",
+      "to": ""
+    },
+    {
+      "name": "bound one day",
+      "file": "firestore.rules",
+      "from": "function maxAheadMs() { return 2678400000; }",
+      "to": "function maxAheadMs() { return 86400000; }"
+    },
+    {
+      "name": "no-going-backwards removed",
+      "file": "firestore.rules",
+      "from": "          && (resource == null || request.resource.data.updatedAt >= resource.data.updatedAt)\n",
+      "to": ""
+    },
+    {
+      "name": "equal stamp refused (> not >=)",
+      "file": "firestore.rules",
+      "from": "request.resource.data.updatedAt >= resource.data.updatedAt",
+      "to": "request.resource.data.updatedAt > resource.data.updatedAt"
+    },
+    {
+      "name": "finite is just \"is number\"",
+      "file": "firestore.rules",
+      "from": "      return field is number && field == field\n        && field <= 9007199254740991 && field >= -9007199254740991;",
+      "to": "      return field is number;"
+    },
+    {
+      "name": "invite date not finite-checked",
+      "file": "firestore.rules",
+      "from": "        && finite(request.resource.data.createdAt)\n        && inviteId ==",
+      "to": "        && request.resource.data.createdAt is number\n        && inviteId =="
+    },
+    {
+      "name": "in-memory: far-future accepted",
+      "file": "src/data/testing/inMemorySharing.ts",
+      "from": "      if (!Number.isFinite(row.updatedAt) || row.updatedAt > Date.now() + MAX_ACCEPTED_AHEAD_MS) {\n        throw new Refused('a stamp too far ahead');\n      }",
+      "to": ""
+    },
+    {
+      "name": "in-memory: backwards accepted",
+      "file": "src/data/testing/inMemorySharing.ts",
+      "from": "      if (before !== undefined && row.updatedAt < before.updatedAt) throw new Refused('a stamp taken backwards');",
+      "to": ""
+    },
+    {
+      "name": "client bound = adoption cap",
+      "file": "src/data/syncClock.ts",
+      "from": "export const MAX_ACCEPTED_AHEAD_MS = MAX_ADOPTED_SKEW_MS + 24 * 60 * 60 * 1000;",
+      "to": "export const MAX_ACCEPTED_AHEAD_MS = MAX_ADOPTED_SKEW_MS;"
+    }
+  ]
+}

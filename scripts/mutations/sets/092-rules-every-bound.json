@@ -1,0 +1,265 @@
+{
+  "title": "#92 Rules upkeep: every bound",
+  "mutations": [
+    {
+      "name": "sized(vehicleId) bound 1 raised by one (#1)",
+      "file": "firestore.rules",
+      "from": "        && request.resource.data.ownerUid == request.auth.uid\n        && sized(request.resource.data.vehicleId, 1, 200)",
+      "to": "        && request.resource.data.ownerUid == request.auth.uid\n        && sized(request.resource.data.vehicleId, 2, 200)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "sized(vehicleId) bound 200 raised by one (#2)",
+      "file": "firestore.rules",
+      "from": "        && request.resource.data.ownerUid == request.auth.uid\n        && sized(request.resource.data.vehicleId, 1, 200)",
+      "to": "        && request.resource.data.ownerUid == request.auth.uid\n        && sized(request.resource.data.vehicleId, 1, 201)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "sized(email) bound 3 raised by one",
+      "file": "firestore.rules",
+      "from": "        && sized(request.resource.data.email, 3, 320)",
+      "to": "        && sized(request.resource.data.email, 4, 320)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "sized(email) bound 320 raised by one",
+      "file": "firestore.rules",
+      "from": "        && sized(request.resource.data.email, 3, 320)",
+      "to": "        && sized(request.resource.data.email, 3, 321)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "label(ownerName) bound 200 raised by one (#5)",
+      "file": "firestore.rules",
+      "from": "        && request.resource.data.email == request.resource.data.email.lower()\n        && label(request.resource.data.ownerName, 200)",
+      "to": "        && request.resource.data.email == request.resource.data.email.lower()\n        && label(request.resource.data.ownerName, 201)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "label(vehicleName) bound 200 raised by one (#6)",
+      "file": "firestore.rules",
+      "from": "        && label(request.resource.data.ownerName, 200)\n        && label(request.resource.data.vehicleName, 200)",
+      "to": "        && label(request.resource.data.ownerName, 200)\n        && label(request.resource.data.vehicleName, 201)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "sized(id) bound 1 raised by one",
+      "file": "firestore.rules",
+      "from": "        return sized(request.resource.data.id, 1, 200)",
+      "to": "        return sized(request.resource.data.id, 2, 200)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "sized(id) bound 200 raised by one",
+      "file": "firestore.rules",
+      "from": "        return sized(request.resource.data.id, 1, 200)",
+      "to": "        return sized(request.resource.data.id, 1, 201)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "label(fuelGrade) bound 40 raised by one",
+      "file": "firestore.rules",
+      "from": "          && label(request.resource.data.fuelGrade, 40)",
+      "to": "          && label(request.resource.data.fuelGrade, 41)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "label(station) bound 200 raised by one",
+      "file": "firestore.rules",
+      "from": "          && label(request.resource.data.station, 200)",
+      "to": "          && label(request.resource.data.station, 201)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "label(notes) bound 4000 raised by one",
+      "file": "firestore.rules",
+      "from": "          && label(request.resource.data.notes, 4000)",
+      "to": "          && label(request.resource.data.notes, 4001)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "label(name) bound 200 raised by one (#12)",
+      "file": "firestore.rules",
+      "from": "          && shape(vehicleKeys(), [])\n          && label(request.resource.data.name, 200)",
+      "to": "          && shape(vehicleKeys(), [])\n          && label(request.resource.data.name, 201)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "label(make) bound 200 raised by one",
+      "file": "firestore.rules",
+      "from": "          && label(request.resource.data.make, 200)",
+      "to": "          && label(request.resource.data.make, 201)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "label(model) bound 200 raised by one",
+      "file": "firestore.rules",
+      "from": "          && label(request.resource.data.model, 200)",
+      "to": "          && label(request.resource.data.model, 201)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "label(name) bound 200 raised by one (#15)",
+      "file": "firestore.rules",
+      "from": "            && label(request.resource.data.name, 200)",
+      "to": "            && label(request.resource.data.name, 201)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "label(ownerUid) bound 128 raised by one",
+      "file": "firestore.rules",
+      "from": "          && label(request.resource.data.ownerUid, 128)",
+      "to": "          && label(request.resource.data.ownerUid, 129)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "sized(vehicleId) bound 1 raised by one (#17)",
+      "file": "firestore.rules",
+      "from": "          && label(request.resource.data.ownerUid, 128)\n          && sized(request.resource.data.vehicleId, 1, 200)",
+      "to": "          && label(request.resource.data.ownerUid, 128)\n          && sized(request.resource.data.vehicleId, 2, 200)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "sized(vehicleId) bound 200 raised by one (#18)",
+      "file": "firestore.rules",
+      "from": "          && label(request.resource.data.ownerUid, 128)\n          && sized(request.resource.data.vehicleId, 1, 200)",
+      "to": "          && label(request.resource.data.ownerUid, 128)\n          && sized(request.resource.data.vehicleId, 1, 201)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "label(ownerName) bound 200 raised by one (#19)",
+      "file": "firestore.rules",
+      "from": "          && label(request.resource.data.ownerName, 200)",
+      "to": "          && label(request.resource.data.ownerName, 201)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "label(vehicleName) bound 200 raised by one (#20)",
+      "file": "firestore.rules",
+      "from": "          && label(request.resource.data.vehicleName, 200)",
+      "to": "          && label(request.resource.data.vehicleName, 201)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "sized(vehicleId) bound 1 raised by one (#21)",
+      "file": "firestore.rules",
+      "from": "          && shape(fillUpKeys(), optionalFillUpKeys())\n          && sized(request.resource.data.vehicleId, 1, 200)",
+      "to": "          && shape(fillUpKeys(), optionalFillUpKeys())\n          && sized(request.resource.data.vehicleId, 2, 200)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "sized(vehicleId) bound 200 raised by one (#22)",
+      "file": "firestore.rules",
+      "from": "          && shape(fillUpKeys(), optionalFillUpKeys())\n          && sized(request.resource.data.vehicleId, 1, 200)",
+      "to": "          && shape(fillUpKeys(), optionalFillUpKeys())\n          && sized(request.resource.data.vehicleId, 1, 201)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "label(enteredBy) bound 128 raised by one",
+      "file": "firestore.rules",
+      "from": "              || label(request.resource.data.enteredBy, 128))",
+      "to": "              || label(request.resource.data.enteredBy, 129))",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "sized(vehicleId) bound 1 raised by one (#24)",
+      "file": "firestore.rules",
+      "from": "          && shape(pendingKeys(), [])\n          && sized(request.resource.data.vehicleId, 1, 200)",
+      "to": "          && shape(pendingKeys(), [])\n          && sized(request.resource.data.vehicleId, 2, 200)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "sized(vehicleId) bound 200 raised by one (#25)",
+      "file": "firestore.rules",
+      "from": "          && shape(pendingKeys(), [])\n          && sized(request.resource.data.vehicleId, 1, 200)",
+      "to": "          && shape(pendingKeys(), [])\n          && sized(request.resource.data.vehicleId, 1, 201)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    },
+    {
+      "name": "label(submitterName) bound 200 raised by one",
+      "file": "firestore.rules",
+      "from": "          && label(request.resource.data.submitterName, 200)",
+      "to": "          && label(request.resource.data.submitterName, 201)",
+      "tests": [
+        "src/data/rulesLimits.test.ts",
+        "src/data/firebase/rulesShape.test.ts"
+      ]
+    }
+  ]
+}

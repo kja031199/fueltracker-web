@@ -1,0 +1,106 @@
+{
+  "title": "#78 Id clash",
+  "mutations": [
+    {
+      "name": "rules: no check on your own car ids",
+      "file": "firestore.rules",
+      "from": "\n            && !exists(/databases/$(database)/documents/users/$(request.auth.uid)/vehicles/$(id))",
+      "to": "",
+      "tests": [
+        "--project",
+        "fueltracker",
+        "src/data/firebase/sharingRules.emulator.test.ts"
+      ]
+    },
+    {
+      "name": "world: no check on your own car ids",
+      "file": "src/data/testing/inMemorySharing.ts",
+      "from": "    if (this.world.remoteFor(this.me.uid).hasVehicle(invite.vehicleId)) {\n      throw new Refused('join a car with the id of one of your own');\n    }",
+      "to": "",
+      "tests": [
+        "src/data/shareSync.test.ts",
+        "src/ui/Sharing.test.tsx"
+      ]
+    },
+    {
+      "name": "client: no check before accepting",
+      "file": "src/ui/useSharingView.ts",
+      "from": "        if (await store.hasVehicle(invite.vehicleId)) throw new ShareClash();\n",
+      "to": "",
+      "tests": [
+        "src/data/shareSync.test.ts",
+        "src/ui/Sharing.test.tsx"
+      ]
+    },
+    {
+      "name": "banner: clash shown as a network error",
+      "file": "src/ui/InvitationsBanner.tsx",
+      "from": "cause instanceof ShareClash",
+      "to": "false && cause instanceof ShareClash",
+      "tests": [
+        "src/data/shareSync.test.ts",
+        "src/ui/Sharing.test.tsx"
+      ]
+    },
+    {
+      "name": "sync: no clash detection",
+      "file": "src/data/shareSync.ts",
+      "from": "if (isNew && (await store.replica.hasVehicle(membership.vehicleId))) clashed.push(membership);",
+      "to": "if (isNew && false) clashed.push(membership);",
+      "tests": [
+        "src/data/shareSync.test.ts",
+        "src/ui/Sharing.test.tsx"
+      ]
+    },
+    {
+      "name": "sync: held shares checked too (false positive)",
+      "file": "src/data/shareSync.ts",
+      "from": "if (isNew && (await store.replica.hasVehicle(membership.vehicleId))) clashed.push(membership);",
+      "to": "if ((await store.replica.hasVehicle(membership.vehicleId)) && isNew !== null) clashed.push(membership);",
+      "tests": [
+        "src/data/shareSync.test.ts",
+        "src/ui/Sharing.test.tsx"
+      ]
+    },
+    {
+      "name": "sync: clashed recorded in the ledger",
+      "file": "src/data/shareSync.ts",
+      "from": "const recorded = [...held, ...sharable.filter(",
+      "to": "const recorded = [...held, ...(current ?? []).filter(",
+      "tests": [
+        "src/data/shareSync.test.ts",
+        "src/ui/Sharing.test.tsx"
+      ]
+    },
+    {
+      "name": "sync: clashed shares synced",
+      "file": "src/data/shareSync.ts",
+      "from": "  for (const membership of sharable) {",
+      "to": "  for (const membership of [...sharable, ...clashed]) {",
+      "tests": [
+        "src/data/shareSync.test.ts",
+        "src/ui/Sharing.test.tsx"
+      ]
+    },
+    {
+      "name": "store: tombstones ignored",
+      "file": "src/data/replica.ts",
+      "from": "    return (await this.repos.vehicles.getMany([id])).length > 0;",
+      "to": "    return (await this.repos.vehicles.get(id)) !== undefined;",
+      "tests": [
+        "src/data/shareSync.test.ts",
+        "src/ui/Sharing.test.tsx"
+      ]
+    },
+    {
+      "name": "notice: clash not reported",
+      "file": "src/ui/useSync.ts",
+      "from": "      for (const clash of all.shares.clashed) {",
+      "to": "      for (const clash of all.shares.clashed.slice(0, 0)) {",
+      "tests": [
+        "src/data/shareSync.test.ts",
+        "src/ui/Sharing.test.tsx"
+      ]
+    }
+  ]
+}

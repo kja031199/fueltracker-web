@@ -1,0 +1,53 @@
+{
+  "title": "#93 Tabs",
+  "mutations": [
+    {
+      "name": "back to unmounting on a switch",
+      "file": "src/ui/AppShell.tsx",
+      "from": "      {TABS.filter((id) => visited.includes(id) || id === tab).map((id) => (\n        <Activity key={id} mode={id === tab ? 'visible' : 'hidden'}>\n          {SCREENS[id]()}\n        </Activity>\n      ))}",
+      "to": "      {SCREENS[tab]()}{visited.length < 0 && <Activity>{null}</Activity>}{TABS.length < 0 && null}"
+    },
+    {
+      "name": "every tab mounted at once",
+      "file": "src/ui/AppShell.tsx",
+      "from": "TABS.filter((id) => visited.includes(id) || id === tab)",
+      "to": "TABS"
+    },
+    {
+      "name": "a hidden tab left showing",
+      "file": "src/ui/AppShell.tsx",
+      "from": "mode={id === tab ? 'visible' : 'hidden'}",
+      "to": "mode=\"visible\""
+    },
+    {
+      "name": "units default not US",
+      "file": "src/ui/session.tsx",
+      "from": "const UNITS_DEFAULT: Units = { units: US, setUnits: () => {} };",
+      "to": "const UNITS_DEFAULT: Units = { units: { ...US, volume: 'liters' }, setUnits: () => {} };"
+    },
+    {
+      "name": "a tab dropped from the table",
+      "file": "src/ui/useTabRoute.ts",
+      "from": "  { id: 'settings', label: 'Settings' },\n",
+      "to": ""
+    },
+    {
+      "name": "the App.tsx allowance put back",
+      "file": "src/test/fileSize.test.ts",
+      "from": "  // None. `App.tsx` was here at 355 lines until #93's route table split it.\n",
+      "to": "  'src/ui/App.tsx': { lines: 355, reason: 'stale allowance kept for the test' },\n"
+    },
+    {
+      "name": "request link without the owner’s name",
+      "file": "src/ui/VehiclesScreen.tsx",
+      "from": "const ownerName = useSession().account?.displayName ?? '';",
+      "to": "const ownerName = useSession().account?.email ?? '';"
+    },
+    {
+      "name": "session ignores a new idle period",
+      "file": "src/ui/session.tsx",
+      "from": "    [account, onSignOut, syncEnabled, idleMinutes],",
+      "to": "    [account, onSignOut, syncEnabled],"
+    }
+  ]
+}

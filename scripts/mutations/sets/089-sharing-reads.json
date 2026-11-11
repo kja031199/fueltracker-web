@@ -1,0 +1,178 @@
+{
+  "title": "#89 Sharing reads",
+  "tests": [
+    "src/ui/SharingReads.test.tsx",
+    "src/ui/Sharing.test.tsx",
+    "src/data/sync.test.ts",
+    "src/data/shareSync.test.ts",
+    "src/data/firebase/sharing.emulator.test.ts",
+    "src/ui/FuelLog.test.tsx"
+  ],
+  "mutations": [
+    {
+      "name": "sync's memberships not handed over",
+      "file": "src/ui/useSync.ts",
+      "from": "      if (all.shares.memberships !== null) sharesSeen.current(all.shares.memberships);\n",
+      "to": "",
+      "tests": [
+        "src/ui/SharingReads.test.tsx",
+        "src/ui/Sharing.test.tsx",
+        "src/data/sync.test.ts",
+        "src/data/shareSync.test.ts",
+        "src/data/firebase/sharing.emulator.test.ts",
+        "src/ui/FuelLog.test.tsx"
+      ]
+    },
+    {
+      "name": "view reads memberships again",
+      "file": "src/ui/useSharingView.ts",
+      "from": "    const invites = await sharing.remote.invitesForMe().catch(() => null);",
+      "to": "    const again = await sharing.remote.memberships().catch(() => null);\n    if (again !== null) setSharedWithMe((shown) => unlessSame(shown, again));\n    const invites = await sharing.remote.invitesForMe().catch(() => null);",
+      "tests": [
+        "src/ui/SharingReads.test.tsx",
+        "src/ui/Sharing.test.tsx",
+        "src/data/sync.test.ts",
+        "src/data/shareSync.test.ts",
+        "src/data/firebase/sharing.emulator.test.ts",
+        "src/ui/FuelLog.test.tsx"
+      ]
+    },
+    {
+      "name": "screens reload after every share sync",
+      "file": "src/ui/useSync.ts",
+      "from": "      const sharesMoved =\n        all.shares.ended.length > 0 ||",
+      "to": "      const sharesMoved =\n        all.shares.synced.length > 0 ||\n        all.shares.ended.length > 0 ||",
+      "tests": [
+        "src/ui/SharingReads.test.tsx",
+        "src/ui/Sharing.test.tsx",
+        "src/data/sync.test.ts",
+        "src/data/shareSync.test.ts",
+        "src/data/firebase/sharing.emulator.test.ts",
+        "src/ui/FuelLog.test.tsx"
+      ]
+    },
+    {
+      "name": "names never cached",
+      "file": "src/ui/useSharingView.ts",
+      "from": "        if (known === undefined || others.some((who) => !known!.asked.has(who))) {",
+      "to": "        if (true) {",
+      "tests": [
+        "src/ui/SharingReads.test.tsx",
+        "src/ui/Sharing.test.tsx",
+        "src/data/sync.test.ts",
+        "src/data/shareSync.test.ts",
+        "src/data/firebase/sharing.emulator.test.ts",
+        "src/ui/FuelLog.test.tsx"
+      ]
+    },
+    {
+      "name": "names cache ignores new uids",
+      "file": "src/ui/useSharingView.ts",
+      "from": "        if (known === undefined || others.some((who) => !known!.asked.has(who))) {",
+      "to": "        if (known === undefined) {",
+      "tests": [
+        "src/ui/SharingReads.test.tsx",
+        "src/ui/Sharing.test.tsx",
+        "src/data/sync.test.ts",
+        "src/data/shareSync.test.ts",
+        "src/data/firebase/sharing.emulator.test.ts",
+        "src/ui/FuelLog.test.tsx"
+      ]
+    },
+    {
+      "name": "asked forgets nobody's uids",
+      "file": "src/ui/useSharingView.ts",
+      "from": "asked: new Set([...(known?.asked ?? []), ...others, ...members.map((m) => m.uid)])",
+      "to": "asked: new Set(members.map((m) => m.uid))",
+      "tests": [
+        "src/ui/SharingReads.test.tsx",
+        "src/ui/Sharing.test.tsx",
+        "src/data/sync.test.ts",
+        "src/data/shareSync.test.ts",
+        "src/data/firebase/sharing.emulator.test.ts",
+        "src/ui/FuelLog.test.tsx"
+      ]
+    },
+    {
+      "name": "index note removed",
+      "file": "src/ui/useSync.ts",
+      "from": "      if (every.some((outcome) => outcome.indexMissing)) {",
+      "to": "      if (false) {",
+      "tests": [
+        "src/ui/SharingReads.test.tsx",
+        "src/ui/Sharing.test.tsx",
+        "src/data/sync.test.ts",
+        "src/data/shareSync.test.ts",
+        "src/data/firebase/sharing.emulator.test.ts",
+        "src/ui/FuelLog.test.tsx"
+      ]
+    },
+    {
+      "name": "indexMissing not carried",
+      "file": "src/data/sync.ts",
+      "from": "      indexMissing: raw.indexMissing === true,",
+      "to": "      indexMissing: false,",
+      "tests": [
+        "src/ui/SharingReads.test.tsx",
+        "src/ui/Sharing.test.tsx",
+        "src/data/sync.test.ts",
+        "src/data/shareSync.test.ts",
+        "src/data/firebase/sharing.emulator.test.ts",
+        "src/ui/FuelLog.test.tsx"
+      ]
+    },
+    {
+      "name": "fallback not told",
+      "file": "src/data/firebase/sharingRemote.ts",
+      "from": "    onFallback();\n",
+      "to": "",
+      "tests": [
+        "src/ui/SharingReads.test.tsx",
+        "src/ui/Sharing.test.tsx",
+        "src/data/sync.test.ts",
+        "src/data/shareSync.test.ts",
+        "src/data/firebase/sharing.emulator.test.ts",
+        "src/ui/FuelLog.test.tsx"
+      ]
+    },
+    {
+      "name": "in-memory invites ignore car",
+      "file": "src/data/testing/inMemorySharing.ts",
+      "from": "(vehicleId === undefined || invite.vehicleId === vehicleId)",
+      "to": "true",
+      "tests": [
+        "src/ui/SharingReads.test.tsx",
+        "src/ui/Sharing.test.tsx",
+        "src/data/sync.test.ts",
+        "src/data/shareSync.test.ts",
+        "src/data/firebase/sharing.emulator.test.ts",
+        "src/ui/FuelLog.test.tsx"
+      ]
+    },
+    {
+      "name": "Firestore invites ignore car",
+      "file": "src/data/firebase/sharingRemote.ts",
+      "from": "vehicleId === undefined ? mine : query(mine, where('vehicleId', '==', vehicleId))",
+      "to": "mine",
+      "tests": [
+        "--project",
+        "fueltracker",
+        "src/data/firebase/sharing.emulator.test.ts"
+      ]
+    },
+    {
+      "name": "syncAll hands back nothing",
+      "file": "src/data/shareSync.ts",
+      "from": "    shares: { ...NO_SHARES, synced, ended, failed, rejected, outcomes, clashed, memberships: current },",
+      "to": "    shares: { ...NO_SHARES, synced, ended, failed, rejected, outcomes, clashed },",
+      "tests": [
+        "src/ui/SharingReads.test.tsx",
+        "src/ui/Sharing.test.tsx",
+        "src/data/sync.test.ts",
+        "src/data/shareSync.test.ts",
+        "src/data/firebase/sharing.emulator.test.ts",
+        "src/ui/FuelLog.test.tsx"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "title": "#96 Dead code",
+  "tests": [
+    "src/test/reachable.test.ts",
+    "src/data/sync.test.ts",
+    "src/ui/Locale.test.tsx",
+    "src/domain/exportReminder.test.ts"
+  ],
+  "mutations": [
+    {
+      "name": "the kept parser not listed",
+      "file": "src/test/reachable.test.ts",
+      "from": "  ['src/domain/scanning/odometerScanParser.ts', 'odometer scanning, #143'],\n",
+      "to": ""
+    },
+    {
+      "name": "the walk one level deep",
+      "file": "src/test/reachable.test.ts",
+      "from": "      if (next !== null && !seen.has(next)) queue.push(next);",
+      "to": "      if (next !== null && !seen.has(next) && file === entry) queue.push(next);"
+    },
+    {
+      "name": "the walk blind to .tsx",
+      "file": "src/test/reachable.test.ts",
+      "from": "  for (const candidate of [path, `${path}.ts`, `${path}.tsx`,",
+      "to": "  for (const candidate of [path, `${path}.ts`,"
+    },
+    {
+      "name": "a kept file allowed to be used",
+      "file": "src/test/reachable.test.ts",
+      "from": "    if (reached.has(file)) return [`${file} is used now`];\n",
+      "to": ""
+    },
+    {
+      "name": "a kept file allowed to be gone",
+      "file": "src/test/reachable.test.ts",
+      "from": "    if (!exists(file)) return [`${file} no longer exists`];\n",
+      "to": ""
+    },
+    {
+      "name": "pushing rows the account already holds",
+      "file": "src/data/sync.ts",
+      "from": "    return held === undefined || row.updatedAt > held;",
+      "to": "    return held === undefined || row.updatedAt >= held;"
+    },
+    {
+      "name": "the push ignoring the collection",
+      "file": "src/data/sync.ts",
+      "from": "    const held = known[keyOf(collection, row.id)];",
+      "to": "    const held = known[keyOf('vehicles', row.id)];"
+    },
+    {
+      "name": "the week always starting on Sunday",
+      "file": "src/ui/DashboardScreen.tsx",
+      "from": "weekdayPrices(inRangeStats, { firstWeekday: firstWeekdayForLocale(locale) })",
+      "to": "weekdayPrices(inRangeStats)"
+    }
+  ]
+}

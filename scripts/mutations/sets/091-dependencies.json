@@ -1,0 +1,26 @@
+{
+  "title": "#91 Dependencies",
+  "tests": [
+    "src/test/importCycles.test.ts"
+  ],
+  "mutations": [
+    {
+      "name": "store↔import cycle back",
+      "file": "src/data/backup.ts",
+      "from": "import type { Repositories } from './repository';",
+      "to": "import type { Repositories } from './store';"
+    },
+    {
+      "name": "clock type from the store",
+      "file": "src/data/syncClock.ts",
+      "from": "export interface StoreClock {",
+      "to": "import type { FuelTrackerStore } from './store';\nexport type Unused = FuelTrackerStore;\nexport interface StoreClock {"
+    },
+    {
+      "name": "db naming sharing",
+      "file": "src/data/dexieState.ts",
+      "from": "import type { Membership } from './sharingTypes';",
+      "to": "import type { Membership } from './sharing';"
+    }
+  ]
+}

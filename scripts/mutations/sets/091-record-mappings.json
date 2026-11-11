@@ -1,0 +1,53 @@
+{
+  "title": "#91 Record mappings",
+  "mutations": [
+    {
+      "name": "a measurement dropped from the mapping",
+      "file": "src/data/recordMapping.ts",
+      "from": "    station: draft.station,\n",
+      "to": ""
+    },
+    {
+      "name": "fill-up loses missed-previous",
+      "file": "src/data/recordMapping.ts",
+      "from": "    missedPreviousFillUp: draft.missedPreviousFillUp,",
+      "to": "    missedPreviousFillUp: false,"
+    },
+    {
+      "name": "draft back ignores missed-previous",
+      "file": "src/data/recordMapping.ts",
+      "from": "    missedPreviousFillUp: 'missedPreviousFillUp' in record ? record.missedPreviousFillUp : false,",
+      "to": "    missedPreviousFillUp: false,"
+    },
+    {
+      "name": "sender's name unbounded",
+      "file": "src/data/recordMapping.ts",
+      "from": "    submitterName: boundText(meta.submitterName, TEXT_LIMITS.submitterName),",
+      "to": "    submitterName: meta.submitterName,"
+    },
+    {
+      "name": "enteredBy not kept",
+      "file": "src/data/recordMapping.ts",
+      "from": "    enteredBy: meta.enteredBy,",
+      "to": "    enteredBy: null,"
+    },
+    {
+      "name": "link keeps place and photo",
+      "file": "src/data/store.ts",
+      "from": "        { ...submission.draft, latitude: null, longitude: null, receiptImageData: null },",
+      "to": "        submission.draft,"
+    },
+    {
+      "name": "import validates nothing",
+      "file": "src/data/backup.ts",
+      "from": "        if (draftFromRecord(incoming) === null) {",
+      "to": "        if (false) {"
+    },
+    {
+      "name": "approve skips the gate",
+      "file": "src/data/store.ts",
+      "from": "    const draft = draftFromRecord(pending);\n    if (draft === null) return null;",
+      "to": "    const draft = draftFromRecord(pending)!;"
+    }
+  ]
+}

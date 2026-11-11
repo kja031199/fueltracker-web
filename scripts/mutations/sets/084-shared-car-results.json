@@ -1,0 +1,40 @@
+{
+  "title": "#84 Shared-car results",
+  "tests": [
+    "src/data/shareSync.test.ts",
+    "src/ui/Sharing.test.tsx",
+    "src/ui/FuelLog.test.tsx"
+  ],
+  "mutations": [
+    {
+      "name": "refused upload filed as unreachable again",
+      "file": "src/data/shareSync.ts",
+      "from": "(result.kind === 'rejected' ? rejected : failed).push(membership);",
+      "to": "failed.push(membership);"
+    },
+    {
+      "name": "refused upload forgets the car",
+      "file": "src/data/shareSync.ts",
+      "from": "      (result.kind === 'rejected' ? rejected : failed).push(membership);\n      continue;",
+      "to": "      if (result.kind === 'rejected') { await forget(membership); continue; }\n      failed.push(membership);\n      continue;"
+    },
+    {
+      "name": "share outcomes dropped",
+      "file": "src/data/shareSync.ts",
+      "from": "    outcomes.push(result.outcome);\n",
+      "to": ""
+    },
+    {
+      "name": "notice ignores shared cars",
+      "file": "src/ui/useSync.ts",
+      "from": "const every: readonly SyncOutcome[] = [result.outcome, ...all.shares.outcomes];",
+      "to": "const every: readonly SyncOutcome[] = [result.outcome];"
+    },
+    {
+      "name": "refused upload not said",
+      "file": "src/ui/useSync.ts",
+      "from": "      for (const refused of all.shares.rejected) {",
+      "to": "      for (const refused of all.shares.rejected.slice(0, 0)) {"
+    }
+  ]
+}

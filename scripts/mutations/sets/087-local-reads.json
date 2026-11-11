@@ -1,0 +1,93 @@
+{
+  "title": "#87 Local reads",
+  "tests": [
+    "src/data/"
+  ],
+  "mutations": [
+    {
+      "name": "export back to two reads per table",
+      "file": "src/data/backup.ts",
+      "from": "  const [vehicles, fillUps, pendingFillUps] = await Promise.all([\n    repos.vehicles.listAll(),\n    repos.fillUps.listAll(),\n    repos.pendingFillUps.listAll(),\n  ]);\n  return { vehicles, fillUps, pendingFillUps };",
+      "to": "  const v = [...(await repos.vehicles.list()), ...(await repos.vehicles.listDeleted())];\n  const f = [...(await repos.fillUps.list()), ...(await repos.fillUps.listDeleted())];\n  const p = [...(await repos.pendingFillUps.list()), ...(await repos.pendingFillUps.listDeleted())];\n  return { vehicles: v, fillUps: f, pendingFillUps: p };"
+    },
+    {
+      "name": "merge reads every row again",
+      "file": "src/data/backup.ts",
+      "from": "  const rows = await repo.getMany(incoming.map((row) => row.id));",
+      "to": "  const rows = await (repo as unknown as { listAll(): Promise<T[]> }).listAll();"
+    },
+    {
+      "name": "push re-reads the device",
+      "file": "src/data/sync.ts",
+      "from": "  const localAfter = await local.snapshot();",
+      "to": "  const localAfter = await store.exportSnapshot();"
+    },
+    {
+      "name": "no refresh after the merge",
+      "file": "src/data/sync.ts",
+      "from": "  await local.refresh('vehicles', vehicles.readable.map((row) => row.id));\n  await local.refresh('fillUps', fillUps.readable.map((row) => row.id));\n  await local.refresh('pendingFillUps', pending.readable.map((row) => row.id));\n",
+      "to": ""
+    },
+    {
+      "name": "no refresh after a re-stamp",
+      "file": "src/data/sync.ts",
+      "from": "    await replica.restamp(collection, ids);\n    await local.refresh(collection, ids);",
+      "to": "    await replica.restamp(collection, ids);"
+    },
+    {
+      "name": "no refresh after the repair",
+      "file": "src/data/sync.ts",
+      "from": "      repaired += ids.length;\n      await local.refresh(collection, ids);",
+      "to": "      repaired += ids.length;"
+    },
+    {
+      "name": "repair never runs",
+      "file": "src/data/sync.ts",
+      "from": "  if (options.repair !== false) {",
+      "to": "  if (options.repair === true) {"
+    },
+    {
+      "name": "a view per remote",
+      "file": "src/data/shareSync.ts",
+      "from": "      { scope: onlyFillUpsOf(membership.vehicleId), local, repair: false },",
+      "to": "      { scope: onlyFillUpsOf(membership.vehicleId), repair: false },"
+    },
+    {
+      "name": "car lookup misses what the share sync wrote",
+      "file": "src/data/shareSync.ts",
+      "from": "    const car = await local.vehicle(membership.vehicleId);",
+      "to": "    const car = (await local.snapshot()).vehicles.length < 0 ? undefined : (await store.rowsById('vehicles', [])).at(0);"
+    },
+    {
+      "name": "Dexie listDeleted returns live rows",
+      "file": "src/data/dexieRepository.ts",
+      "from": "    return this.table.where('deletedAt').aboveOrEqual(Number.NEGATIVE_INFINITY).toArray();",
+      "to": "    return this.table.toArray();"
+    },
+    {
+      "name": "getMany hides tombstones (in memory)",
+      "file": "src/data/repository.ts",
+      "from": "      if (row !== undefined) found.push(row);",
+      "to": "      if (row !== undefined && row.deletedAt === null) found.push(row);"
+    },
+    {
+      "name": "getMany hides tombstones (Dexie)",
+      "file": "src/data/dexieRepository.ts",
+      "from": "    return rows.filter((row): row is T => row !== undefined);",
+      "to": "    return rows.filter((row): row is T => row !== undefined && row.deletedAt === null);"
+    },
+    {
+      "name": "forget misses deleted rows",
+      "file": "src/data/replica.ts",
+      "from": "      for (const row of await repo.listForVehicleAll(vehicleId)) await repo.purge(row.id);",
+      "to": "      for (const row of await repo.listForVehicle(vehicleId)) await repo.purge(row.id);"
+    },
+    {
+      "name": "repair rewrites tombstones",
+      "file": "src/data/replica.ts",
+      "from": "const tooLong = (row: T): boolean => row.deletedAt === null && bound(row) !== row;",
+      "to": "const tooLong = (row: T): boolean => bound(row) !== row;",
+      "survives": "Equivalent: a tombstone carries no text, so the repair has nothing to shorten in one; skipping them is for parity and to spend no write."
+    }
+  ]
+}

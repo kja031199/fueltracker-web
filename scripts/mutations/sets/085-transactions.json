@@ -1,0 +1,83 @@
+{
+  "title": "#85 Transactions",
+  "mutations": [
+    {
+      "name": "no transaction from dexieRepositories",
+      "file": "src/data/dexieRepository.ts",
+      "from": "    transaction: (work) =>\n",
+      "to": "    transactionX: (work) =>\n"
+    },
+    {
+      "name": "transaction work uses db tables (zone)",
+      "file": "src/data/dexieRepository.ts",
+      "from": "        work({\n          vehicles: new DexieRepository(tx.table(db.vehicles.name) as Table<VehicleRecord, string>, true),",
+      "to": "        work({\n          vehicles: new DexieRepository(db.vehicles),"
+    },
+    {
+      "name": "accountStore without the transaction",
+      "file": "src/data/accountStore.ts",
+      "from": "    dexieRepositories(db),",
+      "to": "    { ...dexieRepositories(db), transaction: undefined },"
+    },
+    {
+      "name": "removeVehicle leaves submissions",
+      "file": "src/data/store.ts",
+      "from": "      await r.pendingFillUps.putMany(submissions.map((row) => tombstonePending(row, this.clock.now())));\n",
+      "to": ""
+    },
+    {
+      "name": "removeVehicle not atomic",
+      "file": "src/data/store.ts",
+      "from": "    await atomically(this.repos, async (r) => {\n      // That vehicle's rows only",
+      "to": "    await (async (r: Repositories) => {\n      // That vehicle's rows only"
+    },
+    {
+      "name": "forgetVehicle not atomic",
+      "file": "src/data/replica.ts",
+      "from": "    await atomically(this.repos, async (r) => {\n      for (const repo",
+      "to": "    await (async (r: Repositories) => {\n      for (const repo"
+    },
+    {
+      "name": "import not atomic",
+      "file": "src/data/backup.ts",
+      "from": "  return atomically(repos, (inside) => merge(inside, snapshot, tieBreak));",
+      "to": "  return merge(repos, snapshot, tieBreak);"
+    },
+    {
+      "name": "merge ignores earlier duplicate",
+      "file": "src/data/backup.ts",
+      "from": "      current.set(row.id, row);\n",
+      "to": ""
+    },
+    {
+      "name": "repair from held rows",
+      "file": "src/data/replica.ts",
+      "from": "    const repaired = (await repo.getMany(candidates))",
+      "to": "    const repaired = rows.filter((row) => candidates.includes(row.id))"
+    },
+    {
+      "name": "approve not atomic",
+      "file": "src/data/store.ts",
+      "from": "    return atomically(this.repos, (r) => this.promote(r, id));",
+      "to": "    return this.promote(this.repos, id);"
+    },
+    {
+      "name": "receive not atomic",
+      "file": "src/data/store.ts",
+      "from": "    return atomically(this.repos, (r) => this.queueSubmission(r, submission));",
+      "to": "    return this.queueSubmission(this.repos, submission);"
+    },
+    {
+      "name": "update not atomic",
+      "file": "src/data/store.ts",
+      "from": "    return atomically(this.repos, async (r) => {\n      const existing = await r.fillUps.get(id);",
+      "to": "    return (async (r: Repositories) => {\n      const existing = await r.fillUps.get(id);"
+    },
+    {
+      "name": "putMany Dexie skips writes",
+      "file": "src/data/dexieRepository.ts",
+      "from": "    if (records.length > 0) await this.table.bulkPut([...records]);",
+      "to": "    if (records.length > 1) await this.table.bulkPut([...records]);"
+    }
+  ]
+}

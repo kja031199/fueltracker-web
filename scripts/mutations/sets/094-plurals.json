@@ -1,0 +1,74 @@
+{
+  "title": "#94 Plurals",
+  "tests": [
+    "src/domain/format.test.ts",
+    "src/test/oneCopy.test.ts",
+    "src/ui/Backup.test.tsx",
+    "src/ui/BackupReminder.test.tsx",
+    "src/ui/cspWatch.dom.test.ts",
+    "src/ui/FillUpFlow.test.tsx",
+    "src/ui/Sharing.test.tsx"
+  ],
+  "mutations": [
+    {
+      "name": "plural form by the reader's locale",
+      "file": "src/domain/format.ts",
+      "from": "  const form = ENGLISH_PLURALS.select(count) === 'one' ? forms.one : forms.other;",
+      "to": "  const form = new Intl.PluralRules(locale).select(count) === 'one' ? forms.one : forms.other;"
+    },
+    {
+      "name": "count not in the locale",
+      "file": "src/domain/format.ts",
+      "from": "  return form.replace('#', numberFormat(locale, { maximumFractionDigits: 0 }).format(count));",
+      "to": "  return form.replace('#', String(count));"
+    },
+    {
+      "name": "always plural",
+      "file": "src/domain/format.ts",
+      "from": "  const form = ENGLISH_PLURALS.select(count) === 'one' ? forms.one : forms.other;",
+      "to": "  const form = forms.other;"
+    },
+    {
+      "name": "zero read as singular",
+      "file": "src/domain/format.ts",
+      "from": "  const form = ENGLISH_PLURALS.select(count) === 'one' ? forms.one : forms.other;",
+      "to": "  const form = count <= 1 ? forms.one : forms.other;"
+    },
+    {
+      "name": "backup message back to (s)",
+      "file": "src/ui/settings/BackupSection.tsx",
+      "from": "`Saved a backup of ${vehicles(saved.vehicles)} and ${fillUps(saved.fillUps)}.`",
+      "to": "`Saved a backup of ${saved.vehicles} vehicle(s) and ${fillUps(saved.fillUps)}.`"
+    },
+    {
+      "name": "dashboard warning always plural",
+      "file": "src/ui/DashboardScreen.tsx",
+      "from": "                  one: '# fill-up looks like a fill-up went unlogged before it',",
+      "to": "                  one: '# fill-ups look like a fill-up went unlogged before them',"
+    },
+    {
+      "name": "sync note back to (s)",
+      "file": "src/ui/useSync.ts",
+      "from": "`${countOf(receiptsOmitted, { one: '# receipt photo was', other: '# receipt photos were' }, locale.current)} too large",
+      "to": "`${receiptsOmitted} receipt photo(s) were too large"
+    },
+    {
+      "name": "CSP report back to (s)",
+      "file": "src/ui/cspWatch.ts",
+      "from": "${countOf(events, { one: '# event', other: '# events' })}",
+      "to": "${events} event(s)"
+    },
+    {
+      "name": "describeSince hand-rolled again",
+      "file": "src/ui/wording.ts",
+      "from": "  if (minutes < 60) return countOf(minutes, { one: '# minute ago', other: '# minutes ago' }, locale);",
+      "to": "  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;"
+    },
+    {
+      "name": "guard blind to hand-written ternaries",
+      "file": "src/test/oneCopy.test.ts",
+      "from": "    pattern: /[a-z]\\(s\\)|===\\s*1\\s*\\?\\s*['\"`]/,",
+      "to": "    pattern: /[a-z]\\(s\\)/,"
+    }
+  ]
+}

@@ -99,7 +99,15 @@ line naming `#N` ([docs/development.md](docs/development.md#release-notes)).
 purpose, watch the suite go red, put it back. Required for `firestore.rules`,
 account separation, and anything guarding the data boundary: a test that cannot
 fail is decoration, and a rules test that cannot fail is worse because it reads
-like proof. The recorded results live in [docs/development.md](docs/development.md#mutation-testing).
+like proof. **Record each mutation as data** in `scripts/mutations/sets/` (#98)
+— file, exact `from`, `to`, optionally `tests` — never as a hand-counted table
+row: `npm run mutate -- <name>` runs it, `npm run mutate` runs all of them
+inside one emulator, and the weekly `mutation.yml` fails on a survivor. An
+equivalent survivor gets `survives` with the reason. **A refactor that moves
+code a mutation targets fails `src/test/mutations.test.ts`** (its text must
+occur exactly once): update the mutation's `from`/`to` to the new code rather
+than deleting it, and run it to see it still killed. Details in
+[docs/development.md](docs/development.md#mutation-testing).
 
 **Assert the mechanism, not a stopwatch.** `receiptBounds.test.ts` proved "the
 bound is checked before `atob`" with a 1000 ms budget; it failed at 2673 ms in a
@@ -119,6 +127,8 @@ Use the pinned CLI, which is what CI runs:
 npm ci --prefix .github/firebase-cli
 npm run test:rules   # the *.emulator.test.ts files, inside emulators:exec
 npm run test:build   # vite build, then the *.build.test.ts files
+npm run mutate:check # every recorded mutation still applies (no tests run)
+npm run mutate       # every recorded mutation killed (most of an hour)
 ```
 
 (`firebase-tools` is the CLI; `firebase` is the SDK and ships no binary.)
@@ -847,7 +857,8 @@ intended ([docs/development.md](docs/development.md)).
 ## Before opening a pull request
 
 - [ ] The test was written first and seen to fail, and the PR says so.
-- [ ] Mutation-tested, if it guards data or access.
+- [ ] Mutation-tested, if it guards data or access — and the mutations recorded in
+      `scripts/mutations/sets/`.
 - [ ] `npm run build`, `npm test`, `npm run typecheck`, `npm run lint` — exit
       codes read directly, not through a pipe.
 - [ ] Rules touched? Emulator suite run, and the field in its `…Keys()` list.

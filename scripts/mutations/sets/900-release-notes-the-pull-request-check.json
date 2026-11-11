@@ -1,0 +1,51 @@
+{
+  "title": "Release notes: the pull request check",
+  "tests": [
+    "src/test/releaseNotes.test.ts",
+    "src/test/workflows.test.ts"
+  ],
+  "mutations": [
+    {
+      "name": "keywords: closes only",
+      "file": "scripts/release-notes/check.ts",
+      "from": "(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)",
+      "to": "(?:closes)"
+    },
+    {
+      "name": "title refs ignored",
+      "file": "scripts/release-notes/check.ts",
+      "from": "    ...[...title.matchAll(inTitle)].map((match) => match[1]!),\n",
+      "to": ""
+    },
+    {
+      "name": "removed lines count as notes",
+      "file": "scripts/release-notes/check.ts",
+      "from": "    .filter((line) => line.startsWith('+') && !line.startsWith('+++'))",
+      "to": "    .filter((line) => !line.startsWith('+++'))"
+    },
+    {
+      "name": "#12 matches #123 (noted)",
+      "file": "scripts/release-notes/check.ts",
+      "from": "  return numbers([...added.matchAll(/#(\\d+)(?!\\d)/g)].map((match) => match[1]!));",
+      "to": "  return numbers([...added.matchAll(/#(\\d\\d?)/g)].map((match) => match[1]!));"
+    },
+    {
+      "name": "mentions count as claims",
+      "file": "scripts/release-notes/check.ts",
+      "from": "resolve[sd]?):?\\s+#",
+      "to": "resolve[sd]?|see|of):?\\s+#"
+    },
+    {
+      "name": "body interpolated into run",
+      "file": ".github/workflows/release-notes.yml",
+      "from": "        run: node --experimental-strip-types scripts/release-notes/check.ts",
+      "to": "        run: PR_BODY=\"${{ github.event.pull_request.body }}\" node --experimental-strip-types scripts/release-notes/check.ts"
+    },
+    {
+      "name": "edited not a trigger",
+      "file": ".github/workflows/release-notes.yml",
+      "from": "types: [opened, synchronize, reopened, edited]",
+      "to": "types: [opened, synchronize, reopened]"
+    }
+  ]
+}

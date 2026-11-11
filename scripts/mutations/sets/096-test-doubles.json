@@ -1,0 +1,59 @@
+{
+  "title": "#96 Test doubles",
+  "tests": [
+    "src/test/reachable.test.ts",
+    "src/data/sharing.test.ts",
+    "src/data/shareSync.test.ts",
+    "src/data/syncReads.test.ts"
+  ],
+  "mutations": [
+    {
+      "name": "the car only on a full pull",
+      "file": "src/data/testing/inMemoryRemote.ts",
+      "from": "    const vehicles = car === undefined ? [] : [car];",
+      "to": "    const vehicles = car === undefined || (since !== null && since.vehicles !== null) ? [] : [car];"
+    },
+    {
+      "name": "a vehicle mark for the car",
+      "file": "src/data/testing/inMemoryRemote.ts",
+      "from": "      highWater: { vehicles: null, fillUps: fillUps.highWater, pendingFillUps: null },",
+      "to": "      highWater: { vehicles: 0, fillUps: fillUps.highWater, pendingFillUps: null },"
+    },
+    {
+      "name": "every car’s fill-ups",
+      "file": "src/data/testing/inMemoryRemote.ts",
+      "from": "    const fillUps = this.read('fillUps', this.fillUps, since, (row) => row.vehicleId === vehicleId);",
+      "to": "    const fillUps = this.read('fillUps', this.fillUps, since);"
+    },
+    {
+      "name": "the car read while offline",
+      "file": "src/data/testing/inMemoryRemote.ts",
+      "from": "    if (this.failPull) throw new Error('offline');\n    const car",
+      "to": "    const car"
+    },
+    {
+      "name": "the read ignoring its filter",
+      "file": "src/data/testing/inMemoryRemote.ts",
+      "from": "      if (!which(row)) continue;\n",
+      "to": ""
+    },
+    {
+      "name": "the old scoped pull back",
+      "file": "src/data/testing/inMemorySharing.ts",
+      "from": "    return this.world.remoteFor(this.share.ownerUid).pullCar(this.share.vehicleId, since);",
+      "to": "    const raw = await this.world.remoteFor(this.share.ownerUid).pull(since);\n    return { vehicles: (raw.vehicles as { id: string }[]).filter((v) => v.id === this.share.vehicleId), fillUps: (raw.fillUps as { vehicleId: string }[]).filter((f) => f.vehicleId === this.share.vehicleId), pendingFillUps: [], ...(raw.highWater === undefined ? {} : { highWater: { ...raw.highWater, pendingFillUps: null } }) };"
+    },
+    {
+      "name": "testing/ folders counted as production",
+      "file": "src/test/reachable.test.ts",
+      "from": "  return file.startsWith('src/test/') || /(^|\\/)testing\\//.test(file);",
+      "to": "  return file.startsWith('src/test/');"
+    },
+    {
+      "name": "an allowed name allowed anywhere",
+      "file": "src/test/reachable.test.ts",
+      "from": "  return declared.filter((name) => PRODUCTION_IN_MEMORY.get(name) !== file);",
+      "to": "  return declared.filter((name) => !PRODUCTION_IN_MEMORY.has(name));"
+    }
+  ]
+}
