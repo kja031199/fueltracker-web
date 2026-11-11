@@ -270,9 +270,11 @@ What pinning does **not** do is make the tool's own tree clean. It has 16
 moderate advisories, and they were always there: `npx` installed the same tree
 and simply hid it. Worth knowing before reaching for `npm audit fix` in that
 directory, because the same trap #19 found in the app's tree is there too —
-npm offers **firebase-tools 13.11.2** as the "fix" for ten of the sixteen,
-which is two majors *backwards* from the pinned 15.34.2. It would report
-success while making the deploy tool older.
+npm offered **firebase-tools 13.11.2** as the "fix" for ten of the sixteen,
+two majors *backwards* from the version pinned at the time. It would report
+success while making the deploy tool older. (The pinned version is in
+`.github/firebase-cli/package.json`; docs never quote a pin, because a copy in
+prose goes stale on the next bump — `src/test/pins.test.ts` refuses one.)
 
 The real mitigation for a credential sitting next to that much code is not to
 have a long-lived credential at all — see below.
@@ -294,10 +296,18 @@ then extracts, so a mismatch fails the job before anything runs.
 published checksums where they exist. gitleaks ships
 `gitleaks_<version>_checksums.txt`. Then confirm it against a download of your
 own. Never take the hash from the same download step in CI, because a checksum
-fetched alongside the tarball only proves the two were replaced together.
-lychee v0.15.1 publishes no checksum, so its pin is the hash of two downloads
-made hours apart that agreed. That can't prove the first copy was genuine, but
-it does make any later change fail the job.
+fetched alongside the tarball only proves the two were replaced together. A
+release that publishes no checksum (lychee's, when it was first pinned) is
+pinned to the hash of two downloads made hours apart that agreed. That can't
+prove the first copy was genuine, but it does make any later change fail the
+job.
+
+**Knowing when to bump** (#99). These pins are environment variables, which
+Dependabot cannot see. `.github/workflows/pins.yml` runs
+`scripts/pins/check.ts` weekly and on demand: it reads each version from
+`checks.yml`, asks GitHub for the tool's latest release, and goes red when a
+pin is behind, listing both in the job summary. It only reports — the bump,
+and its hash, are still made by hand as above.
 
 **Every `actions/checkout` sets `persist-credentials: false`.** The default
 leaves the `GITHUB_TOKEN` in `.git/config` for every later step. Those steps

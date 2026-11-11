@@ -1,0 +1,52 @@
+name: Binary pins
+
+# Are gitleaks and lychee still the latest releases? (#99)
+#
+# `checks.yml` downloads both by version and verifies a pinned SHA-256 (#46).
+# Those pins are environment variables, which Dependabot cannot see, so this
+# asks GitHub for each tool's latest release and goes red when a pin is behind.
+# It only reports: bumping means bumping the hash too, by hand, from the
+# release's own checksums (docs/deploying.md).
+#
+# Weekly and on demand. Not a required check, and not on pull requests: a new
+# release upstream is not something a pull request did.
+
+on:
+  schedule:
+    # Wednesdays, 06:17 UTC: off the top of the hour, away from the Monday
+    # mutation run.
+    - cron: '17 6 * * 3'
+  workflow_dispatch:
+
+concurrency:
+  group: pins-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pins:
+    name: Every downloaded binary is the latest release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing after checkout needs git auth (#46).
+          persist-credentials: false
+
+      # Node only: the check imports nothing from the app, so nothing is installed.
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      # The job's own token, read-only, only so the API's rate limit is the
+      # authenticated one; public releases need no access at all.
+      - name: Compare each pin with the latest release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node --experimental-strip-types scripts/pins/check.ts
