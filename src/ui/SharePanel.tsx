@@ -75,8 +75,8 @@ export function SharePanel({ vehicle }: { readonly vehicle: VehicleRecord }): Re
   return (
     <div className="space-above-sm">
       <p className="stack-sm">
-        Someone you share {vehicle.name} with sees its whole history — including receipt photos, notes
-        and stations — and can add, correct and delete its fill-ups. They see nothing else of yours.
+        Someone you share {vehicle.name} with sees its whole history — including receipt photos, notes and stations —
+        and can add, correct and delete its fill-ups. They see nothing else of yours.
       </p>
       {/* `noValidate`: the address is checked by `normalizeEmail`, so the
           message is the same plain sentence in every browser. */}
@@ -110,7 +110,10 @@ export function SharePanel({ vehicle }: { readonly vehicle: VehicleRecord }): Re
                 className="button button--secondary"
                 type="button"
                 onClick={() =>
-                  void act(() => sharing.removeMember(vehicle.id, member.uid), `${verifiedName(member)} no longer has ${vehicle.name}.`)
+                  void act(
+                    () => sharing.removeMember(vehicle.id, member.uid),
+                    `${verifiedName(member)} no longer has ${vehicle.name}.`,
+                  )
                 }
               >
                 Remove {verifiedName(member)}
@@ -129,7 +132,10 @@ export function SharePanel({ vehicle }: { readonly vehicle: VehicleRecord }): Re
                 className="button button--secondary"
                 type="button"
                 onClick={() =>
-                  void act(() => sharing.withdrawInvite(vehicle.id, invitation.email), `Withdrew the invitation to ${invitation.email}.`)
+                  void act(
+                    () => sharing.withdrawInvite(vehicle.id, invitation.email),
+                    `Withdrew the invitation to ${invitation.email}.`,
+                  )
                 }
               >
                 Withdraw {invitation.email}

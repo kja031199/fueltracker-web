@@ -31,7 +31,11 @@ function person(world: InMemorySharingWorld, user: AuthUser): Person {
   return { user, store: makeStore({ author: user.uid }), sharing: sharingFor(world, user) };
 }
 
-function open(world: InMemorySharingWorld, who: Person, initialTab: 'vehicles' | 'fillups' | 'dashboard' | 'settings' = 'vehicles'): void {
+function open(
+  world: InMemorySharingWorld,
+  who: Person,
+  initialTab: 'vehicles' | 'fillups' | 'dashboard' | 'settings' = 'vehicles',
+): void {
   render(
     <App
       store={who.store}
@@ -95,7 +99,9 @@ describe('sharing a car', () => {
     const kyle = person(world, KYLE);
     const sam = person(world, SAM);
     const car = await kylesCivic(world, kyle);
-    await world.sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true }).invite(car, SAM.email);
+    await world
+      .sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true })
+      .invite(car, SAM.email);
     const user = userEvent.setup();
     open(world, sam);
 
@@ -115,7 +121,9 @@ describe('sharing a car', () => {
     const kyle = person(world, KYLE);
     const sam = person(world, SAM);
     const car = await kylesCivic(world, kyle);
-    const invite = await world.sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true }).invite(car, SAM.email);
+    const invite = await world
+      .sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true })
+      .invite(car, SAM.email);
     await sam.sharing.remote.accept(invite);
     open(world, sam);
 
@@ -130,7 +138,9 @@ describe('sharing a car', () => {
     const kyle = person(world, KYLE);
     const sam = person(world, SAM);
     const car = await kylesCivic(world, kyle);
-    await world.sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true }).invite(car, SAM.email);
+    await world
+      .sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true })
+      .invite(car, SAM.email);
     const user = userEvent.setup();
     open(world, sam);
     const banner = await screen.findByRole('region', { name: /invitations/i }, WAIT);
@@ -144,7 +154,9 @@ describe('sharing a car', () => {
     const world = new InMemorySharingWorld();
     const kyle = person(world, KYLE);
     const car = await kylesCivic(world, kyle);
-    await world.sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true }).invite(car, SAM.email);
+    await world
+      .sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true })
+      .invite(car, SAM.email);
     const unverified = person(world, { ...SAM, emailVerified: false });
     open(world, unverified);
     await screen.findByRole('navigation', { name: /sections/i });
@@ -162,7 +174,9 @@ describe('who logged what', () => {
     const kyle = person(world, KYLE);
     const sam = person(world, SAM);
     const car = await kylesCivic(world, kyle);
-    const invite = await world.sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true }).invite(car, SAM.email);
+    const invite = await world
+      .sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true })
+      .invite(car, SAM.email);
     await sam.sharing.remote.accept(invite);
     open(world, sam, 'fillups');
 
@@ -175,7 +189,9 @@ describe('who logged what', () => {
     // Sam's chosen name is the owner's. Only the email is Google's.
     const impostor = person(world, { ...SAM, displayName: 'Kyle' });
     const car = await kylesCivic(world, kyle);
-    const invite = await world.sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true }).invite(car, SAM.email);
+    const invite = await world
+      .sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true })
+      .invite(car, SAM.email);
     await impostor.sharing.remote.accept(invite);
     // A fill-up the member logged on the shared car, already in the owner's account.
     const [mine] = await kyle.store.fillUps(car.id);
@@ -222,14 +238,18 @@ describe('ending it', () => {
     const kyle = person(world, KYLE);
     const sam = person(world, SAM);
     const car = await kylesCivic(world, kyle);
-    const invite = await world.sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true }).invite(car, SAM.email);
+    const invite = await world
+      .sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true })
+      .invite(car, SAM.email);
     await sam.sharing.remote.accept(invite);
     const user = userEvent.setup();
     open(world, kyle);
 
     await user.click(await screen.findByRole('button', { name: /^Share / }));
     // Who they are, by the email Google verified, not only the name they chose (#81).
-    expect(await screen.findByText(/shared with/i, { selector: 'span' })).toHaveTextContent(/^Shared with Sam \(sam@example\.com\)$/);
+    expect(await screen.findByText(/shared with/i, { selector: 'span' })).toHaveTextContent(
+      /^Shared with Sam \(sam@example\.com\)$/,
+    );
     await user.click(screen.getByRole('button', { name: /remove sam \(sam@example\.com\)/i }));
     expect(await screen.findByText(/sam \(sam@example\.com\) no longer has civic/i)).toBeInTheDocument();
     expect(world.isMember(KYLE.uid, car.id, SAM.uid)).toBe(false);
@@ -240,7 +260,9 @@ describe('ending it', () => {
     const kyle = person(world, KYLE);
     const sam = person(world, SAM);
     const car = await kylesCivic(world, kyle);
-    const invite = await world.sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true }).invite(car, SAM.email);
+    const invite = await world
+      .sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true })
+      .invite(car, SAM.email);
     await sam.sharing.remote.accept(invite);
     const user = userEvent.setup();
     open(world, sam);
@@ -263,11 +285,7 @@ describe('when sharing is not available', () => {
     const kyle = person(world, KYLE);
     await kylesCivic(world, kyle);
     render(
-      <App
-        store={kyle.store}
-        auth={new StubAuthProvider({ status: 'signedIn', user: KYLE })}
-        initialTab="vehicles"
-      />,
+      <App store={kyle.store} auth={new StubAuthProvider({ status: 'signedIn', user: KYLE })} initialTab="vehicles" />,
     );
     await screen.findByText('Civic');
     expect(screen.queryByRole('button', { name: /^Share / })).not.toBeInTheDocument();
@@ -417,11 +435,18 @@ describe('an invitation to a car whose id is one of yours (#78)', () => {
   /** Sam's own car, synced; Kyle files a car under the same id and invites Sam. */
   async function clashing(world: InMemorySharingWorld, sam: Person): Promise<VehicleRecord> {
     const mine = await sam.store.addVehicle({ name: 'My Civic' });
-    const draft = makeFuelEntryDraft({ date: new Date(2026, 0, 1), odometer: 20_000, gallons: 10, pricePerGallon: 3.5 });
+    const draft = makeFuelEntryDraft({
+      date: new Date(2026, 0, 1),
+      odometer: 20_000,
+      gallons: 10,
+      pricePerGallon: 3.5,
+    });
     if (draft === null) throw new Error('fixture draft failed validation');
     await sam.store.addFillUp(draft, mine.id);
     await world.remoteFor(KYLE.uid).push({ vehicles: [{ ...mine, name: 'Bait' }], fillUps: [], pendingFillUps: [] });
-    await world.sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true }).invite({ id: mine.id, name: 'Bait' }, SAM.email);
+    await world
+      .sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true })
+      .invite({ id: mine.id, name: 'Bait' }, SAM.email);
     return mine;
   }
 
@@ -447,7 +472,10 @@ describe('an invitation to a car whose id is one of yours (#78)', () => {
     const mine = await clashing(world, sam);
     const key = `${KYLE.uid}__${mine.id}`;
     world.members.set(key, new Map([[SAM.uid, { uid: SAM.uid, name: 'Sam', email: SAM.email, joinedAt: 1 }]]));
-    world.memberships.set(SAM.uid, new Map([[key, { ownerUid: KYLE.uid, vehicleId: mine.id, ownerName: 'Kyle', vehicleName: 'Bait' }]]));
+    world.memberships.set(
+      SAM.uid,
+      new Map([[key, { ownerUid: KYLE.uid, vehicleId: mine.id, ownerName: 'Kyle', vehicleName: 'Bait' }]]),
+    );
     open(world, sam, 'settings');
 
     expect(await screen.findByText(/bait from kyle names a car that is already yours/i, {}, WAIT)).toBeInTheDocument();
@@ -481,7 +509,9 @@ describe('what a shared car’s sync says (#84)', () => {
     const kyle = person(world, KYLE);
     const sam = person(world, SAM);
     const car = await kylesCivic(world, kyle);
-    const invite = await world.sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true }).invite(car, SAM.email);
+    const invite = await world
+      .sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true })
+      .invite(car, SAM.email);
     await world.sharingFor({ uid: SAM.uid, name: 'Sam', email: SAM.email, emailVerified: true }).accept(invite);
     // Sam's first sync brings the car.
     open(world, sam);

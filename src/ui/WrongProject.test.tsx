@@ -12,9 +12,7 @@ import { WrongProjectScreen } from './WrongProjectScreen';
 describe('WrongProjectScreen', () => {
   test('says the build is pointed at production and names the project', () => {
     render(<WrongProjectScreen projectId="fueltracker-899eb" />);
-    expect(
-      screen.getByRole('heading', { name: /pointed at the production project/i }),
-    ).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /pointed at the production project/i })).toBeTruthy();
     expect(screen.getByText('fueltracker-899eb')).toBeTruthy();
   });
 

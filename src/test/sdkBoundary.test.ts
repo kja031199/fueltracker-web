@@ -24,9 +24,11 @@ const PRODUCTION = sourcesUnder('src', false).filter((file) => !file.startsWith(
 
 describe('the Firebase SDK stays in data/firebase', () => {
   test('the rule catches the SDK by any entry point, and only outside its home', () => {
-    expect(sdkOutsideItsHome('src/ui/App.tsx', ['firebase/firestore', 'firebase', '@firebase/auth', 'react'])).toEqual(
-      ['firebase/firestore', 'firebase', '@firebase/auth'],
-    );
+    expect(sdkOutsideItsHome('src/ui/App.tsx', ['firebase/firestore', 'firebase', '@firebase/auth', 'react'])).toEqual([
+      'firebase/firestore',
+      'firebase',
+      '@firebase/auth',
+    ]);
     expect(sdkOutsideItsHome('src/data/firebase/remoteStore.ts', ['firebase/firestore'])).toEqual([]);
     expect(sdkOutsideItsHome('src/data/firebaseish.ts', ['firebase/app'])).toEqual(['firebase/app']);
     expect(sdkOutsideItsHome('src/ui/App.tsx', ['firebasex', 'src/data/firebase/settings'])).toEqual([]);

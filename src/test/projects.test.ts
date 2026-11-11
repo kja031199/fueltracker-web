@@ -73,8 +73,7 @@ function projectsOf(file: string): string[] {
   return projects()
     .filter(
       ({ include, exclude }) =>
-        include.some((glob) => matchesGlob(file, glob)) &&
-        !exclude.some((glob) => matchesGlob(file, glob)),
+        include.some((glob) => matchesGlob(file, glob)) && !exclude.some((glob) => matchesGlob(file, glob)),
     )
     .map(({ name }) => name);
 }
@@ -145,9 +144,7 @@ describe('a test file is named for what it needs', () => {
     // Both directions: a file that needs the emulator but is named as a unit
     // test would run in `npm test` and fail there, and a `.emulator.test.ts`
     // that never touches the emulator is a pure test hiding in the rules job.
-    expect(USES_EMULATOR.test(text), 'imports the emulator setup').toBe(
-      file.includes('.emulator.test.'),
-    );
+    expect(USES_EMULATOR.test(text), 'imports the emulator setup').toBe(file.includes('.emulator.test.'));
     expect(READS_BUILD.test(text), 'reads the build in dist/').toBe(file.includes('.build.test.'));
   });
 });
@@ -205,9 +202,7 @@ describe('isolation is the config’s job, not each file’s', () => {
 });
 
 describe('the npm scripts run one project each', () => {
-  const scripts = (
-    JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> }
-  ).scripts;
+  const scripts = (JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> }).scripts;
 
   test('npm test runs the unit and dom projects, and needs nothing running', () => {
     expect(scripts.test).toBe('vitest run --project unit --project dom');

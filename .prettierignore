@@ -1,0 +1,17 @@
+# Prettier formats the code (#99): TypeScript, JavaScript and the CSS.
+# Everything else is left as written.
+*
+
+!*/
+!src/**/*.ts
+!src/**/*.tsx
+!src/**/*.css
+!scripts/**/*.ts
+!scripts/**/*.mjs
+!vite.config.ts
+
+# Not ours, or not code.
+node_modules/
+.github/firebase-cli/node_modules/
+dist/
+coverage/

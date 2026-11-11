@@ -31,21 +31,12 @@ interface Props {
  * announces its own row and column headers, where a bag of labelled `<path>`
  * elements cannot.
  */
-export function ChartFrame({
-  title,
-  summary,
-  rows,
-  rowHeadings,
-  children,
-}: Props): ReactElement {
+export function ChartFrame({ title, summary, rows, rowHeadings, children }: Props): ReactElement {
   return (
     <figure className="chart flush">
       <figcaption className="card__title">{title}</figcaption>
 
-      <div
-        role="img"
-        aria-label={summary === null ? `${title}: no data yet.` : `${title}. ${summary}`}
-      >
+      <div role="img" aria-label={summary === null ? `${title}: no data yet.` : `${title}. ${summary}`}>
         {children}
       </div>
 

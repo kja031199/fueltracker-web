@@ -36,7 +36,10 @@ function fileFor(path: string): string | null {
 }
 
 /** Every source file reachable from `entry` through its imports. */
-export function reachableFrom(entry: string, importsOfFile: (file: string) => readonly string[] = importsOf): Set<string> {
+export function reachableFrom(
+  entry: string,
+  importsOfFile: (file: string) => readonly string[] = importsOf,
+): Set<string> {
   const seen = new Set<string>();
   const queue = [entry];
   while (queue.length > 0) {
@@ -124,7 +127,8 @@ describe('the walk', () => {
   });
 
   test('finds the in-memory classes a file declares, exported or not', () => {
-    const source = 'export class InMemoryRemoteStore implements RemoteStore {}\nclass InMemoryScoped {}\nclass Other {}\n// class InMemoryNot';
+    const source =
+      'export class InMemoryRemoteStore implements RemoteStore {}\nclass InMemoryScoped {}\nclass Other {}\n// class InMemoryNot';
     expect(inMemoryClasses(source)).toEqual(['InMemoryRemoteStore', 'InMemoryScoped', 'InMemoryNot']);
     expect(inMemoryClasses('const store = new InMemoryRepository();')).toEqual([]);
   });

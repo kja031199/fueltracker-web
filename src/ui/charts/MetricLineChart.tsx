@@ -33,14 +33,7 @@ export const DOWNSAMPLE_THRESHOLD = 500;
  * Thinning the data and then averaging the thinned copy would quietly report a
  * different number than the dashboard does.
  */
-export function MetricLineChart({
-  title,
-  points,
-  metric,
-  unit,
-  formatValue,
-  average = null,
-}: Props): ReactElement {
+export function MetricLineChart({ title, points, metric, unit, formatValue, average = null }: Props): ReactElement {
   const { locale } = useDisplay().style;
   const shown = downsampled(points, DOWNSAMPLE_THRESHOLD);
   // The summary describes the whole series, not the drawn sample.
@@ -67,9 +60,7 @@ export function MetricLineChart({
     <div className="card">
       <ChartFrame title={title} summary={summary} rows={rows} rowHeadings={['Date', unit]}>
         {points.length === 0 ? (
-          <p className="empty empty--chart">
-            Not enough data yet.
-          </p>
+          <p className="empty empty--chart">Not enough data yet.</p>
         ) : (
           <svg
             className="chart__svg"
@@ -83,13 +74,7 @@ export function MetricLineChart({
               return (
                 <g key={tick}>
                   <line x1={x0} x2={x1} y1={y} y2={y} stroke="var(--separator)" strokeWidth={1} />
-                  <text
-                    x={x0 - 6}
-                    y={y + 3}
-                    textAnchor="end"
-                    fontSize={9}
-                    fill="var(--text-secondary)"
-                  >
+                  <text x={x0 - 6} y={y + 3} textAnchor="end" fontSize={9} fill="var(--text-secondary)">
                     {formatValue(tick)}
                   </text>
                 </g>

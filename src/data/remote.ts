@@ -99,15 +99,11 @@ export function emptySnapshot(): Snapshot {
  * storage: refusing to upload somebody's data is not a licence to delete it,
  * and `SyncOutcome.unsendable` is how they get told instead.
  */
-export function sendableRows<T extends SyncFields>(
-  rows: readonly T[],
-  unsendable: string[],
-): T[] {
+export function sendableRows<T extends SyncFields>(rows: readonly T[], unsendable: string[]): T[] {
   const sendable: T[] = [];
   for (const row of rows) {
     const vehicleId = (row as { readonly vehicleId?: unknown }).vehicleId;
-    const addressable =
-      isStorableId(row.id) && (vehicleId === undefined || isStorableId(vehicleId));
+    const addressable = isStorableId(row.id) && (vehicleId === undefined || isStorableId(vehicleId));
     if (addressable && textProblem(row) === null) sendable.push(row);
     else unsendable.push(row.id);
   }

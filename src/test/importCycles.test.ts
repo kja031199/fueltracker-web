@@ -53,8 +53,23 @@ describe('src/data has no import cycles (#91)', () => {
   });
 
   test('the cycle finder finds one when there is one', () => {
-    expect(cycles(new Map([['a', ['b']], ['b', ['c']], ['c', ['a']]]))).toEqual([['a', 'b', 'c', 'a']]);
-    expect(cycles(new Map([['a', ['b']], ['b', []]]))).toEqual([]);
+    expect(
+      cycles(
+        new Map([
+          ['a', ['b']],
+          ['b', ['c']],
+          ['c', ['a']],
+        ]),
+      ),
+    ).toEqual([['a', 'b', 'c', 'a']]);
+    expect(
+      cycles(
+        new Map([
+          ['a', ['b']],
+          ['b', []],
+        ]),
+      ),
+    ).toEqual([]);
   });
 
   test('none, type-only imports included', () => {
@@ -69,12 +84,27 @@ describe('the storage modules depend on nothing above them (#91)', () => {
   // clock into the store, the database and the cursor into sharing — so
   // naming a membership pulled in the whole sharing world.
   const BOTTOM = [
-    'records.ts', 'recordMapping.ts', 'repository.ts', 'atomically.ts', 'db.ts', 'dexieRepository.ts',
-    'dexieState.ts', 'syncState.ts', 'shareLedger.ts', 'syncClock.ts', 'sharingTypes.ts',
+    'records.ts',
+    'recordMapping.ts',
+    'repository.ts',
+    'atomically.ts',
+    'db.ts',
+    'dexieRepository.ts',
+    'dexieState.ts',
+    'syncState.ts',
+    'shareLedger.ts',
+    'syncClock.ts',
+    'sharingTypes.ts',
   ].map((name) => join(ROOT, name));
-  const ABOVE = ['store.ts', 'sync.ts', 'shareSync.ts', 'sharing.ts', 'backup.ts', 'localView.ts', 'accountStore.ts'].map(
-    (name) => join(ROOT, name),
-  );
+  const ABOVE = [
+    'store.ts',
+    'sync.ts',
+    'shareSync.ts',
+    'sharing.ts',
+    'backup.ts',
+    'localView.ts',
+    'accountStore.ts',
+  ].map((name) => join(ROOT, name));
 
   test('they all exist, so a passing suite means something', () => {
     for (const file of [...BOTTOM, ...ABOVE]) expect(FILES.has(file), file).toBe(true);

@@ -82,6 +82,16 @@ stand between a correct change and `main`.
 lockfile pins and fails if the lockfile and manifest disagree, instead of
 silently resolving a different tree.
 
+**Formatting is Prettier's** (#99), set to the style the code already had —
+single quotes, 120 columns, trailing commas (`.prettierrc.json`) — over the
+TypeScript, JavaScript and CSS only (`.prettierignore` lists what is in, so
+Markdown, JSON and the rules are left as written). The code was reformatted
+once, in a commit of its own; `npm run format` fixes a file and
+`npm run format:check` runs in *Typecheck, test & build*. Chosen over an
+EditorConfig alone (not a formatter) and Biome (a second toolchain beside
+oxlint). The reformat disturbed six recorded mutations, which were re-anchored
+by formatting each mutant the same way.
+
 **One setup, in one place** (#99). Every job that runs app code uses
 `.github/actions/setup`: Node from `.nvmrc` — the one place the version is
 written (`engines.node` and `@types/node` follow it, so the types cannot

@@ -110,10 +110,7 @@ describe('importing', () => {
     // ...and restore it into a brand-new one, the cleared-browser case.
     const target = makeStore();
     await renderSettings(target);
-    await importFile(
-      user,
-      new File([captured[0]!.text], 'fueltracker-2025-01-01.json', { type: 'application/json' }),
-    );
+    await importFile(user, new File([captured[0]!.text], 'fueltracker-2025-01-01.json', { type: 'application/json' }));
 
     await waitFor(async () => expect(await target.vehicles()).toHaveLength(1));
     const restored = await target.vehicles();

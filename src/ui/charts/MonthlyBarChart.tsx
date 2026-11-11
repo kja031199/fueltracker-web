@@ -43,14 +43,7 @@ function monthNames(locale: string): { readonly short: Intl.DateTimeFormat; read
  * proportion — twice the height has to mean twice the amount — which is the
  * whole reason to draw a bar rather than a point in the first place.
  */
-export function MonthlyBarChart({
-  title,
-  totals,
-  value,
-  metric,
-  unit,
-  formatValue,
-}: Props): ReactElement {
+export function MonthlyBarChart({ title, totals, value, metric, unit, formatValue }: Props): ReactElement {
   const { x0, x1, y0, y1 } = plotBounds(AREA);
   const months = monthNames(useDisplay().style.locale);
   const amounts = totals.map(value);
@@ -75,9 +68,7 @@ export function MonthlyBarChart({
     <div className="card">
       <ChartFrame title={title} summary={summary} rows={rows} rowHeadings={['Month', unit]}>
         {totals.length === 0 ? (
-          <p className="empty empty--chart">
-            Not enough data yet.
-          </p>
+          <p className="empty empty--chart">Not enough data yet.</p>
         ) : (
           <svg
             className="chart__svg"
@@ -91,13 +82,7 @@ export function MonthlyBarChart({
               return (
                 <g key={tick}>
                   <line x1={x0} x2={x1} y1={y} y2={y} stroke="var(--separator)" strokeWidth={1} />
-                  <text
-                    x={x0 - 6}
-                    y={y + 3}
-                    textAnchor="end"
-                    fontSize={9}
-                    fill="var(--text-secondary)"
-                  >
+                  <text x={x0 - 6} y={y + 3} textAnchor="end" fontSize={9} fill="var(--text-secondary)">
                     {formatValue(tick)}
                   </text>
                 </g>
@@ -120,13 +105,7 @@ export function MonthlyBarChart({
                   />
                   {/* Labels only while they will not overlap into mush. */}
                   {totals.length <= 12 && (
-                    <text
-                      x={centre}
-                      y={AREA.height - 6}
-                      textAnchor="middle"
-                      fontSize={8}
-                      fill="var(--text-secondary)"
-                    >
+                    <text x={centre} y={AREA.height - 6} textAnchor="middle" fontSize={8} fill="var(--text-secondary)">
                       {months.short.format(total.month)}
                     </text>
                   )}

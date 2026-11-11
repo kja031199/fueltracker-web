@@ -35,7 +35,13 @@ function device(remote: InMemoryRemoteStore): Device {
   return { store, sync: () => syncOnce(store, remote, state) };
 }
 
-async function twoDevicesOneFillUp(): Promise<{ remote: InMemoryRemoteStore; a: Device; b: Device; car: string; id: string }> {
+async function twoDevicesOneFillUp(): Promise<{
+  remote: InMemoryRemoteStore;
+  a: Device;
+  b: Device;
+  car: string;
+  id: string;
+}> {
   const remote = new InMemoryRemoteStore();
   const a = device(remote);
   const b = device(remote);

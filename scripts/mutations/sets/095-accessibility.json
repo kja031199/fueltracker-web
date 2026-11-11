@@ -70,8 +70,8 @@
     {
       "name": "id check matching data-id",
       "file": "src/ui/Accessibility.test.tsx",
-      "from": "const FIXED_ID = /(?<![\\w-])(id|htmlFor",
-      "to": "const FIXED_ID = /\\b(id|htmlFor"
+      "from": "  /(?<![\\w-])(id|htmlFor|aria-labelledby|aria-describedby|aria-controls)=(\"[^\"]*\"|\\{\\s*(['\"])[^'\"]*\\3\\s*\\}|\\{\\s*`[^`$]*`\\s*\\})/g;\n",
+      "to": "  /\\b(id|htmlFor|aria-labelledby|aria-describedby|aria-controls)=(\"[^\"]*\"|\\{\\s*(['\"])[^'\"]*\\3\\s*\\}|\\{\\s*`[^`$]*`\\s*\\})/g;\n"
     }
   ]
 }

@@ -32,9 +32,7 @@ export function UnitsSection(): ReactElement {
         <select
           id={`${idBase}-unit-volume`}
           value={units.volume}
-          onChange={(e) =>
-            onChange({ ...units, volume: e.target.value as UnitPreferences['volume'] })
-          }
+          onChange={(e) => onChange({ ...units, volume: e.target.value as UnitPreferences['volume'] })}
         >
           {VOLUME_UNITS.map((unit) => (
             <option key={unit} value={unit}>
@@ -51,9 +49,7 @@ export function UnitsSection(): ReactElement {
         <select
           id={`${idBase}-unit-distance`}
           value={units.distance}
-          onChange={(e) =>
-            onChange({ ...units, distance: e.target.value as UnitPreferences['distance'] })
-          }
+          onChange={(e) => onChange({ ...units, distance: e.target.value as UnitPreferences['distance'] })}
         >
           {DISTANCE_UNITS.map((unit) => (
             <option key={unit} value={unit}>
@@ -70,9 +66,7 @@ export function UnitsSection(): ReactElement {
         <select
           id={`${idBase}-unit-economy`}
           value={units.economy}
-          onChange={(e) =>
-            onChange({ ...units, economy: e.target.value as UnitPreferences['economy'] })
-          }
+          onChange={(e) => onChange({ ...units, economy: e.target.value as UnitPreferences['economy'] })}
         >
           {ECONOMY_UNITS.map((unit) => (
             <option key={unit} value={unit}>
@@ -104,8 +98,8 @@ export function UnitsSection(): ReactElement {
       </div>
 
       <p className="note flush">
-        Readings are stored in miles, US gallons and MPG whatever you pick here — changing a unit
-        changes what you see and type, never what is saved.
+        Readings are stored in miles, US gallons and MPG whatever you pick here — changing a unit changes what you see
+        and type, never what is saved.
       </p>
     </section>
   );

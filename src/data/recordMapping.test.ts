@@ -95,7 +95,10 @@ describe('a draft becomes a submission', () => {
 
   test('and back — everything but "missed the previous fill-up", which a submission never carries', () => {
     const original = draft();
-    expect(draftFromRecord(pendingFromDraft(original, PENDING_META))).toEqual({ ...original, missedPreviousFillUp: false });
+    expect(draftFromRecord(pendingFromDraft(original, PENDING_META))).toEqual({
+      ...original,
+      missedPreviousFillUp: false,
+    });
     const notMissed = draft({ missedPreviousFillUp: false });
     expect(draftFromRecord(pendingFromDraft(notMissed, PENDING_META))).toEqual(notMissed);
   });

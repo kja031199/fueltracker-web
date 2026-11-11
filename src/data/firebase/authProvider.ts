@@ -47,9 +47,8 @@ function toUser(user: User): AuthUser {
  * the person can actually act on rather than faults in the app.
  */
 function explain(cause: unknown): string {
-  const code = typeof cause === 'object' && cause !== null && 'code' in cause
-    ? String((cause as { code: unknown }).code)
-    : '';
+  const code =
+    typeof cause === 'object' && cause !== null && 'code' in cause ? String((cause as { code: unknown }).code) : '';
   switch (code) {
     case 'auth/popup-closed-by-user':
     case 'auth/cancelled-popup-request':
@@ -61,9 +60,7 @@ function explain(cause: unknown): string {
     case 'auth/unauthorized-domain':
       return 'This address is not an authorized domain in the Firebase project.';
     default:
-      return cause instanceof Error && cause.message !== ''
-        ? `Sign-in failed. (${cause.message})`
-        : 'Sign-in failed.';
+      return cause instanceof Error && cause.message !== '' ? `Sign-in failed. (${cause.message})` : 'Sign-in failed.';
   }
 }
 
@@ -79,9 +76,7 @@ export class FirebaseAuthProvider implements AuthProvider {
     // session that does not survive a reload rather than no sign-in at all.
     void setPersistence(this.auth, browserLocalPersistence).catch(() => undefined);
     onAuthStateChanged(this.auth, (user) => {
-      this.set(
-        user === null ? { status: 'signedOut', error: null } : { status: 'signedIn', user: toUser(user) },
-      );
+      this.set(user === null ? { status: 'signedOut', error: null } : { status: 'signedIn', user: toUser(user) });
     });
   }
 

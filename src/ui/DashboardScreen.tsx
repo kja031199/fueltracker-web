@@ -58,10 +58,7 @@ export function DashboardScreen(): ReactElement {
   // (#51): an MPG segment that *ends* in the range began before it, and
   // filtering first threw that segment away. The weekday figures below are
   // per fill-up, so they still read the filtered rows.
-  const stats = useMemo(
-    () => computeFuelStatistics(toStats(fillUps), { from: cutoff }),
-    [fillUps, cutoff],
-  );
+  const stats = useMemo(() => computeFuelStatistics(toStats(fillUps), { from: cutoff }), [fillUps, cutoff]);
   // Values from the domain, words from `kpiText` (#94).
   const kpis = useMemo(
     () => dashboardKPIs(stats).map((kpi) => ({ ...kpiText(kpi, units, style), id: kpi.id, metric: kpi.metric })),
@@ -97,8 +94,7 @@ export function DashboardScreen(): ReactElement {
     () => mapValues(stats.mpgSeries, (mpg) => economySpec.fromMPG(mpg) ?? 0),
     [stats.mpgSeries, economySpec],
   );
-  const averageEconomy =
-    stats.averageMPG === null ? null : economySpec.fromMPG(stats.averageMPG);
+  const averageEconomy = stats.averageMPG === null ? null : economySpec.fromMPG(stats.averageMPG);
 
   if (selectedVehicleId === null) {
     return <p className="empty">Add a vehicle to see its numbers here.</p>;
@@ -143,20 +139,12 @@ export function DashboardScreen(): ReactElement {
       </div>
 
       {fillUps.length === 0 ? (
-        <p className="empty">
-          No fill-ups yet. Log one and your economy, spending and price trends show up here.
-        </p>
+        <p className="empty">No fill-ups yet. Log one and your economy, spending and price trends show up here.</p>
       ) : (
         <>
-          {insight !== null && (
-            <p className="card accent-orange">
-              {insight}
-            </p>
-          )}
+          {insight !== null && <p className="card accent-orange">{insight}</p>}
 
-          <ul
-          className="kpi-grid"
-          >
+          <ul className="kpi-grid">
             {kpis.map((kpi) => (
               // The card is labelled as one phrase rather than three separate
               // texts, so a screen reader reads a coherent stat instead of
@@ -175,10 +163,7 @@ export function DashboardScreen(): ReactElement {
                   {kpi.value ?? '—'}
                 </div>
                 {kpi.detail !== null && (
-                  <div
-                    className="note"
-                    aria-hidden="true"
-                  >
+                  <div className="note" aria-hidden="true">
                     {kpi.detail}
                   </div>
                 )}
@@ -191,7 +176,9 @@ export function DashboardScreen(): ReactElement {
             points={economySeries}
             metric="economy"
             unit={economySpec.abbreviation}
-            formatValue={(value) => numberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value)}
+            formatValue={(value) =>
+              numberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value)
+            }
             average={averageEconomy}
           />
 
@@ -246,8 +233,8 @@ export function DashboardScreen(): ReactElement {
                 },
                 locale,
               )}{' '}
-              — the economy reads far higher than usual. Marking &ldquo;missed logging a fill&rdquo; on that entry
-              keeps it out of your averages.
+              — the economy reads far higher than usual. Marking &ldquo;missed logging a fill&rdquo; on that entry keeps
+              it out of your averages.
             </p>
           )}
         </>

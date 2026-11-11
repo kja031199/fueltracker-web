@@ -22,7 +22,12 @@ test('a range admitting one fill-up still shows the economy of the drive that en
   const vehicle = await store.addVehicle({ name: 'Daily Driver' });
   const now = Date.now();
   // 300 miles on 10 gallons each time: 30 MPG. Only the last is inside 3M.
-  for (const [daysAgo, odometer] of [[130, 10_000], [116, 10_300], [102, 10_600], [10, 10_900]] as const) {
+  for (const [daysAgo, odometer] of [
+    [130, 10_000],
+    [116, 10_300],
+    [102, 10_600],
+    [10, 10_900],
+  ] as const) {
     const draft = makeFuelEntryDraft({ date: new Date(now - daysAgo * DAY), odometer, gallons: 10, pricePerGallon: 3 });
     if (draft === null) throw new Error('fixture draft failed validation');
     await store.addFillUp(draft, vehicle.id);
@@ -41,8 +46,16 @@ describe('the range still narrows what it should', () => {
     const store = makeStore();
     const vehicle = await store.addVehicle({ name: 'Daily Driver' });
     const now = Date.now();
-    for (const [daysAgo, odometer] of [[200, 10_000], [10, 10_300]] as const) {
-      const draft = makeFuelEntryDraft({ date: new Date(now - daysAgo * DAY), odometer, gallons: 10, pricePerGallon: 3 });
+    for (const [daysAgo, odometer] of [
+      [200, 10_000],
+      [10, 10_300],
+    ] as const) {
+      const draft = makeFuelEntryDraft({
+        date: new Date(now - daysAgo * DAY),
+        odometer,
+        gallons: 10,
+        pricePerGallon: 3,
+      });
       if (draft === null) throw new Error('fixture draft failed validation');
       await store.addFillUp(draft, vehicle.id);
     }

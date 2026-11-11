@@ -25,11 +25,7 @@ export interface ReceiptReading {
 }
 
 export function isEmptyReceipt(receipt: ReceiptReading): boolean {
-  return (
-    isEmptyReading(receipt.reading) &&
-    receipt.purchaseDate === null &&
-    receipt.stationName === null
-  );
+  return isEmptyReading(receipt.reading) && receipt.purchaseDate === null && receipt.stationName === null;
 }
 
 /**
@@ -142,8 +138,18 @@ function makeYMD(year: number | null, month: number | null, day: number | null):
 }
 
 const MONTHS: Record<string, number> = {
-  JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6,
-  JUL: 7, AUG: 8, SEP: 9, OCT: 10, NOV: 11, DEC: 12,
+  JAN: 1,
+  FEB: 2,
+  MAR: 3,
+  APR: 4,
+  MAY: 5,
+  JUN: 6,
+  JUL: 7,
+  AUG: 8,
+  SEP: 9,
+  OCT: 10,
+  NOV: 11,
+  DEC: 12,
 };
 
 function monthNumber(name: string): number | null {
@@ -246,20 +252,13 @@ function purchaseDate(lines: readonly string[], referenceDate: Date): Date | nul
   // Reject impossible calendar days — Feb 30 — which the Date constructor would
   // otherwise silently roll forward into the next month, exactly as Calendar
   // does upstream.
-  if (
-    date.getFullYear() !== ymd.year ||
-    date.getMonth() + 1 !== ymd.month ||
-    date.getDate() !== ymd.day
-  ) {
+  if (date.getFullYear() !== ymd.year || date.getMonth() + 1 !== ymd.month || date.getDate() !== ymd.day) {
     return null;
   }
   return date;
 }
 
-export function parseReceipt(
-  rawLines: readonly string[],
-  referenceDate: Date = new Date(),
-): ReceiptReading {
+export function parseReceipt(rawLines: readonly string[], referenceDate: Date = new Date()): ReceiptReading {
   // The pump parser does its own uppercasing and `9/10` normalisation, so it
   // takes the raw lines; the brand and date scans want them folded first.
   const reading = parsePump(rawLines);

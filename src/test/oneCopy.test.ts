@@ -74,7 +74,7 @@ const RULES: readonly Rule[] = [
       '`${tooNew === 1 ? "1 row was" : "rows"}`',
     ],
     innocent: [
-      'fillUps.map((r) => r.station).filter((s) => s !== \'\')',
+      "fillUps.map((r) => r.station).filter((s) => s !== '')",
       'sorted.length % 2 === 1 ? sorted[middle]! : 0',
       "countOf(n, { one: '# row was', other: '# rows were' })",
     ],
@@ -103,9 +103,7 @@ describe.each(RULES)('one copy of $name', (rule) => {
       expect(PRODUCTION).toContain(rule.home);
       expect(rule.pattern.test(readFileSync(rule.home, 'utf8'))).toBe(true);
     }
-    const copies = PRODUCTION.filter(
-      (file) => file !== rule.home && rule.pattern.test(readFileSync(file, 'utf8')),
-    );
+    const copies = PRODUCTION.filter((file) => file !== rule.home && rule.pattern.test(readFileSync(file, 'utf8')));
     expect(copies).toEqual([]);
   });
 });

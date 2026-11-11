@@ -22,8 +22,7 @@ import { App } from './App';
 const A = { uid: 'account-a', email: 'a@example.com', displayName: 'A' };
 const B = { uid: 'account-b', email: 'b@example.com', displayName: 'B' };
 
-const as = (user: typeof A): StubAuthProvider =>
-  new StubAuthProvider({ status: 'signedIn', user });
+const as = (user: typeof A): StubAuthProvider => new StubAuthProvider({ status: 'signedIn', user });
 
 function emptyStore(): FuelTrackerStore {
   return makeStore();
@@ -64,9 +63,7 @@ describe('one browser, two accounts', () => {
     const user = userEvent.setup();
     render(<App store={await storeWith(MINIMUM_ENTRIES_TO_PROMPT)} auth={as(A)} />);
     await user.click(await screen.findByRole('button', { name: /save a backup/i }));
-    await waitFor(() =>
-      expect(screen.queryByRole('button', { name: /save a backup/i })).not.toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.queryByRole('button', { name: /save a backup/i })).not.toBeInTheDocument());
     cleanup();
 
     render(<App store={await storeWith(MINIMUM_ENTRIES_TO_PROMPT)} auth={as(B)} />);
@@ -77,9 +74,7 @@ describe('one browser, two accounts', () => {
     const user = userEvent.setup();
     render(<App store={await storeWith(MINIMUM_ENTRIES_TO_PROMPT)} auth={as(A)} />);
     await user.click(await screen.findByRole('button', { name: /save a backup/i }));
-    await waitFor(() =>
-      expect(screen.queryByRole('button', { name: /save a backup/i })).not.toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.queryByRole('button', { name: /save a backup/i })).not.toBeInTheDocument());
     cleanup();
     render(<App store={await storeWith(MINIMUM_ENTRIES_TO_PROMPT)} auth={as(B)} />);
     await screen.findByText(/never saved a backup/i);
@@ -91,9 +86,7 @@ describe('one browser, two accounts', () => {
   });
 
   test("Settings does not show B the time of A's last sync", async () => {
-    render(
-      <App store={await storeWith(1)} auth={as(A)} remote={new InMemoryRemoteStore()} initialTab="settings" />,
-    );
+    render(<App store={await storeWith(1)} auth={as(A)} remote={new InMemoryRemoteStore()} initialTab="settings" />);
     expect(await screen.findByText(/last synced just now/i)).toBeInTheDocument();
     cleanup();
 
@@ -104,9 +97,7 @@ describe('one browser, two accounts', () => {
   test("A's last sync time is still there when A comes back", async () => {
     // Scoping must not turn into forgetting: the time is stored for A, not
     // merely held in memory until the page goes away.
-    render(
-      <App store={await storeWith(1)} auth={as(A)} remote={new InMemoryRemoteStore()} initialTab="settings" />,
-    );
+    render(<App store={await storeWith(1)} auth={as(A)} remote={new InMemoryRemoteStore()} initialTab="settings" />);
     await screen.findByText(/last synced just now/i);
     cleanup();
 
@@ -160,7 +151,10 @@ describe('state written before it was scoped to an account', () => {
   test('browser-wide settings are kept as they are', async () => {
     // Units and the idle timeout are about the device, not the account, so
     // they stay where they were and are still honoured.
-    localStorage.setItem('fueltracker.units', JSON.stringify({ volume: 'liters', distance: 'kilometers', economy: 'litersPer100km' }));
+    localStorage.setItem(
+      'fueltracker.units',
+      JSON.stringify({ volume: 'liters', distance: 'kilometers', economy: 'litersPer100km' }),
+    );
     render(<App store={await storeWith(1)} auth={as(B)} initialTab="settings" />);
     await screen.findByRole('navigation', { name: /sections/i });
     expect(localStorage.getItem('fueltracker.units')).toContain('liters');

@@ -60,8 +60,7 @@ export function niceTicks(extent: Extent, count = 4): number[] {
   const rough = span / Math.max(1, count);
   const magnitude = 10 ** Math.floor(Math.log10(rough));
   const normalised = rough / magnitude;
-  const step =
-    magnitude * (normalised >= 5 ? 10 : normalised >= 2.5 ? 5 : normalised >= 1.5 ? 2 : 1);
+  const step = magnitude * (normalised >= 5 ? 10 : normalised >= 2.5 ? 5 : normalised >= 1.5 ? 2 : 1);
 
   // Rounded to the step's own precision, which is the only thing that removes
   // the drift. Repeated addition accumulates it, and re-multiplying by the

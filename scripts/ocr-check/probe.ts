@@ -60,8 +60,7 @@ async function suggest(photo: Blob): Promise<unknown> {
 }
 
 /** The real pipeline, on the drawn receipt as a camera would hand it over: a JPEG file. */
-window.runImport = async () =>
-  suggest(new File([await receipt('image/jpeg')], 'receipt.jpg', { type: 'image/jpeg' }));
+window.runImport = async () => suggest(new File([await receipt('image/jpeg')], 'receipt.jpg', { type: 'image/jpeg' }));
 
 /** The real pipeline, on a real photo the check serves (`--photo`, local only). */
 window.runImportFrom = async (url: string) => {

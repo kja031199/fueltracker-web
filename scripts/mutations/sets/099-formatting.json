@@ -1,0 +1,20 @@
+{
+  "title": "#99 Formatting",
+  "tests": [
+    "src/test/workflows.test.ts"
+  ],
+  "mutations": [
+    {
+      "name": "the formatting check dropped from CI",
+      "file": ".github/workflows/ci.yml",
+      "from": "      - name: Formatting\n        run: npm run format:check\n",
+      "to": ""
+    },
+    {
+      "name": "the formatting check narrowed to part of the tree",
+      "file": "package.json",
+      "from": "\"format:check\": \"prettier --check .\"",
+      "to": "\"format:check\": \"prettier --check src/ui\""
+    }
+  ]
+}

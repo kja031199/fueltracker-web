@@ -70,7 +70,7 @@ const COMPONENTS = sourcesUnder('src/ui', false).filter((file) => file.endsWith(
 describe('inline styles are only for computed values', () => {
   test('the check catches a fixed style, one line or many, and passes a computed one', () => {
     const fixed = [
-      "<p style={{ margin: 0 }}>",
+      '<p style={{ margin: 0 }}>',
       "<p style={{ margin: '0 0 8px', opacity: 0.8 }}>",
       "<ul\n  style={{\n    listStyle: 'none',\n    margin: 0,\n    padding: 0,\n  }}\n>",
       '<svg style={{ display: `block` }}>',

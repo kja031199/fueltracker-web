@@ -61,7 +61,8 @@ export function IncomingScreen({ payload, onReceived, onDone }: Props): ReactEle
   const { draft } = submission;
   const car = vehicles.find((vehicle) => vehicle.id === submission.vehicleId);
   const name = submission.submitterName.trim();
-  const from = name === '' ? 'Someone sent you this fill-up.' : `Someone who says they are ${name} sent you this fill-up.`;
+  const from =
+    name === '' ? 'Someone sent you this fill-up.' : `Someone who says they are ${name} sent you this fill-up.`;
 
   async function queue(): Promise<void> {
     if (started.current === payload) return;
@@ -101,8 +102,8 @@ export function IncomingScreen({ payload, onReceived, onDone }: Props): ReactEle
     <LinkScreen title="Fill-up link">
       <p>{from}</p>
       <p className="note">
-        A name in a link is whatever its sender typed. Queue it only if you know who sent it — nothing is added to
-        your log until you approve it.
+        A name in a link is whatever its sender typed. Queue it only if you know who sent it — nothing is added to your
+        log until you approve it.
       </p>
       <FillUpSummary
         title={car?.name ?? 'A car not in your log'}

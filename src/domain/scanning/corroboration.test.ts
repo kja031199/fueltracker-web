@@ -35,8 +35,7 @@ const SEEN = [10.234, 3.499, 35.81];
 
 describe('numbersIn', () => {
   test('collects the decimal numbers the OCR actually saw', () => {
-    expect(numbersIn(['GALLONS 10.234', 'PRICE/GAL $3.499', 'FUEL TOTAL $35.81']))
-      .toEqual([10.234, 3.499, 35.81]);
+    expect(numbersIn(['GALLONS 10.234', 'PRICE/GAL $3.499', 'FUEL TOTAL $35.81'])).toEqual([10.234, 3.499, 35.81]);
   });
 
   test('ignores integers, which the parser never reads as measurements', () => {

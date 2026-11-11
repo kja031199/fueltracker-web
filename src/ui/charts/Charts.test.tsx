@@ -32,10 +32,7 @@ describe('a line chart', () => {
       />,
     );
     const figure = screen.getByRole('img');
-    expect(figure).toHaveAttribute(
-      'aria-label',
-      expect.stringContaining('3 points, from 24 to 36 MPG'),
-    );
+    expect(figure).toHaveAttribute('aria-label', expect.stringContaining('3 points, from 24 to 36 MPG'));
     expect(figure.getAttribute('aria-label')).toContain('trending up');
   });
 
@@ -73,15 +70,7 @@ describe('a line chart', () => {
   });
 
   test('says there is no data rather than drawing an empty frame', () => {
-    render(
-      <MetricLineChart
-        title="Fuel economy"
-        points={[]}
-        metric="economy"
-        unit="MPG"
-        formatValue={whole}
-      />,
-    );
+    render(<MetricLineChart title="Fuel economy" points={[]} metric="economy" unit="MPG" formatValue={whole} />);
     expect(screen.getByText(/not enough data yet/i)).toBeInTheDocument();
     expect(screen.getByRole('img')).toHaveAttribute('aria-label', 'Fuel economy: no data yet.');
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
@@ -89,13 +78,7 @@ describe('a line chart', () => {
 
   test('a single point renders without dividing by zero', () => {
     const { container } = render(
-      <MetricLineChart
-        title="Fuel economy"
-        points={series([42])}
-        metric="economy"
-        unit="MPG"
-        formatValue={whole}
-      />,
+      <MetricLineChart title="Fuel economy" points={series([42])} metric="economy" unit="MPG" formatValue={whole} />,
     );
     expect(screen.getByRole('img').getAttribute('aria-label')).toContain('One point');
     const path = container.querySelector('path');
@@ -123,13 +106,7 @@ describe('a line chart', () => {
     // the chart and the dashboard cannot disagree about how much data there is.
     const long = series(Array.from({ length: 2_000 }, (_, i) => 30 + (i % 7)));
     const { container } = render(
-      <MetricLineChart
-        title="Fuel economy"
-        points={long}
-        metric="economy"
-        unit="MPG"
-        formatValue={whole}
-      />,
+      <MetricLineChart title="Fuel economy" points={long} metric="economy" unit="MPG" formatValue={whole} />,
     );
     expect(screen.getByRole('img').getAttribute('aria-label')).toContain('2000 points');
     // Well under 2,000 nodes drawn.
@@ -235,7 +212,13 @@ describe('the weekday dot plot', () => {
   });
 
   test('a weekday out of range is named as nothing rather than breaking the chart', () => {
-    render(<WeekdayPriceChart prices={[{ weekday: 9, averagePrice: 3, fillUpCount: 1 }]} cheapestWeekday={null} formatPrice={(v) => v.toFixed(3)} />);
+    render(
+      <WeekdayPriceChart
+        prices={[{ weekday: 9, averagePrice: 3, fillUpCount: 1 }]}
+        cheapestWeekday={null}
+        formatPrice={(v) => v.toFixed(3)}
+      />,
+    );
     expect(screen.getByRole('table')).toBeInTheDocument();
   });
 
@@ -250,9 +233,7 @@ describe('the weekday dot plot', () => {
   });
 
   test('handles a single day without dividing by zero', () => {
-    const { container } = render(
-      <WeekdayPriceChart prices={[prices[0]!]} cheapestWeekday={3} formatPrice={whole} />,
-    );
+    const { container } = render(<WeekdayPriceChart prices={[prices[0]!]} cheapestWeekday={3} formatPrice={whole} />);
     for (const element of container.querySelectorAll('circle, line')) {
       expect(element.outerHTML).not.toContain('NaN');
     }

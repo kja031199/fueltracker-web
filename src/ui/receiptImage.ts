@@ -62,15 +62,10 @@ export interface PreparedImage {
   readonly height: number;
 }
 
-export type PrepareFailure =
-  | 'too-large'
-  | 'empty'
-  | 'not-an-image'
-  | 'no-canvas';
+export type PrepareFailure = 'too-large' | 'empty' | 'not-an-image' | 'no-canvas';
 
 export type PrepareResult =
-  | { readonly ok: true; readonly image: PreparedImage }
-  | { readonly ok: false; readonly reason: PrepareFailure };
+  { readonly ok: true; readonly image: PreparedImage } | { readonly ok: false; readonly reason: PrepareFailure };
 
 /** The scale factor that fits `width`×`height` inside `max` on its long edge. */
 export function fitScale(width: number, height: number, max: number): number {

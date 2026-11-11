@@ -52,13 +52,7 @@ interface Props {
   readonly onExport?: (() => void) | undefined;
 }
 
-export function NoAccessScreen({
-  account,
-  onRetry,
-  retrying,
-  onSignOut,
-  onExport,
-}: Props): ReactElement {
+export function NoAccessScreen({ account, onRetry, retrying, onSignOut, onExport }: Props): ReactElement {
   // One base per rendering, so a component shown twice never repeats an id (#95).
   const idBase = useId();
   const name = account.email === '' ? account.displayName : account.email;
@@ -70,9 +64,9 @@ export function NoAccessScreen({
           This account does not have access
         </h2>
         <p className="stack-sm">
-          You are signed in as <strong>{name}</strong>, but this copy of FuelTracker only
-          syncs for accounts that have been added to it. Nothing you enter here would be
-          saved to your account, so the app stays closed rather than pretending otherwise.
+          You are signed in as <strong>{name}</strong>, but this copy of FuelTracker only syncs for accounts that have
+          been added to it. Nothing you enter here would be saved to your account, so the app stays closed rather than
+          pretending otherwise.
         </p>
 
         <AccountId uid={account.uid}>
@@ -80,9 +74,8 @@ export function NoAccessScreen({
         </AccountId>
 
         <p className="stack-sm">
-          Adding an account means deploying a change, so it is{' '}
-          <strong>not immediate</strong> — expect a few minutes rather than seconds. When
-          they tell you it is done, use <em>Try again</em>; there is no need to reload.
+          Adding an account means deploying a change, so it is <strong>not immediate</strong> — expect a few minutes
+          rather than seconds. When they tell you it is done, use <em>Try again</em>; there is no need to reload.
         </p>
 
         <p className="after row-wrap">
@@ -101,9 +94,8 @@ export function NoAccessScreen({
 
         {onExport !== undefined && (
           <p className="warning after">
-            There are fill-ups stored in this browser that have not reached any account.
-            Export them before clearing your browser data or signing out on this device —
-            that file is the only copy.
+            There are fill-ups stored in this browser that have not reached any account. Export them before clearing
+            your browser data or signing out on this device — that file is the only copy.
           </p>
         )}
       </section>

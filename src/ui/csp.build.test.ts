@@ -85,7 +85,7 @@ describe('the built page stays compatible with a strict policy', () => {
     );
     expect(
       inline.map(([, attrs]) => attrs),
-      'an inline <script> would be blocked by script-src \'self\' in production only',
+      "an inline <script> would be blocked by script-src 'self' in production only",
     ).toEqual([]);
   });
 
@@ -139,12 +139,8 @@ describe('the policy', () => {
     // supported way to run it without that script.
     const scriptSrc = policy().get('script-src') ?? '';
     expect(scriptSrc).toContain('https://apis.google.com');
-    const offOrigin = scriptSrc
-      .split(/\s+/)
-      .filter((source) => source.startsWith('http') || source.includes('*'));
-    expect(offOrigin, 'script-src should name exactly one off-origin source').toEqual([
-      'https://apis.google.com',
-    ]);
+    const offOrigin = scriptSrc.split(/\s+/).filter((source) => source.startsWith('http') || source.includes('*'));
+    expect(offOrigin, 'script-src should name exactly one off-origin source').toEqual(['https://apis.google.com']);
   });
 
   it('does not weaken script-src', () => {

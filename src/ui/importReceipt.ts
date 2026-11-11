@@ -25,8 +25,7 @@ export interface ReceiptSuggestion {
 }
 
 export type ImportOutcome =
-  | { readonly ok: true; readonly suggestion: ReceiptSuggestion }
-  | { readonly ok: false; readonly message: string };
+  { readonly ok: true; readonly suggestion: ReceiptSuggestion } | { readonly ok: false; readonly message: string };
 
 /** Injected so tests can drive this without loading Tesseract. */
 export interface ImportDeps {
@@ -36,10 +35,7 @@ export interface ImportDeps {
 
 const defaultDeps: ImportDeps = { recognise, now: () => new Date() };
 
-export async function importReceiptPhoto(
-  file: Blob,
-  deps: Partial<ImportDeps> = {},
-): Promise<ImportOutcome> {
+export async function importReceiptPhoto(file: Blob, deps: Partial<ImportDeps> = {}): Promise<ImportOutcome> {
   const { recognise: read, now } = { ...defaultDeps, ...deps };
 
   const prepared = await prepareImage(file);

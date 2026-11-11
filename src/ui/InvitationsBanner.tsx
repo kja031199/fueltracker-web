@@ -49,11 +49,16 @@ export function InvitationsBanner(): ReactElement | null {
         return (
           <div className="space-below-sm" key={key}>
             <p className="stack-sm">
-              <strong>{who}</strong> wants to share <strong>{car}</strong> with you. You would both see
-              and log its fill-ups — including receipt photos, notes and stations.
+              <strong>{who}</strong> wants to share <strong>{car}</strong> with you. You would both see and log its
+              fill-ups — including receipt photos, notes and stations.
             </p>
             <div className="row-actions">
-              <button className="button" type="button" disabled={busy !== null} onClick={() => void answer(invite, true)}>
+              <button
+                className="button"
+                type="button"
+                disabled={busy !== null}
+                onClick={() => void answer(invite, true)}
+              >
                 Accept {car}
               </button>
               <button

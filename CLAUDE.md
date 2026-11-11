@@ -115,6 +115,12 @@ full run and passed in isolation, because the worker was starved rather than the
 payload decoded. It spies on `atob` now, with a second test proving the spy sees
 a real decode.
 
+**Formatting is Prettier's** (#99): run `npm run format` before committing;
+CI fails on `npm run format:check`. Only TS/JS/CSS are formatted — Markdown,
+JSON and `firestore.rules` are not. A reformat that moves code a mutation
+targets makes `mutations.test.ts` fail: re-anchor the mutation to the
+formatted text.
+
 **Check exit codes directly.** `npm run typecheck | tail` reports *tail's*
 status. That shipped a broken typecheck to `main` once: redirect to a file and
 read `$?`.

@@ -82,7 +82,12 @@ describe('sharingFor', () => {
   });
 
   test('a cursor per shared car is kept, so the next sync reads on from the last', () => {
-    const sharing = sharingFor(new InMemorySharingWorld(), { uid: 'u', name: 'U', email: 'u@example.com', emailVerified: true });
+    const sharing = sharingFor(new InMemorySharingWorld(), {
+      uid: 'u',
+      name: 'U',
+      email: 'u@example.com',
+      emailVerified: true,
+    });
     expect(sharing.stateFor('car-1')).toBe(sharing.stateFor('car-1'));
     expect(sharing.stateFor('car-1')).not.toBe(sharing.stateFor('car-2'));
   });
@@ -98,10 +103,22 @@ const HAND_BUILT_STORE =
 
 describe('the fixtures are defined once', () => {
   test('the checks find a copy in every spelling, and let a file’s own defaults through', () => {
-    for (const copy of ['function makeStore(): FuelTrackerStore {', 'async function makeStore() {', 'function draft(odometer: number) {', 'const draft = (odometer: number) =>', 'function sharingFor(world) {', 'function allowedUidsInRules(): string[] {', 'function storeFor(account) {']) {
+    for (const copy of [
+      'function makeStore(): FuelTrackerStore {',
+      'async function makeStore() {',
+      'function draft(odometer: number) {',
+      'const draft = (odometer: number) =>',
+      'function sharingFor(world) {',
+      'function allowedUidsInRules(): string[] {',
+      'function storeFor(account) {',
+    ]) {
       expect(REDEFINED.test(copy), copy).toBe(true);
     }
-    for (const fine of ["const draft = draftWith({ station: 'Shell' });", 'const fillUpAt = (odometer: number) => draft({ odometer });', 'store.draft(x)']) {
+    for (const fine of [
+      "const draft = draftWith({ station: 'Shell' });",
+      'const fillUpAt = (odometer: number) => draft({ odometer });',
+      'store.draft(x)',
+    ]) {
       expect(REDEFINED.test(fine), fine).toBe(false);
     }
     const handBuilt = `new FuelTrackerStore({

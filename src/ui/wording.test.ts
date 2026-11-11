@@ -26,9 +26,7 @@ describe('describeSince, how long ago something last happened (#93: moved from S
   });
 
   test('falls back to a date once it stops being recent', () => {
-    expect(describeSince(now - 3 * 24 * 3_600_000, now)).toBe(
-      new Date(now - 3 * 24 * 3_600_000).toLocaleDateString(),
-    );
+    expect(describeSince(now - 3 * 24 * 3_600_000, now)).toBe(new Date(now - 3 * 24 * 3_600_000).toLocaleDateString());
   });
 
   test('does not read a clock-skewed future timestamp as a negative age', () => {
@@ -168,11 +166,11 @@ describe('phrased in the reader\u2019s locale (#94)', () => {
     expect(fillUpName({ date: may1, odometer: 10_000 }, METRIC, 'de-DE')).toBe(
       'the fill-up of 1.5.2026 at 16.093,4 km',
     );
-    expect(fillUpFacts({ gallons: 10, odometer: 10_000, fuelGrade: 'Regular', isFullTank: true }, METRIC, { locale: 'de-DE' })).toEqual([
-      '37,854 L',
-      '16.093,4 km',
-      'Regular',
-    ]);
+    expect(
+      fillUpFacts({ gallons: 10, odometer: 10_000, fuelGrade: 'Regular', isFullTank: true }, METRIC, {
+        locale: 'de-DE',
+      }),
+    ).toEqual(['37,854 L', '16.093,4 km', 'Regular']);
     expect(describeSince(may1, may1 + 3 * 86_400_000, 'de-DE')).toBe('1.5.2026');
   });
 });

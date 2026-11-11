@@ -11,6 +11,14 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-11
 
+- **Nothing you see changes.** The code is now laid out the same way
+  everywhere, by a tool rather than by hand.
+  *Technical:* Prettier, configured to the style the code already used
+  (single quotes, 120 columns, trailing commas) and limited to TS/JS/CSS,
+  reformatted the code once; `npm run format:check` now runs in the main CI
+  check. Six recorded mutations the reformat moved were re-anchored and are
+  still killed. Part three of four on #99.
+  [#99](https://github.com/kja031199/fueltracker-web/issues/99) · [PR #151](https://github.com/kja031199/fueltracker-web/pull/151)
 - **Nothing you see changes.** The checker for broken links in the
   documentation is up to date.
   *Technical:* lychee bumped nine minor versions to its latest release, the

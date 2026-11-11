@@ -208,10 +208,7 @@ function failure(cause: unknown, problem: 'pull-failed' | 'push-failed'): SyncRe
  * push only that car's fill-ups. `true` means "this remote's row". Without a
  * scope, every row is, as before sharing existed.
  */
-export type RowScope = (
-  collection: Collection,
-  row: { readonly id: string; readonly vehicleId?: string },
-) => boolean;
+export type RowScope = (collection: Collection, row: { readonly id: string; readonly vehicleId?: string }) => boolean;
 
 export interface SyncOptions {
   readonly scope?: RowScope;
@@ -338,8 +335,7 @@ export async function syncOnce(
   const vehicles = partitionBySchema(remoteSnapshot.vehicles);
   const fillUps = partitionBySchema(remoteSnapshot.fillUps);
   const pending = partitionBySchema(remoteSnapshot.pendingFillUps);
-  const skippedNewerSchema =
-    vehicles.tooNew.length + fillUps.tooNew.length + pending.tooNew.length;
+  const skippedNewerSchema = vehicles.tooNew.length + fillUps.tooNew.length + pending.tooNew.length;
 
   const localBefore = await local.snapshot();
   // Ties: this device and the account hold different versions of a row with
@@ -361,9 +357,18 @@ export async function syncOnce(
     (incoming, existing) => tieWinner(incoming, existing) === 'first',
   );
   // What the merge may have written, re-read by id.
-  await local.refresh('vehicles', vehicles.readable.map((row) => row.id));
-  await local.refresh('fillUps', fillUps.readable.map((row) => row.id));
-  await local.refresh('pendingFillUps', pending.readable.map((row) => row.id));
+  await local.refresh(
+    'vehicles',
+    vehicles.readable.map((row) => row.id),
+  );
+  await local.refresh(
+    'fillUps',
+    fillUps.readable.map((row) => row.id),
+  );
+  await local.refresh(
+    'pendingFillUps',
+    pending.readable.map((row) => row.id),
+  );
   for (const [collection, ids] of Object.entries(localWins) as [Collection, string[]][]) {
     if (ids.length === 0) continue;
     await replica.restamp(collection, ids);

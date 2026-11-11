@@ -61,11 +61,7 @@ export interface ImportSummary {
  * throwaway. It also makes re-importing the same file a no-op instead of a way
  * to duplicate an entire history.
  */
-function shouldReplace(
-  incoming: SyncFields,
-  existing: SyncFields | undefined,
-  tieBreak?: TieBreak,
-): boolean {
+function shouldReplace(incoming: SyncFields, existing: SyncFields | undefined, tieBreak?: TieBreak): boolean {
   if (existing === undefined) return true;
   if (incoming.updatedAt === existing.updatedAt && tieBreak !== undefined) {
     return tieBreak(incoming, existing);
@@ -155,30 +151,26 @@ async function merge(repos: Repositories, snapshot: Snapshot, tieBreak?: TieBrea
   // one long station name in a backup then failed every upload afterwards.
   const vehiclesWritten = await mergeInto<VehicleRecord>(repos.vehicles, snapshot.vehicles.map(boundVehicleText));
 
-  const fillUpsWritten = await mergeInto<FillUpRecord>(
-    repos.fillUps,
-    snapshot.fillUps.map(boundFillUpText),
-    {
-      // A vehicle id is not text to shorten — a shortened one points at a
-      // vehicle that does not exist — and one the account cannot store fails
-      // every push. A CSV only requires it to be non-empty, so it is checked here.
-      storable: (incoming) => {
-        if (isStorableId(incoming.vehicleId)) return true;
-        rejected.push(`fill-up ${incoming.id}: its vehicle id cannot be stored`);
-        return false;
-      },
-      valid: (incoming) => {
-        // A tombstone carries no usable measurements and does not need to: it
-        // is a record that something was deleted, and validating it would reject it.
-        if (incoming.deletedAt !== null) return true;
-        if (draftFromRecord(incoming) === null) {
-          rejected.push(`fill-up ${incoming.id}: odometer, volume and price must all be positive numbers`);
-          return false;
-        }
-        return true;
-      },
+  const fillUpsWritten = await mergeInto<FillUpRecord>(repos.fillUps, snapshot.fillUps.map(boundFillUpText), {
+    // A vehicle id is not text to shorten — a shortened one points at a
+    // vehicle that does not exist — and one the account cannot store fails
+    // every push. A CSV only requires it to be non-empty, so it is checked here.
+    storable: (incoming) => {
+      if (isStorableId(incoming.vehicleId)) return true;
+      rejected.push(`fill-up ${incoming.id}: its vehicle id cannot be stored`);
+      return false;
     },
-  );
+    valid: (incoming) => {
+      // A tombstone carries no usable measurements and does not need to: it
+      // is a record that something was deleted, and validating it would reject it.
+      if (incoming.deletedAt !== null) return true;
+      if (draftFromRecord(incoming) === null) {
+        rejected.push(`fill-up ${incoming.id}: odometer, volume and price must all be positive numbers`);
+        return false;
+      }
+      return true;
+    },
+  });
 
   // Submissions are re-validated when approved, so a questionable one is
   // allowed to sit in the queue — that is what the queue is for.

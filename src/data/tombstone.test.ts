@@ -1,11 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records';
-import {
-  isScrubbed,
-  tombstoneFillUp,
-  tombstonePending,
-  tombstoneVehicle,
-} from './tombstone';
+import { isScrubbed, tombstoneFillUp, tombstonePending, tombstoneVehicle } from './tombstone';
 
 /**
  * What a deletion leaves behind.

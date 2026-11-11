@@ -56,6 +56,12 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Prettier, with the repository's settings (#99). The code was formatted
+      # once, in a commit `.git-blame-ignore-revs` skips; `npm run format`
+      # fixes whatever this finds.
+      - name: Formatting
+        run: npm run format:check
+
       # Builds, then runs the `*.build.test.ts` files against that build (#97):
       # the manifest, the CSP and the self-hosted reader. A suite that passes
       # while the app fails to build is a green check over something nobody can

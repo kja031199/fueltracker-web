@@ -311,9 +311,11 @@ describe('reading once does not change what is sent (#87)', () => {
     expect(result.own.ok && result.own.outcome.repaired).toBe(1);
     expect(result.shares.synced).toHaveLength(1);
     expect(result.shares.failed).toEqual([]);
-    expect(((await store.fillUp(mine.id))?.notes.length ?? 0)).toBeLessThan(10_000);
+    expect((await store.fillUp(mine.id))?.notes.length ?? 0).toBeLessThan(10_000);
     // And the owner's account has the shortened row, not the old one.
-    const theirs = ((await world.remoteFor('owner-0').pull(null)).fillUps as FillUpRecord[]).find((row) => row.id === mine.id);
+    const theirs = ((await world.remoteFor('owner-0').pull(null)).fillUps as FillUpRecord[]).find(
+      (row) => row.id === mine.id,
+    );
     expect(theirs).toBeDefined();
     expect(theirs?.notes.length ?? Infinity).toBeLessThan(10_000);
   });

@@ -55,10 +55,7 @@ export interface DateValuePoint {
  * display unit (e.g. L/100km), where relabelling the axis isn't enough because
  * the curve's shape changes.
  */
-export function mapValues(
-  series: readonly DateValuePoint[],
-  transform: (value: number) => number,
-): DateValuePoint[] {
+export function mapValues(series: readonly DateValuePoint[], transform: (value: number) => number): DateValuePoint[] {
   return series.map((p) => ({ id: p.id, date: p.date, value: transform(p.value) }));
 }
 

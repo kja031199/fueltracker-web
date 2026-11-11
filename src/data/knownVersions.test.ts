@@ -113,13 +113,27 @@ class Counting extends InMemorySyncState {
 }
 
 function vehicle(id: string, updatedAt: number): VehicleRecord {
-  return { id, updatedAt, deletedAt: null, schemaVersion: SCHEMA_VERSION, name: id, make: '', model: '', year: 2020, createdAt: 1 };
+  return {
+    id,
+    updatedAt,
+    deletedAt: null,
+    schemaVersion: SCHEMA_VERSION,
+    name: id,
+    make: '',
+    model: '',
+    year: 2020,
+    createdAt: 1,
+  };
 }
 
 describe('a sync writes only the versions it read (#91)', () => {
   test('a full read replaces all three; an incremental one adds what changed, and nothing else', async () => {
     const remote = new InMemoryRemoteStore();
-    await remote.push({ vehicles: Array.from({ length: 50 }, (_, i) => vehicle(`v${i}`, 100 + i)), fillUps: [], pendingFillUps: [] });
+    await remote.push({
+      vehicles: Array.from({ length: 50 }, (_, i) => vehicle(`v${i}`, 100 + i)),
+      fillUps: [],
+      pendingFillUps: [],
+    });
     const store = makeStore();
     const state = new Counting();
 

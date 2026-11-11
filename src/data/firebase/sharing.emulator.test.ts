@@ -39,22 +39,33 @@ describe('falling back while an index builds', () => {
   test('says so when it falls back, and only then (#89)', async () => {
     const missing = Object.assign(new Error('needs an index'), { code: 'failed-precondition' });
     let told = 0;
-    await withIndexFallback(() => Promise.reject(missing), async () => 'all', () => (told += 1));
+    await withIndexFallback(
+      () => Promise.reject(missing),
+      async () => 'all',
+      () => (told += 1),
+    );
     expect(told).toBe(1);
-    await withIndexFallback(async () => 'some', async () => 'all', () => (told += 1));
+    await withIndexFallback(
+      async () => 'some',
+      async () => 'all',
+      () => (told += 1),
+    );
     expect(told).toBe(1);
   });
 
   test('any other failure is not hidden behind a second read', async () => {
     const denied = Object.assign(new Error('no'), { code: 'permission-denied' });
-    await expect(withIndexFallback(() => Promise.reject(denied), async () => 'never')).rejects.toBe(denied);
+    await expect(
+      withIndexFallback(
+        () => Promise.reject(denied),
+        async () => 'never',
+      ),
+    ).rejects.toBe(denied);
     expect(isMissingIndex(denied)).toBe(false);
     expect(isMissingIndex(null)).toBe(false);
     expect(isMissingIndex('failed-precondition')).toBe(false);
   });
 });
-
-
 
 const [OWNER_UID, PARTNER_UID] = allowedUidsInRules();
 const OWNER: Account = { uid: OWNER_UID!, name: 'Kyle', email: 'kyle@example.com', emailVerified: true };
@@ -76,8 +87,10 @@ describe('sharing through the real rules', () => {
   });
 
   function device(account: Account) {
-    const db = signedIn(env, account.uid, { email: account.email, email_verified: account.emailVerified })
-      .firestore() as unknown as Firestore;
+    const db = signedIn(env, account.uid, {
+      email: account.email,
+      email_verified: account.emailVerified,
+    }).firestore() as unknown as Firestore;
     const clock = new MonotonicClock();
     const store = new FuelTrackerStore(
       {

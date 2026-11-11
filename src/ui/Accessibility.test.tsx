@@ -118,7 +118,8 @@ describe('focus follows the screen', () => {
 });
 
 /** An id, label target or ARIA reference written as a fixed string: "x", {'x'}, {"x"} or a template with nothing in it. */
-const FIXED_ID = /(?<![\w-])(id|htmlFor|aria-labelledby|aria-describedby|aria-controls)=("[^"]*"|\{\s*(['"])[^'"]*\3\s*\}|\{\s*`[^`$]*`\s*\})/g;
+const FIXED_ID =
+  /(?<![\w-])(id|htmlFor|aria-labelledby|aria-describedby|aria-controls)=("[^"]*"|\{\s*(['"])[^'"]*\3\s*\}|\{\s*`[^`$]*`\s*\})/g;
 
 describe('ids are unique however often a component renders', () => {
   test('two link panels on one page share no id', () => {
@@ -158,13 +159,7 @@ describe('ids are unique however often a component renders', () => {
   test('no component writes an id as a fixed string', () => {
     const fixed = sourcesUnder('src/ui', false)
       .filter((file) => file.endsWith('.tsx'))
-      .flatMap((file) =>
-        [
-          ...readFileSync(file, 'utf8').matchAll(FIXED_ID),
-        ].map(
-          (match) => `${file}: ${match[0]}`,
-        ),
-      );
+      .flatMap((file) => [...readFileSync(file, 'utf8').matchAll(FIXED_ID)].map((match) => `${file}: ${match[0]}`));
     expect(fixed).toEqual([]);
   });
 });

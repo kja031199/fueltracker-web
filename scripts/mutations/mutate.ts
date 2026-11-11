@@ -103,7 +103,10 @@ export function problemWith(
  * names only missing files makes vitest exit non-zero with nothing run, which
  * would read as a kill.
  */
-export function missingTests(tests: readonly string[] | undefined, exists: (path: string) => boolean = existsSync): string[] {
+export function missingTests(
+  tests: readonly string[] | undefined,
+  exists: (path: string) => boolean = existsSync,
+): string[] {
   if (tests === undefined) return [];
   const missing: string[] = [];
   for (let i = 0; i < tests.length; i += 1) {
@@ -181,8 +184,15 @@ export function insideEmulator(argv: readonly string[]): string[] {
     .map(shellQuoted)
     .join(' ');
   return [
-    FIREBASE, 'emulators:exec', '--config', 'scripts/mutations/firebase.json',
-    '--only', 'firestore', '--project', 'fueltracker-rules-test', inner,
+    FIREBASE,
+    'emulators:exec',
+    '--config',
+    'scripts/mutations/firebase.json',
+    '--only',
+    'firestore',
+    '--project',
+    'fueltracker-rules-test',
+    inner,
   ];
 }
 

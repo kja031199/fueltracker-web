@@ -136,10 +136,7 @@ export interface StatisticsWindow {
  *
  * With no window every figure is exactly what it always was.
  */
-export function computeFuelStatistics(
-  input: readonly FuelEntryStats[],
-  window: StatisticsWindow = {},
-): FuelStatistics {
+export function computeFuelStatistics(input: readonly FuelEntryStats[], window: StatisticsWindow = {}): FuelStatistics {
   const history = [...input].sort((a, b) => a.odometer - b.odometer);
   const from = window.from?.getTime();
   const windowed = from !== undefined && Number.isFinite(from);

@@ -94,4 +94,3 @@ export function makeFuelEntryDraft(input: FuelEntryDraftInput): FuelEntryDraft |
     receiptImageData: keptReceipt,
   };
 }
-

@@ -96,16 +96,14 @@ describe('the Firebase CLI is pinned and installed from a lockfile', () => {
         .split('\n')
         .filter((line) => !line.trim().startsWith('#'))
         .join('\n');
-      expect(commands, `${name} still resolves firebase-tools at run time`).not.toMatch(
-        /npx[^\n]*firebase-tools/,
-      );
+      expect(commands, `${name} still resolves firebase-tools at run time`).not.toMatch(/npx[^\n]*firebase-tools/);
     }
   });
 
   test('its manifest pins an exact version, not a range', () => {
-    const manifest = JSON.parse(
-      readFileSync('.github/firebase-cli/package.json', 'utf8'),
-    ) as { dependencies?: Record<string, string> };
+    const manifest = JSON.parse(readFileSync('.github/firebase-cli/package.json', 'utf8')) as {
+      dependencies?: Record<string, string>;
+    };
     const version = manifest.dependencies?.['firebase-tools'];
     expect(version).toBeDefined();
     // No `^`, no `~`, no `*`, no range: one version, chosen deliberately.
@@ -134,9 +132,8 @@ describe('the Firebase CLI is pinned and installed from a lockfile', () => {
     const needed = ['deploy.yml', 'ci.yml'];
     // `npm run test:rules` counts as running it: that script is the pinned
     // binary (#97), which `projects.test.ts` asserts.
-    const rulesScript = (
-      JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> }
-    ).scripts['test:rules'];
+    const rulesScript = (JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> })
+      .scripts['test:rules'];
     expect(rulesScript).toMatch(/^\.github\/firebase-cli\/node_modules\/\.bin\/firebase /);
     // Installed directly, or through the setup action asked for it (#99),
     // whose own steps install it from the lockfile.
@@ -166,9 +163,7 @@ describe('dependabot watches what it needs to', () => {
 
 describe('the deploy smoke test proves configuration was baked in', () => {
   const deploy = readFileSync(`${WORKFLOW_DIR}/deploy.yml`, 'utf8');
-  const bundleCheck = deploy
-    .split('\n')
-    .find((line) => line.includes('$url$bundle') && line.includes('grep'));
+  const bundleCheck = deploy.split('\n').find((line) => line.includes('$url$bundle') && line.includes('grep'));
 
   test('there is a bundle check to inspect', () => {
     expect(bundleCheck).toBeDefined();
@@ -402,9 +397,7 @@ describe('the deploy key never meets the build toolchain (#76)', () => {
   test('the key is written last: after every install, the download and the config', () => {
     expect(writesKey).toBeGreaterThan(-1);
     const download = keySteps.findIndex((step) => /actions\/download-artifact@/.test(step));
-    const lastInstall = Math.max(
-      ...keySteps.map((step, i) => (/\bnpm ci\b/.test(commands(step)) ? i : -1)),
-    );
+    const lastInstall = Math.max(...keySteps.map((step, i) => (/\bnpm ci\b/.test(commands(step)) ? i : -1)));
     const config = index(/firebase\.ci\.json/);
     expect(download).toBeGreaterThan(-1);
     expect(download).toBeLessThan(writesKey);
@@ -435,7 +428,9 @@ function runBlock(step: string): string {
 function jobCommands(workflow: string, id: string): string {
   const job = jobs().find((candidate) => candidate.workflow === workflow && candidate.id === id);
   expect(job, `${workflow} has a ${id} job`).toBeDefined();
-  return stepsOf(job?.text ?? '').map(commands).join('\n');
+  return stepsOf(job?.text ?? '')
+    .map(commands)
+    .join('\n');
 }
 
 describe('every test project runs in CI, through its npm script (#97)', () => {
@@ -443,6 +438,12 @@ describe('every test project runs in CI, through its npm script (#97)', () => {
     const run = jobCommands('ci.yml', 'test');
     expect(run).toMatch(/\bnpm run test:build\b/);
     expect(run).toMatch(/\bnpm test\b/);
+  });
+
+  test('the main check holds the code to its formatting (#99)', () => {
+    expect(jobCommands('ci.yml', 'test')).toMatch(/\bnpm run format:check\b/);
+    const scripts = (JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> }).scripts;
+    expect(scripts['format:check']).toBe('prettier --check .');
   });
 
   test('the rules check runs the rules project', () => {
@@ -539,7 +540,9 @@ describe('one setup, one Node version, one build per merge (#99)', () => {
 
   test('the setup caches both lockfiles and the emulator, and pins Java', () => {
     const setup = readFileSync(`${ACTIONS_DIR}/setup/action.yml`, 'utf8');
-    expect(setup).toMatch(/cache-dependency-path:\s*\|\s*\n\s+package-lock\.json\s*\n\s+\.github\/firebase-cli\/package-lock\.json/);
+    expect(setup).toMatch(
+      /cache-dependency-path:\s*\|\s*\n\s+package-lock\.json\s*\n\s+\.github\/firebase-cli\/package-lock\.json/,
+    );
     expect(setup).toMatch(/path:\s*~\/\.cache\/firebase\/emulators/);
     expect(setup).toMatch(/uses:\s*actions\/setup-java@[0-9a-f]{40}/);
     expect(setup).toMatch(/java-version:\s*'\d+'/);

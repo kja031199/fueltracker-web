@@ -40,7 +40,10 @@ export interface SharingView {
    * `entered` is the uids its fill-ups carry. Remembered per car (#89): read
    * once, and again only when a fill-up names somebody it has not seen.
    */
-  namesFor(vehicleId: string, entered: readonly (string | null | undefined)[]): Promise<ReadonlyMap<string, string> | null>;
+  namesFor(
+    vehicleId: string,
+    entered: readonly (string | null | undefined)[],
+  ): Promise<ReadonlyMap<string, string> | null>;
   removeMember(vehicleId: string, memberUid: string): Promise<void>;
   /** Joins, then syncs so the car arrives at once. */
   accept(invite: Invite): Promise<void>;
@@ -48,7 +51,6 @@ export interface SharingView {
   /** Leaves, then syncs, which forgets the car on this device. */
   leave(membership: Membership): Promise<void>;
 }
-
 
 /**
  * The fuel log. Sync status is **not** in here (#88): it changes several

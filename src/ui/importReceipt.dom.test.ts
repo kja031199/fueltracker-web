@@ -8,32 +8,26 @@ import type { OcrResult } from './ocr';
  * not the pixel plumbing, which the browser run covers.
  */
 function stubImagePipeline(): void {
-  vi.stubGlobal('createImageBitmap', async () =>
-    ({ width: 1200, height: 1600, close: () => {} }) as unknown as ImageBitmap,
+  vi.stubGlobal(
+    'createImageBitmap',
+    async () => ({ width: 1200, height: 1600, close: () => {} }) as unknown as ImageBitmap,
   );
   // Spied on, not assigned: the config restores spies before every test, and
   // an assignment to the prototype was never put back (#97).
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
     () => ({ drawImage: () => {} }) as unknown as CanvasRenderingContext2D,
   );
-  vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((cb) =>
-    cb(new Blob([new Uint8Array([1, 2, 3])])),
-  );
+  vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((cb) => cb(new Blob([new Uint8Array([1, 2, 3])])));
 }
 
 const photo = (): Blob => new Blob([new Uint8Array(2048)], { type: 'image/jpeg' });
 
-const RECEIPT_LINES = [
-  'SHELL',
-  '07/19/2026 14:35:07',
-  'GALLONS 10.234',
-  'PRICE/GAL $3.499',
-  'FUEL TOTAL $35.81',
-];
+const RECEIPT_LINES = ['SHELL', '07/19/2026 14:35:07', 'GALLONS 10.234', 'PRICE/GAL $3.499', 'FUEL TOTAL $35.81'];
 
 const NOW = new Date(2026, 9, 15);
 
-const ocr = (lines: string[]): (() => Promise<OcrResult>) =>
+const ocr =
+  (lines: string[]): (() => Promise<OcrResult>) =>
   async () => ({ ok: true, lines, confidence: 90 });
 
 beforeEach(() => {
@@ -193,7 +187,6 @@ describe('what the reader is handed (after #63)', () => {
     expect((handed as Blob).size).toBeGreaterThan(0);
   });
 });
-
 
 describe('a browser that will not encode the reading copy', () => {
   test('says so, and never hands the reader nothing', async () => {

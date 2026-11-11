@@ -111,8 +111,7 @@ export const economy: Record<EconomyUnit, EconomySpec> = {
   litersPer100km: {
     abbreviation: 'L/100km',
     higherIsBetter: false,
-    fromMPG: (mpg) =>
-      definedMPG(mpg) ? (100 * LITERS_PER_GALLON) / (mpg * KILOMETERS_PER_MILE) : null,
+    fromMPG: (mpg) => (definedMPG(mpg) ? (100 * LITERS_PER_GALLON) / (mpg * KILOMETERS_PER_MILE) : null),
   },
   kmPerLiter: {
     abbreviation: 'km/L',

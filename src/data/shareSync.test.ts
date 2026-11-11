@@ -420,7 +420,16 @@ describe('when the account itself has trouble', () => {
     const car = await store.addVehicle({ name: 'Solo' });
     const result = await syncAll(store, world.remoteFor('solo'), null, new InMemorySyncState());
     expect(result.own.ok).toBe(true);
-    expect(result.shares).toEqual({ synced: [], ended: [], failed: [], rejected: [], outcomes: [], unreachable: false, memberships: null, clashed: [] });
+    expect(result.shares).toEqual({
+      synced: [],
+      ended: [],
+      failed: [],
+      rejected: [],
+      outcomes: [],
+      unreachable: false,
+      memberships: null,
+      clashed: [],
+    });
     expect((await rowsIn(world, 'solo')).vehicles).toEqual([car.id]);
   });
 });
@@ -662,8 +671,14 @@ describe('a share whose car id is already one of yours (#78)', () => {
     // Stands in for a membership that got past every check — accepted on a
     // device that had not synced the car yet, say.
     const key = `${OWNER.uid}__${vehicleId}`;
-    world.members.set(key, new Map([[PARTNER.uid, { uid: PARTNER.uid, name: 'Sam', email: 'sam@example.com', joinedAt: 1 }]]));
-    world.memberships.set(PARTNER.uid, new Map([[key, { ownerUid: OWNER.uid, vehicleId, ownerName: 'Kyle', vehicleName: 'Bait' }]]));
+    world.members.set(
+      key,
+      new Map([[PARTNER.uid, { uid: PARTNER.uid, name: 'Sam', email: 'sam@example.com', joinedAt: 1 }]]),
+    );
+    world.memberships.set(
+      PARTNER.uid,
+      new Map([[key, { ownerUid: OWNER.uid, vehicleId, ownerName: 'Kyle', vehicleName: 'Bait' }]]),
+    );
   }
 
   test('the account refuses the join, as the rules do', async () => {
@@ -777,7 +792,10 @@ describe('a member cannot lock the owner’s fill-up with a far-future stamp (#7
     await owner.sync();
     await partner.sync();
     expect((await partner.store.fillUp(theirs.id))?.odometer).toBe(10_123);
-    expect(((await world.remoteFor(OWNER.uid).pull(null)).fillUps as FillUpRecord[]).find((f) => f.id === theirs.id)?.odometer).toBe(10_123);
+    expect(
+      ((await world.remoteFor(OWNER.uid).pull(null)).fillUps as FillUpRecord[]).find((f) => f.id === theirs.id)
+        ?.odometer,
+    ).toBe(10_123);
   });
 
   test('nor take its stamp backwards', async () => {
@@ -789,9 +807,11 @@ describe('a member cannot lock the owner’s fill-up with a far-future stamp (#7
     const [membership] = await partner.sharing.remote.memberships();
     if (membership === undefined) throw new Error('no membership');
     await expect(
-      partner.sharing.remote
-        .scoped(membership)
-        .push({ vehicles: [], fillUps: [{ ...whole, odometer: 99_999, updatedAt: whole.updatedAt - 1 }], pendingFillUps: [] }),
+      partner.sharing.remote.scoped(membership).push({
+        vehicles: [],
+        fillUps: [{ ...whole, odometer: 99_999, updatedAt: whole.updatedAt - 1 }],
+        pendingFillUps: [],
+      }),
     ).rejects.toBeInstanceOf(Refused);
   });
 });

@@ -76,8 +76,8 @@
     {
       "name": "request warning removed",
       "file": "src/ui/SubmitScreen.tsx",
-      "from": "        Names in a link are whatever its author typed; only fill this in if you know who sent it.\n",
-      "to": ""
+      "from": "      <p className=\"note\">Names in a link are whatever its author typed; only fill this in if you know who sent it.</p>\n",
+      "to": "      <p className=\"note\"></p>\n"
     },
     {
       "name": "(unverified) removed from the queue",

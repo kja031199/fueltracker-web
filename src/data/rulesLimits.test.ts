@@ -16,9 +16,10 @@ import type { Invite, Member, Membership } from './sharing';
  * fails here, without needing the emulator.
  */
 const RULES = readFileSync('firestore.rules', 'utf8');
-const LABELS = [...RULES.matchAll(/label\(request\.resource\.data\.(\w+),\s*(\d+)\)/g)].map(
-  (match) => ({ field: match[1]!, max: Number(match[2]) }),
-);
+const LABELS = [...RULES.matchAll(/label\(request\.resource\.data\.(\w+),\s*(\d+)\)/g)].map((match) => ({
+  field: match[1]!,
+  max: Number(match[2]),
+}));
 
 describe('the rules and the client agree on text limits', () => {
   test('there are limits to compare, so a passing suite means something', () => {
@@ -68,7 +69,9 @@ describe('the rules and the client agree on how far ahead a stamp may be (#79)',
 
   test('the stamp is checked in the one place every row passes through', () => {
     expect(RULES).toMatch(/updatedAt\s*<=\s*request\.time\.toMillis\(\)\s*\+\s*maxAheadMs\(\)/);
-    expect(RULES).toMatch(/resource\s*==\s*null\s*\|\|\s*request\.resource\.data\.updatedAt\s*>=\s*resource\.data\.updatedAt/);
+    expect(RULES).toMatch(
+      /resource\s*==\s*null\s*\|\|\s*request\.resource\.data\.updatedAt\s*>=\s*resource\.data\.updatedAt/,
+    );
   });
 });
 
@@ -139,15 +142,17 @@ function keysOf(name: string): string[] {
   if (body === undefined) throw new Error(`firestore.rules has no ${name}()`);
   const expression = /return\s+([\s\S]*?);\s*\}\s*$/.exec(body.replace(/\/\/.*$/gm, ''))?.[1];
   if (expression === undefined) throw new Error(`${name}() does not return a list`);
-  return expression
-    .split(/\.concat\(/)
-    // Every part after the first closes its `.concat(`.
-    .map((part, index) => (index === 0 ? part : part.replace(/\)\s*$/, '')).trim())
-    .flatMap((part) => {
-      const call = /^(\w+)\(\)$/.exec(part);
-      if (call !== null) return keysOf(call[1]!);
-      return [...part.matchAll(/'([^']+)'/g)].map((match) => match[1]!);
-    });
+  return (
+    expression
+      .split(/\.concat\(/)
+      // Every part after the first closes its `.concat(`.
+      .map((part, index) => (index === 0 ? part : part.replace(/\)\s*$/, '')).trim())
+      .flatMap((part) => {
+        const call = /^(\w+)\(\)$/.exec(part);
+        if (call !== null) return keysOf(call[1]!);
+        return [...part.matchAll(/'([^']+)'/g)].map((match) => match[1]!);
+      })
+  );
 }
 
 describe('each document’s keys are listed once, and are what the client writes (#92)', () => {
@@ -159,16 +164,47 @@ describe('each document’s keys are listed once, and are what the client writes
   const SYNC = { id: 'x', updatedAt: 1, deletedAt: null, schemaVersion: SCHEMA_VERSION };
   const vehicle: Required<VehicleRecord> = { ...SYNC, name: '', make: '', model: '', year: 2020, createdAt: 1 };
   const fillUp: Required<FillUpRecord> = {
-    ...SYNC, vehicleId: 'v', date: 1, odometer: 1, gallons: 1, pricePerGallon: 1, isFullTank: true,
-    missedPreviousFillUp: false, fuelGrade: 'Regular', station: '', notes: '', latitude: null, longitude: null,
-    receiptImageData: null, enteredBy: null,
+    ...SYNC,
+    vehicleId: 'v',
+    date: 1,
+    odometer: 1,
+    gallons: 1,
+    pricePerGallon: 1,
+    isFullTank: true,
+    missedPreviousFillUp: false,
+    fuelGrade: 'Regular',
+    station: '',
+    notes: '',
+    latitude: null,
+    longitude: null,
+    receiptImageData: null,
+    enteredBy: null,
   };
   const pending: Required<PendingFillUpRecord> = {
-    ...SYNC, vehicleId: 'v', submittedAt: 1, submitterName: '', date: 1, odometer: 1, gallons: 1,
-    pricePerGallon: 1, isFullTank: true, fuelGrade: 'Regular', station: '', notes: '', latitude: null,
-    longitude: null, receiptImageData: null,
+    ...SYNC,
+    vehicleId: 'v',
+    submittedAt: 1,
+    submitterName: '',
+    date: 1,
+    odometer: 1,
+    gallons: 1,
+    pricePerGallon: 1,
+    isFullTank: true,
+    fuelGrade: 'Regular',
+    station: '',
+    notes: '',
+    latitude: null,
+    longitude: null,
+    receiptImageData: null,
   };
-  const invite: Required<Invite> = { ownerUid: '', vehicleId: '', email: '', ownerName: '', vehicleName: '', createdAt: 1 };
+  const invite: Required<Invite> = {
+    ownerUid: '',
+    vehicleId: '',
+    email: '',
+    ownerName: '',
+    vehicleName: '',
+    createdAt: 1,
+  };
   const member: Required<Member> = { uid: '', name: '', email: '', joinedAt: 1 };
   const membership: Required<Membership> = { ownerUid: '', vehicleId: '', ownerName: '', vehicleName: '' };
 

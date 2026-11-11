@@ -218,25 +218,19 @@ describe('installCspWatch', () => {
     installCspWatch();
     document.dispatchEvent(violation({ blockedURI: 'https://second.example/' }));
 
-    expect(loadViolations().map((v) => v.blockedURI)).toEqual([
-      'https://first.example/',
-      'https://second.example/',
-    ]);
+    expect(loadViolations().map((v) => v.blockedURI)).toEqual(['https://first.example/', 'https://second.example/']);
   });
 
   test('falls back to the legacy directive field when the modern one is absent', () => {
     localStorage.setItem(CSP_WATCH_FLAG, 'on');
     installCspWatch();
-    document.dispatchEvent(
-      violation({ effectiveDirective: undefined, violatedDirective: 'frame-src' }),
-    );
+    document.dispatchEvent(violation({ effectiveDirective: undefined, violatedDirective: 'frame-src' }));
     expect(loadViolations()[0]?.directive).toBe('frame-src');
   });
 
   test('exposes the console helpers, which are the whole interface', () => {
     installCspWatch();
-    const helper = (window as unknown as { __fuelTrackerCsp?: Record<string, unknown> })
-      .__fuelTrackerCsp;
+    const helper = (window as unknown as { __fuelTrackerCsp?: Record<string, unknown> }).__fuelTrackerCsp;
     expect(typeof helper?.on).toBe('function');
     expect(typeof helper?.off).toBe('function');
     expect(typeof helper?.report).toBe('function');
@@ -245,9 +239,11 @@ describe('installCspWatch', () => {
 
   test('on() arms it and off() disarms it', () => {
     installCspWatch();
-    const helper = (window as unknown as {
-      __fuelTrackerCsp: { on: () => string; off: () => string; report: () => string };
-    }).__fuelTrackerCsp;
+    const helper = (
+      window as unknown as {
+        __fuelTrackerCsp: { on: () => string; off: () => string; report: () => string };
+      }
+    ).__fuelTrackerCsp;
 
     helper.on();
     document.dispatchEvent(violation());
@@ -261,9 +257,11 @@ describe('installCspWatch', () => {
 
   test('clear() empties the log without disarming', () => {
     installCspWatch();
-    const helper = (window as unknown as {
-      __fuelTrackerCsp: { on: () => string; clear: () => string };
-    }).__fuelTrackerCsp;
+    const helper = (
+      window as unknown as {
+        __fuelTrackerCsp: { on: () => string; clear: () => string };
+      }
+    ).__fuelTrackerCsp;
     helper.on();
     document.dispatchEvent(violation());
     helper.clear();

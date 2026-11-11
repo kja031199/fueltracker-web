@@ -162,10 +162,7 @@ export async function boot(deps: BootDeps): Promise<void> {
     close();
     deps.view.opening();
 
-    const [account, factory] = await Promise.all([
-      deps.openAccount(uid),
-      loadRemotes().catch(() => null),
-    ]);
+    const [account, factory] = await Promise.all([deps.openAccount(uid), loadRemotes().catch(() => null)]);
 
     if (mine !== generation) {
       // Another auth event overtook this one while the database was opening.

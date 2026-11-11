@@ -80,7 +80,8 @@ export interface Submission {
 
 export type LinkProblem = 'too-long' | 'damaged' | 'wrong-kind' | 'newer-version' | 'invalid';
 
-export type Decoded<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly problem: LinkProblem };
+export type Decoded<T> =
+  { readonly ok: true; readonly value: T } | { readonly ok: false; readonly problem: LinkProblem };
 
 // --- base64url over UTF-8 JSON ----------------------------------------------
 
@@ -112,7 +113,6 @@ function kindOf(value: Record<string, unknown>, kind: string): LinkProblem | nul
   if (version > LINK_VERSION) return 'newer-version';
   return value['k'] === kind ? null : 'wrong-kind';
 }
-
 
 // --- Requests -----------------------------------------------------------------
 

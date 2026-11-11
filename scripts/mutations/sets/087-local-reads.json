@@ -25,7 +25,7 @@
     {
       "name": "no refresh after the merge",
       "file": "src/data/sync.ts",
-      "from": "  await local.refresh('vehicles', vehicles.readable.map((row) => row.id));\n  await local.refresh('fillUps', fillUps.readable.map((row) => row.id));\n  await local.refresh('pendingFillUps', pending.readable.map((row) => row.id));\n",
+      "from": "  await local.refresh(\n    'vehicles',\n    vehicles.readable.map((row) => row.id),\n  );\n  await local.refresh(\n    'fillUps',\n    fillUps.readable.map((row) => row.id),\n  );\n  await local.refresh(\n    'pendingFillUps',\n    pending.readable.map((row) => row.id),\n  );\n",
       "to": ""
     },
     {

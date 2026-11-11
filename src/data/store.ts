@@ -33,8 +33,6 @@ import { atomically } from './atomically';
 import { TEXT_LIMITS, boundText } from '../domain/textLimits';
 import { StaleEdit } from './staleEdit';
 
-
-
 export interface NewVehicle {
   readonly name: string;
   readonly make?: string;
@@ -96,7 +94,6 @@ export class FuelTrackerStore {
   async hasVehicle(id: string): Promise<boolean> {
     return this.replica.hasVehicle(id);
   }
-
 
   async vehicles(): Promise<VehicleRecord[]> {
     const rows = await this.repos.vehicles.list();
@@ -243,7 +240,10 @@ export class FuelTrackerStore {
     return atomically(this.repos, (r) => this.queueSubmission(r, submission));
   }
 
-  private async queueSubmission(r: Repositories, submission: Submission): Promise<'queued' | 'duplicate' | 'no-such-car'> {
+  private async queueSubmission(
+    r: Repositories,
+    submission: Submission,
+  ): Promise<'queued' | 'duplicate' | 'no-such-car'> {
     if ((await r.vehicles.get(submission.vehicleId)) === undefined) return 'no-such-car';
     // Queued, approved or rejected: any row with this id, by key (#87).
     if ((await r.pendingFillUps.getMany([submission.id])).length > 0) return 'duplicate';
@@ -343,10 +343,7 @@ export class FuelTrackerStore {
     );
   }
 
-  private async scrub<T extends SyncFields>(
-    repo: Repository<T>,
-    tombstone: Tombstoner<T>,
-  ): Promise<number> {
+  private async scrub<T extends SyncFields>(repo: Repository<T>, tombstone: Tombstoner<T>): Promise<number> {
     let fixed = 0;
     for (const row of await repo.listDeleted()) {
       if (isScrubbed(row, tombstone)) continue;
@@ -379,5 +376,4 @@ export class FuelTrackerStore {
   async importBackup(snapshot: Snapshot): Promise<ImportSummary> {
     return importBackup(this.repos, snapshot);
   }
-
 }

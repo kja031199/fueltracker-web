@@ -16,7 +16,11 @@ import { US, pricePerUnit, volume } from '../domain/units';
 import type { DisplayStyle } from '../domain/format';
 import { US_STYLE, plainCurrency } from '../domain/format';
 
-export function insightText(insight: WeekdayInsight, units: UnitPreferences = US, style: DisplayStyle = US_STYLE): string {
+export function insightText(
+  insight: WeekdayInsight,
+  units: UnitPreferences = US,
+  style: DisplayStyle = US_STYLE,
+): string {
   const names = weekdayNames(US_STYLE.locale, 'long');
   const cheapName = names[insight.cheapestWeekday - 1] ?? '';
   const priceyName = names[insight.priciestWeekday - 1] ?? '';

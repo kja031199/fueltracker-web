@@ -71,10 +71,7 @@ export function firstWeekdayForLocale(locale: string): number {
  * and drops out silently — the same outcome as the Swift, where the grouping
  * key simply never equals 1…7.
  */
-export function weekdayPrices(
-  entries: readonly FuelEntryStats[],
-  options: WeekdayOptions = {},
-): WeekdayPrice[] {
+export function weekdayPrices(entries: readonly FuelEntryStats[], options: WeekdayOptions = {}): WeekdayPrice[] {
   const firstWeekday = options.firstWeekday ?? 1;
 
   const grouped = new Map<number, FuelEntryStats[]>();
@@ -111,18 +108,12 @@ export function weekdayPrices(
  * positional, so it has to be written deliberately — a `reduce` using `<=`
  * would silently keep the last instead.
  */
-export function cheapestWeekday(
-  entries: readonly FuelEntryStats[],
-  options: WeekdayOptions = {},
-): WeekdayPrice | null {
+export function cheapestWeekday(entries: readonly FuelEntryStats[], options: WeekdayOptions = {}): WeekdayPrice | null {
   return extreme(weekdayPrices(entries, options), (candidate, best) => candidate < best);
 }
 
 /** The priciest weekday, with the same first-wins tie-break. */
-export function priciestWeekday(
-  entries: readonly FuelEntryStats[],
-  options: WeekdayOptions = {},
-): WeekdayPrice | null {
+export function priciestWeekday(entries: readonly FuelEntryStats[], options: WeekdayOptions = {}): WeekdayPrice | null {
   return extreme(weekdayPrices(entries, options), (candidate, best) => candidate > best);
 }
 

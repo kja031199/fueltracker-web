@@ -93,8 +93,7 @@ export interface Repository<T extends SyncFields> {
  * `vehicleId` index, which had been declared since the first schema and never
  * queried.
  */
-export interface VehicleScopedRepository<T extends SyncFields & { readonly vehicleId: string }>
-  extends Repository<T> {
+export interface VehicleScopedRepository<T extends SyncFields & { readonly vehicleId: string }> extends Repository<T> {
   /** One vehicle's live records. */
   listForVehicle(vehicleId: string): Promise<T[]>;
   /** One vehicle's records, tombstones included, from the same index (#87). */
@@ -176,9 +175,7 @@ export class InMemoryRepository<T extends SyncFields> implements Repository<T> {
   }
 
   async listForVehicleAll(vehicleId: string): Promise<T[]> {
-    return [...this.rows.values()].filter(
-      (row) => (row as { readonly vehicleId?: unknown }).vehicleId === vehicleId,
-    );
+    return [...this.rows.values()].filter((row) => (row as { readonly vehicleId?: unknown }).vehicleId === vehicleId);
   }
 }
 

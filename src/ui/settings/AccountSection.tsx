@@ -31,21 +31,13 @@ export function AccountSection({
       </p>
 
       <AccountId uid={account.uid}>
-        Send this to whoever runs this copy of FuelTracker if they need to give your
-        account access.
+        Send this to whoever runs this copy of FuelTracker if they need to give your account access.
       </AccountId>
 
       {syncEnabled ? (
         <>
-          <p className="stack-sm">
-            Last synced {describeSince(sync.lastSyncedAt, Date.now(), locale)}.
-          </p>
-          <button
-            className="button"
-            type="button"
-            onClick={() => void sync.syncNow()}
-            disabled={sync.syncing}
-          >
+          <p className="stack-sm">Last synced {describeSince(sync.lastSyncedAt, Date.now(), locale)}.</p>
+          <button className="button" type="button" onClick={() => void sync.syncNow()} disabled={sync.syncing}>
             {sync.syncing ? 'Syncing…' : 'Sync now'}
           </button>
           {sync.message !== null && (
@@ -56,8 +48,7 @@ export function AccountSection({
         </>
       ) : (
         <p className="warning stack-sm">
-          This build has no backend configured, so nothing is syncing — your fuel log is only on
-          this device.
+          This build has no backend configured, so nothing is syncing — your fuel log is only on this device.
         </p>
       )}
 

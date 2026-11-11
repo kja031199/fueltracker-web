@@ -98,16 +98,16 @@ describe('fill-ups go through the draft, and only through the draft', () => {
   test('an unvalidated entry cannot be constructed at all', async () => {
     // The gate is the type system rather than a review: `addFillUp` takes a
     // draft, and these inputs never produce one, so there is no value to pass.
-    expect(makeFuelEntryDraft({ date: new Date(), odometer: 0, gallons: 10, pricePerGallon: 3 }))
-      .toBeNull();
-    expect(makeFuelEntryDraft({ date: new Date(), odometer: 100, gallons: -1, pricePerGallon: 3 }))
-      .toBeNull();
-    expect(makeFuelEntryDraft({
-      date: new Date(),
-      odometer: 100,
-      gallons: 10,
-      pricePerGallon: Number.POSITIVE_INFINITY,
-    })).toBeNull();
+    expect(makeFuelEntryDraft({ date: new Date(), odometer: 0, gallons: 10, pricePerGallon: 3 })).toBeNull();
+    expect(makeFuelEntryDraft({ date: new Date(), odometer: 100, gallons: -1, pricePerGallon: 3 })).toBeNull();
+    expect(
+      makeFuelEntryDraft({
+        date: new Date(),
+        odometer: 100,
+        gallons: 10,
+        pricePerGallon: Number.POSITIVE_INFINITY,
+      }),
+    ).toBeNull();
   });
 
   test('the date is stored as epoch milliseconds and round-trips', async () => {
@@ -223,9 +223,7 @@ describe('pending submissions', () => {
     const repos = new InMemoryRepository<PendingFillUpRecord>();
     const scoped = new FuelTrackerStore(
       {
-        vehicles: new InMemoryRepository<VehicleRecord>([
-          { ...vehicle },
-        ]),
+        vehicles: new InMemoryRepository<VehicleRecord>([{ ...vehicle }]),
         fillUps: new InMemoryRepository<FillUpRecord>(),
         pendingFillUps: repos,
       },
@@ -274,8 +272,7 @@ describe('pending submissions', () => {
     const vehicle = await store.addVehicle({ name: 'Car' });
     await submitted(store, draft(), vehicle.id, 'First');
     await submitted(store, draft(), vehicle.id, 'Second');
-    expect((await store.pendingFillUps()).map((p) => p.submitterName))
-      .toEqual(['Second', 'First']);
+    expect((await store.pendingFillUps()).map((p) => p.submitterName)).toEqual(['Second', 'First']);
   });
 });
 
@@ -386,7 +383,11 @@ describe('deleting leaves a tombstone, not a copy of the row', () => {
       }),
     ]);
     const store = new FuelTrackerStore(
-      { vehicles: new InMemoryRepository<VehicleRecord>(), fillUps: new InMemoryRepository<FillUpRecord>(), pendingFillUps },
+      {
+        vehicles: new InMemoryRepository<VehicleRecord>(),
+        fillUps: new InMemoryRepository<FillUpRecord>(),
+        pendingFillUps,
+      },
       testClock(),
     );
 
@@ -481,7 +482,7 @@ describe('scrubTombstones cleans up what older builds left behind', () => {
 describe('text is bounded on every write (#50)', () => {
   const long = (n: number) => 'x'.repeat(n + 1);
 
-  test('a vehicle\'s name, make and model are shortened to their limits', async () => {
+  test("a vehicle's name, make and model are shortened to their limits", async () => {
     const store = makeStore({ clock: testClock() });
     const vehicle = await store.addVehicle({
       name: long(TEXT_LIMITS.name),
@@ -527,7 +528,11 @@ describe('repairing text an older build stored unbounded (#50)', () => {
       },
     ]);
     const store = new FuelTrackerStore(
-      { vehicles: new InMemoryRepository<VehicleRecord>(), fillUps, pendingFillUps: new InMemoryRepository<PendingFillUpRecord>() },
+      {
+        vehicles: new InMemoryRepository<VehicleRecord>(),
+        fillUps,
+        pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
+      },
       testClock(),
     );
     return { store, fillUps };

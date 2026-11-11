@@ -29,7 +29,13 @@ export function LinkScreen({
   );
 }
 
-export function DoneButton({ onDone, label = 'Go to FuelTracker' }: { readonly onDone: () => void; readonly label?: string }): ReactElement {
+export function DoneButton({
+  onDone,
+  label = 'Go to FuelTracker',
+}: {
+  readonly onDone: () => void;
+  readonly label?: string;
+}): ReactElement {
   return (
     <button className="button button--secondary" type="button" onClick={onDone}>
       {label}

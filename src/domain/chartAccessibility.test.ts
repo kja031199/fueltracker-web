@@ -23,7 +23,14 @@ describe('summarizeSeries', () => {
   });
 
   test('a single point is its own range, and flat', () => {
-    expect(summarizeSeries(series([42]))).toEqual({ count: 1, low: 42, high: 42, average: 42, latest: 42, trend: 'flat' });
+    expect(summarizeSeries(series([42]))).toEqual({
+      count: 1,
+      low: 42,
+      high: 42,
+      average: 42,
+      latest: 42,
+      trend: 'flat',
+    });
   });
 
   test('an empty series has nothing to summarise', () => {

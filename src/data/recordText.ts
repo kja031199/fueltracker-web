@@ -13,12 +13,7 @@ import type { FillUpRecord, PendingFillUpRecord, VehicleRecord } from './records
 
 const VEHICLE_TEXT = ['name', 'make', 'model'] as const satisfies readonly TextField[];
 const FILL_UP_TEXT = ['station', 'notes', 'fuelGrade'] as const satisfies readonly TextField[];
-const PENDING_TEXT = [
-  'submitterName',
-  'station',
-  'notes',
-  'fuelGrade',
-] as const satisfies readonly TextField[];
+const PENDING_TEXT = ['submitterName', 'station', 'notes', 'fuelGrade'] as const satisfies readonly TextField[];
 
 function bound<T extends object>(row: T, fields: readonly TextField[]): T {
   let changed: Record<string, string> | null = null;

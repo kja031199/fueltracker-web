@@ -364,11 +364,7 @@ describe('a local row the account cannot address', () => {
   /** Behaves like Firestore: it will not address a document named `a/b`. */
   class StrictRemoteStore extends InMemoryRemoteStore {
     override async push(snapshot: Snapshot): Promise<import('./remote').PushSummary> {
-      for (const row of [
-        ...snapshot.vehicles,
-        ...snapshot.fillUps,
-        ...snapshot.pendingFillUps,
-      ]) {
+      for (const row of [...snapshot.vehicles, ...snapshot.fillUps, ...snapshot.pendingFillUps]) {
         if (row.id.includes('/')) {
           throw new Error(
             `Invalid document reference. Document references must have an even number of segments, but users/u1/fillUps/${row.id} has 5.`,
@@ -401,7 +397,7 @@ describe('a local row the account cannot address', () => {
     expect(result.ok).toBe(true);
     const after = await remote.pull();
     expect((after.fillUps as FillUpRecord[]).map((row) => row.id)).toEqual(['good']);
-    expect((after.vehicles as VehicleRecord[])).toHaveLength(1);
+    expect(after.vehicles as VehicleRecord[]).toHaveLength(1);
   });
 
   it('reports the row rather than dropping it quietly', async () => {
@@ -468,9 +464,7 @@ describe('syncOnce', () => {
   it('lets the newer edit win regardless of which side it is on', async () => {
     const { store, repos: r } = storeWith();
     await r.vehicles.put(vehicle({ name: 'Local name', updatedAt: 300 }));
-    const remote = new InMemoryRemoteStore(
-      snapshot({ vehicles: [vehicle({ name: 'Remote name', updatedAt: 200 })] }),
-    );
+    const remote = new InMemoryRemoteStore(snapshot({ vehicles: [vehicle({ name: 'Remote name', updatedAt: 200 })] }));
 
     await syncOnce(store, remote, new InMemorySyncState());
 
@@ -482,9 +476,7 @@ describe('syncOnce', () => {
   it('propagates a remote tombstone into local storage', async () => {
     const { store, repos: r } = storeWith();
     await r.vehicles.put(vehicle({ updatedAt: 100 }));
-    const remote = new InMemoryRemoteStore(
-      snapshot({ vehicles: [vehicle({ updatedAt: 200, deletedAt: 200 })] }),
-    );
+    const remote = new InMemoryRemoteStore(snapshot({ vehicles: [vehicle({ updatedAt: 200, deletedAt: 200 })] }));
 
     await syncOnce(store, remote, new InMemorySyncState());
 
@@ -584,9 +576,7 @@ describe('syncOnce', () => {
       const { store, repos: r } = storeWith(clock);
       await r.vehicles.put(vehicle({ name: 'Local', updatedAt: 1_000 }));
       const ahead = clock.now() + 60 * 60 * 1000;
-      const remote = new InMemoryRemoteStore(
-        snapshot({ vehicles: [vehicle({ name: 'Ahead', updatedAt: ahead })] }),
-      );
+      const remote = new InMemoryRemoteStore(snapshot({ vehicles: [vehicle({ name: 'Ahead', updatedAt: ahead })] }));
 
       await syncOnce(store, remote, new InMemorySyncState());
 
@@ -654,9 +644,7 @@ describe('syncOnce', () => {
       const clock = fakeClock();
       const { store } = storeWith(clock);
       const skewed = clock.now() + 60 * 60 * 1000;
-      const remote = new InMemoryRemoteStore(
-        snapshot({ vehicles: [vehicle({ id: 'v1', updatedAt: skewed })] }),
-      );
+      const remote = new InMemoryRemoteStore(snapshot({ vehicles: [vehicle({ id: 'v1', updatedAt: skewed })] }));
 
       await syncOnce(store, remote, new InMemorySyncState());
       expect(await store.vehicles()).toHaveLength(1);
@@ -759,9 +747,7 @@ describe('syncOnce', () => {
 
     it('leaves a row written by a newer schema alone in the account', async () => {
       const { store } = storeWith();
-      const remote = new InMemoryRemoteStore(
-        snapshot({ vehicles: [vehicle({ schemaVersion: 99 })] }),
-      );
+      const remote = new InMemoryRemoteStore(snapshot({ vehicles: [vehicle({ schemaVersion: 99 })] }));
 
       const result = await syncOnce(store, remote, new InMemorySyncState());
 
@@ -883,10 +869,7 @@ describe('the last check before a push (#50)', () => {
     // this never fires. It is the backstop: if something new slips past, it
     // costs that row, not the whole batch.
     const unsendable: string[] = [];
-    const sent = sendableRows(
-      [fillUp({ id: 'fine' }), fillUp({ id: 'long', notes: 'n'.repeat(4001) })],
-      unsendable,
-    );
+    const sent = sendableRows([fillUp({ id: 'fine' }), fillUp({ id: 'long', notes: 'n'.repeat(4001) })], unsendable);
     expect(sent.map((row) => row.id)).toEqual(['fine']);
     expect(unsendable).toEqual(['long']);
   });
@@ -986,7 +969,7 @@ describe('incremental pull (#52)', () => {
     expect(marks?.vehicles).toBeLessThan(marks!.fillUps!);
   });
 
-  it('never moves a collection\'s mark backwards', async () => {
+  it("never moves a collection's mark backwards", async () => {
     // An incremental read only returns newer stamps, so this cannot happen
     // with a correct remote — and if a remote ever got it wrong, a mark moving
     // back would just re-read; a mark moving forward wrongly would lose rows.

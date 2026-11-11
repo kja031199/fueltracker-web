@@ -24,11 +24,7 @@ const AREA = { width: 320, height: 150, left: 52, right: 8, top: 10, bottom: 20 
  * The cheapest day is drawn larger **and** named in the table beside the chart,
  * so the finding does not depend on noticing a size difference.
  */
-export function WeekdayPriceChart({
-  prices,
-  cheapestWeekday,
-  formatPrice,
-}: Props): ReactElement {
+export function WeekdayPriceChart({ prices, cheapestWeekday, formatPrice }: Props): ReactElement {
   // Day names in the reader's locale, like every other date part (#94).
   const names = weekdayNames(useDisplay().style.locale, 'short');
   const dayName = (weekday: number): string => names[weekday - 1] ?? '';
@@ -51,16 +47,9 @@ export function WeekdayPriceChart({
 
   return (
     <div className="card">
-      <ChartFrame
-        title="Price by day of the week"
-        summary={summary}
-        rows={rows}
-        rowHeadings={['Day', 'Average price']}
-      >
+      <ChartFrame title="Price by day of the week" summary={summary} rows={rows} rowHeadings={['Day', 'Average price']}>
         {prices.length === 0 ? (
-          <p className="empty empty--chart">
-            Not enough data yet.
-          </p>
+          <p className="empty empty--chart">Not enough data yet.</p>
         ) : (
           <svg
             className="chart__svg"
@@ -74,13 +63,7 @@ export function WeekdayPriceChart({
               return (
                 <g key={tick}>
                   <line x1={x0} x2={x1} y1={y} y2={y} stroke="var(--separator)" strokeWidth={1} />
-                  <text
-                    x={x0 - 6}
-                    y={y + 3}
-                    textAnchor="end"
-                    fontSize={9}
-                    fill="var(--text-secondary)"
-                  >
+                  <text x={x0 - 6} y={y + 3} textAnchor="end" fontSize={9} fill="var(--text-secondary)">
                     {formatPrice(tick)}
                   </text>
                 </g>
@@ -98,13 +81,7 @@ export function WeekdayPriceChart({
                     r={cheapest ? 6 : 4}
                     fill={cheapest ? 'var(--accent-green)' : 'var(--accent-orange)'}
                   />
-                  <text
-                    x={centre}
-                    y={AREA.height - 6}
-                    textAnchor="middle"
-                    fontSize={8}
-                    fill="var(--text-secondary)"
-                  >
+                  <text x={centre} y={AREA.height - 6} textAnchor="middle" fontSize={8} fill="var(--text-secondary)">
                     {dayName(price.weekday)}
                   </text>
                 </g>

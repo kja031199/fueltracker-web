@@ -169,6 +169,8 @@ describe('the reads sync relies on, over IndexedDB (#87)', () => {
     const snapshot = await store.exportSnapshot();
     expect(snapshot.fillUps).toHaveLength(4);
     expect(snapshot.fillUps.filter((row) => row.deletedAt !== null)).toHaveLength(1);
-    expect(Array.from(snapshot.fillUps.find((row) => row.id === withPhoto.id)?.receiptImageData ?? [])).toEqual(Array.from(photo));
+    expect(Array.from(snapshot.fillUps.find((row) => row.id === withPhoto.id)?.receiptImageData ?? [])).toEqual(
+      Array.from(photo),
+    );
   });
 });

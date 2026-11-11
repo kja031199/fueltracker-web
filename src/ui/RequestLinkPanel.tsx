@@ -26,8 +26,8 @@ export function RequestLinkPanel({
   return (
     <div className="space-above-sm">
       <p className="stack-sm">
-        Send this to whoever is filling up {vehicle.name}. They fill in the fill-up and send you a link back;
-        nothing reaches your log until you approve it under Fill-ups.
+        Send this to whoever is filling up {vehicle.name}. They fill in the fill-up and send you a link back; nothing
+        reaches your log until you approve it under Fill-ups.
       </p>
       <LinkOut url={url} label={`Fill-up request for ${vehicle.name}`} />
     </div>

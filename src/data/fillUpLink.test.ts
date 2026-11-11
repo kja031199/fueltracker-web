@@ -54,7 +54,9 @@ function raw(value: unknown): string {
 const validSubmissionObject = (): Record<string, unknown> => {
   const decoded = JSON.parse(
     new TextDecoder().decode(
-      Uint8Array.from(atob(encodeSubmission(submission()).replaceAll('-', '+').replaceAll('_', '/')), (c) => c.charCodeAt(0)),
+      Uint8Array.from(atob(encodeSubmission(submission()).replaceAll('-', '+').replaceAll('_', '/')), (c) =>
+        c.charCodeAt(0),
+      ),
     ),
   ) as Record<string, unknown>;
   return decoded;
@@ -118,7 +120,11 @@ describe('a submission link', () => {
       draft: { ...submission().draft, latitude: 40.8, longitude: -96.7, receiptImageData: new Uint8Array([1, 2, 3]) },
     });
     const decoded = decodeSubmission(encodeSubmission(withExtras), NOW);
-    expect(decoded.ok && decoded.value.draft).toMatchObject({ latitude: null, longitude: null, receiptImageData: null });
+    expect(decoded.ok && decoded.value.draft).toMatchObject({
+      latitude: null,
+      longitude: null,
+      receiptImageData: null,
+    });
   });
 
   test('"missed the previous fill-up" is the owner’s to say, so a link never carries it', () => {
@@ -136,7 +142,11 @@ describe('a submission link', () => {
   test('even with every text field at its link limit, it stays under the cap', () => {
     const long = submission({
       submitterName: 'n'.repeat(LINK_TEXT_LIMITS.submitterName),
-      draft: { ...submission().draft, station: 's'.repeat(LINK_TEXT_LIMITS.station), notes: 'x'.repeat(LINK_TEXT_LIMITS.notes) },
+      draft: {
+        ...submission().draft,
+        station: 's'.repeat(LINK_TEXT_LIMITS.station),
+        notes: 'x'.repeat(LINK_TEXT_LIMITS.notes),
+      },
     });
     expect(encodeSubmission(long).length).toBeLessThanOrEqual(MAX_LINK_PAYLOAD);
   });
@@ -184,7 +194,10 @@ describe('a damaged or hostile link', () => {
     const head = new TextEncoder().encode('{"v":1,"k":"req","car":"car-1","name":"');
     const tail = new TextEncoder().encode('"}');
     const bytes = [...head, 0xff, ...tail];
-    const payload = btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+    const payload = btoa(String.fromCharCode(...bytes))
+      .replaceAll('+', '-')
+      .replaceAll('/', '_')
+      .replace(/=+$/, '');
     expect(decodeRequest(payload)).toEqual({ ok: false, problem: 'damaged' });
   });
 
@@ -216,7 +229,10 @@ describe('a damaged or hostile link', () => {
   });
 
   test('a newer version is named as such, so the reader knows to update', () => {
-    expect(decodeSubmission(raw({ ...validSubmissionObject(), v: 2 }), NOW)).toEqual({ ok: false, problem: 'newer-version' });
+    expect(decodeSubmission(raw({ ...validSubmissionObject(), v: 2 }), NOW)).toEqual({
+      ok: false,
+      problem: 'newer-version',
+    });
     expect(decodeRequest(raw({ v: 9, k: 'req', car: 'c' }))).toEqual({ ok: false, problem: 'newer-version' });
   });
 
@@ -280,6 +296,8 @@ describe('a damaged or hostile link', () => {
 
   test('text that is not text becomes empty', () => {
     const decoded = decodeSubmission(raw({ ...validSubmissionObject(), s: { nested: true }, n: 42, by: null }), NOW);
-    expect(decoded.ok && [decoded.value.draft.station, decoded.value.draft.notes, decoded.value.submitterName]).toEqual(['', '', '']);
+    expect(decoded.ok && [decoded.value.draft.station, decoded.value.draft.notes, decoded.value.submitterName]).toEqual(
+      ['', '', ''],
+    );
   });
 });

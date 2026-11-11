@@ -51,9 +51,7 @@ export function PendingReview(): ReactElement | null {
       <h2 className="card__title" id={`${idBase}-pending-heading`}>
         Waiting for review ({pending.length})
       </h2>
-      <p className="note flush-top">
-        Sent to you by link. Nothing here is in your log until you approve it.
-      </p>
+      <p className="note flush-top">Sent to you by link. Nothing here is in your log until you approve it.</p>
       <ul className="list-plain">
         {pending.map((row) => {
           const car = vehicles.find((vehicle) => vehicle.id === row.vehicleId);
@@ -68,8 +66,7 @@ export function PendingReview(): ReactElement | null {
               />
               {refused === row.id && (
                 <p className="warning after-sm" role="alert">
-                  This could not be added — its car is gone, or its numbers no longer check out. Reject it to
-                  clear it.
+                  This could not be added — its car is gone, or its numbers no longer check out. Reject it to clear it.
                 </p>
               )}
               <div className="row-actions space-above-sm">

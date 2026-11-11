@@ -2,15 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { DASHBOARD_TIME_RANGES } from '../domain/dashboardTimeRange';
 import { FUEL_GRADES } from '../domain/fuelGrade';
 import { DISTANCE_UNITS, ECONOMY_UNITS, VOLUME_UNITS } from '../domain/units';
-import {
-  distanceWords,
-  economyNames,
-  gradeLabel,
-  rangeLabel,
-  volumeWords,
-  weekdayName,
-  weekdayNames,
-} from './words';
+import { distanceWords, economyNames, gradeLabel, rangeLabel, volumeWords, weekdayName, weekdayNames } from './words';
 
 /**
  * The words for the domain's identifiers (#94). They used to live beside the
@@ -68,10 +60,13 @@ describe('weekday names', () => {
     expect(weekdayName(weekday, 'en-US', 'short')).toBe('');
   });
 
-  test.each(['', 'not a locale', '!!!', 'x'.repeat(1_000)])('a locale Intl rejects (%#) falls back to English', (locale) => {
-    expect(weekdayNames(locale, 'short')).toEqual(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
-    expect(weekdayNames(locale, 'long')[0]).toBe('Sunday');
-  });
+  test.each(['', 'not a locale', '!!!', 'x'.repeat(1_000)])(
+    'a locale Intl rejects (%#) falls back to English',
+    (locale) => {
+      expect(weekdayNames(locale, 'short')).toEqual(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
+      expect(weekdayNames(locale, 'long')[0]).toBe('Sunday');
+    },
+  );
 
   test('the fallback is a copy, so a caller cannot change the next one', () => {
     const names = weekdayNames('!!!', 'short');

@@ -32,11 +32,7 @@ const UNITS_DEFAULT: Units = { units: US, setUnits: () => {} };
 
 const UnitsContext = createContext<Units>(UNITS_DEFAULT);
 
-export function UnitsProvider({
-  units,
-  setUnits,
-  children,
-}: Units & { readonly children: ReactNode }): ReactElement {
+export function UnitsProvider({ units, setUnits, children }: Units & { readonly children: ReactNode }): ReactElement {
   const value = useMemo(() => ({ units, setUnits }), [units, setUnits]);
   return <UnitsContext.Provider value={value}>{children}</UnitsContext.Provider>;
 }

@@ -15,7 +15,12 @@ async function carEvery300(): Promise<FuelTrackerStore> {
   const store = makeStore();
   const car = await store.addVehicle({ name: 'Civic' });
   for (const [i, odometer] of [10_000, 10_300, 10_600, 10_900].entries()) {
-    const draft = makeFuelEntryDraft({ date: new Date(2026, 0, 1 + i * 7), odometer, gallons: 10, pricePerGallon: 3.5 });
+    const draft = makeFuelEntryDraft({
+      date: new Date(2026, 0, 1 + i * 7),
+      odometer,
+      gallons: 10,
+      pricePerGallon: 3.5,
+    });
     if (draft === null) throw new Error('fixture draft failed validation');
     await store.addFillUp(draft, car.id);
   }
@@ -71,7 +76,12 @@ describe('the missed fill-up hint', () => {
   test('stays quiet on a new car with too little history to judge', async () => {
     const store = makeStore();
     const car = await store.addVehicle({ name: 'New' });
-    const draft = makeFuelEntryDraft({ date: new Date(2026, 0, 1), odometer: 10_000, gallons: 10, pricePerGallon: 3.5 });
+    const draft = makeFuelEntryDraft({
+      date: new Date(2026, 0, 1),
+      odometer: 10_000,
+      gallons: 10,
+      pricePerGallon: 3.5,
+    });
     await store.addFillUp(draft!, car.id);
     const user = await openForm(store);
     await user.type(screen.getByLabelText(/odometer/i), '19000');
@@ -90,7 +100,12 @@ describe('the missed fill-up hint', () => {
     // One warning, not two that contradict each other.
     const store = await carEvery300();
     const [car] = await store.vehicles();
-    const draft = makeFuelEntryDraft({ date: new Date(2026, 1, 1), odometer: 12_500, gallons: 10, pricePerGallon: 3.5 });
+    const draft = makeFuelEntryDraft({
+      date: new Date(2026, 1, 1),
+      odometer: 12_500,
+      gallons: 10,
+      pricePerGallon: 3.5,
+    });
     await store.addFillUp(draft!, car!.id);
     const user = await openForm(store);
     await user.type(screen.getByLabelText(/odometer/i), '11800');
@@ -99,7 +114,10 @@ describe('the missed fill-up hint', () => {
   });
 
   test('uses the reader’s units', async () => {
-    localStorage.setItem('fueltracker.units', JSON.stringify({ volume: 'liters', distance: 'kilometers', economy: 'litersPer100km' }));
+    localStorage.setItem(
+      'fueltracker.units',
+      JSON.stringify({ volume: 'liters', distance: 'kilometers', economy: 'litersPer100km' }),
+    );
     const user = await openForm(await carEvery300());
     // 11,550 mi is 18,588 km; type the km reading.
     await user.type(screen.getByLabelText(/odometer/i), '18588');
@@ -112,7 +130,12 @@ describe('the missed fill-up hint', () => {
     // would look like a quiet 400.
     const store = await carEvery300();
     const [car] = await store.vehicles();
-    const draft = makeFuelEntryDraft({ date: new Date(2026, 1, 1), odometer: 11_200, gallons: 10, pricePerGallon: 3.5 });
+    const draft = makeFuelEntryDraft({
+      date: new Date(2026, 1, 1),
+      odometer: 11_200,
+      gallons: 10,
+      pricePerGallon: 3.5,
+    });
     await store.addFillUp(draft!, car!.id);
     const user = userEvent.setup();
     render(<App store={store} initialTab="fillups" />);
@@ -125,4 +148,3 @@ describe('the missed fill-up hint', () => {
     expect(await screen.findByText(/700 mi since the last fill-up/i)).toBeInTheDocument();
   });
 });
-

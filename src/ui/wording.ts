@@ -29,7 +29,11 @@ export function describeSince(at: number | null, now: number = Date.now(), local
 }
 
 /** "2021 Honda Civic" under a car's name, or nothing when only the year is known. Moved from Vehicles (#93). */
-export function vehicleSubtitle(vehicle: { readonly year: number; readonly make: string; readonly model: string }): string {
+export function vehicleSubtitle(vehicle: {
+  readonly year: number;
+  readonly make: string;
+  readonly model: string;
+}): string {
   const parts = [String(vehicle.year), vehicle.make, vehicle.model].filter((p) => p !== '');
   const joined = parts.join(' ');
   return joined === String(vehicle.year) ? '' : joined;
@@ -40,10 +44,7 @@ export function vehicleSubtitle(vehicle: { readonly year: number; readonly make:
  * fallback. Trimmed, so a name of only spaces shows the email instead of a
  * blank. Written four times as `name || email` before.
  */
-export function displayName(
-  person: { readonly name: string; readonly email: string },
-  fallback = 'someone',
-): string {
+export function displayName(person: { readonly name: string; readonly email: string }, fallback = 'someone'): string {
   return person.name.trim() || person.email.trim() || fallback;
 }
 
@@ -57,10 +58,7 @@ export function displayName(
  * always shown, and a name never stands in for it — not even one that looks
  * like an email. Just the email when the name is blank or the same address.
  */
-export function verifiedName(
-  person: { readonly name: string; readonly email: string },
-  fallback = 'someone',
-): string {
+export function verifiedName(person: { readonly name: string; readonly email: string }, fallback = 'someone'): string {
   const name = person.name.trim();
   const email = person.email.trim();
   if (email === '') return name || fallback;

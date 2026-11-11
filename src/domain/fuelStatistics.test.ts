@@ -159,10 +159,7 @@ describe('segments that are skipped still advance the baseline', () => {
   });
 
   test('negative gallons never fabricate a segment or a cost per mile', () => {
-    const s = computeFuelStatistics([
-      entry({ odometer: 1000, gallons: 10 }),
-      entry({ odometer: 1400, gallons: -10 }),
-    ]);
+    const s = computeFuelStatistics([entry({ odometer: 1000, gallons: 10 }), entry({ odometer: 1400, gallons: -10 })]);
     expect(s.mpgPoints).toHaveLength(0);
     expect(s.averageMPG).toBeNull();
     // Post-baseline spend is negative, so cost per mile refuses.
@@ -198,29 +195,21 @@ describe('missed fill-ups break the chain', () => {
   });
 
   test('the flag does not remove the fuel from spending totals', () => {
-    const s = computeFuelStatistics([
-      entry({ odometer: 1000 }),
-      entry({ odometer: 1400, missedPreviousFillUp: true }),
-    ]);
+    const s = computeFuelStatistics([entry({ odometer: 1000 }), entry({ odometer: 1400, missedPreviousFillUp: true })]);
     expect(s.totalSpent).toBeCloseTo(70, 10);
     expect(s.totalGallons).toBeCloseTo(20, 10);
     expect(s.fillUpCount).toBe(2);
   });
 
   test('marking every entry leaves no segments but keeps spending positive', () => {
-    const s = computeFuelStatistics(
-      chain([1000, 1400, 1800]).map((e) => ({ ...e, missedPreviousFillUp: true })),
-    );
+    const s = computeFuelStatistics(chain([1000, 1400, 1800]).map((e) => ({ ...e, missedPreviousFillUp: true })));
     expect(s.mpgPoints).toHaveLength(0);
     expect(s.averageMPG).toBeNull();
     expect(s.totalSpent).toBeGreaterThan(0);
   });
 
   test('the flag on the very first entry is just a baseline, harmless', () => {
-    const entries = [
-      { ...entry({ odometer: 1000 }), missedPreviousFillUp: true },
-      entry({ odometer: 1400 }),
-    ];
+    const entries = [{ ...entry({ odometer: 1000 }), missedPreviousFillUp: true }, entry({ odometer: 1400 })];
     const s = computeFuelStatistics(entries);
     expect(s.mpgPoints).toHaveLength(1);
     expect(s.mpgPoints[0]!.mpg).toBeCloseTo(40, 10);
@@ -315,9 +304,7 @@ describe('suspect-segment detection — two rules, strict > at every boundary', 
   test('marking the suspect clears the flag AND repairs the average', () => {
     const polluted = computeFuelStatistics(chain([1000, 1300, 1600, 3600]));
     const repaired = computeFuelStatistics(
-      chain([1000, 1300, 1600, 3600]).map((e, i) =>
-        i === 3 ? { ...e, missedPreviousFillUp: true } : e,
-      ),
+      chain([1000, 1300, 1600, 3600]).map((e, i) => (i === 3 ? { ...e, missedPreviousFillUp: true } : e)),
     );
     expect(polluted.suspectSegmentIds.size).toBe(1);
     expect(repaired.suspectSegmentIds.size).toBe(0);

@@ -214,10 +214,7 @@ export class FirestoreRemoteStore implements RemoteStore {
     since: number | null,
   ): Promise<{ rows: Record<string, unknown>[]; highWater: number | null }> {
     const all = collection(this.db, 'users', this.uid, path);
-    const target =
-      since === null
-        ? all
-        : query(all, where('syncedAt', '>', fromMicros(since)));
+    const target = since === null ? all : query(all, where('syncedAt', '>', fromMicros(since)));
     return readStamped((await getDocsFromServer(target)).docs);
   }
 }
@@ -248,9 +245,10 @@ export function decode(data: Record<string, unknown>): Record<string, unknown> {
  * shared-car remote writes fill-ups with this too (#66), so the two can never
  * disagree about what a row looks like on the wire.
  */
-export function encodeReceipt(
-  row: FillUpRecord | PendingFillUpRecord,
-): { readonly data: object; readonly omitted: boolean } {
+export function encodeReceipt(row: FillUpRecord | PendingFillUpRecord): {
+  readonly data: object;
+  readonly omitted: boolean;
+} {
   const bytes = row.receiptImageData;
   if (bytes === null || bytes.byteLength === 0) {
     return { data: { ...row, receiptImageData: null }, omitted: false };

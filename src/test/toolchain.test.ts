@@ -21,12 +21,9 @@ const installed = (name: string): unknown => json(`node_modules/${name}/package.
 describe('React', () => {
   // A React 18 runtime type-checked against React 19's types compiled `use`,
   // ref-as-prop and `<Context>` as a provider — and then failed in the browser.
-  test.each(['@types/react', '@types/react-dom'])(
-    'the runtime and %s are the same major version',
-    (types) => {
-      expect(major(installed(types))).toBe(major(installed('react')));
-    },
-  );
+  test.each(['@types/react', '@types/react-dom'])('the runtime and %s are the same major version', (types) => {
+    expect(major(installed(types))).toBe(major(installed('react')));
+  });
 
   test('react and react-dom are the same major version', () => {
     expect(major(installed('react-dom'))).toBe(major(installed('react')));
@@ -34,10 +31,8 @@ describe('React', () => {
 });
 
 describe('the hooks lint', () => {
-  const config = (): Record<string, unknown> =>
-    existsSync('.oxlintrc.json') ? json('.oxlintrc.json') : {};
-  const rules = (): Record<string, unknown> =>
-    (config()['rules'] ?? {}) as Record<string, unknown>;
+  const config = (): Record<string, unknown> => (existsSync('.oxlintrc.json') ? json('.oxlintrc.json') : {});
+  const rules = (): Record<string, unknown> => (config()['rules'] ?? {}) as Record<string, unknown>;
 
   test('both hooks rules are errors, so a finding fails the build', () => {
     expect(rules()['react-hooks/rules-of-hooks']).toBe('error');

@@ -1,11 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import {
-  MAX_IMPORT_BYTES,
-  MAX_OCR_DIMENSION,
-  MAX_STORED_DIMENSION,
-  describeFailure,
-  fitScale,
-} from './receiptImage';
+import { MAX_IMPORT_BYTES, MAX_OCR_DIMENSION, MAX_STORED_DIMENSION, describeFailure, fitScale } from './receiptImage';
 import { MAX_RECEIPT_BYTES } from '../domain/fuelEntryDraft';
 
 describe('fitScale', () => {
