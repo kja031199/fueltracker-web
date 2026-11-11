@@ -13,7 +13,7 @@ Track gas fill-ups and fuel economy in your browser. **Sign in with Google; your
 > it up to send you the fill-up by link**, which waits for your approval. There is a test file beside nearly every module, plus a suite
 > that runs the security rules against the Firestore emulator. What is *not*
 > here was left out on purpose, not left unfinished — see
-> [what was deliberately not built](docs/port.md#what-was-deliberately-not-built).
+> [what was left out on purpose](docs/port.md#left-out-on-purpose).
 
 ## What this is
 
@@ -25,19 +25,18 @@ this port was written against. It is simply no longer where work happens. Featur
 ideas that were open there have been moved here as issues; the ones that were
 blocked on a paid Apple account are no longer blocked.
 
-The rewrite is not a port of the UI. SwiftUI does not run on the web and SwiftData does not exist there, so the interface is built fresh. What carries over is the part worth carrying: roughly 1,500 lines of domain logic, and the test suite that specifies it.
+The rewrite is not a port of the UI. SwiftUI does not run on the web and SwiftData does not exist there, so the interface is built fresh. What carries over is the part worth carrying: the domain logic (`src/domain/`), and the test suite that specifies it.
 
 ## Running it
 
 ```bash
 npm install
-npm run dev        # vite dev server
-npm test           # vitest: the unit and DOM tests, which need nothing but Node
-npm run test:build # build, then test the built site in dist/
-npm run test:rules # the rules tests, on the Firestore emulator (see below)
-npm run lint       # oxlint: the two React hooks rules, nothing else
-npm run build      # typecheck, then a production build
+npm run dev
 ```
+
+Every other command — the test projects, the checks, formatting, mutation
+testing — is in [docs/development.md](docs/development.md), the one place they
+are listed.
 
 It runs with no configuration: without a Firebase config the sign-in screen
 says what is missing rather than offering a dead button. To point a checkout at
@@ -47,21 +46,10 @@ build refuses the production project, so local work needs a
 
 ## Documentation
 
-The detail lives in [`docs/`](docs/), one file per subject:
-
-| | |
-|---|---|
-| [docs/port.md](docs/port.md) | Why this is a web app, what the rewrite kept, what the platform took away, and what was left out on purpose |
-| [docs/accounts.md](docs/accounts.md) | Signing in, who is allowed to, the idle timeout, and per-account storage |
-| [docs/sync.md](docs/sync.md) | How two devices reconcile, what a deletion deletes, how a shared car syncs, and why nothing from the account is trusted |
-| [docs/deploying.md](docs/deploying.md) | Your own Firebase project, the deploy on merge, and the supply chain around the one credential |
-| [docs/security.md](docs/security.md) | Security headers, the one third-party request, and the dependency audit |
-| [docs/interface.md](docs/interface.md) | Measured contrast, hand-drawn charts, installing and offline |
-| [docs/development.md](docs/development.md) | Local commands and the checks every pull request goes through |
-| [RELEASE_NOTES.md](RELEASE_NOTES.md) | What each update changed, newest first |
-
-[`CLAUDE.md`](CLAUDE.md) is the operating manual for an AI assistant working
-here: the invariants, and the traps already fallen into.
+The detail lives in [`docs/`](docs/), one file per subject; the index is
+[docs/README.md](docs/README.md). What each update changed is in
+[RELEASE_NOTES.md](RELEASE_NOTES.md), and [`CLAUDE.md`](CLAUDE.md) is the
+operating manual for an AI assistant working here.
 
 ## Licence
 

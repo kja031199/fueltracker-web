@@ -8,13 +8,17 @@ an AI assistant working in this repository, read
 
 ```bash
 npm install
-npm run dev        # vite dev server
-npm test           # vitest: the unit and DOM tests, which need nothing but Node
-npm run test:build # build, then test the built site in dist/
-npm run test:rules # the rules tests, on the Firestore emulator (see below)
-npm run lint       # oxlint: the two React hooks rules, nothing else
-npm run typecheck  # tsc -b: the app and the tests, as two projects
-npm run build      # typecheck, then a production build
+npm run dev           # vite dev server
+npm test              # vitest: the unit and DOM tests, which need nothing but Node
+npm run test:coverage # the same tests, measuring coverage (reported, never enforced)
+npm run test:build    # build, then test the built site in dist/
+npm run test:rules    # the rules tests, on the Firestore emulator (see below)
+npm run typecheck     # tsc -b: the app and the tests, as two projects
+npm run lint          # oxlint: the two React hooks rules, nothing else
+npm run format        # Prettier; `format:check` is what CI runs
+npm run build         # typecheck, then a production build
+npm run mutate        # every recorded mutation; `mutate:check` only checks they apply
+npm run check:ocr     # the OCR browser check (needs Chromium; see below)
 ```
 
 The tests are four Vitest projects, and a file's **name** says which one it
@@ -164,8 +168,8 @@ tests both it and the shape of `RELEASE_NOTES.md`: real dates, newest first, a
 user sentence, a *Technical* line, and links whose number matches where they
 point.
 
-It is not one of the four required checks until it is added to the branch
-protection rules on `main` (Settings → Branches), which is a manual step.
+It is not a required check until it is added to the branch protection rules
+on `main` (Settings → Branches), which is a manual step.
 
 ## The OCR browser check
 
@@ -181,7 +185,8 @@ npm run check:ocr
 
 It builds the app with a probe page added (`OCR_PROBE=1`, into a temporary
 directory; the probe never ships), serves it with **the headers from
-`firebase.json`**, and drives Chromium through four scenarios:
+`firebase.json`**, and drives Chromium through these scenarios (the sixth
+only when given a photo):
 
 1. The production CSP reads a receipt drawn on a canvas.
 2. No request leaves this origin. Anything that tries is aborted, so a CDN
@@ -191,7 +196,6 @@ directory; the probe never ships), serves it with **the headers from
 4. **Negative control:** the same CSP without `'wasm-unsafe-eval'` must fail,
    and fail *cleanly*, with "unavailable" rather than a hang. This proves the
    check can fail, and it reproduces the live site's failure exactly.
-
 5. **The app's real import pipeline** reads a receipt. A drawn receipt,
    encoded as a JPEG `File`, goes through `importReceiptPhoto` → `prepareImage`
    → `recognise` → `parseReceipt`, and the suggested gallons and price must be

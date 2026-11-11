@@ -1,0 +1,26 @@
+{
+  "title": "#100 One home per fact",
+  "tests": [
+    "src/test/docs.test.ts"
+  ],
+  "mutations": [
+    {
+      "name": "a copy of the docs index back in the README",
+      "file": "README.md",
+      "from": "## Documentation\n",
+      "to": "## Documentation\n\n| [docs/port.md](docs/port.md) | The port |\n"
+    },
+    {
+      "name": "a doc missing from the index",
+      "file": "docs/README.md",
+      "from": "- **[csp-check.md](csp-check.md)**",
+      "to": "- **csp-check.md**"
+    },
+    {
+      "name": "a command missing from the command list",
+      "file": "docs/development.md",
+      "from": "npm run mutate        # every recorded mutation; `mutate:check` only checks they apply\n",
+      "to": ""
+    }
+  ]
+}
