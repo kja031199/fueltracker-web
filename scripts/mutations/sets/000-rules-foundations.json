@@ -1,0 +1,51 @@
+{
+  "title": "Rules foundations (rebuilt from the table kept before #77)",
+  "mutations": [
+    {
+      "name": "identity-only rules: \"is this your tree?\" and nothing else",
+      "file": "firestore.rules",
+      "to": "rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /users/{uid}/{document=**} {\n      allow read, write: if request.auth != null && request.auth.uid == uid;\n    }\n  }\n}\n"
+    },
+    {
+      "name": "wide-open rules",
+      "file": "firestore.rules",
+      "to": "rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /{document=**} {\n      allow read, write: if true;\n    }\n  }\n}\n"
+    },
+    {
+      "name": "sign-in allowlist dropped from owner()",
+      "file": "firestore.rules",
+      "from": "        return allowed() && request.auth.uid == uid;",
+      "to": "        return request.auth != null && request.auth.uid == uid;"
+    },
+    {
+      "name": "per-uid scoping dropped from owner()",
+      "file": "firestore.rules",
+      "from": "        return allowed() && request.auth.uid == uid;",
+      "to": "        return allowed();"
+    },
+    {
+      "name": "any allowlisted account reads any fill-up",
+      "file": "firestore.rules",
+      "from": "        allow read: if owner() || memberOf(uid, resource.data.vehicleId);",
+      "to": "        allow read: if allowed();"
+    },
+    {
+      "name": "joining without an invitation",
+      "file": "firestore.rules",
+      "from": "            && exists(/databases/$(database)/documents/invites/$(uid + '__' + id + '__' + request.auth.token.email.lower()))\n",
+      "to": ""
+    },
+    {
+      "name": "a member changes who entered a fill-up",
+      "file": "firestore.rules",
+      "from": "          && request.resource.data.get('enteredBy', null) == resource.data.get('enteredBy', null)\n",
+      "to": ""
+    },
+    {
+      "name": "any syncedAt accepted",
+      "file": "firestore.rules",
+      "from": "          && request.resource.data.syncedAt == request.time;",
+      "to": "          && true;"
+    }
+  ]
+}

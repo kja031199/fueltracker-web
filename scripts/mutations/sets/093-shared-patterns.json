@@ -1,0 +1,77 @@
+{
+  "title": "#93 Shared patterns",
+  "mutations": [
+    {
+      "name": "first press acts",
+      "file": "src/ui/ConfirmButton.tsx",
+      "from": "onClick={onAsk}",
+      "to": "onClick={onConfirm}"
+    },
+    {
+      "name": "cancel does nothing",
+      "file": "src/ui/ConfirmButton.tsx",
+      "from": "onClick={onCancel}>",
+      "to": "onClick={() => {}}>"
+    },
+    {
+      "name": "confirm takes the first tone",
+      "file": "src/ui/ConfirmButton.tsx",
+      "from": "<button className=\"button button--danger\" type=\"button\" onClick={onConfirm}>",
+      "to": "<button className={`button button--${tone}`} type=\"button\" onClick={onConfirm}>"
+    },
+    {
+      "name": "after dropped",
+      "file": "src/ui/ScreenFrame.tsx",
+      "from": "      {after}\n    </div>",
+      "to": "    </div>"
+    },
+    {
+      "name": "no clipboard claims copied",
+      "file": "src/ui/useCopyToClipboard.ts",
+      "from": "if (clipboard === undefined) throw new Error('no clipboard');",
+      "to": "if (clipboard === undefined) { setState('copied'); return; }"
+    },
+    {
+      "name": "refusal claims copied",
+      "file": "src/ui/useCopyToClipboard.ts",
+      "from": "    } catch {\n      setState('failed');",
+      "to": "    } catch {\n      setState('copied');"
+    },
+    {
+      "name": "displayName untrimmed",
+      "file": "src/ui/wording.ts",
+      "from": "return person.name.trim() || person.email.trim() || fallback;",
+      "to": "return person.name || person.email || fallback;"
+    },
+    {
+      "name": "missed always shown",
+      "file": "src/ui/wording.ts",
+      "from": "if (options.missed === true && entry.missedPreviousFillUp === true)",
+      "to": "if (entry.missedPreviousFillUp === true)"
+    },
+    {
+      "name": "frame guard narrowed",
+      "file": "src/test/oneCopy.test.ts",
+      "from": "pattern: /className=[\"']app[\"']/,",
+      "to": "pattern: /className=\"app\" /,"
+    },
+    {
+      "name": "clipboard guard narrowed",
+      "file": "src/test/oneCopy.test.ts",
+      "from": "pattern: /navigator\\.clipboard/,",
+      "to": "pattern: /navigator\\.clipboard\\.writeText/,"
+    },
+    {
+      "name": "name guard narrowed",
+      "file": "src/test/oneCopy.test.ts",
+      "from": "pattern: /\\.name\\s*\\|\\|\\s*[\\w.]*\\.email/,",
+      "to": "pattern: /member\\.name \\|\\| member\\.email/,"
+    },
+    {
+      "name": "confirm guard narrowed",
+      "file": "src/test/oneCopy.test.ts",
+      "from": "pattern: />\\s*(Keep|Stay)\\s*</,",
+      "to": "pattern: />Keep</,"
+    }
+  ]
+}

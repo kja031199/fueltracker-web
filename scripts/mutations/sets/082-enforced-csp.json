@@ -1,0 +1,46 @@
+{
+  "title": "#82 Enforced CSP",
+  "tests": [
+    "--project",
+    "build",
+    "src/ui/csp.build.test.ts"
+  ],
+  "mutations": [
+    {
+      "name": "connect-src back to *.googleapis.com",
+      "file": "firebase.json",
+      "from": "connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com",
+      "to": "connect-src 'self' https://*.googleapis.com"
+    },
+    {
+      "name": "frame-src back to *.firebaseapp.com",
+      "file": "firebase.json",
+      "from": "frame-src https://fueltracker-899eb.firebaseapp.com",
+      "to": "frame-src https://*.firebaseapp.com"
+    },
+    {
+      "name": "'unsafe-inline' back in style-src",
+      "file": "firebase.json",
+      "from": "style-src 'self';",
+      "to": "style-src 'self' 'unsafe-inline';"
+    },
+    {
+      "name": "Cloud Storage added to connect-src",
+      "file": "firebase.json",
+      "from": "https://securetoken.googleapis.com;",
+      "to": "https://securetoken.googleapis.com https://storage.googleapis.com;"
+    },
+    {
+      "name": "another project as the auth domain",
+      "file": "firebase.json",
+      "from": "frame-src https://fueltracker-899eb.firebaseapp.com",
+      "to": "frame-src https://some-other-project.firebaseapp.com"
+    },
+    {
+      "name": "'wasm-unsafe-eval' dropped",
+      "file": "firebase.json",
+      "from": "script-src 'self' 'wasm-unsafe-eval' https://apis.google.com",
+      "to": "script-src 'self' https://apis.google.com"
+    }
+  ]
+}

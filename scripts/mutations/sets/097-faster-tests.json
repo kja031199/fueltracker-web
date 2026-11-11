@@ -1,0 +1,47 @@
+{
+  "title": "#97 Faster tests",
+  "mutations": [
+    {
+      "name": "the timers not passed on",
+      "file": "src/ui/useSync.ts",
+      "from": "createSyncScheduler(() => latest.current(), timers)",
+      "to": "createSyncScheduler(() => latest.current())"
+    },
+    {
+      "name": "a write that schedules no sync",
+      "file": "src/ui/fuelLog.tsx",
+      "from": "        afterWrite();\n",
+      "to": ""
+    },
+    {
+      "name": "a failed write still scheduling a sync",
+      "file": "src/ui/fuelLog.tsx",
+      "from": "        const result = await write(...args);\n",
+      "to": "        afterWrite();\n        const result = await write(...args);\n"
+    },
+    {
+      "name": "the same invitations re-rendering",
+      "file": "src/ui/useSharingView.ts",
+      "from": "setInvitesForMe((shown) => unlessSame(shown, invites))",
+      "to": "setInvitesForMe(invites)"
+    },
+    {
+      "name": "every focus syncing",
+      "file": "src/ui/syncScheduler.ts",
+      "from": "      if (timers.now() - lastStartedAt < FOCUS_SYNC_MIN_INTERVAL_MS) return;\n",
+      "to": ""
+    },
+    {
+      "name": "invitations shown to an unverified address",
+      "file": "src/data/testing/inMemorySharing.ts",
+      "from": "    return this.me.emailVerified ? this.me.email.toLowerCase() : null;",
+      "to": "    return this.me.email.toLowerCase();"
+    },
+    {
+      "name": "decoding before the bound",
+      "file": "src/data/backupFormat.ts",
+      "from": "  if (decodedLengthOf(text) > maxBytes) return null;\n  try {\n    const binary = atob(text);",
+      "to": "  try {\n    const binary = atob(text);\n    if (decodedLengthOf(text) > maxBytes) return null;"
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "title": "#94 Words out of the domain",
+  "tests": [
+    "src/ui/kpiText.test.ts",
+    "src/domain/kpi.test.ts",
+    "src/ui/insightText.test.ts",
+    "src/domain/weekdayPricePattern.test.ts",
+    "src/ui/charts/chartSummary.test.ts",
+    "src/domain/chartAccessibility.test.ts",
+    "src/ui/Locale.test.tsx",
+    "src/ui/wording.test.ts",
+    "src/test/oneCopy.test.ts",
+    "src/ui/Dashboard.test.tsx"
+  ],
+  "mutations": [
+    {
+      "name": "a KPI title reworded",
+      "file": "src/ui/kpiText.ts",
+      "from": "      return 'Total Spent';",
+      "to": "      return 'Total spent';"
+    },
+    {
+      "name": "a KPI detail reworded",
+      "file": "src/ui/kpiText.ts",
+      "from": "return `Best: ${",
+      "to": "return `Top: ${"
+    },
+    {
+      "name": "insight day names in the display locale",
+      "file": "src/ui/insightText.ts",
+      "from": "weekdayNames(US_STYLE.locale, 'long')",
+      "to": "weekdayNames(style.locale, 'long')"
+    },
+    {
+      "name": "chart trend words swapped",
+      "file": "src/ui/charts/chartSummary.ts",
+      "from": "  up: 'trending up',\n  down: 'trending down',",
+      "to": "  up: 'trending down',\n  down: 'trending up',"
+    },
+    {
+      "name": "domain trend wrong",
+      "file": "src/domain/chartAccessibility.ts",
+      "from": "  if (last.value > first.value * (1 + FLAT_BAND)) trend = 'up';",
+      "to": "  if (last.value > first.value * (1 + FLAT_BAND)) trend = 'down';"
+    },
+    {
+      "name": "sync note ignoring the locale",
+      "file": "src/ui/useSync.ts",
+      "from": "{ one: '# row from your account was', other: '# rows from your account were' }, locale.current)",
+      "to": "{ one: '# row from your account was', other: '# rows from your account were' })"
+    },
+    {
+      "name": "sync locale ref never updated",
+      "file": "src/ui/useSync.ts",
+      "from": "  locale.current = display;\n",
+      "to": "",
+      "survives": "Equivalent: the display locale is read once, when App mounts, so the ref never sees a second value; the refresh is there for the day it can change without a remount."
+    }
+  ]
+}

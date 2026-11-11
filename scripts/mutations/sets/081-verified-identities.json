@@ -1,0 +1,95 @@
+{
+  "title": "#81 Verified identities",
+  "mutations": [
+    {
+      "name": "receive on open again (no confirm step)",
+      "file": "src/ui/IncomingScreen.tsx",
+      "from": "  async function queue(): Promise<void> {",
+      "to": "  if (started.current !== payload) void queue();\n  async function queue(): Promise<void> {"
+    },
+    {
+      "name": "Ignore that queues",
+      "file": "src/ui/IncomingScreen.tsx",
+      "from": "        <button className=\"button button--secondary\" type=\"button\" onClick={onDone}>\n          Ignore",
+      "to": "        <button className=\"button button--secondary\" type=\"button\" onClick={() => void queue().then(onDone)}>\n          Ignore"
+    },
+    {
+      "name": "incoming name shown as fact",
+      "file": "src/ui/IncomingScreen.tsx",
+      "from": "`Someone who says they are ${name} sent you this fill-up.`",
+      "to": "`${name} sent you this fill-up.`"
+    },
+    {
+      "name": "rows back to the chosen name",
+      "file": "src/ui/useSharingView.ts",
+      "from": "shown.set(member.uid, verifiedName(member));",
+      "to": "shown.set(member.uid, member.name.trim() || member.email);"
+    },
+    {
+      "name": "verifiedName dropping the email",
+      "file": "src/ui/wording.ts",
+      "from": "  return `${name} (${email})`;",
+      "to": "  return name;"
+    },
+    {
+      "name": "the email shown twice",
+      "file": "src/ui/wording.ts",
+      "from": "  if (name === '' || name.toLowerCase() === email.toLowerCase()) return email;",
+      "to": "  if (name === '') return email;"
+    },
+    {
+      "name": "owner label without (owner)",
+      "file": "src/ui/useSharingView.ts",
+      "from": "`${ownerName} (owner)`",
+      "to": "ownerName"
+    },
+    {
+      "name": "a nameless owner shown blank",
+      "file": "src/ui/useSharingView.ts",
+      "from": "ownerName === '' ? 'the owner' :",
+      "to": "ownerName === '' ? '' :"
+    },
+    {
+      "name": "share panel by name only",
+      "file": "src/ui/SharePanel.tsx",
+      "from": "Shared with <strong>{verifiedName(member)}</strong>",
+      "to": "Shared with <strong>{member.name}</strong>"
+    },
+    {
+      "name": "request owner name shown as fact",
+      "file": "src/ui/SubmitScreen.tsx",
+      "from": "`Someone who says they are ${ownerName}`",
+      "to": "ownerName"
+    },
+    {
+      "name": "name field disclosure detached",
+      "file": "src/ui/SubmitScreen.tsx",
+      "from": "          aria-describedby={`${idBase}-submitter-name-hint`}\n",
+      "to": ""
+    },
+    {
+      "name": "send-back disclosure removed",
+      "file": "src/ui/SubmitScreen.tsx",
+      "from": "          This link carries your name, the fill-up and any notes as plain text.",
+      "to": "          Here is your link."
+    },
+    {
+      "name": "request warning removed",
+      "file": "src/ui/SubmitScreen.tsx",
+      "from": "        Names in a link are whatever its author typed; only fill this in if you know who sent it.\n",
+      "to": ""
+    },
+    {
+      "name": "(unverified) removed from the queue",
+      "file": "src/ui/PendingReview.tsx",
+      "from": "`from ${name} (unverified)`",
+      "to": "`from ${name}`"
+    },
+    {
+      "name": "a nameless submitter marked unverified",
+      "file": "src/ui/PendingReview.tsx",
+      "from": "name === '' ? 'from someone'",
+      "to": "name === '' ? 'from  (unverified)'"
+    }
+  ]
+}

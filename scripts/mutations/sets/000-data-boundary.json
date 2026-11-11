@@ -1,0 +1,53 @@
+{
+  "title": "Data boundary foundations (rebuilt from the table kept before #77)",
+  "mutations": [
+    {
+      "name": "one shared database for all accounts",
+      "file": "src/data/accountStore.ts",
+      "from": "  return withPrefix(prefix, `${LEGACY_DATABASE_NAME}-u-${uid}`);",
+      "to": "  void uid;\n  return withPrefix(prefix, LEGACY_DATABASE_NAME);"
+    },
+    {
+      "name": "an account preference key ignoring the uid",
+      "file": "src/ui/preferences.ts",
+      "from": "  return isUsableUid(uid) ? `${unscopedKey(preference)}.u.${uid}` : null;",
+      "to": "  return isUsableUid(uid) ? `${unscopedKey(preference)}.u` : null;"
+    },
+    {
+      "name": "a fill-up tombstone keeping its receipt",
+      "file": "src/data/tombstone.ts",
+      "from": "  notes: '',\n  latitude: null,\n  longitude: null,\n  receiptImageData: null,\n  // Kept, not cleared (#66)",
+      "to": "  notes: '',\n  latitude: null,\n  longitude: null,\n  receiptImageData: row.receiptImageData,\n  // Kept, not cleared (#66)"
+    },
+    {
+      "name": "isScrubbed always true",
+      "file": "src/data/tombstone.ts",
+      "from": "  const expected = tombstone(row, row.deletedAt ?? row.updatedAt);",
+      "to": "  return true;\n  const expected = tombstone(row, row.deletedAt ?? row.updatedAt);"
+    },
+    {
+      "name": "isStorableId reduced to a non-empty check",
+      "file": "src/data/recordId.ts",
+      "from": "  return idProblem(value) === null;",
+      "to": "  return typeof value === 'string' && value !== '';"
+    },
+    {
+      "name": "an id with a slash accepted",
+      "file": "src/data/recordId.ts",
+      "from": "  if (value.includes('/')) {",
+      "to": "  if (false) {"
+    },
+    {
+      "name": "CSV formula guard removed",
+      "file": "src/data/backupFormat.ts",
+      "from": "  return CSV_FORMULA_START.test(value) ? `'${value}` : value;",
+      "to": "  return value;"
+    },
+    {
+      "name": "CSV guard not undone on import",
+      "file": "src/data/backupFormat.ts",
+      "from": "  return CSV_GUARDED_START.test(value) ? value.slice(1) : value;",
+      "to": "  return value;"
+    }
+  ]
+}

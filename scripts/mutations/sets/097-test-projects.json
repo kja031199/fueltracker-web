@@ -1,0 +1,77 @@
+{
+  "title": "#97 Test projects",
+  "mutations": [
+    {
+      "name": "unit also running the emulator tests",
+      "file": "vite.config.ts",
+      "from": "exclude: [...configDefaults.exclude, EMULATOR_TESTS, BUILD_TESTS],",
+      "to": "exclude: [...configDefaults.exclude, BUILD_TESTS],"
+    },
+    {
+      "name": "rules running a directory again",
+      "file": "vite.config.ts",
+      "from": "test: { name: 'rules', include: [EMULATOR_TESTS],",
+      "to": "test: { name: 'rules', include: ['src/data/firebase/**/*.test.ts'],"
+    },
+    {
+      "name": "rules project without its prerequisite",
+      "file": "vite.config.ts",
+      "from": "include: [EMULATOR_TESTS], globalSetup: ['src/test/needsEmulator.ts'] },",
+      "to": "include: [EMULATOR_TESTS] },"
+    },
+    {
+      "name": "build project without its prerequisite",
+      "file": "vite.config.ts",
+      "from": "include: [BUILD_TESTS], globalSetup: ['src/test/needsBuild.ts'] },",
+      "to": "include: [BUILD_TESTS] },"
+    },
+    {
+      "name": "a blank emulator host accepted",
+      "file": "src/test/prerequisites.ts",
+      "from": "if ((env.FIRESTORE_EMULATOR_HOST ?? '').trim() !== '') return null;",
+      "to": "if (env.FIRESTORE_EMULATOR_HOST !== undefined) return null;"
+    },
+    {
+      "name": "an empty dist/ accepted",
+      "file": "src/test/prerequisites.ts",
+      "from": "if (exists(join('dist', 'index.html'))) return null;",
+      "to": "if (exists('dist')) return null;"
+    },
+    {
+      "name": "the error stack left to Vitest",
+      "file": "src/test/prerequisites.ts",
+      "from": "  error.stack = message;\n",
+      "to": ""
+    },
+    {
+      "name": "npm test running every project",
+      "file": "package.json",
+      "from": "\"test\": \"vitest run --project unit --project dom\",",
+      "to": "\"test\": \"vitest run\","
+    },
+    {
+      "name": "test:build not building",
+      "file": "package.json",
+      "from": "\"test:build\": \"vite build && vitest run --project build\",",
+      "to": "\"test:build\": \"vitest run --project build\","
+    },
+    {
+      "name": "test:rules running a directory",
+      "file": "package.json",
+      "from": "--project fueltracker-rules-test \\\"vitest run --project rules\\\"\"",
+      "to": "--project fueltracker-rules-test \\\"vitest run src/data/firebase/\\\"\""
+    },
+    {
+      "name": "CI rules job calling vitest on a path",
+      "file": ".github/workflows/ci.yml",
+      "from": "        run: npm run test:rules\n",
+      "to": "        run: npx vitest run src/data/firebase/\n"
+    },
+    {
+      "name": "CI building without testing the build",
+      "file": ".github/workflows/ci.yml",
+      "from": "        run: npm run test:build\n",
+      "to": "        run: npx vite build\n"
+    }
+  ]
+}

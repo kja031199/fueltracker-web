@@ -255,6 +255,46 @@ describe('reading once does not change what is sent (#87)', () => {
     expect(ids).toContain(saved!.id);
   });
 
+  test('a view handed to sync shows what the merge wrote, not what it read before (#98)', async () => {
+    // `syncAll` reads the device once and hands that view to every remote's
+    // sync, then asks it about the cars (a shared car the owner deleted is
+    // noticed that way). A view left as it was before the merge answers about
+    // a device that no longer exists. Found by `npm run mutate`: nothing else
+    // failed when the refresh after the merge was removed.
+    const world = new InMemorySharingWorld();
+    const store = new FuelTrackerStore(
+      {
+        vehicles: new InMemoryRepository<VehicleRecord>(),
+        fillUps: new InMemoryRepository<FillUpRecord>(),
+        pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
+      },
+      new MonotonicClock(),
+    );
+    const car = await store.addVehicle({ name: 'Civic' });
+    const remote = world.remoteFor('solo');
+    const state = new InMemorySyncState();
+    await syncOnce(store, remote, state);
+
+    // Another device renames the car, and logs a fill-up on it.
+    const renamed: VehicleRecord = { ...car, name: 'Civic (renamed)', updatedAt: car.updatedAt + 60_000 };
+    const theirs = await new FuelTrackerStore(
+      {
+        vehicles: new InMemoryRepository<VehicleRecord>([renamed]),
+        fillUps: new InMemoryRepository<FillUpRecord>(),
+        pendingFillUps: new InMemoryRepository<PendingFillUpRecord>(),
+      },
+      new MonotonicClock(),
+    ).addFillUp(draft(10_000), car.id);
+    await remote.push({ vehicles: [renamed], fillUps: [theirs], pendingFillUps: [] });
+
+    const local = new LocalView(store.replica);
+    await local.snapshot(); // read before the merge, as `syncAll` does
+    await syncOnce(store, remote, state, { local });
+
+    expect((await local.vehicle(car.id))?.name).toBe('Civic (renamed)');
+    expect((await local.snapshot()).fillUps.map((row) => row.id)).toContain(theirs.id);
+  });
+
   test('text repaired once, in the account’s own sync, still reaches a shared car’s owner', async () => {
     const { store, repos, sync, world } = await member(1);
     await sync();

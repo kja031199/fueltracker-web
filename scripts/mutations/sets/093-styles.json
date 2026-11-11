@@ -1,0 +1,53 @@
+{
+  "title": "#93 Styles",
+  "mutations": [
+    {
+      "name": "guard: everything counts as computed",
+      "file": "src/test/inlineStyles.test.ts",
+      "from": "  return values(body).every((value) => LITERAL.test(value));",
+      "to": "  return values(body).every((value) => LITERAL.test(value)) && false;"
+    },
+    {
+      "name": "guard: single-line styles only",
+      "file": "src/test/inlineStyles.test.ts",
+      "from": "    found.push(source.slice(start + 'style={{'.length, i).trim());",
+      "to": "    if (!source.slice(start, i).includes('\\n')) found.push(source.slice(start + 'style={{'.length, i).trim());"
+    },
+    {
+      "name": "guard: an interpolated template counts as fixed",
+      "file": "src/test/inlineStyles.test.ts",
+      "from": "const LITERAL = /^(-?\\d+(\\.\\d+)?|'[^']*'|\"[^\"]*\"|`[^`$]*`)$/;",
+      "to": "const LITERAL = /^(-?\\d+(\\.\\d+)?|'[^']*'|\"[^\"]*\"|`[^`]*`)$/;"
+    },
+    {
+      "name": "a fixed inline style put back",
+      "file": "src/ui/AccountId.tsx",
+      "from": "<p className=\"stack-xs\">",
+      "to": "<p style={{ margin: '0 0 4px' }}>"
+    },
+    {
+      "name": "secondary text back to #6C6C70",
+      "file": "src/domain/accessiblePalette.ts",
+      "from": ": { red: 0x6b / 255, green: 0x6b / 255, blue: 0x6f / 255 }; // #6B6B6F",
+      "to": ": { red: 0x6c / 255, green: 0x6c / 255, blue: 0x70 / 255 }; // #6B6B6F"
+    },
+    {
+      "name": "text colours not painted",
+      "file": "src/domain/accessiblePalette.ts",
+      "from": "    '--text-primary': toCssRgb(textPrimary(scheme)),\n    '--text-secondary': toCssRgb(textSecondary(scheme)),\n",
+      "to": ""
+    },
+    {
+      "name": "stylesheet copy drifts",
+      "file": "src/ui/styles.css",
+      "from": "  --text-secondary: rgb(107 107 111);",
+      "to": "  --text-secondary: rgb(108 108 112);"
+    },
+    {
+      "name": "contrast measured on the card only",
+      "file": "src/domain/accessiblePalette.test.ts",
+      "from": "    ['page', groupedBackground(scheme)],\n",
+      "to": ""
+    }
+  ]
+}

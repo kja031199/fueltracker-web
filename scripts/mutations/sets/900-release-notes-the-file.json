@@ -1,0 +1,56 @@
+{
+  "title": "Release notes: the file",
+  "tests": [
+    "src/test/releaseNotes.test.ts"
+  ],
+  "mutations": [
+    {
+      "name": "no word boundary on keywords",
+      "file": "scripts/release-notes/check.ts",
+      "from": "  const keyword = /\\b(?:close",
+      "to": "  const keyword = /(?:close"
+    },
+    {
+      "name": "data: dates out of order",
+      "file": "RELEASE_NOTES.md",
+      "from": "## 2026-11-05",
+      "to": "## 2026-11-09"
+    },
+    {
+      "name": "data: an impossible date",
+      "file": "RELEASE_NOTES.md",
+      "from": "## 2026-11-04",
+      "to": "## 2026-02-30"
+    },
+    {
+      "name": "data: an entry with no technical line",
+      "file": "RELEASE_NOTES.md",
+      "from": "  *Technical:* `syncAll` reports",
+      "to": "  Technical: `syncAll` reports"
+    },
+    {
+      "name": "data: a link to the wrong number",
+      "file": "RELEASE_NOTES.md",
+      "from": "[#85](https://github.com/kja031199/fueltracker-web/issues/85)",
+      "to": "[#85](https://github.com/kja031199/fueltracker-web/issues/58)"
+    },
+    {
+      "name": "data: an issue link labelled PR",
+      "file": "RELEASE_NOTES.md",
+      "from": "[#79](https://github.com/kja031199/fueltracker-web/issues/79)",
+      "to": "[PR #79](https://github.com/kja031199/fueltracker-web/issues/79)"
+    },
+    {
+      "name": "data: an Unreleased heading",
+      "file": "RELEASE_NOTES.md",
+      "from": "## 2026-11-08",
+      "to": "## Unreleased\n\n## 2026-11-08"
+    },
+    {
+      "name": "data: an entry with no user sentence",
+      "file": "RELEASE_NOTES.md",
+      "from": "- **Release notes.** No change",
+      "to": "- Release notes. No change"
+    }
+  ]
+}

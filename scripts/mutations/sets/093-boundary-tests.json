@@ -1,0 +1,77 @@
+{
+  "title": "#93 Boundary tests",
+  "mutations": [
+    {
+      "name": "single quotes only",
+      "file": "src/test/imports.ts",
+      "from": "/\\b(?:import|export)\\b[^'\"`;]*?\\bfrom\\s*(['\"])([^'\"]+)\\1/g",
+      "to": "/\\b(?:import|export)\\b[^'\"`;]*?\\bfrom\\s*(['])([^'\"]+)\\1/g"
+    },
+    {
+      "name": "no dynamic import",
+      "file": "src/test/imports.ts",
+      "from": "    /\\bimport\\s*\\(\\s*(['\"`])([^'\"`]+)\\1\\s*\\)/g,\n",
+      "to": ""
+    },
+    {
+      "name": "no side-effect import",
+      "file": "src/test/imports.ts",
+      "from": "    /\\bimport\\s*(['\"])([^'\"]+)\\1/g,\n",
+      "to": ""
+    },
+    {
+      "name": "comments kept",
+      "file": "src/test/imports.ts",
+      "from": "const code = withoutComments(source);",
+      "to": "const code = source;"
+    },
+    {
+      "name": "no resolution",
+      "file": "src/test/imports.ts",
+      "from": "specifier.startsWith('.') ?",
+      "to": "false ?"
+    },
+    {
+      "name": "firebase allowed in domain",
+      "file": "src/test/layering.test.ts",
+      "from": "|firebase|@firebase",
+      "to": ""
+    },
+    {
+      "name": "package prefix match",
+      "file": "src/test/layering.test.ts",
+      "from": "(\\/|$)/;",
+      "to": "/;"
+    },
+    {
+      "name": "layer prefix match",
+      "file": "src/test/layering.test.ts",
+      "from": "path === dir || path.startsWith(`${dir}/`)",
+      "to": "path.startsWith(dir)"
+    },
+    {
+      "name": "tsx only",
+      "file": "src/test/storeBoundary.test.ts",
+      "from": "sourcesUnder('src/ui', false)",
+      "to": "sourcesUnder('src/ui', false).filter((f) => f.endsWith('.tsx'))"
+    },
+    {
+      "name": "stale allowance",
+      "file": "src/test/storeBoundary.test.ts",
+      "from": "  'src/ui/useSync.ts': 'runs a sync against the store for the fuel log',\n",
+      "to": "  'src/ui/useSync.ts': 'runs a sync against the store for the fuel log',\n  'src/ui/Dashboard.tsx': 'stale',\n"
+    },
+    {
+      "name": "home by substring",
+      "file": "src/test/sdkBoundary.test.ts",
+      "from": "file.startsWith(HOME) ? []",
+      "to": "file.includes('firebase') ? []"
+    },
+    {
+      "name": "scoped packages missed",
+      "file": "src/test/sdkBoundary.test.ts",
+      "from": "|@firebase\\/[^/]+",
+      "to": ""
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "title": "#83 Stale edit",
+  "tests": [
+    "src/data/store.test.ts",
+    "src/ui/StaleEdit.test.tsx",
+    "src/ui/FillUpFlow.test.tsx",
+    "src/ui/FuelLog.test.tsx"
+  ],
+  "mutations": [
+    {
+      "name": "store: deleted fill-up not refused",
+      "file": "src/data/store.ts",
+      "from": "    if (existing === undefined) throw new StaleEdit('fill-up-gone');\n",
+      "to": ""
+    },
+    {
+      "name": "store: deleted fill-up written back",
+      "file": "src/data/store.ts",
+      "from": "    if (existing === undefined) throw new StaleEdit('fill-up-gone');\n",
+      "to": "    if (existing === undefined) { const row = { ...this.recordFromDraft(draft, (await this.vehicles())[0]?.id ?? '', id), enteredBy: null }; await this.repos.fillUps.put(row); return row; }\n"
+    },
+    {
+      "name": "store: car gone not refused",
+      "file": "src/data/store.ts",
+      "from": "      if ((await r.vehicles.get(existing.vehicleId)) === undefined) throw new StaleEdit('car-gone');\n",
+      "to": ""
+    },
+    {
+      "name": "store: saved under another car",
+      "file": "src/data/store.ts",
+      "from": "        vehicleId: existing.vehicleId,\n        updatedAt: this.clock.now(),\n        enteredBy: existing.enteredBy ?? null,",
+      "to": "        vehicleId: (await r.vehicles.list()).at(-1)?.id ?? existing.vehicleId,\n        updatedAt: this.clock.now(),\n        enteredBy: existing.enteredBy ?? null,"
+    },
+    {
+      "name": "fuel log: no refresh after a stale edit",
+      "file": "src/ui/fuelLog.tsx",
+      "from": "          if (cause instanceof StaleEdit) await reload();\n",
+      "to": ""
+    },
+    {
+      "name": "form: refusal swallowed silently",
+      "file": "src/ui/useFillUpForm.ts",
+      "from": "      setSaveProblem(\n        cause instanceof StaleEdit ? cause.message : 'That could not be saved. Your changes are still here; try again.',\n      );",
+      "to": "      void cause;"
+    },
+    {
+      "name": "form: generic message for a stale edit",
+      "file": "src/ui/useFillUpForm.ts",
+      "from": "cause instanceof StaleEdit ? cause.message :",
+      "to": "false ? '' :"
+    },
+    {
+      "name": "form: closes on a refusal",
+      "file": "src/ui/useFillUpForm.ts",
+      "from": "      setSaveProblem(\n        cause instanceof StaleEdit",
+      "to": "      await onSaved();\n      setSaveProblem(\n        cause instanceof StaleEdit"
+    }
+  ]
+}

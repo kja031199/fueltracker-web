@@ -1,0 +1,77 @@
+{
+  "title": "#95 Accessibility",
+  "mutations": [
+    {
+      "name": "table rows keyed by label again",
+      "file": "src/ui/charts/ChartFrame.tsx",
+      "from": "                {rows.map((row, index) => (\n                  <tr key={index}>",
+      "to": "                {rows.map((row) => (\n                  <tr key={row.label}>"
+    },
+    {
+      "name": "Edit without its fill-up",
+      "file": "src/ui/FillUpsScreen.tsx",
+      "from": "                    aria-label={`Edit ${fillUpName(record, units, locale)}`}\n",
+      "to": ""
+    },
+    {
+      "name": "Delete without its row",
+      "file": "src/ui/ConfirmButton.tsx",
+      "from": "aria-label={labelSuffix === '' ? undefined : `${label} ${labelSuffix}`}",
+      "to": "aria-label={undefined}"
+    },
+    {
+      "name": "Request without its car",
+      "file": "src/ui/VehicleRow.tsx",
+      "from": "                  : `Request a fill-up for ${vehicle.name}`",
+      "to": "                  : 'Request a fill-up'"
+    },
+    {
+      "name": "title not focusable",
+      "file": "src/ui/ScreenFrame.tsx",
+      "from": "<h1 className=\"app__title\" tabIndex={-1}>",
+      "to": "<h1 className=\"app__title\">"
+    },
+    {
+      "name": "no focus after a tab switch",
+      "file": "src/ui/AppShell.tsx",
+      "from": "    document.querySelector<HTMLElement>('main h1')?.focus();\n",
+      "to": ""
+    },
+    {
+      "name": "focus moved on arrival too",
+      "file": "src/ui/AppShell.tsx",
+      "from": "    if (shownRoute.current === routeKey) return;\n",
+      "to": ""
+    },
+    {
+      "name": "page title never set",
+      "file": "src/ui/ScreenFrame.tsx",
+      "from": "    document.title = section === undefined ? title : `${section} · ${title}`;\n",
+      "to": ""
+    },
+    {
+      "name": "no focus after closing the form",
+      "file": "src/ui/FillUpsScreen.tsx",
+      "from": "    if (!formOpen) listHeading.current?.focus();\n",
+      "to": ""
+    },
+    {
+      "name": "no focus on opening the form",
+      "file": "src/ui/FillUpForm.tsx",
+      "from": "    if (focusHeading) heading.current?.focus();\n",
+      "to": ""
+    },
+    {
+      "name": "a fixed id back",
+      "file": "src/ui/LinkOut.tsx",
+      "from": "id={`${idBase}-link-out`}",
+      "to": "id=\"link-out\""
+    },
+    {
+      "name": "id check matching data-id",
+      "file": "src/ui/Accessibility.test.tsx",
+      "from": "const FIXED_ID = /(?<![\\w-])(id|htmlFor",
+      "to": "const FIXED_ID = /\\b(id|htmlFor"
+    }
+  ]
+}

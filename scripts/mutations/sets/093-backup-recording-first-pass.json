@@ -1,0 +1,17 @@
+{
+  "title": "#93 Backup recording (first pass)",
+  "mutations": [
+    {
+      "name": "skipped rows dropped",
+      "file": "src/ui/fuelLog.tsx",
+      "from": "problems: [...parsed.skipped, ...summary.rejected]",
+      "to": "problems: [...summary.rejected]"
+    },
+    {
+      "name": "Settings ignoring the last backup",
+      "file": "src/ui/settings/BackupSection.tsx",
+      "from": "  const { lastBackupAt } = useBackupStatus();",
+      "to": "  const lastBackupAt = null as number | null; useBackupStatus();"
+    }
+  ]
+}

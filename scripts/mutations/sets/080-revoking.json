@@ -1,0 +1,65 @@
+{
+  "title": "#80 Revoking",
+  "mutations": [
+    {
+      "name": "rules: join leaves the invitation",
+      "file": "firestore.rules",
+      "from": "            && !existsAfter(/databases/$(database)/documents/invites/$(uid + '__' + id + '__' + request.auth.token.email.lower()))\n",
+      "to": ""
+    },
+    {
+      "name": "rules: join a deleted car",
+      "file": "firestore.rules",
+      "from": "            && liveCar(uid, id)\n",
+      "to": ""
+    },
+    {
+      "name": "rules: memberOf ignores deletion",
+      "file": "firestore.rules",
+      "from": "        && exists(/databases/$(database)/documents/users/$(owner)/vehicles/$(vehicleId)/members/$(request.auth.uid))\n        && liveCar(owner, vehicleId);",
+      "to": "        && exists(/databases/$(database)/documents/users/$(owner)/vehicles/$(vehicleId)/members/$(request.auth.uid));"
+    },
+    {
+      "name": "client: accept in three writes",
+      "file": "src/data/firebase/sharingRemote.ts",
+      "from": "    await batch.commit();\n    return membership;",
+      "to": "    await setDoc(doc(this.db, 'users', invite.ownerUid, 'vehicles', invite.vehicleId, 'members', this.me.uid), { uid: this.me.uid, name: this.me.name, email, joinedAt: Date.now() });\n    await setDoc(doc(this.db, 'users', this.me.uid, 'memberships', membershipKey(membership)), { ...membership });\n    await deleteDoc(doc(this.db, 'invites', inviteKey(invite.ownerUid, invite.vehicleId, invite.email)));\n    return membership;"
+    },
+    {
+      "name": "client: removeMember keeps the invitation",
+      "file": "src/data/firebase/sharingRemote.ts",
+      "from": "    for (const invite of leftover) batch.delete(doc(this.db, 'invites', inviteKey(invite.ownerUid, invite.vehicleId, invite.email)));\n",
+      "to": "    void leftover;\n"
+    },
+    {
+      "name": "client: endSharing does nothing",
+      "file": "src/data/firebase/sharingRemote.ts",
+      "from": "    if (members.length === 0 && ofCar.length === 0) return;",
+      "to": "    if (members.length >= 0) return;"
+    },
+    {
+      "name": "app: delete does not end sharing",
+      "file": "src/ui/fuelLog.tsx",
+      "from": "          await shared.remote.endSharing(id).catch(() => {});",
+      "to": "          void shared;"
+    },
+    {
+      "name": "world: check ignores deletion",
+      "file": "src/data/testing/inMemorySharing.ts",
+      "from": "    if (!(await this.world.isLiveMember(this.share.ownerUid, this.share.vehicleId, this.uid))) throw new Refused(what);",
+      "to": "    if (!this.world.isMember(this.share.ownerUid, this.share.vehicleId, this.uid)) throw new Refused(what);"
+    },
+    {
+      "name": "world: accept a deleted car",
+      "file": "src/data/testing/inMemorySharing.ts",
+      "from": "    if ((await this.world.liveVehicle(invite.ownerUid, invite.vehicleId)) === undefined) {\n      throw new Refused('join a car that has been deleted');\n    }",
+      "to": ""
+    },
+    {
+      "name": "world: removeMember keeps the invitation",
+      "file": "src/data/testing/inMemorySharing.ts",
+      "from": "    if (email !== undefined) this.world.invites.delete(inviteKey(this.me.uid, vehicleId, email));",
+      "to": "    void email;"
+    }
+  ]
+}

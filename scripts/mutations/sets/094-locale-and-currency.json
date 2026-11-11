@@ -1,0 +1,92 @@
+{
+  "title": "#94 Locale and currency",
+  "tests": [
+    "src/domain/format.test.ts",
+    "src/domain/kpi.test.ts",
+    "src/domain/weekdayPricePattern.test.ts",
+    "src/ui/Locale.test.tsx",
+    "src/test/oneCopy.test.ts"
+  ],
+  "mutations": [
+    {
+      "name": "App ignoring the browser language",
+      "file": "src/ui/App.tsx",
+      "from": "displayLocale(typeof navigator === 'undefined' ? undefined : navigator.language)",
+      "to": "displayLocale(undefined)"
+    },
+    {
+      "name": "currency default ignoring the locale",
+      "file": "src/ui/unitSettings.ts",
+      "from": "  return readPreference(CURRENCY) ?? currencyForLocale(locale);",
+      "to": "  return readPreference(CURRENCY) ?? 'USD';"
+    },
+    {
+      "name": "KPI money dropping the style",
+      "file": "src/ui/kpiText.ts",
+      "from": "    case 'totalSpent':\n      return currency(value, style);",
+      "to": "    case 'totalSpent':\n      return currency(value);"
+    },
+    {
+      "name": "volume back to US English",
+      "file": "src/domain/format.ts",
+      "from": "export function volume(gallons: number, unit: VolumeUnit, withUnit = false, locale = US_STYLE.locale): string {\n  const spec = volumeUnits[unit];\n  const number = numberFormat(locale, {",
+      "to": "export function volume(gallons: number, unit: VolumeUnit, withUnit = false, locale = US_STYLE.locale): string {\n  const spec = volumeUnits[unit];\n  const number = numberFormat(US_STYLE.locale, {"
+    },
+    {
+      "name": "formatDate ignoring its locale",
+      "file": "src/domain/format.ts",
+      "from": "    formatter = new Intl.DateTimeFormat(locale);",
+      "to": "    formatter = new Intl.DateTimeFormat(US_STYLE.locale);"
+    },
+    {
+      "name": "a stored currency trusted as it is",
+      "file": "src/ui/unitSettings.ts",
+      "from": "browserPreference('currency', jsonCodec(isCurrencyCode))",
+      "to": "browserPreference('currency', jsonCodec((value: unknown): value is string => typeof value === 'string'))"
+    },
+    {
+      "name": "month names back to US English",
+      "file": "src/ui/charts/MonthlyBarChart.tsx",
+      "from": "  const months = monthNames(useDisplay().style.locale);",
+      "to": "  const months = monthNames('en-US');"
+    },
+    {
+      "name": "the currency picked but not saved",
+      "file": "src/ui/App.tsx",
+      "from": "    setCurrencyCode(code);\n    saveCurrency(code);",
+      "to": "    setCurrencyCode(code);"
+    },
+    {
+      "name": "displayLocale accepting what Intl does not support",
+      "file": "src/domain/format.ts",
+      "from": "    return supported === undefined ? US_STYLE.locale : language;",
+      "to": "    return language;"
+    },
+    {
+      "name": "list dates back to the browser default",
+      "file": "src/ui/FillUpsScreen.tsx",
+      "from": "                  title={formatDate(record.date, locale)}",
+      "to": "                  title={new Date(record.date).toLocaleDateString()}"
+    },
+    {
+      "name": "lower-case currency codes accepted",
+      "file": "src/domain/format.ts",
+      "from": "  return typeof value === 'string' && /^[A-Z]{3}$/.test(value);",
+      "to": "  return typeof value === 'string' && /^[A-Za-z]{3}$/.test(value);"
+    },
+    {
+      "name": "weekday insight ignoring the style",
+      "file": "src/ui/insightText.ts",
+      "from": "plainCurrency(pricePerUnit(insight.spreadPerGallon, units.volume), style)",
+      "to": "plainCurrency(pricePerUnit(insight.spreadPerGallon, units.volume))",
+      "tests": [
+        "src/domain/format.test.ts",
+        "src/domain/kpi.test.ts",
+        "src/domain/weekdayPricePattern.test.ts",
+        "src/ui/Locale.test.tsx",
+        "src/test/oneCopy.test.ts",
+        "src/ui/insightText.test.ts"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "title": "#92 Rules upkeep",
+  "tests": [
+    "src/data/rulesLimits.test.ts",
+    "src/data/firebase/rulesShape.test.ts"
+  ],
+  "mutations": [
+    {
+      "name": "receipt bound +1",
+      "file": "firestore.rules",
+      "from": "function maxReceiptBytes() { return 716800; }",
+      "to": "function maxReceiptBytes() { return 716801; }"
+    },
+    {
+      "name": "ahead bound +1",
+      "file": "firestore.rules",
+      "from": "function maxAheadMs() { return 2678400000; }",
+      "to": "function maxAheadMs() { return 2678400001; }"
+    },
+    {
+      "name": "inline size back in syncFields",
+      "file": "firestore.rules",
+      "from": "return sized(request.resource.data.id, 1, 200)",
+      "to": "return request.resource.data.id is string && request.resource.data.id.size() <= 200"
+    },
+    {
+      "name": "fill-up key dropped",
+      "file": "firestore.rules",
+      "from": "concat(['vehicleId', 'missedPreviousFillUp', 'enteredBy'])",
+      "to": "concat(['vehicleId', 'enteredBy'])"
+    },
+    {
+      "name": "junk key allowed on vehicles",
+      "file": "firestore.rules",
+      "from": "concat(['name', 'make', 'model', 'year', 'createdAt'])",
+      "to": "concat(['name', 'make', 'model', 'year', 'createdAt', 'junk'])"
+    },
+    {
+      "name": "enteredBy required",
+      "file": "firestore.rules",
+      "from": "function optionalFillUpKeys() { return ['enteredBy']; }",
+      "to": "function optionalFillUpKeys() { return []; }"
+    },
+    {
+      "name": "liveCar reads twice",
+      "file": "firestore.rules",
+      "from": "      return get(/databases/$(database)/documents/users/$(owner)/vehicles/$(vehicleId)).data.deletedAt == null;",
+      "to": "      return exists(/databases/$(database)/documents/users/$(owner)/vehicles/$(vehicleId))\n        && get(/databases/$(database)/documents/users/$(owner)/vehicles/$(vehicleId)).data.deletedAt == null;"
+    },
+    {
+      "name": "shape without hasAll",
+      "file": "firestore.rules",
+      "from": "        && request.resource.data.keys().hasAll(keys.removeAll(optional));",
+      "to": "        && true;"
+    },
+    {
+      "name": "users document readable",
+      "file": "firestore.rules",
+      "from": "      // No rule for the account document itself",
+      "to": "      allow read: if owner();\n      // No rule for the account document itself",
+      "tests": [
+        "--project",
+        "rules"
+      ]
+    },
+    {
+      "name": "liveCar ignores deletion",
+      "file": "firestore.rules",
+      "from": "      return get(/databases/$(database)/documents/users/$(owner)/vehicles/$(vehicleId)).data.deletedAt == null;",
+      "to": "      return true;",
+      "tests": [
+        "--project",
+        "rules"
+      ]
+    }
+  ]
+}

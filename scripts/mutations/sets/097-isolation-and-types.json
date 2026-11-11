@@ -1,0 +1,107 @@
+{
+  "title": "#97 Isolation and types",
+  "mutations": [
+    {
+      "name": "spies not restored",
+      "file": "vite.config.ts",
+      "from": "    restoreMocks: true,\n",
+      "to": ""
+    },
+    {
+      "name": "globals not unstubbed",
+      "file": "vite.config.ts",
+      "from": "    unstubGlobals: true,\n",
+      "to": ""
+    },
+    {
+      "name": "env not unstubbed",
+      "file": "vite.config.ts",
+      "from": "    unstubEnvs: true,\n",
+      "to": ""
+    },
+    {
+      "name": "globals off (no auto-cleanup)",
+      "file": "vite.config.ts",
+      "from": "    globals: true,\n",
+      "to": "    globals: false,\n"
+    },
+    {
+      "name": "dom project on node",
+      "file": "vite.config.ts",
+      "from": "          environment: 'jsdom',\n",
+      "to": ""
+    },
+    {
+      "name": "unit also taking the tsx tests",
+      "file": "vite.config.ts",
+      "from": "          include: ['src/**/*.test.ts'],",
+      "to": "          include: ['src/**/*.test.{ts,tsx}'],"
+    },
+    {
+      "name": "dom-named .ts files in no project",
+      "file": "vite.config.ts",
+      "from": "          include: ['src/**/*.test.tsx', DOM_TESTS],",
+      "to": "          include: ['src/**/*.test.tsx'],"
+    },
+    {
+      "name": "a docblock planted back",
+      "file": "src/ui/App.test.tsx",
+      "from": "import { beforeEach,",
+      "to": "// @vitest-environment jsdom\nimport { beforeEach,"
+    },
+    {
+      "name": "a hand cleanup planted back",
+      "file": "src/ui/App.test.tsx",
+      "from": "describe('first run', () => {",
+      "to": "afterEach(cleanup);\n\ndescribe('first run', () => {"
+    },
+    {
+      "name": "a hand restore planted back",
+      "file": "src/ui/preferences.dom.test.ts",
+      "from": "beforeEach(() => localStorage.clear());\n",
+      "to": "beforeEach(() => localStorage.clear());\nafterEach(() => vi.restoreAllMocks());\n"
+    },
+    {
+      "name": "a prototype assigned again",
+      "file": "src/ui/importReceipt.dom.test.ts",
+      "from": "  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(\n    () => ({ drawImage: () => {} }) as unknown as CanvasRenderingContext2D,\n  );",
+      "to": "  const proto = HTMLCanvasElement.prototype as unknown as Record<string, unknown>;\n  proto['getContext'] = () => ({ drawImage: () => {} });"
+    },
+    {
+      "name": "app code given Node types",
+      "file": "tsconfig.app.json",
+      "from": "\"types\": [],",
+      "to": "\"types\": [\"node\"],"
+    },
+    {
+      "name": "app code given test globals",
+      "file": "tsconfig.app.json",
+      "from": "\"types\": [],",
+      "to": "\"types\": [\"vitest/globals\"],"
+    },
+    {
+      "name": "tests left in the app project",
+      "file": "tsconfig.app.json",
+      "from": "\"exclude\": [\"src/**/*.test.ts\", \"src/**/*.test.tsx\", \"src/test\"]",
+      "to": "\"exclude\": [\"src/test\"]"
+    },
+    {
+      "name": "typecheck checking nothing",
+      "file": "package.json",
+      "from": "\"typecheck\": \"tsc -b\",",
+      "to": "\"typecheck\": \"tsc --noEmit\","
+    },
+    {
+      "name": "build checking nothing",
+      "file": "package.json",
+      "from": "\"build\": \"tsc -b && vite build\",",
+      "to": "\"build\": \"tsc --noEmit && vite build\","
+    },
+    {
+      "name": "npm test leaving out the dom project",
+      "file": "package.json",
+      "from": "\"test\": \"vitest run --project unit --project dom\",",
+      "to": "\"test\": \"vitest run --project unit\","
+    }
+  ]
+}

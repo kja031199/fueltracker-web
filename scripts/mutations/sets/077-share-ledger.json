@@ -1,0 +1,45 @@
+{
+  "title": "#77 Share ledger",
+  "tests": [
+    "src/data/shareSync.test.ts",
+    "src/ui/FuelLog.test.tsx"
+  ],
+  "mutations": [
+    {
+      "name": "ledger failure read as empty (the bug)",
+      "file": "src/data/shareSync.ts",
+      "from": "  try {\n    held = await sharing.ledger.load();\n  } catch {\n    // A pause to retry, not a refusal (#77): said in the screens' words (#91).\n    return { own: { ok: false, kind: 'unreachable', problem: 'ledger-unreadable' }, shares: NO_SHARES };\n  }",
+      "to": "  held = await sharing.ledger.load().catch(() => [] as Membership[]);"
+    },
+    {
+      "name": "fail closed only if the list is unreadable too",
+      "file": "src/data/shareSync.ts",
+      "from": "  } catch {\n    // A pause to retry, not a refusal (#77): said in the screens' words (#91).\n    return { own: { ok: false, kind: 'unreachable', problem: 'ledger-unreadable' }, shares: NO_SHARES };\n  }",
+      "to": "  } catch {\n    held = [];\n    if (await sharing.remote.memberships().then(() => false, () => true)) {\n      return { own: { ok: false, kind: 'unreachable', problem: 'ledger-unreadable' }, shares: NO_SHARES };\n    }\n  }"
+    },
+    {
+      "name": "reported as a refusal",
+      "file": "src/data/shareSync.ts",
+      "from": "kind: 'unreachable', problem: 'ledger-unreadable'",
+      "to": "kind: 'refused', problem: 'ledger-unreadable'"
+    },
+    {
+      "name": "no save before pulling",
+      "file": "src/data/shareSync.ts",
+      "from": "  try {\n    await sharing.ledger.save(recorded);\n  } catch {\n    return { own: ownResult, shares: { ...NO_SHARES, clashed, failed: [...sharable], memberships: current } };\n  }",
+      "to": "  void recorded;"
+    },
+    {
+      "name": "pre-save failure ignored",
+      "file": "src/data/shareSync.ts",
+      "from": "  try {\n    await sharing.ledger.save(recorded);\n  } catch {\n    return { own: ownResult, shares: { ...NO_SHARES, clashed, failed: [...sharable], memberships: current } };\n  }",
+      "to": "  await sharing.ledger.save(recorded).catch(() => {});"
+    },
+    {
+      "name": "pre-save drops held (ended) shares",
+      "file": "src/data/shareSync.ts",
+      "from": "const recorded = [...held, ...sharable.filter((membership) => !heldKeys.has(membershipKey(membership)))];",
+      "to": "const recorded = [...sharable]; void heldKeys;"
+    }
+  ]
+}

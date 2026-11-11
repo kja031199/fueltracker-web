@@ -1,0 +1,65 @@
+{
+  "title": "#93 Backup recording",
+  "mutations": [
+    {
+      "name": "saveBackup records nothing",
+      "file": "src/ui/fuelLog.tsx",
+      "from": "        recordBackup(saved.fillUps);\n",
+      "to": ""
+    },
+    {
+      "name": "CSV recorded as a backup",
+      "file": "src/ui/fuelLog.tsx",
+      "from": "      exportCsv: () => saveCsvExport(store),",
+      "to": "      exportCsv: async () => { const n = await saveCsvExport(store); recordBackup(n); return n; },"
+    },
+    {
+      "name": "unreadable file still imported",
+      "file": "src/ui/fuelLog.tsx",
+      "from": "        if (parsed.value === null) return { summary: null, problems: [parsed.error ?? 'That file could not be read.'] };\n",
+      "to": ""
+    },
+    {
+      "name": "rejected rows dropped",
+      "file": "src/ui/fuelLog.tsx",
+      "from": "problems: [...parsed.skipped, ...summary.rejected]",
+      "to": "problems: [...parsed.skipped]"
+    },
+    {
+      "name": "import bypassing written",
+      "file": "src/ui/fuelLog.tsx",
+      "from": "    const importBackup = written((snapshot: Snapshot) => store.importBackup(snapshot));",
+      "to": "    const importBackup = (snapshot: Snapshot) => store.importBackup(snapshot);"
+    },
+    {
+      "name": "backup status an input of the log",
+      "file": "src/ui/fuelLog.tsx",
+      "from": "[data, written, store, reload, sharingView, uid, shared, recordBackup]",
+      "to": "[data, written, store, reload, sharingView, uid, shared, recordBackup, backup]"
+    },
+    {
+      "name": "extension case-sensitive",
+      "file": "src/data/backupFormat.ts",
+      "from": "if (!name.toLowerCase().endsWith('.csv'))",
+      "to": "if (!name.endsWith('.csv'))"
+    },
+    {
+      "name": "extension anywhere in the name",
+      "file": "src/data/backupFormat.ts",
+      "from": "if (!name.toLowerCase().endsWith('.csv'))",
+      "to": "if (!name.toLowerCase().includes('.csv'))"
+    },
+    {
+      "name": "CSV skipped lost",
+      "file": "src/data/backupFormat.ts",
+      "from": "  return { ...parsed, value };\n}",
+      "to": "  return { ...parsed, skipped: [], value };\n}"
+    },
+    {
+      "name": "CSV includes tombstones",
+      "file": "src/ui/exportBackup.ts",
+      "from": "  const live = snapshot.fillUps.filter((record) => record.deletedAt === null);\n  downloadText(toCsv(live)",
+      "to": "  const live = snapshot.fillUps;\n  downloadText(toCsv(live)"
+    }
+  ]
+}

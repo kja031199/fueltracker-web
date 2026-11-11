@@ -1,0 +1,53 @@
+{
+  "title": "#97 Shared fixtures",
+  "mutations": [
+    {
+      "name": "makeStore ignoring its author",
+      "file": "src/test/fixtures.ts",
+      "from": "    options.author ?? null,",
+      "to": "    null,"
+    },
+    {
+      "name": "makeStore ignoring its clock",
+      "file": "src/test/fixtures.ts",
+      "from": "    options.clock,\n",
+      "to": "    undefined,\n"
+    },
+    {
+      "name": "a number not read as the odometer",
+      "file": "src/test/fixtures.ts",
+      "from": "  const changes = typeof overrides === 'number' ? { odometer: overrides } : overrides;",
+      "to": "  const changes = typeof overrides === 'number' ? {} : overrides;"
+    },
+    {
+      "name": "a file’s defaults beating a test’s changes",
+      "file": "src/test/fixtures.ts",
+      "from": "  const made = makeFuelEntryDraft({ ...DRAFT_DEFAULTS, ...base, ...changes });",
+      "to": "  const made = makeFuelEntryDraft({ ...DRAFT_DEFAULTS, ...changes, ...base });"
+    },
+    {
+      "name": "a refused fixture returned as null",
+      "file": "src/test/fixtures.ts",
+      "from": "  if (made === null) throw new Error(`fixture draft failed validation: ${JSON.stringify(changes)}`);\n  return made;",
+      "to": "  return made as FuelEntryDraft;"
+    },
+    {
+      "name": "a signed-in user shared as unverified",
+      "file": "src/test/fixtures.ts",
+      "from": "      ? { uid: who.uid, name: who.displayName, email: who.email, emailVerified: who.emailVerified === true }",
+      "to": "      ? { uid: who.uid, name: who.displayName, email: who.email, emailVerified: false }"
+    },
+    {
+      "name": "the guard missing an arrow-function copy",
+      "file": "src/test/fixtures.test.ts",
+      "from": "|^const (makeStore|storeFor|draft|sharingFor) = (?!draftWith\\()/m;",
+      "to": "/m;"
+    },
+    {
+      "name": "a copy planted back in a test file",
+      "file": "src/ui/App.test.tsx",
+      "from": "import { makeStore, saveHasOnboarded } from '../test/fixtures';",
+      "to": "import { makeStore as shared, saveHasOnboarded } from '../test/fixtures';\nfunction makeStore() { return shared(); }"
+    }
+  ]
+}

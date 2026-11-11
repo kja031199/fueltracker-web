@@ -1,0 +1,105 @@
+{
+  "title": "#90 Startup and the reader",
+  "tests": [
+    "src/bootstrap.test.ts",
+    "src/ui/ocr.dom.test.ts"
+  ],
+  "mutations": [
+    {
+      "name": "Firestore requested at boot, before sign-in",
+      "file": "src/bootstrap.ts",
+      "from": "  const auth = await deps.loadAuth();\n",
+      "to": "  const auth = await deps.loadAuth();\n  void deps.loadRemotes().catch(() => {});\n"
+    },
+    {
+      "name": "no shell before auth arrives",
+      "file": "src/bootstrap.ts",
+      "from": "export async function boot(deps: BootDeps): Promise<void> {\n  deps.view.opening();\n",
+      "to": "export async function boot(deps: BootDeps): Promise<void> {\n"
+    },
+    {
+      "name": "Firestore modules loaded on every sign-in",
+      "file": "src/bootstrap.ts",
+      "from": "    if (remotes === null) {",
+      "to": "    if (true) {"
+    },
+    {
+      "name": "a failed load remembered",
+      "file": "src/bootstrap.ts",
+      "from": "      loading.catch(() => {\n        if (remotes === loading) remotes = null;\n      });\n",
+      "to": "      loading.catch(() => {});\n"
+    },
+    {
+      "name": "no local-only fallback",
+      "file": "src/bootstrap.ts",
+      "from": "      loadRemotes().catch(() => null),",
+      "to": "      loadRemotes(),"
+    },
+    {
+      "name": "token refresh reopens everything",
+      "file": "src/bootstrap.ts",
+      "from": "    if (open?.uid === uid && open.remote !== null) {",
+      "to": "    if (false) {"
+    },
+    {
+      "name": "local-only account never retries",
+      "file": "src/bootstrap.ts",
+      "from": "    if (open?.uid === uid && open.remote !== null) {",
+      "to": "    if (open?.uid === uid) {"
+    },
+    {
+      "name": "overtaken account shown",
+      "file": "src/bootstrap.ts",
+      "from": "    if (mine !== generation) {",
+      "to": "    if (false) {"
+    },
+    {
+      "name": "session resources kept on sign-out",
+      "file": "src/bootstrap.ts",
+      "from": "    deps.onAccountClosed?.();\n",
+      "to": ""
+    },
+    {
+      "name": "main loads Firestore with auth",
+      "file": "src/main.tsx",
+      "from": "      const { FirebaseAuthProvider } = await import('./data/firebase/authProvider');",
+      "to": "      await import('./data/firebase/remoteStore');\n      const { FirebaseAuthProvider } = await import('./data/firebase/authProvider');"
+    },
+    {
+      "name": "worker terminated after every scan",
+      "file": "src/ui/ocr.ts",
+      "from": "  if (kept !== reader) {\n    shutDown(reader);\n    return;\n  }",
+      "to": "  kept = null;\n  shutDown(reader);\n  return;"
+    },
+    {
+      "name": "idle window not restarted by a scan",
+      "file": "src/ui/ocr.ts",
+      "from": "  clearTimeout(kept.idle);\n  kept.idle = undefined;\n  kept.busy += 1;",
+      "to": "  kept.busy += 1;"
+    },
+    {
+      "name": "a broken worker reused",
+      "file": "src/ui/ocr.ts",
+      "from": "  if (broken && kept === reader) kept = null;\n",
+      "to": ""
+    },
+    {
+      "name": "a failed load remembered (OCR)",
+      "file": "src/ui/ocr.ts",
+      "from": "  if (broken && kept === reader) kept = null;",
+      "to": "  if (false && kept === reader) kept = null;"
+    },
+    {
+      "name": "release kills a scan in progress",
+      "file": "src/ui/ocr.ts",
+      "from": "  if (reader.busy === 0) await reader.worker",
+      "to": "  await reader.worker"
+    },
+    {
+      "name": "worker never released when idle",
+      "file": "src/ui/ocr.ts",
+      "from": "  reader.idle = setTimeout(() => {",
+      "to": "  reader.idle = setTimeout(() => {\n    return;"
+    }
+  ]
+}

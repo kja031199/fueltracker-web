@@ -1,0 +1,83 @@
+{
+  "title": "#93 One formula, pure logic",
+  "mutations": [
+    {
+      "name": "totalCost adds",
+      "file": "src/domain/models.ts",
+      "from": "return entry.gallons * entry.pricePerGallon;",
+      "to": "return entry.gallons + entry.pricePerGallon;"
+    },
+    {
+      "name": "guard misses gallons * price",
+      "file": "src/test/oneTotalCost.test.ts",
+      "from": "const MULTIPLIED = /\\bgallons\\s*\\*\\s*[\\w.]*price/i;",
+      "to": "const MULTIPLIED = /\\bgallons\\s*\\*\\s*\\w*\\.pricePerGallon/i;"
+    },
+    {
+      "name": "guard reads only ui",
+      "file": "src/test/oneTotalCost.test.ts",
+      "from": ".filter((file) => file !== HOME)",
+      "to": ".filter((file) => file.startsWith('src/ui'))"
+    },
+    {
+      "name": "pricePerUnit multiplies",
+      "file": "src/domain/units.ts",
+      "from": "  return pricePerGallon / volume[unit].fromGallons(1);",
+      "to": "  return pricePerGallon * volume[unit].fromGallons(1);"
+    },
+    {
+      "name": "pricePerGallonFrom wrong factor",
+      "file": "src/domain/units.ts",
+      "from": "  return price * volume[unit].fromGallons(1);",
+      "to": "  return price * volume[unit].toGallons(1);"
+    },
+    {
+      "name": "describeSince unclamped",
+      "file": "src/ui/wording.ts",
+      "from": "Math.max(0, Math.round((now - at) / 1000))",
+      "to": "Math.round((now - at) / 1000)"
+    },
+    {
+      "name": "describeSince NaN",
+      "file": "src/ui/wording.ts",
+      "from": "if (at === null || !Number.isFinite(at)) return 'not yet';",
+      "to": "if (at === null) return 'not yet';"
+    },
+    {
+      "name": "subtitle keeps year alone",
+      "file": "src/ui/wording.ts",
+      "from": "return joined === String(vehicle.year) ? '' : joined;",
+      "to": "return joined;"
+    },
+    {
+      "name": "parse accepts Infinity",
+      "file": "src/domain/fillUpForm.ts",
+      "from": "return Number.isFinite(value) ? value : null;",
+      "to": "return Number.isNaN(value) ? null : value;"
+    },
+    {
+      "name": "blank reads as 0",
+      "file": "src/domain/fillUpForm.ts",
+      "from": "if (text.trim() === '') return null;",
+      "to": ""
+    },
+    {
+      "name": "editableText unrounded",
+      "file": "src/domain/fillUpForm.ts",
+      "from": "return String(Math.round(toDisplay(value) * 1000) / 1000);",
+      "to": "return String(toDisplay(value));"
+    },
+    {
+      "name": "formFromRecord loses date",
+      "file": "src/data/recordMapping.ts",
+      "from": "FillUpFormState {\n  return {\n    date: new Date(record.date),",
+      "to": "FillUpFormState {\n  return {\n    date: new Date(0),"
+    },
+    {
+      "name": "form stores per-litre price",
+      "file": "src/ui/FillUpForm.tsx",
+      "from": "(typed) => pricePerGallonFrom(typed, units.volume))",
+      "to": "(typed) => typed)"
+    }
+  ]
+}
