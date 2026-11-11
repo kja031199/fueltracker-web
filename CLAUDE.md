@@ -273,7 +273,11 @@ npm run mutate       # every recorded mutation killed (most of an hour)
   (#46): bumping a `*_VERSION` means bumping its `*_SHA256`, taken from the
   release's published checksums and confirmed against your own download, never
   computed in CI. **Every checkout sets `persist-credentials: false`**; both are
-  enforced by `workflows.test.ts`.
+  enforced by `workflows.test.ts`. Dependabot cannot see those env pins, so
+  **`pins.yml` checks them weekly** (`scripts/pins/check.ts`, #99) and goes red
+  when one is behind; it only reports. **Never write a pinned version in
+  prose** — gitleaks, lychee or firebase-tools: `pins.test.ts` refuses it, since
+  a copy in a doc goes stale on the next bump. Say "the pinned version".
 - **Do not run `npm audit fix`.** Assessed in #19: npm claims a fix for the
   production findings and there isn't one — `firebase` is already current, so
   the suggestion would downgrade it. None of the findings reaches a browser,

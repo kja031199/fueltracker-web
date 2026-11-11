@@ -1,0 +1,50 @@
+{
+  "title": "#99 Binary pins",
+  "tests": [
+    "src/test/pins.test.ts"
+  ],
+  "mutations": [
+    {
+      "name": "a missing pin read as nothing",
+      "file": "scripts/pins/check.ts",
+      "from": "    if (version === undefined) throw new Error(`checks.yml has no ${variable}`);\n    return { tool, repo, version };",
+      "to": "    return { tool, repo, version: version ?? '0.0.0' };"
+    },
+    {
+      "name": "the comparison backwards",
+      "file": "scripts/pins/check.ts",
+      "from": "    if (x[i] !== y[i]) return x[i]! - y[i]!;",
+      "to": "    if (x[i] !== y[i]) return y[i]! - x[i]!;"
+    },
+    {
+      "name": "anything accepted as a version",
+      "file": "scripts/pins/check.ts",
+      "from": "  if (match === null) throw new Error(`${JSON.stringify(version)} is not a version`);\n  return [Number(match[1]), Number(match[2]), Number(match[3])];",
+      "to": "  if (match === null) return [0, 0, 0];\n  return [Number(match[1]), Number(match[2]), Number(match[3])];"
+    },
+    {
+      "name": "the same version counted as behind",
+      "file": "scripts/pins/check.ts",
+      "from": "  return compareVersions(pin.version, latest) < 0;",
+      "to": "  return compareVersions(pin.version, latest) <= 0;"
+    },
+    {
+      "name": "a tag with the tool\u2019s name in front not read",
+      "file": "scripts/pins/check.ts",
+      "from": "/^(?:[a-z-]*-)?v?(\\d+)\\.(\\d+)\\.(\\d+)$/",
+      "to": "/^v?(\\d+)\\.(\\d+)\\.(\\d+)$/"
+    },
+    {
+      "name": "the docs quoting a pin again",
+      "file": "docs/deploying.md",
+      "from": "two majors *backwards* from the version pinned at the time.",
+      "to": "two majors *backwards* from the pinned 15.34.2."
+    },
+    {
+      "name": "the weekly run dropped",
+      "file": ".github/workflows/pins.yml",
+      "from": "    - cron: '17 6 * * 3'\n",
+      "to": ""
+    }
+  ]
+}

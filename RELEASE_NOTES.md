@@ -11,6 +11,17 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-11
 
+- **Nothing you see changes.** The tools that check every change for leaked
+  passwords and broken links are now checked weekly for newer releases, so
+  they don't quietly age.
+  *Technical:* `scripts/pins/check.ts` reads the gitleaks and lychee pins from
+  `checks.yml` (environment variables Dependabot cannot see), asks GitHub for
+  each tool's latest release, and fails when a pin is behind;
+  `.github/workflows/pins.yml` runs it weekly and on demand. It only reports —
+  a bump still pins its SHA-256 by hand. The docs no longer quote any pinned
+  version, and `pins.test.ts` keeps them from doing so again. Part two of four
+  on #99.
+  [#99](https://github.com/kja031199/fueltracker-web/issues/99) · [PR #148](https://github.com/kja031199/fueltracker-web/pull/148)
 - **Nothing you see changes.** Each change is now built and tested once on its
   way to the live site instead of twice, so updates go out sooner.
   *Technical:* one composite setup action (`.github/actions/setup`) for every
