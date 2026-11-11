@@ -60,12 +60,12 @@ export function SubmitScreen({ payload, accountName, onDone }: Props): ReactElem
     return (
       <LinkScreen title="Send this back">
         <p>
-          Send this link to {ownerName || 'the car’s owner'}. When they open it, the fill-up waits for them
-          to review — nothing is added to their log until they approve it.
+          Send this link to {ownerName || 'the car’s owner'}. When they open it, the fill-up waits for them to review —
+          nothing is added to their log until they approve it.
         </p>
         <p className="note">
-          This link carries your name, the fill-up and any notes as plain text. Anyone who sees it can read them,
-          and it stays in the history of the chat you send it in.
+          This link carries your name, the fill-up and any notes as plain text. Anyone who sees it can read them, and it
+          stays in the history of the chat you send it in.
         </p>
         <LinkOut url={url} label={`Fill-up for ${car}`} />
         <DoneButton onDone={onDone} />
@@ -88,12 +88,10 @@ export function SubmitScreen({ payload, accountName, onDone }: Props): ReactElem
   return (
     <LinkScreen title="Fill-up request">
       <p>
-        {asker} asked you to log a fill-up for <strong>{car}</strong>. Fill it in and you will get a link to
-        send back. Nothing is saved to your own log.
+        {asker} asked you to log a fill-up for <strong>{car}</strong>. Fill it in and you will get a link to send back.
+        Nothing is saved to your own log.
       </p>
-      <p className="note">
-        Names in a link are whatever its author typed; only fill this in if you know who sent it.
-      </p>
+      <p className="note">Names in a link are whatever its author typed; only fill this in if you know who sent it.</p>
       <div className="field">
         <label className="field__label" htmlFor={`${idBase}-submitter-name`}>
           Your name
@@ -106,8 +104,8 @@ export function SubmitScreen({ payload, accountName, onDone }: Props): ReactElem
           onChange={(event) => setName(event.target.value)}
         />
         <p className="fine" id={`${idBase}-submitter-name-hint`}>
-          The link you make carries this name, the fill-up and any notes, as plain text, to whoever you send it
-          to — and it stays in that chat’s history.
+          The link you make carries this name, the fill-up and any notes, as plain text, to whoever you send it to — and
+          it stays in that chat’s history.
         </p>
       </div>
       <FillUpForm

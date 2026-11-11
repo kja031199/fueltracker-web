@@ -40,8 +40,8 @@
     {
       "name": "import validates nothing",
       "file": "src/data/backup.ts",
-      "from": "        if (draftFromRecord(incoming) === null) {",
-      "to": "        if (false) {"
+      "from": "      if (draftFromRecord(incoming) === null) {\n",
+      "to": "      if (false) {\n"
     },
     {
       "name": "approve skips the gate",

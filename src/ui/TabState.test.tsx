@@ -22,7 +22,12 @@ async function setUp(tab: 'fillups' | 'dashboard' = 'fillups'): Promise<FuelTrac
   const store = makeStore();
   const vehicle = await store.addVehicle({ name: 'Daily Driver' });
   for (const [i, odometer] of [10_000, 10_300].entries()) {
-    const draft = makeFuelEntryDraft({ date: new Date(2026, 0, 1 + i * 7), odometer, gallons: 10, pricePerGallon: 3.5 });
+    const draft = makeFuelEntryDraft({
+      date: new Date(2026, 0, 1 + i * 7),
+      odometer,
+      gallons: 10,
+      pricePerGallon: 3.5,
+    });
     if (draft === null) throw new Error('fixture draft failed validation');
     await store.addFillUp(draft, vehicle.id);
   }

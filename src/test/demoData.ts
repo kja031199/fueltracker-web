@@ -40,10 +40,7 @@ function seededRandom(seed: number): () => number {
   };
 }
 
-const PRICES = [
-  3.199, 3.249, 3.399, 3.359, 3.289, 3.459,
-  3.599, 3.549, 3.479, 3.389, 3.299, 3.349,
-];
+const PRICES = [3.199, 3.249, 3.399, 3.359, 3.289, 3.459, 3.599, 3.549, 3.479, 3.389, 3.299, 3.349];
 
 const STATIONS = ['Shell', 'Costco', 'Chevron', '76'];
 
@@ -64,10 +61,7 @@ export interface DemoDataOptions {
  * dashboard's charts and the suspect-segment detection look like they are
  * describing a real car.
  */
-export async function seedDemoData(
-  store: FuelTrackerStore,
-  options: DemoDataOptions = {},
-): Promise<string> {
+export async function seedDemoData(store: FuelTrackerStore, options: DemoDataOptions = {}): Promise<string> {
   const now = options.now ?? new Date();
   const random = seededRandom(options.seed ?? 20_250_101);
   const between = (min: number, max: number): number => min + random() * (max - min);

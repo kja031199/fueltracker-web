@@ -25,9 +25,7 @@ export function BackupSection(): ReactElement {
   async function exportJson(): Promise<void> {
     const saved = await saveBackup();
     setProblems([]);
-    setStatus(
-      `Saved a backup of ${vehicles(saved.vehicles)} and ${fillUps(saved.fillUps)}.`,
-    );
+    setStatus(`Saved a backup of ${vehicles(saved.vehicles)} and ${fillUps(saved.fillUps)}.`);
   }
 
   async function exportSpreadsheet(): Promise<void> {
@@ -57,8 +55,8 @@ export function BackupSection(): ReactElement {
         Last backup: <strong>{describeSince(lastBackupAt, Date.now(), locale)}</strong>.
       </p>
       <p className="stack muted">
-        Only the JSON export counts as a backup. The CSV is fill-ups only — no vehicles, no
-        deletions, no receipt photos — so it is for spreadsheets, not for restoring.
+        Only the JSON export counts as a backup. The CSV is fill-ups only — no vehicles, no deletions, no receipt photos
+        — so it is for spreadsheets, not for restoring.
       </p>
 
       <div className="row-actions">
@@ -68,11 +66,7 @@ export function BackupSection(): ReactElement {
         <button className="button button--secondary" type="button" onClick={() => void exportSpreadsheet()}>
           Export spreadsheet (CSV)
         </button>
-        <button
-          className="button button--secondary"
-          type="button"
-          onClick={() => fileInput.current?.click()}
-        >
+        <button className="button button--secondary" type="button" onClick={() => fileInput.current?.click()}>
           Import a file
         </button>
       </div>
@@ -109,10 +103,10 @@ export function BackupSection(): ReactElement {
       )}
 
       <p className="note flush-bottom">
-        The JSON backup is the complete one — every vehicle, every fill-up, and the deletions
-        too — and importing it merges rather than replaces, so restoring an old backup will not
-        wipe out newer entries. The CSV is for spreadsheets: fill-ups only, in miles and US
-        gallons whatever you have selected above, with the unit named in each column heading.
+        The JSON backup is the complete one — every vehicle, every fill-up, and the deletions too — and importing it
+        merges rather than replaces, so restoring an old backup will not wipe out newer entries. The CSV is for
+        spreadsheets: fill-ups only, in miles and US gallons whatever you have selected above, with the unit named in
+        each column heading.
       </p>
     </section>
   );

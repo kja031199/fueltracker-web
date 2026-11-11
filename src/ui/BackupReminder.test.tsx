@@ -61,9 +61,7 @@ describe('the backup reminder', () => {
 
     await user.click(await screen.findByRole('button', { name: /save a backup/i }));
 
-    await waitFor(() =>
-      expect(screen.queryByRole('button', { name: /save a backup/i })).not.toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.queryByRole('button', { name: /save a backup/i })).not.toBeInTheDocument());
     expect(loadBackupState('local').lastExportAt).not.toBeNull();
   });
 
@@ -76,9 +74,7 @@ describe('the backup reminder', () => {
 
     await user.click(await screen.findByRole('button', { name: /not now/i }));
 
-    await waitFor(() =>
-      expect(screen.queryByRole('button', { name: /save a backup/i })).not.toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.queryByRole('button', { name: /save a backup/i })).not.toBeInTheDocument());
 
     const stored = loadBackupState('local');
     expect(stored.snoozedUntil).not.toBeNull();

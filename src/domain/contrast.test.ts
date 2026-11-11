@@ -95,11 +95,13 @@ describe('toCssRgb', () => {
 
   test('maps non-finite components to 0 instead of producing NaN', () => {
     expect(toCssRgb({ red: Number.NaN, green: 0.5, blue: 0 })).toBe('rgb(0 128 0)');
-    expect(toCssRgb({
-      red: Number.POSITIVE_INFINITY,
-      green: Number.NEGATIVE_INFINITY,
-      blue: Number.NaN,
-    })).toBe('rgb(0 0 0)');
+    expect(
+      toCssRgb({
+        red: Number.POSITIVE_INFINITY,
+        green: Number.NEGATIVE_INFINITY,
+        blue: Number.NaN,
+      }),
+    ).toBe('rgb(0 0 0)');
   });
 
   test('always emits three integer channels in range', () => {

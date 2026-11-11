@@ -106,10 +106,7 @@ function largest(candidates: readonly Candidate[]): Candidate {
   return best;
 }
 
-export function parseOdometer(
-  rawLines: readonly string[],
-  options: OdometerOptions = {},
-): OdometerCandidate | null {
+export function parseOdometer(rawLines: readonly string[], options: OdometerOptions = {}): OdometerCandidate | null {
   const excluding = options.excluding ?? [];
   const previous = options.previousOdometer ?? null;
 

@@ -87,9 +87,7 @@ export interface ChooseOptions {
 
 /** The route to show, and how to choose a tab. */
 export function useRoute(fallback: Tab): readonly [Route, (tab: Tab, options?: ChooseOptions) => void] {
-  const [route, setRoute] = useState<Route>(
-    () => parseRoute(window.location.hash) ?? { kind: 'tab', tab: fallback },
-  );
+  const [route, setRoute] = useState<Route>(() => parseRoute(window.location.hash) ?? { kind: 'tab', tab: fallback });
 
   useEffect(() => {
     // Correct an address that names nothing, without spending a history entry.

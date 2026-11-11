@@ -60,11 +60,33 @@ export function countOf(count: number, forms: PluralForms, locale: string = US_S
  * with the other Settings choices in Phase 3.
  */
 const REGION_CURRENCY: Record<string, string> = {
-  US: 'USD', CA: 'CAD', GB: 'GBP', AU: 'AUD', NZ: 'NZD',
-  JP: 'JPY', CN: 'CNY', IN: 'INR', MX: 'MXN', BR: 'BRL',
-  ZA: 'ZAR', CH: 'CHF', SE: 'SEK', NO: 'NOK', DK: 'DKK', PL: 'PLN',
-  DE: 'EUR', FR: 'EUR', ES: 'EUR', IT: 'EUR', NL: 'EUR', IE: 'EUR',
-  PT: 'EUR', AT: 'EUR', BE: 'EUR', FI: 'EUR', GR: 'EUR',
+  US: 'USD',
+  CA: 'CAD',
+  GB: 'GBP',
+  AU: 'AUD',
+  NZ: 'NZD',
+  JP: 'JPY',
+  CN: 'CNY',
+  IN: 'INR',
+  MX: 'MXN',
+  BR: 'BRL',
+  ZA: 'ZAR',
+  CH: 'CHF',
+  SE: 'SEK',
+  NO: 'NOK',
+  DK: 'DKK',
+  PL: 'PLN',
+  DE: 'EUR',
+  FR: 'EUR',
+  ES: 'EUR',
+  IT: 'EUR',
+  NL: 'EUR',
+  IE: 'EUR',
+  PT: 'EUR',
+  AT: 'EUR',
+  BE: 'EUR',
+  FI: 'EUR',
+  GR: 'EUR',
 };
 
 export const DEFAULT_CURRENCY = 'USD';
@@ -219,11 +241,7 @@ export function economy(mpg: number, unit: EconomyUnit, locale = US_STYLE.locale
  * rounding it away would make two different prices display identically — which
  * the showdown would then have to call a tie.
  */
-export function fuelPrice(
-  pricePerGallon: number,
-  unit: VolumeUnit,
-  options: CurrencyOptions = {},
-): string {
+export function fuelPrice(pricePerGallon: number, unit: VolumeUnit, options: CurrencyOptions = {}): string {
   const locale = options.locale ?? 'en-US';
   const perUnit = pricePerUnit(pricePerGallon, unit);
   return numberFormat(locale, {
@@ -235,11 +253,7 @@ export function fuelPrice(
 }
 
 /** A canonical **cost per mile** shown per the given distance unit. */
-export function costPerDistance(
-  costPerMile: number,
-  unit: DistanceUnit,
-  options: CurrencyOptions = {},
-): string {
+export function costPerDistance(costPerMile: number, unit: DistanceUnit, options: CurrencyOptions = {}): string {
   const locale = options.locale ?? 'en-US';
   const perUnit = costPerMile / distanceUnits[unit].fromMiles(1);
   return numberFormat(locale, {

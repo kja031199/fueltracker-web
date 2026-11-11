@@ -72,59 +72,62 @@ describe('a save (#88)', () => {
     // must not count as a change.
     ['with sharing', sharingOn],
   ];
-  test.each(cases)('re-renders a screen that shows only the vehicles once, sync included (%s)', async (_name, sharingCase) => {
-    const { sharing, refreshes } = sharingCase();
-    const timers = manualTimers();
-    let status: SyncStatus | null = null;
-    const store = makeStore();
-    const car = await store.addVehicle({ name: 'Civic' });
-    const remote = new InMemoryRemoteStore();
-    let renders = 0;
-    let log: FuelLog | null = null;
+  test.each(cases)(
+    're-renders a screen that shows only the vehicles once, sync included (%s)',
+    async (_name, sharingCase) => {
+      const { sharing, refreshes } = sharingCase();
+      const timers = manualTimers();
+      let status: SyncStatus | null = null;
+      const store = makeStore();
+      const car = await store.addVehicle({ name: 'Civic' });
+      const remote = new InMemoryRemoteStore();
+      let renders = 0;
+      let log: FuelLog | null = null;
 
-    function VehiclesOnly(): ReactElement {
-      const { vehicles } = useFuelLog();
-      renders += 1;
-      return <p>{vehicles.length}</p>;
-    }
-    function Actions(): null {
-      log = useFuelLog();
-      status = useSyncStatus();
-      return null;
-    }
+      function VehiclesOnly(): ReactElement {
+        const { vehicles } = useFuelLog();
+        renders += 1;
+        return <p>{vehicles.length}</p>;
+      }
+      function Actions(): null {
+        log = useFuelLog();
+        status = useSyncStatus();
+        return null;
+      }
 
-    render(
-      <FuelLogProvider store={store} remote={remote} uid="u1" sharing={sharing} syncTimers={timers}>
-        <VehiclesOnly />
-        <Actions />
-      </FuelLogProvider>,
-    );
-    // Loaded, the mount sync done and its sharing refresh read, before counting.
-    await waitFor(() => expect(remote.pullLog.length).toBeGreaterThan(0));
-    await waitFor(() => expect(status!.syncing).toBe(false));
-    if (sharing !== null) await waitFor(() => expect(refreshes()).toBeGreaterThan(0));
-    await settle();
-    renders = 0;
-    const refreshedBefore = refreshes();
+      render(
+        <FuelLogProvider store={store} remote={remote} uid="u1" sharing={sharing} syncTimers={timers}>
+          <VehiclesOnly />
+          <Actions />
+        </FuelLogProvider>,
+      );
+      // Loaded, the mount sync done and its sharing refresh read, before counting.
+      await waitFor(() => expect(remote.pullLog.length).toBeGreaterThan(0));
+      await waitFor(() => expect(status!.syncing).toBe(false));
+      if (sharing !== null) await waitFor(() => expect(refreshes()).toBeGreaterThan(0));
+      await settle();
+      renders = 0;
+      const refreshedBefore = refreshes();
 
-    let saved: FillUpRecord | null = null;
-    await act(async () => {
-      saved = await log!.addFillUp(draft(10_000), car.id);
-    });
-    // The sync a save schedules, run now rather than after its 1.5 s delay,
-    // and the sharing refresh after it.
-    expect(timers.pending()).toBe(1);
-    await act(async () => {
-      timers.fire();
-    });
-    await waitFor(async () => expect(await remoteHolds(remote, saved!.id)).toBe(true));
-    await waitFor(() => expect(status!.syncing).toBe(false));
-    if (sharing !== null) await waitFor(() => expect(refreshes()).toBeGreaterThan(refreshedBefore));
-    await settle();
+      let saved: FillUpRecord | null = null;
+      await act(async () => {
+        saved = await log!.addFillUp(draft(10_000), car.id);
+      });
+      // The sync a save schedules, run now rather than after its 1.5 s delay,
+      // and the sharing refresh after it.
+      expect(timers.pending()).toBe(1);
+      await act(async () => {
+        timers.fire();
+      });
+      await waitFor(async () => expect(await remoteHolds(remote, saved!.id)).toBe(true));
+      await waitFor(() => expect(status!.syncing).toBe(false));
+      if (sharing !== null) await waitFor(() => expect(refreshes()).toBeGreaterThan(refreshedBefore));
+      await settle();
 
-    // Once: the reload that shows the save. Not the sync, not its status.
-    expect(renders).toBe(1);
-  });
+      // Once: the reload that shows the save. Not the sync, not its status.
+      expect(renders).toBe(1);
+    },
+  );
 });
 
 describe('what the screens are shown (#88)', () => {

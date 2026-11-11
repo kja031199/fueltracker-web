@@ -167,10 +167,7 @@ describe('units convert at the entry boundary', () => {
 describe('the fill-up list filter', () => {
   const seedThree = async (store: FuelTrackerStore, vehicleId: string): Promise<void> => {
     await store.addFillUp(draft({ odometer: 10_000, station: 'Shell' }), vehicleId);
-    await store.addFillUp(
-      draft({ odometer: 10_400, station: 'Costco', fuelGrade: 'Premium' }),
-      vehicleId,
-    );
+    await store.addFillUp(draft({ odometer: 10_400, station: 'Costco', fuelGrade: 'Premium' }), vehicleId);
     await store.addFillUp(draft({ odometer: 10_800, station: 'Shell' }), vehicleId);
   };
 
@@ -240,7 +237,14 @@ describe('the dashboard', () => {
   test('two suspect gaps are said in the plural (#94)', async () => {
     await setUp(async (store, vehicleId) => {
       // Two 4,000-mile jumps among 400-mile fills.
-      for (const [day, odometer] of [[1, 10_000], [11, 10_400], [21, 10_800], [31, 14_800], [41, 15_200], [51, 19_200]] as const) {
+      for (const [day, odometer] of [
+        [1, 10_000],
+        [11, 10_400],
+        [21, 10_800],
+        [31, 14_800],
+        [41, 15_200],
+        [51, 19_200],
+      ] as const) {
         await store.addFillUp(draft({ date: new Date(2025, 0, day), odometer }), vehicleId);
       }
     }, 'dashboard');

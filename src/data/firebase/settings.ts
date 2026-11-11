@@ -43,9 +43,7 @@ const REQUIRED = ['apiKey', 'authDomain', 'projectId', 'appId'] as const;
  * and a half-configured build that renders a live-looking button is worse than
  * one that says plainly what is missing.
  */
-export function readSettings(
-  env: Record<string, string | undefined>,
-): FirebaseSettings | null {
+export function readSettings(env: Record<string, string | undefined>): FirebaseSettings | null {
   const settings: FirebaseSettings = {
     apiKey: env.VITE_FIREBASE_API_KEY ?? '',
     authDomain: env.VITE_FIREBASE_AUTH_DOMAIN ?? '',

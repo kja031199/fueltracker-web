@@ -24,18 +24,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { BackupPromptReason, BackupState } from '../domain/exportReminder';
-import {
-  accountPreference,
-  jsonCodec,
-  readPreference,
-  useAccountPreference,
-} from './preferences';
-import {
-  NEVER_BACKED_UP,
-  afterBackup,
-  afterSnooze,
-  backupPromptReason,
-} from '../domain/exportReminder';
+import { accountPreference, jsonCodec, readPreference, useAccountPreference } from './preferences';
+import { NEVER_BACKED_UP, afterBackup, afterSnooze, backupPromptReason } from '../domain/exportReminder';
 
 function isBackupState(value: unknown): value is BackupState {
   if (typeof value !== 'object' || value === null) return false;
@@ -77,15 +67,9 @@ export function useBackupNudge(fillUpCount: number, uid: string | null): BackupN
     return () => clearInterval(timer);
   }, []);
 
-  const recordBackup = useCallback(
-    (count: number) => setState(afterBackup(count, Date.now())),
-    [setState],
-  );
+  const recordBackup = useCallback((count: number) => setState(afterBackup(count, Date.now())), [setState]);
 
-  const snooze = useCallback(
-    () => setState(afterSnooze(state, Date.now())),
-    [setState, state],
-  );
+  const snooze = useCallback(() => setState(afterSnooze(state, Date.now())), [setState, state]);
 
   return { state, reason: backupPromptReason(state, fillUpCount, now), recordBackup, snooze };
 }

@@ -1,11 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { makeStore } from '../../test/fixtures';
 import { allowedUidsInRules, rulesEnvironment, signedIn } from '../../test/emulator';
-import {
-  assertFails,
-  assertSucceeds,
-  type RulesTestEnvironment,
-} from '@firebase/rules-unit-testing';
+import { assertFails, assertSucceeds, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import {
   collection,
   deleteDoc,
@@ -31,8 +27,6 @@ import { makeFuelEntryDraft } from '../../domain/fuelEntryDraft';
  * emulator, with documents shaped exactly as the app writes them.
  */
 
-
-
 const ALLOWED = allowedUidsInRules();
 const OWNER = ALLOWED[0]!;
 /** The second allowlisted account: the partner being invited. */
@@ -49,7 +43,12 @@ const inviteId = (vehicleId: string, email: string): string => `${OWNER}__${vehi
 async function records(): Promise<{ vehicle: VehicleRecord; fillUp: FillUpRecord }> {
   const store = makeStore();
   const vehicle = await store.addVehicle({ name: 'Civic' });
-  const draft = makeFuelEntryDraft({ date: new Date(1_700_000_000_000), odometer: 10_000, gallons: 10, pricePerGallon: 3.5 });
+  const draft = makeFuelEntryDraft({
+    date: new Date(1_700_000_000_000),
+    odometer: 10_000,
+    gallons: 10,
+    pricePerGallon: 3.5,
+  });
   if (draft === null) throw new Error('fixture draft failed validation');
   const fillUp = await store.addFillUp(draft, vehicle.id);
   return { vehicle, fillUp };
@@ -168,7 +167,12 @@ describe('sharing a car (#66)', () => {
     it('nobody can forge an invitation from someone else', async () => {
       // The partner inviting themselves into the owner's car.
       await assertFails(setDoc(doc(partner(), `invites/${inviteId(SHARED, PARTNER_EMAIL)}`), invite()));
-      await assertFails(setDoc(doc(stranger(), `invites/${inviteId(SHARED, 'stranger@example.com')}`), invite(SHARED, 'stranger@example.com')));
+      await assertFails(
+        setDoc(
+          doc(stranger(), `invites/${inviteId(SHARED, 'stranger@example.com')}`),
+          invite(SHARED, 'stranger@example.com'),
+        ),
+      );
     });
 
     it('the invitee finds it by their verified address, whatever its case', async () => {
@@ -227,7 +231,12 @@ describe('sharing a car (#66)', () => {
       await assertFails(joining(impostor, { uid: STRANGER, data: { ...membership(), uid: STRANGER } }));
       await assertSucceeds(joining(partner()));
       // A member cannot add a third person.
-      await assertFails(setDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}/members/${STRANGER}`), { ...membership(), uid: STRANGER }));
+      await assertFails(
+        setDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}/members/${STRANGER}`), {
+          ...membership(),
+          uid: STRANGER,
+        }),
+      );
     });
 
     // #78: a car's id is not secret, and an owner can file a car under any
@@ -245,7 +254,11 @@ describe('sharing a car (#66)', () => {
     it('…including one you deleted, whose tombstone still names it', async () => {
       const { vehicle } = await records();
       await env.withSecurityRulesDisabled(async (context) => {
-        await setDoc(doc(context.firestore(), `users/${PARTNER}/vehicles/${SHARED}`), { ...vehicle, id: SHARED, deletedAt: 5 });
+        await setDoc(doc(context.firestore(), `users/${PARTNER}/vehicles/${SHARED}`), {
+          ...vehicle,
+          id: SHARED,
+          deletedAt: 5,
+        });
       });
       await setDoc(doc(owner(), `invites/${inviteId(SHARED, PARTNER_EMAIL)}`), invite());
       await assertFails(joining(partner()));
@@ -286,7 +299,11 @@ describe('sharing a car (#66)', () => {
       await setDoc(doc(owner(), `invites/${inviteId(SHARED, PARTNER_EMAIL)}`), invite());
       const { vehicle } = await records();
       await env.withSecurityRulesDisabled(async (context) => {
-        await setDoc(doc(context.firestore(), `users/${OWNER}/vehicles/${SHARED}`), { ...vehicle, id: SHARED, deletedAt: 5 });
+        await setDoc(doc(context.firestore(), `users/${OWNER}/vehicles/${SHARED}`), {
+          ...vehicle,
+          id: SHARED,
+          deletedAt: 5,
+        });
       });
       await assertFails(joining(partner()));
     });
@@ -304,7 +321,15 @@ describe('sharing a car (#66)', () => {
       await assertSucceeds(getDoc(doc(db, `users/${OWNER}/vehicles/${SHARED}`)));
       await assertSucceeds(getDoc(doc(db, `users/${OWNER}/fillUps/on-shared`)));
       await assertSucceeds(getDocs(query(collection(db, `users/${OWNER}/fillUps`), where('vehicleId', '==', SHARED))));
-      await assertSucceeds(getDocs(query(collection(db, `users/${OWNER}/fillUps`), where('vehicleId', '==', SHARED), where('syncedAt', '>', new Date(0)))));
+      await assertSucceeds(
+        getDocs(
+          query(
+            collection(db, `users/${OWNER}/fillUps`),
+            where('vehicleId', '==', SHARED),
+            where('syncedAt', '>', new Date(0)),
+          ),
+        ),
+      );
     });
 
     it('nothing else of the owner’s', async () => {
@@ -335,7 +360,9 @@ describe('sharing a car (#66)', () => {
   describe('what a member can write', () => {
     it('a new fill-up on the shared car, entered by themselves', async () => {
       await join();
-      await assertSucceeds(setDoc(doc(partner(), `users/${OWNER}/fillUps/new`), await fillUpFor('new', SHARED, PARTNER)));
+      await assertSucceeds(
+        setDoc(doc(partner(), `users/${OWNER}/fillUps/new`), await fillUpFor('new', SHARED, PARTNER)),
+      );
     });
 
     it('not one claiming someone else entered it, or with nobody named', async () => {
@@ -347,8 +374,12 @@ describe('sharing a car (#66)', () => {
     it('not one on another car, and not by moving an existing one there', async () => {
       await join();
       await assertFails(setDoc(doc(partner(), `users/${OWNER}/fillUps/new`), await fillUpFor('new', PRIVATE, PARTNER)));
-      await assertFails(setDoc(doc(partner(), `users/${OWNER}/fillUps/on-shared`), await fillUpFor('on-shared', PRIVATE, OWNER)));
-      await assertFails(setDoc(doc(partner(), `users/${OWNER}/fillUps/on-private`), await fillUpFor('on-private', SHARED, OWNER)));
+      await assertFails(
+        setDoc(doc(partner(), `users/${OWNER}/fillUps/on-shared`), await fillUpFor('on-shared', PRIVATE, OWNER)),
+      );
+      await assertFails(
+        setDoc(doc(partner(), `users/${OWNER}/fillUps/on-private`), await fillUpFor('on-private', SHARED, OWNER)),
+      );
     });
 
     it('an edit to an existing one, without changing who entered it', async () => {
@@ -360,14 +391,30 @@ describe('sharing a car (#66)', () => {
 
     it('still the shape every write must have', async () => {
       await join();
-      await assertFails(setDoc(doc(partner(), `users/${OWNER}/fillUps/new`), { ...(await fillUpFor('new', SHARED, PARTNER)), extra: 1 }));
-      await assertFails(setDoc(doc(partner(), `users/${OWNER}/fillUps/new`), { ...(await fillUpFor('new', SHARED, PARTNER)), syncedAt: new Date() }));
+      await assertFails(
+        setDoc(doc(partner(), `users/${OWNER}/fillUps/new`), {
+          ...(await fillUpFor('new', SHARED, PARTNER)),
+          extra: 1,
+        }),
+      );
+      await assertFails(
+        setDoc(doc(partner(), `users/${OWNER}/fillUps/new`), {
+          ...(await fillUpFor('new', SHARED, PARTNER)),
+          syncedAt: new Date(),
+        }),
+      );
     });
 
     it('never the car itself, or anything else of the owner’s', async () => {
       await join();
       const { vehicle } = await records();
-      await assertFails(setDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}`), { ...vehicle, id: SHARED, syncedAt: serverTimestamp() }));
+      await assertFails(
+        setDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}`), {
+          ...vehicle,
+          id: SHARED,
+          syncedAt: serverTimestamp(),
+        }),
+      );
       await assertFails(setDoc(doc(partner(), `users/${OWNER}/pendingFillUps/p2`), { id: 'p2' }));
     });
   });
@@ -388,7 +435,13 @@ describe('sharing a car (#66)', () => {
     it('still lets them edit it with an honest stamp', async () => {
       await join();
       const theirs = await fillUpFor('on-shared', SHARED, OWNER);
-      await assertSucceeds(setDoc(doc(partner(), `users/${OWNER}/fillUps/on-shared`), { ...theirs, odometer: 10_050, updatedAt: Date.now() }));
+      await assertSucceeds(
+        setDoc(doc(partner(), `users/${OWNER}/fillUps/on-shared`), {
+          ...theirs,
+          odometer: 10_050,
+          updatedAt: Date.now(),
+        }),
+      );
     });
 
     it('refuses taking the owner\u2019s stamp backwards, and allows the same stamp again', async () => {
@@ -410,7 +463,10 @@ describe('sharing a car (#66)', () => {
 
     it('refuses an invitation dated infinity', async () => {
       await assertFails(
-        setDoc(doc(owner(), `invites/${inviteId(SHARED, PARTNER_EMAIL)}`), { ...invite(), createdAt: Number.POSITIVE_INFINITY }),
+        setDoc(doc(owner(), `invites/${inviteId(SHARED, PARTNER_EMAIL)}`), {
+          ...invite(),
+          createdAt: Number.POSITIVE_INFINITY,
+        }),
       );
     });
   });
@@ -418,12 +474,20 @@ describe('sharing a car (#66)', () => {
   describe('the owner', () => {
     it('can still write their own fill-ups, with or without a name on them', async () => {
       await assertSucceeds(setDoc(doc(owner(), `users/${OWNER}/fillUps/mine`), await fillUpFor('mine', SHARED, OWNER)));
-      await assertSucceeds(setDoc(doc(owner(), `users/${OWNER}/fillUps/old-build`), await fillUpFor('old-build', SHARED, null)));
+      await assertSucceeds(
+        setDoc(doc(owner(), `users/${OWNER}/fillUps/old-build`), await fillUpFor('old-build', SHARED, null)),
+      );
     });
 
     it('cannot join their own car', async () => {
       await setDoc(doc(owner(), `invites/${inviteId(SHARED, OWNER_EMAIL)}`), invite(SHARED, OWNER_EMAIL));
-      await assertFails(setDoc(doc(owner(), `users/${OWNER}/vehicles/${SHARED}/members/${OWNER}`), { ...membership(), uid: OWNER, email: OWNER_EMAIL }));
+      await assertFails(
+        setDoc(doc(owner(), `users/${OWNER}/vehicles/${SHARED}/members/${OWNER}`), {
+          ...membership(),
+          uid: OWNER,
+          email: OWNER_EMAIL,
+        }),
+      );
     });
   });
 
@@ -431,7 +495,9 @@ describe('sharing a car (#66)', () => {
     it('a member can leave, and then reads nothing', async () => {
       await join();
       await assertSucceeds(deleteDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}/members/${PARTNER}`)));
-      await assertFails(getDocs(query(collection(partner(), `users/${OWNER}/fillUps`), where('vehicleId', '==', SHARED))));
+      await assertFails(
+        getDocs(query(collection(partner(), `users/${OWNER}/fillUps`), where('vehicleId', '==', SHARED))),
+      );
     });
 
     it('the owner can remove a member, and then they read nothing', async () => {
@@ -445,7 +511,11 @@ describe('sharing a car (#66)', () => {
       async function deleteTheCar(): Promise<void> {
         const { vehicle } = await records();
         await env.withSecurityRulesDisabled(async (context) => {
-          await setDoc(doc(context.firestore(), `users/${OWNER}/vehicles/${SHARED}`), { ...vehicle, id: SHARED, deletedAt: 5 });
+          await setDoc(doc(context.firestore(), `users/${OWNER}/vehicles/${SHARED}`), {
+            ...vehicle,
+            id: SHARED,
+            deletedAt: 5,
+          });
         });
       }
 
@@ -453,20 +523,33 @@ describe('sharing a car (#66)', () => {
         await join();
         await deleteTheCar();
         await assertFails(getDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}`)));
-        await assertFails(getDocs(query(collection(partner(), `users/${OWNER}/fillUps`), where('vehicleId', '==', SHARED))));
+        await assertFails(
+          getDocs(query(collection(partner(), `users/${OWNER}/fillUps`), where('vehicleId', '==', SHARED))),
+        );
       });
 
       it('…and writes nothing to it', async () => {
         await join();
         await deleteTheCar();
-        await assertFails(setDoc(doc(partner(), `users/${OWNER}/fillUps/new`), await fillUpFor('new', SHARED, PARTNER)));
+        await assertFails(
+          setDoc(doc(partner(), `users/${OWNER}/fillUps/new`), await fillUpFor('new', SHARED, PARTNER)),
+        );
         const theirs = await fillUpFor('on-shared', SHARED, OWNER);
-        await assertFails(setDoc(doc(partner(), `users/${OWNER}/fillUps/on-shared`), { ...theirs, odometer: 10_050, updatedAt: Date.now() }));
+        await assertFails(
+          setDoc(doc(partner(), `users/${OWNER}/fillUps/on-shared`), {
+            ...theirs,
+            odometer: 10_050,
+            updatedAt: Date.now(),
+          }),
+        );
       });
 
       it('the owner can still clear its members and invitations', async () => {
         await join();
-        await setDoc(doc(owner(), `invites/${inviteId(SHARED, 'third@example.com')}`), invite(SHARED, 'third@example.com'));
+        await setDoc(
+          doc(owner(), `invites/${inviteId(SHARED, 'third@example.com')}`),
+          invite(SHARED, 'third@example.com'),
+        );
         await deleteTheCar();
         await assertSucceeds(deleteDoc(doc(owner(), `users/${OWNER}/vehicles/${SHARED}/members/${PARTNER}`)));
         await assertSucceeds(deleteDoc(doc(owner(), `invites/${inviteId(SHARED, 'third@example.com')}`)));
@@ -496,7 +579,9 @@ describe('sharing a car (#66)', () => {
 
     it('someone not on the allowlist cannot join, even with an invitation to their address', async () => {
       const strangerEmail = 'stranger@example.com';
-      await assertSucceeds(setDoc(doc(owner(), `invites/${inviteId(SHARED, strangerEmail)}`), invite(SHARED, strangerEmail)));
+      await assertSucceeds(
+        setDoc(doc(owner(), `invites/${inviteId(SHARED, strangerEmail)}`), invite(SHARED, strangerEmail)),
+      );
       await assertFails(
         setDoc(doc(stranger(), `users/${OWNER}/vehicles/${SHARED}/members/${STRANGER}`), {
           ...membership(),
@@ -508,7 +593,10 @@ describe('sharing a car (#66)', () => {
 
     it('a member cannot read the invitations the owner has sent', async () => {
       await join();
-      await setDoc(doc(owner(), `invites/${inviteId(PRIVATE, 'someone@example.com')}`), invite(PRIVATE, 'someone@example.com'));
+      await setDoc(
+        doc(owner(), `invites/${inviteId(PRIVATE, 'someone@example.com')}`),
+        invite(PRIVATE, 'someone@example.com'),
+      );
       await assertFails(getDocs(query(collection(partner(), 'invites'), where('ownerUid', '==', OWNER))));
     });
 
@@ -521,14 +609,20 @@ describe('sharing a car (#66)', () => {
     it('a member cannot edit their own membership document', async () => {
       await join();
       await assertFails(
-        setDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}/members/${PARTNER}`), { ...membership(), name: 'Owner' }),
+        setDoc(doc(partner(), `users/${OWNER}/vehicles/${SHARED}/members/${PARTNER}`), {
+          ...membership(),
+          name: 'Owner',
+        }),
       );
     });
 
     it('a member’s fill-up still obeys the receipt size limit', async () => {
       await join();
       const { Bytes } = await import('firebase/firestore');
-      const big = { ...(await fillUpFor('big', SHARED, PARTNER)), receiptImageData: Bytes.fromUint8Array(new Uint8Array(716_801)) };
+      const big = {
+        ...(await fillUpFor('big', SHARED, PARTNER)),
+        receiptImageData: Bytes.fromUint8Array(new Uint8Array(716_801)),
+      };
       await assertFails(setDoc(doc(partner(), `users/${OWNER}/fillUps/big`), big));
     });
 
@@ -563,7 +657,9 @@ describe('sharing a car (#66)', () => {
 
     it('under an id that matches what it says, with nothing extra', async () => {
       await assertFails(setDoc(doc(partner(), `users/${PARTNER}/memberships/wrong`), entry()));
-      await assertFails(setDoc(doc(partner(), `users/${PARTNER}/memberships/${OWNER}__${SHARED}`), { ...entry(), role: 'owner' }));
+      await assertFails(
+        setDoc(doc(partner(), `users/${PARTNER}/memberships/${OWNER}__${SHARED}`), { ...entry(), role: 'owner' }),
+      );
     });
 
     it('and nobody else’s', async () => {

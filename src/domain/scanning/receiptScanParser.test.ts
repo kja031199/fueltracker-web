@@ -11,11 +11,7 @@ const REFERENCE = new Date(2026, 9, 15); // 15 October 2026, local
 
 const parse = (lines: string[]) => parseReceipt(lines, REFERENCE);
 
-const ymd = (date: Date): [number, number, number] => [
-  date.getFullYear(),
-  date.getMonth() + 1,
-  date.getDate(),
-];
+const ymd = (date: Date): [number, number, number] => [date.getFullYear(), date.getMonth() + 1, date.getDate()];
 
 const hm = (date: Date): [number, number] => [date.getHours(), date.getMinutes()];
 

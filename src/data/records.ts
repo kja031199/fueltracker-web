@@ -121,14 +121,11 @@ export interface Snapshot {
   readonly pendingFillUps: readonly PendingFillUpRecord[];
 }
 
-
 /**
  * Presence check for a usable receipt. Empty bytes count as none, so a stray
  * zero-length blob never shows an empty thumbnail slot.
  */
-export function hasReceipt(
-  record: Pick<FillUpRecord, 'receiptImageData'>,
-): boolean {
+export function hasReceipt(record: Pick<FillUpRecord, 'receiptImageData'>): boolean {
   return record.receiptImageData !== null && record.receiptImageData.byteLength > 0;
 }
 

@@ -22,7 +22,7 @@ import { MAX_ID_LENGTH, idProblem, isStorableId } from './recordId';
 describe('ids that are fine', () => {
   test.each([
     ['a uuid', '8f14e45f-ceea-467a-9f3a-1c0a4f1a9b77'],
-    ['the test suite\'s own ids', 'id-1'],
+    ["the test suite's own ids", 'id-1'],
     ['dots inside a name', 'fill.up.1'],
     ['underscores that are not a reserved pair', '__leading'],
     ['a trailing pair only', 'trailing__'],

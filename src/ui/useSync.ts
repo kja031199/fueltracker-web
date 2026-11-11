@@ -140,7 +140,9 @@ export function useSync(
       // passed shape and then failed the draft gate on its numbers.
       const unusable = invalid + pulledRejected;
       if (unusable > 0) {
-        notes.push(`${countOf(unusable, { one: '# row from your account was', other: '# rows from your account were' }, locale.current)} unusable and skipped`);
+        notes.push(
+          `${countOf(unusable, { one: '# row from your account was', other: '# rows from your account were' }, locale.current)} unusable and skipped`,
+        );
       }
       if (receiptsOmitted > 0) {
         notes.push(
@@ -161,16 +163,23 @@ export function useSync(
         );
       }
       if (skippedNewerSchema > 0) {
-        notes.push(`${countOf(skippedNewerSchema, { one: '# row was', other: '# rows were' }, locale.current)} written by a newer version and left alone`);
+        notes.push(
+          `${countOf(skippedNewerSchema, { one: '# row was', other: '# rows were' }, locale.current)} written by a newer version and left alone`,
+        );
       }
       if (unbeatable > 0) {
         // Said plainly because the consequence is specific and otherwise
         // invisible: edits made here to those rows will not stick.
         notes.push(
-          countOf(unbeatable, {
-            one: '# row is dated far in the future, probably by a device with a wrong clock — changes you make to it here may not stick until its clock is fixed',
-            other: '# rows are dated far in the future, probably by a device with a wrong clock — changes you make to them here may not stick until its clock is fixed',
-          }, locale.current),
+          countOf(
+            unbeatable,
+            {
+              one: '# row is dated far in the future, probably by a device with a wrong clock — changes you make to it here may not stick until its clock is fixed',
+              other:
+                '# rows are dated far in the future, probably by a device with a wrong clock — changes you make to them here may not stick until its clock is fixed',
+            },
+            locale.current,
+          ),
         );
       }
       // Shared cars (#66). An ended share is said by name: a car vanishing
@@ -199,12 +208,13 @@ export function useSync(
         );
       }
       if (all.shares.failed.length > 0) {
-        notes.push(`${countOf(all.shares.failed.length, { one: '# shared car', other: '# shared cars' }, locale.current)} could not be reached and will be retried`);
+        notes.push(
+          `${countOf(all.shares.failed.length, { one: '# shared car', other: '# shared cars' }, locale.current)} could not be reached and will be retried`,
+        );
       }
       setMessage(notes.length === 0 ? null : `Synced. ${notes.join('; ')}.`);
 
-      const changed =
-        pulled.vehiclesWritten + pulled.fillUpsWritten + pulled.pendingWritten > 0;
+      const changed = pulled.vehiclesWritten + pulled.fillUpsWritten + pulled.pendingWritten > 0;
       // A shared car's sync can bring rows too — but only one that did (#89):
       // every sync of a shared car used to reload every screen.
       const sharesMoved =

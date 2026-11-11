@@ -45,15 +45,13 @@ const BUILD_TESTS = 'src/**/*.build.test.{ts,tsx}';
  * wasm, which is why there are no `.wasm` files here.
  */
 const requireFromHere = createRequire(import.meta.url);
-const TESSERACT_VERSION = (requireFromHere('tesseract.js/package.json') as { version: string })
-  .version;
+const TESSERACT_VERSION = (requireFromHere('tesseract.js/package.json') as { version: string }).version;
 const TESSERACT_ASSETS = `tesseract/${TESSERACT_VERSION}/`;
 const TESSERACT_FILES: Readonly<Record<string, string>> = {
   'worker.min.js': 'tesseract.js/dist/worker.min.js',
   'core/tesseract-core-lstm.wasm.js': 'tesseract.js-core/tesseract-core-lstm.wasm.js',
   'core/tesseract-core-simd-lstm.wasm.js': 'tesseract.js-core/tesseract-core-simd-lstm.wasm.js',
-  'core/tesseract-core-relaxedsimd-lstm.wasm.js':
-    'tesseract.js-core/tesseract-core-relaxedsimd-lstm.wasm.js',
+  'core/tesseract-core-relaxedsimd-lstm.wasm.js': 'tesseract.js-core/tesseract-core-relaxedsimd-lstm.wasm.js',
   'lang/eng.traineddata.gz': '@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz',
 };
 
@@ -80,10 +78,7 @@ function tesseractAssets(): Plugin {
         // Own keys only (#82): `in` also finds what every object inherits, so
         // `/tesseract/<v>/constructor` reached `require.resolve(undefined)`.
         if (file === null || !Object.hasOwn(TESSERACT_FILES, file)) return next();
-        response.setHeader(
-          'Content-Type',
-          file.endsWith('.js') ? 'text/javascript' : 'application/octet-stream',
-        );
+        response.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript' : 'application/octet-stream');
         response.end(readFileSync(source(file)));
       });
     },
@@ -107,8 +102,7 @@ export default defineConfig({
       manifest: {
         name: 'FuelTracker',
         short_name: 'FuelTracker',
-        description:
-          'Track gas fill-ups and fuel economy. Kept on your device and synced to your own Google account.',
+        description: 'Track gas fill-ups and fuel economy. Kept on your device and synced to your own Google account.',
         start_url: base,
         scope: base,
         display: 'standalone',

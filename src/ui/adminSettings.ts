@@ -16,6 +16,4 @@
 import { idleMinutesFromConfig } from '../domain/idleTimeout';
 
 /** Minutes of inactivity before anyone is signed out: `VITE_IDLE_TIMEOUT_MINUTES`. */
-export const ADMIN_IDLE_MINUTES: number = idleMinutesFromConfig(
-  import.meta.env.VITE_IDLE_TIMEOUT_MINUTES,
-);
+export const ADMIN_IDLE_MINUTES: number = idleMinutesFromConfig(import.meta.env.VITE_IDLE_TIMEOUT_MINUTES);

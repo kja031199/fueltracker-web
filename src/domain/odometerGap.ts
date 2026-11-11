@@ -42,10 +42,7 @@ function median(values: readonly number[]): number {
  * when it is not unusual — or when there is not enough to say. Readings that
  * are not finite and positive are ignored rather than trusted.
  */
-export function unusualOdometerJump(
-  odometer: number | null,
-  history: readonly number[],
-): UnusualJump | null {
+export function unusualOdometerJump(odometer: number | null, history: readonly number[]): UnusualJump | null {
   return jumpFrom(odometerHistory(history), odometer);
 }
 
@@ -61,9 +58,7 @@ export interface OdometerHistory {
 }
 
 export function odometerHistory(history: readonly number[]): OdometerHistory {
-  const readings = [...new Set(history.filter((value) => Number.isFinite(value) && value > 0))].sort(
-    (a, b) => a - b,
-  );
+  const readings = [...new Set(history.filter((value) => Number.isFinite(value) && value > 0))].sort((a, b) => a - b);
   const gaps = readings.slice(1).map((value, index) => value - readings[index]!);
   return { readings, usual: gaps.length < MIN_GAPS ? null : median(gaps) };
 }

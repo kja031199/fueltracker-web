@@ -7,7 +7,14 @@ import { InMemoryRemoteStore } from '../data/testing/inMemoryRemote';
 import { InMemorySharingWorld } from '../data/testing/inMemorySharing';
 import { InMemoryShareLedger } from '../data/testing/inMemoryShareLedger';
 import { FuelTrackerStore } from '../data/store';
-import { FuelLogProvider, useBackupStatus, useFuelLog, useSyncStatus, type BackupStatus, type FuelLog } from './fuelLog';
+import {
+  FuelLogProvider,
+  useBackupStatus,
+  useFuelLog,
+  useSyncStatus,
+  type BackupStatus,
+  type FuelLog,
+} from './fuelLog';
 import { toJsonBackup } from '../data/backupFormat';
 import { loadBackupState } from './backupNudge';
 import { manualTimers, type ManualTimers } from '../test/manualTimers';
@@ -120,8 +127,7 @@ describe('every write reaches the account without anyone remembering to ask', ()
       await log().updateFillUp(entry.id, draft(1234));
     });
     await synced();
-    await waitFor(
-      async () => expect((await remoteRow(remote, entry.id))?.['odometer']).toBe(1234));
+    await waitFor(async () => expect((await remoteRow(remote, entry.id))?.['odometer']).toBe(1234));
   });
 
   test('removeFillUp', async () => {

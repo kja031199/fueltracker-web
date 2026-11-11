@@ -55,11 +55,7 @@ export type BackupPromptReason = 'never' | 'stale' | 'manyNewEntries';
  * backup" deserve different sentences, and a generic nag is the kind people
  * learn to dismiss without reading.
  */
-export function backupPromptReason(
-  state: BackupState,
-  fillUpCount: number,
-  now: number,
-): BackupPromptReason | null {
+export function backupPromptReason(state: BackupState, fillUpCount: number, now: number): BackupPromptReason | null {
   // Nothing worth losing yet. Nagging a brand-new reader is how you train
   // someone to ignore the banner that matters later.
   if (fillUpCount < MINIMUM_ENTRIES_TO_PROMPT) return null;

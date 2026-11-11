@@ -127,10 +127,7 @@ function unscopedKey<T>(preference: Preference<T, PreferenceScope>): string {
 
 export function storageKey<T>(preference: BrowserPreference<T>): string;
 export function storageKey<T>(preference: AccountPreference<T>, uid: string | null): string | null;
-export function storageKey<T>(
-  preference: Preference<T, PreferenceScope>,
-  uid: string | null = null,
-): string | null {
+export function storageKey<T>(preference: Preference<T, PreferenceScope>, uid: string | null = null): string | null {
   if (preference.scope === 'browser') return unscopedKey(preference);
   return isUsableUid(uid) ? `${unscopedKey(preference)}.u.${uid}` : null;
 }
@@ -158,10 +155,7 @@ function forgetUnscoped<T>(preference: Preference<T, PreferenceScope>): void {
 
 export function readPreference<T>(preference: BrowserPreference<T>): T | null;
 export function readPreference<T>(preference: AccountPreference<T>, uid: string | null): T | null;
-export function readPreference<T>(
-  preference: Preference<T, PreferenceScope>,
-  uid: string | null = null,
-): T | null {
+export function readPreference<T>(preference: Preference<T, PreferenceScope>, uid: string | null = null): T | null {
   forgetUnscoped(preference);
   const key = storageKey(preference as AccountPreference<T>, uid);
   if (key === null) return null;
@@ -175,11 +169,7 @@ export function readPreference<T>(
 
 /** True when the value was stored; false when there is no account or no room. */
 export function writePreference<T>(preference: BrowserPreference<T>, value: T): boolean;
-export function writePreference<T>(
-  preference: AccountPreference<T>,
-  value: T,
-  uid: string | null,
-): boolean;
+export function writePreference<T>(preference: AccountPreference<T>, value: T, uid: string | null): boolean;
 export function writePreference<T>(
   preference: Preference<T, PreferenceScope>,
   value: T,
@@ -199,10 +189,7 @@ export function writePreference<T>(
 
 export function removePreference<T>(preference: BrowserPreference<T>): void;
 export function removePreference<T>(preference: AccountPreference<T>, uid: string | null): void;
-export function removePreference<T>(
-  preference: Preference<T, PreferenceScope>,
-  uid: string | null = null,
-): void {
+export function removePreference<T>(preference: Preference<T, PreferenceScope>, uid: string | null = null): void {
   forgetUnscoped(preference);
   const key = storageKey(preference as AccountPreference<T>, uid);
   if (key === null) return;

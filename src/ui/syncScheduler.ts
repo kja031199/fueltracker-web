@@ -43,10 +43,7 @@ export interface SyncScheduler {
   dispose(): void;
 }
 
-export function createSyncScheduler(
-  run: () => Promise<void>,
-  timers: SchedulerTimers = browserTimers,
-): SyncScheduler {
+export function createSyncScheduler(run: () => Promise<void>, timers: SchedulerTimers = browserTimers): SyncScheduler {
   let timer: unknown = null;
   let current: Promise<void> | null = null;
   let again = false;

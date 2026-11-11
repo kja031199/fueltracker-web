@@ -78,9 +78,7 @@ describe('a session that went idle', () => {
 
     render(<App store={await storeWithAVehicle()} auth={auth} initialTab="settings" />);
 
-    expect(
-      await screen.findByRole('button', { name: /continue with google/i }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /continue with google/i })).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: /sections/i })).not.toBeInTheDocument();
   });
 
@@ -110,7 +108,7 @@ describe('a session that went idle', () => {
     expect(await screen.findByRole('button', { name: /continue with google/i })).toBeInTheDocument();
   });
 
-  test('a stored longer period cannot stretch the administrator\'s', async () => {
+  test("a stored longer period cannot stretch the administrator's", async () => {
     localStorage.setItem('fueltracker.idleTimeout', JSON.stringify({ enabled: true, minutes: 1440 }));
     localStorage.setItem(ACTIVITY_STORAGE_KEY, String(Date.now() - 10 * 60 * 1000));
     const auth = new StubAuthProvider({ status: 'signedIn', user: USER }, USER);

@@ -36,9 +36,7 @@ export function AccountId({ uid, children }: Props): ReactElement {
       <p className="stack-xs">
         Your account id: <code>{uid}</code>
       </p>
-      {children !== undefined && (
-        <p className="stack-sm muted">{children}</p>
-      )}
+      {children !== undefined && <p className="stack-sm muted">{children}</p>}
       <p className="stack-sm">
         <button className="button button--secondary" type="button" onClick={() => void copy(uid)}>
           Copy account id

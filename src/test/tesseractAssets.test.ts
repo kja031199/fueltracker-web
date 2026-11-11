@@ -27,7 +27,9 @@ function flatten(list: unknown): unknown[] {
 function middleware(): Middleware {
   const plugin = flatten(config.plugins ?? []).find(
     (candidate): candidate is { name: string; configureServer: unknown } =>
-      typeof candidate === 'object' && candidate !== null && (candidate as { name?: unknown }).name === 'fueltracker:tesseract-assets',
+      typeof candidate === 'object' &&
+      candidate !== null &&
+      (candidate as { name?: unknown }).name === 'fueltracker:tesseract-assets',
   );
   expect(plugin, 'the tesseract assets plugin').toBeDefined();
   let used: Middleware | null = null;

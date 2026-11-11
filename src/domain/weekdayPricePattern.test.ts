@@ -12,8 +12,7 @@ import {
 // January 2025 weekday reference (1 = Sun … 7 = Sat):
 //   Jan 5 Sun, Jan 6 Mon, Jan 7 Tue, Jan 8 Wed, Jan 9 Thu, Jan 10 Fri, Jan 11 Sat
 // Tuesdays: 7, 14, 21, 28.  Fridays: 3, 10, 17, 24, 31.
-const day = (year: number, month: number, dayOfMonth: number): Date =>
-  new Date(year, month - 1, dayOfMonth);
+const day = (year: number, month: number, dayOfMonth: number): Date => new Date(year, month - 1, dayOfMonth);
 
 let nextId = 0;
 function makeEntry(date: Date, price: number, gallons = 10): FuelEntryStats {
@@ -42,10 +41,7 @@ describe('grouping and averaging', () => {
     // Two Tuesday fills, very different gallons. A gallon-weighted mean would be
     // 3.32; the simple mean is 3.20 — the price you "tend to catch", which is
     // what the pattern is about.
-    const prices = weekdayPrices([
-      makeEntry(day(2025, 1, 7), 3.0, 5),
-      makeEntry(day(2025, 1, 14), 3.4, 20),
-    ]);
+    const prices = weekdayPrices([makeEntry(day(2025, 1, 7), 3.0, 5), makeEntry(day(2025, 1, 14), 3.4, 20)]);
     const tuesday = prices.find((p) => p.weekday === 3);
     expect(tuesday).toBeDefined();
     expect(tuesday!.averagePrice).toBeCloseTo(3.2, 4);
@@ -65,10 +61,8 @@ describe('grouping and averaging', () => {
     const entries = [5, 6, 7, 8, 9, 10, 11].map((d) => makeEntry(day(2025, 1, d), 3.0));
 
     expect(weekdayPrices(entries).map((p) => p.weekday)).toEqual([1, 2, 3, 4, 5, 6, 7]);
-    expect(weekdayPrices(entries, { firstWeekday: 2 }).map((p) => p.weekday))
-      .toEqual([2, 3, 4, 5, 6, 7, 1]);
-    expect(weekdayPrices(entries, { firstWeekday: 7 }).map((p) => p.weekday))
-      .toEqual([7, 1, 2, 3, 4, 5, 6]);
+    expect(weekdayPrices(entries, { firstWeekday: 2 }).map((p) => p.weekday)).toEqual([2, 3, 4, 5, 6, 7, 1]);
+    expect(weekdayPrices(entries, { firstWeekday: 7 }).map((p) => p.weekday)).toEqual([7, 1, 2, 3, 4, 5, 6]);
   });
 
   test('returns the weekday by number and leaves naming it to the UI (#94)', () => {
@@ -237,10 +231,7 @@ describe('degenerate and hostile input', () => {
   });
 
   test('an invalid date drops out rather than forming a bucket', () => {
-    const entries = [
-      makeEntry(new Date('nonsense'), 9.99),
-      makeEntry(day(2025, 1, 7), 3.2),
-    ];
+    const entries = [makeEntry(new Date('nonsense'), 9.99), makeEntry(day(2025, 1, 7), 3.2)];
     const prices = weekdayPrices(entries);
     expect(prices).toHaveLength(1);
     expect(prices[0]?.weekday).toBe(3);
@@ -265,5 +256,3 @@ describe('degenerate and hostile input', () => {
     expect(prices[0]?.averagePrice).toBeCloseTo(3.0, 10);
   });
 });
-
-

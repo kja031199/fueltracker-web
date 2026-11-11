@@ -32,8 +32,8 @@
     {
       "name": "no local-only fallback",
       "file": "src/bootstrap.ts",
-      "from": "      loadRemotes().catch(() => null),",
-      "to": "      loadRemotes(),"
+      "from": "    const [account, factory] = await Promise.all([deps.openAccount(uid), loadRemotes().catch(() => null)]);\n",
+      "to": "    const [account, factory] = await Promise.all([deps.openAccount(uid), loadRemotes()]);\n"
     },
     {
       "name": "token refresh reopens everything",

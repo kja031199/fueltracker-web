@@ -49,12 +49,7 @@ function trimmedSearch(filter: FillUpFilter): string {
 
 /** Whether any constraint is set — drives the "filters active" indicator. */
 export function isFilterActive(filter: FillUpFilter): boolean {
-  return (
-    trimmedSearch(filter) !== '' ||
-    filter.range !== 'All' ||
-    filter.fuelGrade !== null ||
-    filter.station !== null
-  );
+  return trimmedSearch(filter) !== '' || filter.range !== 'All' || filter.fuelGrade !== null || filter.station !== null;
 }
 
 /**

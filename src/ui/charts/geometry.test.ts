@@ -112,7 +112,12 @@ describe('plotBounds', () => {
 
 describe('linePath', () => {
   test('moves to the first point and lines to the rest', () => {
-    expect(linePath([{ x: 0, y: 10 }, { x: 5, y: 20 }])).toBe('M0.00 10.00 L5.00 20.00');
+    expect(
+      linePath([
+        { x: 0, y: 10 },
+        { x: 5, y: 20 },
+      ]),
+    ).toBe('M0.00 10.00 L5.00 20.00');
   });
 
   test('an empty series draws nothing rather than an invalid path', () => {

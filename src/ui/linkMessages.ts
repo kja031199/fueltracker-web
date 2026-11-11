@@ -17,9 +17,7 @@ export function linkProblemText(problem: LinkProblem, kind: 'request' | 'submiss
     case 'damaged':
       return `This link is damaged — part of it was probably lost when it was copied. ${ask}`;
     case 'wrong-kind':
-      return kind === 'request'
-        ? 'This is not a fill-up request link.'
-        : 'This is not a fill-up link.';
+      return kind === 'request' ? 'This is not a fill-up request link.' : 'This is not a fill-up link.';
     case 'newer-version':
       return 'This link was made by a newer version of FuelTracker. Reload the page to update, then open the link again.';
     case 'invalid':

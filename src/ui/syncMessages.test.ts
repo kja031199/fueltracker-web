@@ -22,7 +22,9 @@ describe('a failed sync, in words', () => {
 
   test('an unreachable account, with what went wrong when there is something to say', () => {
     expect(syncFailureMessage({ problem: 'pull-failed' })).toBe('Could not reach your account.');
-    expect(syncFailureMessage({ problem: 'pull-failed', detail: 'offline' })).toBe('Could not reach your account. (offline)');
+    expect(syncFailureMessage({ problem: 'pull-failed', detail: 'offline' })).toBe(
+      'Could not reach your account. (offline)',
+    );
   });
 
   test('a failed upload says the changes are kept', () => {

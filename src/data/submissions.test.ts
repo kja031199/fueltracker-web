@@ -12,10 +12,22 @@ describe('receiving a submission', () => {
   test('queues it under the id the link carried, with who sent it and when', async () => {
     const store = makeStore({ author: 'owner' });
     const car = await store.addVehicle({ name: 'Civic' });
-    const result = await store.receiveSubmission({ id: 'sub-1', vehicleId: car.id, submitterName: 'Sam', submittedAt: 123, draft: draft() });
+    const result = await store.receiveSubmission({
+      id: 'sub-1',
+      vehicleId: car.id,
+      submitterName: 'Sam',
+      submittedAt: 123,
+      draft: draft(),
+    });
     expect(result).toBe('queued');
     const [pending] = await store.pendingFillUps();
-    expect(pending).toMatchObject({ id: 'sub-1', vehicleId: car.id, submitterName: 'Sam', submittedAt: 123, odometer: 10_000 });
+    expect(pending).toMatchObject({
+      id: 'sub-1',
+      vehicleId: car.id,
+      submitterName: 'Sam',
+      submittedAt: 123,
+      odometer: 10_000,
+    });
     expect(await store.fillUpCount()).toBe(0);
   });
 
@@ -25,11 +37,22 @@ describe('receiving a submission', () => {
     const store = makeStore({ author: 'owner' });
     const car = await store.addVehicle({ name: 'Civic' });
     const placed = makeFuelEntryDraft({
-      date: new Date(2026, 0, 1), odometer: 10_000, gallons: 10, pricePerGallon: 3.5,
-      latitude: 51.5, longitude: -0.12, receiptImageData: new Uint8Array([1, 2, 3]),
+      date: new Date(2026, 0, 1),
+      odometer: 10_000,
+      gallons: 10,
+      pricePerGallon: 3.5,
+      latitude: 51.5,
+      longitude: -0.12,
+      receiptImageData: new Uint8Array([1, 2, 3]),
     });
     if (placed === null) throw new Error('fixture draft failed validation');
-    await store.receiveSubmission({ id: 'sub-1', vehicleId: car.id, submitterName: 'S'.repeat(500), submittedAt: 1, draft: placed });
+    await store.receiveSubmission({
+      id: 'sub-1',
+      vehicleId: car.id,
+      submitterName: 'S'.repeat(500),
+      submittedAt: 1,
+      draft: placed,
+    });
     const [pending] = await store.pendingFillUps();
     expect(pending).toMatchObject({ latitude: null, longitude: null, receiptImageData: null });
     expect(pending?.submitterName).toHaveLength(200);
@@ -73,7 +96,13 @@ describe('receiving a submission', () => {
   test('the submitter’s name is bounded like any text from outside', async () => {
     const store = makeStore({ author: 'owner' });
     const car = await store.addVehicle({ name: 'Civic' });
-    await store.receiveSubmission({ id: 's', vehicleId: car.id, submitterName: 'x'.repeat(5000), submittedAt: 1, draft: draft() });
+    await store.receiveSubmission({
+      id: 's',
+      vehicleId: car.id,
+      submitterName: 'x'.repeat(5000),
+      submittedAt: 1,
+      draft: draft(),
+    });
     expect((await store.pendingFillUps())[0]?.submitterName.length).toBeLessThanOrEqual(200);
   });
 });
@@ -82,7 +111,13 @@ describe('approving', () => {
   test('makes a fill-up entered by the owner who approved it, and clears the queue', async () => {
     const store = makeStore({ author: 'owner' });
     const car = await store.addVehicle({ name: 'Civic' });
-    await store.receiveSubmission({ id: 'sub-1', vehicleId: car.id, submitterName: 'Sam', submittedAt: 1, draft: draft() });
+    await store.receiveSubmission({
+      id: 'sub-1',
+      vehicleId: car.id,
+      submitterName: 'Sam',
+      submittedAt: 1,
+      draft: draft(),
+    });
     const made = await store.approvePendingFillUp('sub-1');
     expect(made?.odometer).toBe(10_000);
     expect(made?.station).toBe('Shell');
@@ -93,7 +128,13 @@ describe('approving', () => {
   test('is refused once the car has been deleted, and the submission stays to be dealt with', async () => {
     const store = makeStore({ author: 'owner' });
     const car = await store.addVehicle({ name: 'Civic' });
-    await store.receiveSubmission({ id: 'sub-1', vehicleId: car.id, submitterName: 'Sam', submittedAt: 1, draft: draft() });
+    await store.receiveSubmission({
+      id: 'sub-1',
+      vehicleId: car.id,
+      submitterName: 'Sam',
+      submittedAt: 1,
+      draft: draft(),
+    });
     await store.removeVehicle(car.id);
     expect(await store.approvePendingFillUp('sub-1')).toBeNull();
     expect(await store.fillUpCount()).toBe(0);

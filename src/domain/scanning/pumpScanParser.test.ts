@@ -19,11 +19,7 @@ describe('labelled displays', () => {
   test('parses labels on separate lines', () => {
     // Pumps routinely put the caption on one display line and the value on the
     // next, so a label has to survive until the next number turns up.
-    const reading = parsePump([
-      'GALLONS', '8.712',
-      'PRICE PER GALLON', '3.499',
-      'TOTAL SALE', '30.48',
-    ]);
+    const reading = parsePump(['GALLONS', '8.712', 'PRICE PER GALLON', '3.499', 'TOTAL SALE', '30.48']);
     expect(reading.gallons).toBe(8.712);
     expect(reading.pricePerGallon).toBe(3.499);
     expect(reading.totalCost).toBe(30.48);
@@ -69,8 +65,12 @@ describe('arithmetic consistency', () => {
     // The car wash and tax mean 41.24 will not reconcile with gallons × price,
     // so the fuel numbers win on their own arithmetic.
     const reading = parsePump([
-      'UNLEADED  9.000 GAL', 'PRICE/GAL 3.500',
-      'FUEL 31.50', 'CAR WASH 9.00', 'TAX 0.74', 'TOTAL 41.24',
+      'UNLEADED  9.000 GAL',
+      'PRICE/GAL 3.500',
+      'FUEL 31.50',
+      'CAR WASH 9.00',
+      'TAX 0.74',
+      'TOTAL 41.24',
     ]);
     expect(reading.gallons).toBe(9.0);
     expect(reading.pricePerGallon).toBe(3.5);
@@ -260,13 +260,14 @@ describe('the fuel "@" line', () => {
   });
 
   test('an "@" with nothing usable either side changes nothing', () => {
-    expect(parsePump(['@', '@ @ @', '4.092 @', '@ 4.099', 'EMAIL ME @ HOME'])).toEqual(
-      EMPTY_PUMP_READING,
-    );
+    expect(parsePump(['@', '@ @ @', '4.092 @', '@ 4.099', 'EMAIL ME @ HOME'])).toEqual(EMPTY_PUMP_READING);
   });
 
   test('a flood of fuel lines is bounded and refuses to choose', () => {
-    const flood = Array.from({ length: 5000 }, (_, i) => `${(1 + (i % 50)).toFixed(3)} @ 3.${String(100 + (i % 800)).slice(0, 3)}`);
+    const flood = Array.from(
+      { length: 5000 },
+      (_, i) => `${(1 + (i % 50)).toFixed(3)} @ 3.${String(100 + (i % 800)).slice(0, 3)}`,
+    );
     const started = Date.now();
     const reading = parsePump(flood);
     expect(Date.now() - started).toBeLessThan(1000);

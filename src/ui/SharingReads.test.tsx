@@ -135,8 +135,12 @@ describe('the cars shared with you, as the screens see them (#89)', () => {
     const mine = await store.addVehicle({ name: 'Civic' });
     // Somebody shares a car whose id is already one of this device's (#78):
     // the sync leaves it out of the device's ledger, and says to leave it.
-    await world.remoteFor(THEM.uid).push({ vehicles: [{ ...mine, name: 'Their Civic' }], fillUps: [], pendingFillUps: [] });
-    await world.sharingFor(ME).accept(await world.sharingFor(THEM).invite({ id: mine.id, name: 'Their Civic' }, ME.email));
+    await world
+      .remoteFor(THEM.uid)
+      .push({ vehicles: [{ ...mine, name: 'Their Civic' }], fillUps: [], pendingFillUps: [] });
+    await world
+      .sharingFor(ME)
+      .accept(await world.sharingFor(THEM).invite({ id: mine.id, name: 'Their Civic' }, ME.email));
 
     const mounted = await mount(world, ME, store);
 
@@ -193,7 +197,10 @@ describe('invitations sent for one car (#89)', () => {
     await remote.invite(jazz, 'b@example.com');
 
     expect((await remote.invitesSent(civic.id)).map((invite) => invite.email)).toEqual(['a@example.com']);
-    expect((await remote.invitesSent()).map((invite) => invite.email).sort()).toEqual(['a@example.com', 'b@example.com']);
+    expect((await remote.invitesSent()).map((invite) => invite.email).sort()).toEqual([
+      'a@example.com',
+      'b@example.com',
+    ]);
   });
 });
 
@@ -207,7 +214,10 @@ describe('a shared car read in full while its index builds (#89)', () => {
     const scopedTo = sharing.remote.scoped.bind(sharing.remote);
     sharing.remote.scoped = (membership) => {
       const scoped = scopedTo(membership);
-      return { pull: async (since) => ({ ...(await scoped.pull(since)), indexMissing: true }), push: (rows) => scoped.push(rows) };
+      return {
+        pull: async (since) => ({ ...(await scoped.pull(since)), indexMissing: true }),
+        push: (rows) => scoped.push(rows),
+      };
     };
     for (const name of ['Jazz', 'Golf']) {
       const owner = makeStore({ author: THEM.uid });

@@ -35,15 +35,7 @@ function subtractMonths(from: Date, months: number): Date {
   const year = from.getFullYear() + Math.floor(targetMonthIndex / 12);
   const month = ((targetMonthIndex % 12) + 12) % 12; // 0-based, normalised
   const day = Math.min(from.getDate(), daysInMonth(year, month + 1));
-  return new Date(
-    year,
-    month,
-    day,
-    from.getHours(),
-    from.getMinutes(),
-    from.getSeconds(),
-    from.getMilliseconds(),
-  );
+  return new Date(year, month, day, from.getHours(), from.getMinutes(), from.getSeconds(), from.getMilliseconds());
 }
 
 /**

@@ -118,7 +118,10 @@ describe('more edges', () => {
  * The check as it was written before #88 split it, kept here verbatim as the
  * reference: comparing the split version only with itself would prove nothing.
  */
-function reference(odometer: number | null, history: readonly number[]): { distance: number; usual: number; previous: number } | null {
+function reference(
+  odometer: number | null,
+  history: readonly number[],
+): { distance: number; usual: number; previous: number } | null {
   if (odometer === null || !Number.isFinite(odometer) || odometer <= 0) return null;
   const readings = [...new Set(history.filter((value) => Number.isFinite(value) && value > 0))].sort((a, b) => a - b);
   const gaps = readings.slice(1).map((value, index) => value - readings[index]!);

@@ -2,12 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { isScrubbed, tombstoneFillUp, tombstonePending } from './tombstone';
 import { MAX_RECEIPT_BYTES } from '../domain/fuelEntryDraft';
 import { TEXT_LIMITS } from '../domain/textLimits';
-import {
-  validateFillUp,
-  validatePending,
-  validateSnapshot,
-  validateVehicle,
-} from './recordValidation';
+import { validateFillUp, validatePending, validateSnapshot, validateVehicle } from './recordValidation';
 
 /**
  * What arrives from the account is untrusted, and these are the cases that
@@ -335,9 +330,7 @@ describe('tombstones', () => {
   });
 
   it('a deleted submission still needs its vehicle', () => {
-    expect(
-      typeof validatePending({ id: 'p1', updatedAt: 1, deletedAt: 1, schemaVersion: 1 }),
-    ).toBe('string');
+    expect(typeof validatePending({ id: 'p1', updatedAt: 1, deletedAt: 1, schemaVersion: 1 })).toBe('string');
   });
 });
 

@@ -37,12 +37,7 @@
  * be a lie about where it came from.
  */
 
-import type {
-  FillUpRecord,
-  PendingFillUpRecord,
-  SyncFields,
-  VehicleRecord,
-} from './records';
+import type { FillUpRecord, PendingFillUpRecord, SyncFields, VehicleRecord } from './records';
 
 /** A function that turns a live row into its tombstone, stamped at `at`. */
 export type Tombstoner<T extends SyncFields> = (row: T, at: number) => T;

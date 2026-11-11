@@ -96,10 +96,8 @@ describe.each(ACCENT_HUES)('%s', (hue) => {
     const card = contrastRatio(ink, cardBackground(scheme));
     const grouped = contrastRatio(ink, groupedBackground(scheme));
 
-    expect(wash, `${hue}/${scheme}: wash ${wash} is not tighter than card ${card}`)
-      .toBeLessThanOrEqual(card);
-    expect(wash, `${hue}/${scheme}: wash ${wash} is not tighter than grouped ${grouped}`)
-      .toBeLessThanOrEqual(grouped);
+    expect(wash, `${hue}/${scheme}: wash ${wash} is not tighter than card ${card}`).toBeLessThanOrEqual(card);
+    expect(wash, `${hue}/${scheme}: wash ${wash} is not tighter than grouped ${grouped}`).toBeLessThanOrEqual(grouped);
   });
 
   test.each(COLOR_SCHEMES)('stays distinguishable from its own wash in %s mode', (scheme) => {
@@ -116,9 +114,7 @@ describe('the palette as a whole', () => {
     // this is where it would show first.
     const ratios = COLOR_SCHEMES.flatMap((scheme) =>
       ACCENT_HUES.flatMap((hue) =>
-        surfaces(hue, scheme).map(([, background]) =>
-          contrastRatio(components(hue, scheme), background),
-        ),
+        surfaces(hue, scheme).map(([, background]) => contrastRatio(components(hue, scheme), background)),
       ),
     );
     expect(Math.min(...ratios)).toBeCloseTo(4.8031, 3);
@@ -230,8 +226,7 @@ describe('metric', () => {
       for (const metric of METRICS) {
         const hue = hueFor(metric);
         for (const [, background] of surfaces(hue, scheme)) {
-          expect(contrastRatio(components(hue, scheme), background))
-            .toBeGreaterThanOrEqual(REQUIREMENT);
+          expect(contrastRatio(components(hue, scheme), background)).toBeGreaterThanOrEqual(REQUIREMENT);
         }
       }
     }
@@ -267,9 +262,10 @@ describe('text colours', () => {
       expect(worstContrast(text(scheme), scheme)).toBeGreaterThanOrEqual(MINIMUM_TEXT_CONTRAST);
       for (const [surface, background] of textSurfaces(scheme)) {
         const ratio = contrastRatio(text(scheme), background);
-        expect(ratio, `${_name} text on the ${surface} in ${scheme} mode is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(
-          MINIMUM_TEXT_CONTRAST,
-        );
+        expect(
+          ratio,
+          `${_name} text on the ${surface} in ${scheme} mode is ${ratio.toFixed(2)}:1`,
+        ).toBeGreaterThanOrEqual(MINIMUM_TEXT_CONTRAST);
       }
     });
 

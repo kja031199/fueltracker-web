@@ -1,14 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import { DASHBOARD_TIME_RANGES, cutoffFrom } from './dashboardTimeRange';
 
-const day = (year: number, month: number, dayOfMonth: number): Date =>
-  new Date(year, month - 1, dayOfMonth);
+const day = (year: number, month: number, dayOfMonth: number): Date => new Date(year, month - 1, dayOfMonth);
 
-const ymd = (date: Date): [number, number, number] => [
-  date.getFullYear(),
-  date.getMonth() + 1,
-  date.getDate(),
-];
+const ymd = (date: Date): [number, number, number] => [date.getFullYear(), date.getMonth() + 1, date.getDate()];
 
 describe('cutoffFrom', () => {
   test('All has no cutoff', () => {

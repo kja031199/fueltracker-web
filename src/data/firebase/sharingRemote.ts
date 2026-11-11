@@ -34,8 +34,6 @@ import { decode, encodeReceipt, fromMicros, readStamped, writeStamped } from './
 import { firebaseApp, type FirebaseSettings } from './config';
 import { numberOr, textOr } from '../guards';
 
-
-
 function asInvite(data: DocumentData): Invite | null {
   const ownerUid = textOr(data['ownerUid']);
   const vehicleId = textOr(data['vehicleId']);
@@ -105,14 +103,14 @@ export class FirestoreSharingRemote implements SharingRemote {
     // One car's alone, when that is all that is wanted (#89): it used to read
     // every invitation the account had sent and filter here. Two equality
     // filters need no composite index.
-    const found = await getDocsFromServer(vehicleId === undefined ? mine : query(mine, where('vehicleId', '==', vehicleId)));
+    const found = await getDocsFromServer(
+      vehicleId === undefined ? mine : query(mine, where('vehicleId', '==', vehicleId)),
+    );
     return found.docs.flatMap((d) => asInvite(d.data()) ?? []);
   }
 
   async members(ownerUid: string, vehicleId: string): Promise<Member[]> {
-    const found = await getDocsFromServer(
-      collection(this.db, 'users', ownerUid, 'vehicles', vehicleId, 'members'),
-    );
+    const found = await getDocsFromServer(collection(this.db, 'users', ownerUid, 'vehicles', vehicleId, 'members'));
     return found.docs.flatMap((d) => asMember(d.data()) ?? []);
   }
 
@@ -122,12 +120,11 @@ export class FirestoreSharingRemote implements SharingRemote {
     // deleted blind, because the rules refuse deleting one that is not there.
     const member = (await this.members(this.me.uid, vehicleId)).find((m) => m.uid === memberUid);
     const leftover =
-      member === undefined
-        ? []
-        : (await this.invitesSent(vehicleId)).filter((i) => i.email === member.email);
+      member === undefined ? [] : (await this.invitesSent(vehicleId)).filter((i) => i.email === member.email);
     const batch = writeBatch(this.db);
     batch.delete(doc(this.db, 'users', this.me.uid, 'vehicles', vehicleId, 'members', memberUid));
-    for (const invite of leftover) batch.delete(doc(this.db, 'invites', inviteKey(invite.ownerUid, invite.vehicleId, invite.email)));
+    for (const invite of leftover)
+      batch.delete(doc(this.db, 'invites', inviteKey(invite.ownerUid, invite.vehicleId, invite.email)));
     await batch.commit();
   }
 
@@ -135,8 +132,10 @@ export class FirestoreSharingRemote implements SharingRemote {
     const [members, ofCar] = await Promise.all([this.members(this.me.uid, vehicleId), this.invitesSent(vehicleId)]);
     if (members.length === 0 && ofCar.length === 0) return;
     const batch = writeBatch(this.db);
-    for (const member of members) batch.delete(doc(this.db, 'users', this.me.uid, 'vehicles', vehicleId, 'members', member.uid));
-    for (const invite of ofCar) batch.delete(doc(this.db, 'invites', inviteKey(invite.ownerUid, invite.vehicleId, invite.email)));
+    for (const member of members)
+      batch.delete(doc(this.db, 'users', this.me.uid, 'vehicles', vehicleId, 'members', member.uid));
+    for (const invite of ofCar)
+      batch.delete(doc(this.db, 'invites', inviteKey(invite.ownerUid, invite.vehicleId, invite.email)));
     await batch.commit();
   }
 
@@ -144,9 +143,7 @@ export class FirestoreSharingRemote implements SharingRemote {
     const email = this.verifiedEmail();
     // An unverified address could be anybody's, and the rules say so too.
     if (email === null) return [];
-    const found = await getDocsFromServer(
-      query(collection(this.db, 'invites'), where('email', '==', email)),
-    );
+    const found = await getDocsFromServer(query(collection(this.db, 'invites'), where('email', '==', email)));
     return found.docs.flatMap((d) => asInvite(d.data()) ?? []);
   }
 
@@ -201,11 +198,7 @@ export class FirestoreSharingRemote implements SharingRemote {
 
 /** Firestore's "this query needs an index", which a fresh deploy can briefly lack. */
 export function isMissingIndex(cause: unknown): boolean {
-  return (
-    typeof cause === 'object' &&
-    cause !== null &&
-    (cause as { code?: unknown }).code === 'failed-precondition'
-  );
+  return typeof cause === 'object' && cause !== null && (cause as { code?: unknown }).code === 'failed-precondition';
 }
 
 /**

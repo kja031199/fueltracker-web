@@ -118,9 +118,23 @@ describe.each([
 
 describe('enteredBy from the account', () => {
   const base = {
-    id: 'f1', updatedAt: 1, deletedAt: null, schemaVersion: 1, vehicleId: 'v1', date: 1_700_000_000_000,
-    odometer: 10_000, gallons: 10, pricePerGallon: 3, isFullTank: true, missedPreviousFillUp: false,
-    fuelGrade: 'Regular', station: '', notes: '', latitude: null, longitude: null, receiptImageData: null,
+    id: 'f1',
+    updatedAt: 1,
+    deletedAt: null,
+    schemaVersion: 1,
+    vehicleId: 'v1',
+    date: 1_700_000_000_000,
+    odometer: 10_000,
+    gallons: 10,
+    pricePerGallon: 3,
+    isFullTank: true,
+    missedPreviousFillUp: false,
+    fuelGrade: 'Regular',
+    station: '',
+    notes: '',
+    latitude: null,
+    longitude: null,
+    receiptImageData: null,
   };
 
   test('is kept when it is a plausible uid', () => {

@@ -98,7 +98,6 @@ export function collectionOf(key: string): Collection {
 
 const COLLECTIONS = ['vehicles', 'fillUps', 'pendingFillUps'] as const;
 
-
 /**
  * A stored cursor, checked, or `null`. A damaged cursor costs one full read;
  * trusting it could cost rows, so anything off is discarded.
@@ -106,7 +105,8 @@ const COLLECTIONS = ['vehicles', 'fillUps', 'pendingFillUps'] as const;
 export function parseCursor(value: unknown): SyncCursor | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
   const raw = value as Record<string, unknown>;
-  if (!isFiniteNumber(raw.version) || !isFiniteNumber(raw.schemaVersion) || !isFiniteNumber(raw.fullPulledAt)) return null;
+  if (!isFiniteNumber(raw.version) || !isFiniteNumber(raw.schemaVersion) || !isFiniteNumber(raw.fullPulledAt))
+    return null;
 
   const marks = raw.highWater;
   if (typeof marks !== 'object' || marks === null || Array.isArray(marks)) return null;

@@ -226,9 +226,7 @@ class InMemoryScopedRemote implements RemoteStore {
       throw new Refused('a member writes fill-ups only');
     }
     const owner = this.world.remoteFor(this.share.ownerUid);
-    const existing = new Map(
-      ((await owner.pull(null)).fillUps as FillUpRecord[]).map((row) => [row.id, row]),
-    );
+    const existing = new Map(((await owner.pull(null)).fillUps as FillUpRecord[]).map((row) => [row.id, row]));
     for (const row of snapshot.fillUps) {
       const before = existing.get(row.id);
       if (row.vehicleId !== this.share.vehicleId) throw new Refused('a fill-up for another car');

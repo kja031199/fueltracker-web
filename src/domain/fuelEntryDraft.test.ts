@@ -20,14 +20,11 @@ describe('the write chokepoint rejects bad measurements', () => {
     expect(d.pricePerGallon).toBe(3.499);
   });
 
-  test.each(['odometer', 'gallons', 'pricePerGallon'] as const)(
-    'rejects missing, zero and negative %s',
-    (field) => {
-      for (const bad of [null, undefined, 0, -1, -0.0001]) {
-        expect(makeFuelEntryDraft({ ...valid(), [field]: bad })).toBeNull();
-      }
-    },
-  );
+  test.each(['odometer', 'gallons', 'pricePerGallon'] as const)('rejects missing, zero and negative %s', (field) => {
+    for (const bad of [null, undefined, 0, -1, -0.0001]) {
+      expect(makeFuelEntryDraft({ ...valid(), [field]: bad })).toBeNull();
+    }
+  });
 
   test.each(['odometer', 'gallons', 'pricePerGallon'] as const)(
     'rejects non-finite %s — NaN fails > 0, but +Infinity would not',

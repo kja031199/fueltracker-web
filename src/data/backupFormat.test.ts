@@ -161,9 +161,7 @@ describe('reading a hostile backup file', () => {
     expect(result.value?.vehicles.map((row) => row.id)).toEqual(['v1']);
     expect(result.value?.fillUps.map((row) => row.id)).toEqual(['f1']);
     expect(result.value?.pendingFillUps).toEqual([]);
-    expect(result.skipped).toEqual([
-      expect.stringMatching(/3 rows .*newer version.*skipped/i),
-    ]);
+    expect(result.skipped).toEqual([expect.stringMatching(/3 rows .*newer version.*skipped/i)]);
   });
 
   test('a newer row this build could not even read is counted as newer, not as damaged', () => {
@@ -238,9 +236,7 @@ describe('reading a hostile backup file', () => {
   });
 
   test('missing collections read as empty rather than throwing', () => {
-    const result = parseJsonBackup(
-      JSON.stringify({ format: 'fueltracker-backup', formatVersion: 1 }),
-    );
+    const result = parseJsonBackup(JSON.stringify({ format: 'fueltracker-backup', formatVersion: 1 }));
     expect(result.error).toBeNull();
     expect(result.value?.vehicles).toEqual([]);
     expect(result.value?.fillUps).toEqual([]);
@@ -290,9 +286,7 @@ describe('CSV writing', () => {
   test('quotes fields containing commas, quotes or newlines', () => {
     // A station name with a comma and a note with a newline are both ordinary,
     // and a naive join corrupts the row silently.
-    const csv = toCsv([
-      fillUp('f1', { station: 'Shell, Main St', notes: 'said "fill it"\nthen left' }),
-    ]);
+    const csv = toCsv([fillUp('f1', { station: 'Shell, Main St', notes: 'said "fill it"\nthen left' })]);
     expect(csv).toContain('"Shell, Main St"');
     expect(csv).toContain('"said ""fill it""\nthen left"');
   });
@@ -427,8 +421,9 @@ describe('CSV is escaped for the spreadsheet as well as for the parser', () => {
       toJsonBackup({ vehicles: [], fillUps: [fillUp('f1', { station })], pendingFillUps: [] }),
     );
     expect(back.value?.fillUps[0]?.station).toBe(station);
-    expect(toJsonBackup({ vehicles: [], fillUps: [fillUp('f1', { station })], pendingFillUps: [] }))
-      .not.toContain("'=1+1");
+    expect(toJsonBackup({ vehicles: [], fillUps: [fillUp('f1', { station })], pendingFillUps: [] })).not.toContain(
+      "'=1+1",
+    );
   });
 });
 
@@ -507,9 +502,7 @@ describe('CSV reading', () => {
   });
 
   test('a large file parses without trouble', () => {
-    const rows = Array.from({ length: 5_000 }, (_, i) =>
-      fillUp(`f${i}`, { odometer: 10_000 + i * 300 }),
-    );
+    const rows = Array.from({ length: 5_000 }, (_, i) => fillUp(`f${i}`, { odometer: 10_000 + i * 300 }));
     const result = parseCsv(toCsv(rows));
     expect(result.value).toHaveLength(5_000);
   });

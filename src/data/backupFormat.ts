@@ -33,7 +33,6 @@ import { isRecord } from './guards';
 /** Bumped only when the *file* shape changes, not when a record shape does. */
 export const BACKUP_FORMAT_VERSION = 1;
 
-
 export interface BackupFile extends Snapshot {
   readonly format: 'fueltracker-backup';
   readonly formatVersion: number;
@@ -79,10 +78,7 @@ export function bytesToBase64(bytes: Uint8Array): string {
  *
  * Unbounded by default, so callers that already know the size stay unchanged.
  */
-export function base64ToBytes(
-  text: string,
-  maxBytes: number = Number.POSITIVE_INFINITY,
-): Uint8Array | null {
+export function base64ToBytes(text: string, maxBytes: number = Number.POSITIVE_INFINITY): Uint8Array | null {
   if (decodedLengthOf(text) > maxBytes) return null;
   try {
     const binary = atob(text);
@@ -116,13 +112,11 @@ export function toJsonBackup(snapshot: Snapshot, exportedAt: Date = new Date()):
     vehicles: snapshot.vehicles,
     fillUps: snapshot.fillUps.map((record) => ({
       ...record,
-      receiptImageData:
-        record.receiptImageData === null ? null : bytesToBase64(record.receiptImageData),
+      receiptImageData: record.receiptImageData === null ? null : bytesToBase64(record.receiptImageData),
     })),
     pendingFillUps: snapshot.pendingFillUps.map((record) => ({
       ...record,
-      receiptImageData:
-        record.receiptImageData === null ? null : bytesToBase64(record.receiptImageData),
+      receiptImageData: record.receiptImageData === null ? null : bytesToBase64(record.receiptImageData),
     })),
   };
   return JSON.stringify(file, null, 2);

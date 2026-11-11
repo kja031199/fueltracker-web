@@ -95,10 +95,7 @@ export function canSaveForm(state: FillUpFormState): boolean {
  * fill-up legitimately has a reading below the latest one, and warning about it
  * would train the reader to ignore the warning.
  */
-export function previousOdometer(
-  existingOdometers: readonly number[],
-  isEditing: boolean,
-): number | null {
+export function previousOdometer(existingOdometers: readonly number[], isEditing: boolean): number | null {
   if (isEditing || existingOdometers.length === 0) return null;
   return Math.max(...existingOdometers);
 }

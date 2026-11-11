@@ -27,15 +27,13 @@ export function WrongProjectScreen({ projectId }: Props): ReactElement {
           This development build is pointed at the production project
         </h2>
         <p className="stack-sm">
-          <code>.env.local</code> names <code>{projectId}</code>, which is where the live
-          site keeps everyone&apos;s fuel logs. A build running on your own machine is not
-          allowed to use it, so nothing has been started: no sign-in, no sync, no local
-          database.
+          <code>.env.local</code> names <code>{projectId}</code>, which is where the live site keeps everyone&apos;s
+          fuel logs. A build running on your own machine is not allowed to use it, so nothing has been started: no
+          sign-in, no sync, no local database.
         </p>
         <p className="flush">
           Point <code>.env.local</code> at a development project instead. The steps are in{' '}
-          <code>docs/deploying.md</code>, under &ldquo;Local development uses its own
-          project&rdquo;.
+          <code>docs/deploying.md</code>, under &ldquo;Local development uses its own project&rdquo;.
         </p>
       </section>
     </ScreenFrame>

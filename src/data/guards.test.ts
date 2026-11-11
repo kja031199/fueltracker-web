@@ -81,7 +81,8 @@ describe('nothing in src/data defines its own copy (#91)', () => {
       const code = readFileSync(file, 'utf8');
       if (/BATCH_LIMIT\s*=/.test(code)) batchLimits += 1;
       if (file.endsWith('guards.ts')) continue;
-      for (const match of code.matchAll(/\bfunction (finite|text|isRaw|asRecord)\s*\(/g)) copies.push(`${file}: ${match[1]}`);
+      for (const match of code.matchAll(/\bfunction (finite|text|isRaw|asRecord)\s*\(/g))
+        copies.push(`${file}: ${match[1]}`);
     }
     expect(copies).toEqual([]);
     expect(batchLimits).toBe(1);

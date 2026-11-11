@@ -58,15 +58,18 @@ execFileSync('npx', ['vite', 'build', '--outDir', out, '--emptyOutDir'], {
 
 // --- Serve with the production headers --------------------------------------
 const hosting = JSON.parse(readFileSync('firebase.json', 'utf8')).hosting;
-const everywhere = new Map(
-  hosting.headers.find((entry) => entry.source === '**').headers.map((h) => [h.key, h.value]),
-);
+const everywhere = new Map(hosting.headers.find((entry) => entry.source === '**').headers.map((h) => [h.key, h.value]));
 const PRODUCTION_CSP = everywhere.get('Content-Security-Policy');
 if (!PRODUCTION_CSP) throw new Error('firebase.json has no Content-Security-Policy on **');
 
 const TYPES = {
-  '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json',
-  '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.svg': 'image/svg+xml',
+  '.html': 'text/html',
+  '.js': 'text/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.webmanifest': 'application/manifest+json',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
   '.gz': 'application/gzip',
 };
 
@@ -152,7 +155,9 @@ await scenario('import', PRODUCTION_CSP, async ({ page, console: logs }) => {
     const real = await page.evaluate(() => window.runImportFrom('/__local-photo'));
     if (process.env.OCR_DEBUG) {
       const read = await page.evaluate(() => window.readFrom('/__local-photo'));
-      console.log('      recognised lines:\n' + (read?.lines ?? []).map((line) => `        ${JSON.stringify(line)}`).join('\n'));
+      console.log(
+        '      recognised lines:\n' + (read?.lines ?? []).map((line) => `        ${JSON.stringify(line)}`).join('\n'),
+      );
     }
     // Passes when the photo is *read* and values are offered. Whether they are
     // the right values is for a person holding the receipt to judge: this
@@ -173,9 +178,14 @@ await scenario('offline', PRODUCTION_CSP, async ({ page, context, failures, cons
   const online = await scan(page); // first scan: fetched, and cached on the way
   if (process.env.OCR_DEBUG) {
     const cached = await page.evaluate(async () =>
-      Promise.all((await caches.keys()).map(async (name) => [name, (await (await caches.open(name)).keys()).map((r) => r.url)])),
+      Promise.all(
+        (await caches.keys()).map(async (name) => [name, (await (await caches.open(name)).keys()).map((r) => r.url)]),
+      ),
     );
-    console.log('      caches after the online scan:', JSON.stringify(cached).replace(/http:[^"]*?(?=\/(tesseract|assets|index))/g, ''));
+    console.log(
+      '      caches after the online scan:',
+      JSON.stringify(cached).replace(/http:[^"]*?(?=\/(tesseract|assets|index))/g, ''),
+    );
   }
   await context.setOffline(true);
   // The app keeps its reader between scans (#90); without letting it go, the
@@ -205,7 +215,10 @@ await scenario('control', withoutWasm, async ({ page, console: logs }) => {
   report(
     "4. control: without 'wasm-unsafe-eval' the scan fails, and says so",
     result?.ok === false && result.reason === 'unavailable',
-    `${JSON.stringify(result)}; console: ${logs.filter((l) => /wasm|Content.Security|Refused|CompileError/i.test(l)).slice(0, 1).join(' | ')}`,
+    `${JSON.stringify(result)}; console: ${logs
+      .filter((l) => /wasm|Content.Security|Refused|CompileError/i.test(l))
+      .slice(0, 1)
+      .join(' | ')}`,
   );
 });
 

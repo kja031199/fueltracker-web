@@ -27,12 +27,7 @@ describe('the sign-in gate', () => {
   });
 
   test('a signed-out reader is asked to sign in and sees no data', async () => {
-    render(
-      <App
-        store={makeStore()}
-        auth={new StubAuthProvider({ status: 'signedOut', error: null })}
-      />,
-    );
+    render(<App store={makeStore()} auth={new StubAuthProvider({ status: 'signedOut', error: null })} />);
     expect(await screen.findByRole('button', { name: /continue with google/i })).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: /sections/i })).not.toBeInTheDocument();
   });
@@ -68,11 +63,7 @@ describe('the sign-in gate', () => {
 
   test('a build with no Firebase config explains itself instead of offering a dead button', async () => {
     render(
-      <App
-        store={makeStore()}
-        auth={new StubAuthProvider({ status: 'signedOut', error: null })}
-        configured={false}
-      />,
+      <App store={makeStore()} auth={new StubAuthProvider({ status: 'signedOut', error: null })} configured={false} />,
     );
     expect(await screen.findByText(/no firebase configuration/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /continue with google/i })).not.toBeInTheDocument();
@@ -98,11 +89,7 @@ describe('the account section', () => {
     const store = makeStore();
     await store.addVehicle({ name: 'Civic' });
     render(
-      <App
-        store={store}
-        auth={new StubAuthProvider({ status: 'signedIn', user: USER }, USER)}
-        initialTab="settings"
-      />,
+      <App store={store} auth={new StubAuthProvider({ status: 'signedIn', user: USER }, USER)} initialTab="settings" />,
     );
     expect(await screen.findByText(/no backend configured/i)).toBeInTheDocument();
   });
@@ -283,9 +270,7 @@ describe('the account section', () => {
       />,
     );
 
-    await waitFor(() =>
-      expect(screen.getByRole('status')).toHaveTextContent(/could not be uploaded/i),
-    );
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/could not be uploaded/i));
   });
 
   test('a refusal closes the app rather than showing a status line', async () => {
@@ -320,9 +305,7 @@ describe('the account section', () => {
       />,
     );
 
-    expect(
-      await screen.findByRole('heading', { name: /does not have access/i }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /does not have access/i })).toBeInTheDocument();
     expect(screen.getByText(USER.uid)).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: /sections/i })).not.toBeInTheDocument();
   });
@@ -352,9 +335,6 @@ describe('the account section', () => {
       />,
     );
 
-    await waitFor(() =>
-      expect(screen.getByRole('status')).toHaveTextContent(/too large to sync/i),
-    );
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/too large to sync/i));
   });
 });
-

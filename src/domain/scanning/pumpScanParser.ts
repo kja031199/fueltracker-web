@@ -47,9 +47,7 @@ export function isCompleteReading(reading: PumpReading): boolean {
 }
 
 export function isEmptyReading(reading: PumpReading): boolean {
-  return (
-    reading.gallons === null && reading.pricePerGallon === null && reading.totalCost === null
-  );
+  return reading.gallons === null && reading.pricePerGallon === null && reading.totalCost === null;
 }
 
 /** Plausible bands. Anything outside them is octane, an odometer, or noise. */
@@ -152,9 +150,7 @@ function applyConsistentTriple(values: readonly number[], reading: MutableReadin
   // Only in-range values can form a valid triple; keeping just those and
   // capping the count bounds this cubic search against a number flood.
   const pool = values
-    .filter(
-      (v) => inRange(v, TOTAL_RANGE) || inRange(v, GALLONS_RANGE) || inRange(v, PRICE_RANGE),
-    )
+    .filter((v) => inRange(v, TOTAL_RANGE) || inRange(v, GALLONS_RANGE) || inRange(v, PRICE_RANGE))
     .slice(0, MAX_TRIPLE_CANDIDATES);
 
   let best: { gallons: number; price: number; total: number; error: number } | null = null;
@@ -212,17 +208,12 @@ function deriveMissingValue(reading: MutableReading): void {
  */
 function applyDecimalHeuristics(numbers: readonly ScannedNumber[], reading: MutableReading): void {
   if (reading.pricePerGallon === null) {
-    const candidates = numbers.filter(
-      (n) => n.fractionDigits === 3 && inRange(n.value, PRICE_RANGE),
-    );
+    const candidates = numbers.filter((n) => n.fractionDigits === 3 && inRange(n.value, PRICE_RANGE));
     if (candidates.length === 1) reading.pricePerGallon = candidates[0]!.value;
   }
   if (reading.gallons === null) {
     const candidates = numbers.filter(
-      (n) =>
-        n.fractionDigits === 3 &&
-        inRange(n.value, GALLONS_RANGE) &&
-        n.value !== reading.pricePerGallon,
+      (n) => n.fractionDigits === 3 && inRange(n.value, GALLONS_RANGE) && n.value !== reading.pricePerGallon,
     );
     if (candidates.length === 1) reading.gallons = candidates[0]!.value;
   }
@@ -304,7 +295,10 @@ export function parsePump(rawLines: readonly string[]): PumpReading {
     }
   }
 
-  applyConsistentTriple(numbers.map((n) => n.value), reading);
+  applyConsistentTriple(
+    numbers.map((n) => n.value),
+    reading,
+  );
   deriveMissingValue(reading);
   applyDecimalHeuristics(numbers, reading);
   deriveMissingValue(reading);

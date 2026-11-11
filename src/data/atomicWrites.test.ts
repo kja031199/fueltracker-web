@@ -206,7 +206,10 @@ describe('a save that lands while sync merges (#85)', () => {
     const edit = once(() => {
       editing = store.updateFillUp(mine.id, draft(30_000));
     });
-    const racing = new FuelTrackerStore(swapping(repos, 'fillUps', (repo) => readThen(repo, edit)), clock);
+    const racing = new FuelTrackerStore(
+      swapping(repos, 'fillUps', (repo) => readThen(repo, edit)),
+      clock,
+    );
     await syncOnce(racing, remote, state);
     await editing;
 

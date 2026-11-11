@@ -109,9 +109,7 @@ export function AppShell({ account, onSignOut, initialTab }: AppShellProps): Rea
   );
 
   if (route.kind === 'submit') {
-    return gated(
-      <SubmitScreen payload={route.payload} accountName={account.displayName} onDone={leaveLink} />,
-    );
+    return gated(<SubmitScreen payload={route.payload} accountName={account.displayName} onDone={leaveLink} />);
   }
   if (route.kind === 'incoming') {
     return gated(<IncomingScreen payload={route.payload} onReceived={showReceived} onDone={leaveLink} />);

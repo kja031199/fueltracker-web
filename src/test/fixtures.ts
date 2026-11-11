@@ -53,7 +53,9 @@ export async function submitted(
 }
 
 /** A store over empty in-memory repositories. */
-export function makeStore(options: { readonly author?: string; readonly clock?: MonotonicClock } = {}): FuelTrackerStore {
+export function makeStore(
+  options: { readonly author?: string; readonly clock?: MonotonicClock } = {},
+): FuelTrackerStore {
   return new FuelTrackerStore(
     {
       vehicles: new InMemoryRepository<VehicleRecord>(),

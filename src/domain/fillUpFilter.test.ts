@@ -3,12 +3,9 @@ import type { FuelGrade } from './fuelGrade';
 import type { FilterableEntry, FillUpFilter } from './fillUpFilter';
 import { EMPTY_FILTER, applyFilter, isFilterActive } from './fillUpFilter';
 
-const day = (year: number, month: number, dayOfMonth: number): Date =>
-  new Date(year, month - 1, dayOfMonth);
+const day = (year: number, month: number, dayOfMonth: number): Date => new Date(year, month - 1, dayOfMonth);
 
-function entry(
-  overrides: Partial<FilterableEntry> = {},
-): FilterableEntry {
+function entry(overrides: Partial<FilterableEntry> = {}): FilterableEntry {
   return {
     date: new Date(1_700_000_000_000),
     station: '',
@@ -78,11 +75,7 @@ describe('date range', () => {
 
 describe('fuel grade', () => {
   test('matches the exact grade', () => {
-    const entries = [
-      entry({ fuelGrade: 'Premium' }),
-      entry({ fuelGrade: 'Regular' }),
-      entry({ fuelGrade: 'Premium' }),
-    ];
+    const entries = [entry({ fuelGrade: 'Premium' }), entry({ fuelGrade: 'Regular' }), entry({ fuelGrade: 'Premium' })];
     expect(applyFilter(withFilter({ fuelGrade: 'Premium' }), entries)).toHaveLength(2);
   });
 
@@ -100,11 +93,7 @@ describe('station', () => {
   test('matches exactly, not by prefix', () => {
     // "Shell" must not swallow "Shell #123" — a prefix match looks more helpful
     // and quietly merges two stations' histories into one.
-    const entries = [
-      entry({ station: 'Shell' }),
-      entry({ station: 'Shell #123' }),
-      entry({ station: 'BP' }),
-    ];
+    const entries = [entry({ station: 'Shell' }), entry({ station: 'Shell #123' }), entry({ station: 'BP' })];
     expect(applyFilter(withFilter({ station: 'Shell' }), entries)).toHaveLength(1);
   });
 
@@ -115,8 +104,7 @@ describe('station', () => {
   });
 
   test('an absent station returns empty', () => {
-    expect(applyFilter(withFilter({ station: 'Chevron' }), [entry({ station: 'Shell' })]))
-      .toHaveLength(0);
+    expect(applyFilter(withFilter({ station: 'Chevron' }), [entry({ station: 'Shell' })])).toHaveLength(0);
   });
 });
 
@@ -169,8 +157,7 @@ describe('isFilterActive', () => {
     // real thing to ask for and must not be treated as no filter at all.
     const filter = withFilter({ station: '' });
     expect(isFilterActive(filter)).toBe(true);
-    expect(applyFilter(filter, [entry({ station: '' }), entry({ station: 'Shell' })]))
-      .toHaveLength(1);
+    expect(applyFilter(filter, [entry({ station: '' }), entry({ station: 'Shell' })])).toHaveLength(1);
   });
 });
 
@@ -210,9 +197,7 @@ describe('hostile input', () => {
   });
 
   test('a large list filters without trouble', () => {
-    const entries = Array.from({ length: 20_000 }, (_, i) =>
-      entry({ station: i % 2 === 0 ? 'Shell' : 'BP' }),
-    );
+    const entries = Array.from({ length: 20_000 }, (_, i) => entry({ station: i % 2 === 0 ? 'Shell' : 'BP' }));
     expect(applyFilter(withFilter({ station: 'Shell' }), entries)).toHaveLength(10_000);
   });
 });

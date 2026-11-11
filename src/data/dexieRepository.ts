@@ -89,9 +89,7 @@ export class DexieRepository<T extends SyncFields> implements Repository<T> {
       await table.put(toTombstone(row));
     };
     if (this.inTransaction) return tombstone(this.table);
-    await this.table.db.transaction('rw', this.table, (tx) =>
-      tombstone(tx.table(this.table.name) as Table<T, string>),
-    );
+    await this.table.db.transaction('rw', this.table, (tx) => tombstone(tx.table(this.table.name) as Table<T, string>));
   }
 
   /**

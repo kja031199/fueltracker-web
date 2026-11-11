@@ -145,8 +145,8 @@ export function FillUpForm({
         // A warning, not a block: this is usually a typo, but it can be a
         // replaced cluster or a correction, and the app cannot tell which.
         <p className="warning" id={`${idBase}-odometer-warning`} role="status">
-          That is at or below the last reading (
-          {formatDistance(previous, units.distance, true)}). Double-check before saving.
+          That is at or below the last reading ({formatDistance(previous, units.distance, true)}). Double-check before
+          saving.
         </p>
       )}
 
@@ -155,10 +155,9 @@ export function FillUpForm({
         // that nobody logged — easy when two people share a car — stretches
         // the next MPG over two tanks, and this is the box that prevents it.
         <p className="warning" id={`${idBase}-odometer-gap-warning`} role="status">
-          That is {formatDistance(jump.distance, units.distance, true)} since the last fill-up — more
-          than twice the usual {formatDistance(jump.usual, units.distance, true)}. If a fill-up was not
-          logged, tick &ldquo;Missed logging a fill before this one&rdquo; so the economy is not
-          stretched across two tanks.
+          That is {formatDistance(jump.distance, units.distance, true)} since the last fill-up — more than twice the
+          usual {formatDistance(jump.usual, units.distance, true)}. If a fill-up was not logged, tick &ldquo;Missed
+          logging a fill before this one&rdquo; so the economy is not stretched across two tanks.
         </p>
       )}
 
@@ -212,10 +211,9 @@ export function FillUpForm({
       )}
 
       <p className="note flush-top">
-        Marking full tanks is what lets the app work out exact economy between
-        fills. Leave it off for a partial fill — those gallons still count toward
-        the next full tank. Marking a missed fill keeps an impossible-looking
-        segment out of your stats while the fuel still counts toward spending.
+        Marking full tanks is what lets the app work out exact economy between fills. Leave it off for a partial fill —
+        those gallons still count toward the next full tank. Marking a missed fill keeps an impossible-looking segment
+        out of your stats while the fuel still counts toward spending.
       </p>
 
       <div className="field">

@@ -9,7 +9,7 @@ describe('importsIn', () => {
     ["import type { A } from '../data/store';", '../data/store'],
     ["import * as all from '../data/store';", '../data/store'],
     ["export { a } from '../data/store';", '../data/store'],
-    ["export * from \"../data/store\";", '../data/store'],
+    ['export * from "../data/store";', '../data/store'],
     ["import '../data/store';", '../data/store'],
     ['import "../data/store";', '../data/store'],
     ["const m = await import('../data/store');", '../data/store'],

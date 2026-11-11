@@ -53,7 +53,15 @@ interface OpenOptions {
   readonly syncTimers?: ManualTimers;
 }
 
-function open({ store, user = KYLE, hash, remote = null, sharing = null, initialTab = 'dashboard', syncTimers }: OpenOptions): void {
+function open({
+  store,
+  user = KYLE,
+  hash,
+  remote = null,
+  sharing = null,
+  initialTab = 'dashboard',
+  syncTimers,
+}: OpenOptions): void {
   if (hash !== undefined) window.history.replaceState(null, '', `/${hash}`);
   render(
     <App
@@ -163,7 +171,9 @@ describe('the owner asks', () => {
     const kyleStore = makeStore({ author: KYLE.uid });
     const civic = await kyleStore.addVehicle({ name: 'Civic' });
     await world.remoteFor(KYLE.uid).push(await kyleStore.exportSnapshot());
-    await world.sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true }).invite(civic, SAM.email);
+    await world
+      .sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true })
+      .invite(civic, SAM.email);
     const samRemote = world.sharingFor({ uid: SAM.uid, name: 'Sam', email: SAM.email, emailVerified: true });
     const [invite] = await samRemote.invitesForMe();
     if (invite === undefined) throw new Error('no invite');
@@ -172,7 +182,13 @@ describe('the owner asks', () => {
     saveHasOnboarded(SAM.uid);
     const samStore = makeStore({ author: SAM.uid });
     await samStore.addVehicle({ name: 'Corolla' });
-    open({ store: samStore, user: SAM, remote: world.remoteFor(SAM.uid), sharing: sharingFor(world, SAM), initialTab: 'vehicles' });
+    open({
+      store: samStore,
+      user: SAM,
+      remote: world.remoteFor(SAM.uid),
+      sharing: sharingFor(world, SAM),
+      initialTab: 'vehicles',
+    });
 
     const shared = (await screen.findByText(/shared with you by kyle/i, {}, WAIT)).closest('li');
     if (shared === null) throw new Error('no shared row');
@@ -193,7 +209,9 @@ describe('the submitter answers', () => {
     const user = userEvent.setup();
     open({ store, user: SAM, hash: requestHash() });
 
-    expect(await screen.findByText(/someone who says they are kyle asked you to log a fill-up for/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/someone who says they are kyle asked you to log a fill-up for/i),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText('Your name')).toHaveValue('Sam');
     // What the link will carry, said before it is made (#81).
     expect(screen.getByLabelText('Your name')).toHaveAccessibleDescription(
@@ -210,7 +228,12 @@ describe('the submitter answers', () => {
     expect(decoded.ok).toBe(true);
     if (!decoded.ok) return;
     expect(decoded.value).toMatchObject({ vehicleId: 'car-123', submitterName: 'Sam' });
-    expect(decoded.value.draft).toMatchObject({ odometer: 10_300, gallons: 9.5, pricePerGallon: 3.25, station: 'Shell' });
+    expect(decoded.value.draft).toMatchObject({
+      odometer: 10_300,
+      gallons: 9.5,
+      pricePerGallon: 3.25,
+      station: 'Shell',
+    });
 
     expect(await store.vehicles()).toHaveLength(0);
     expect(await store.fillUpCount()).toBe(0);
@@ -278,8 +301,16 @@ describe('the submitter answers', () => {
     ['damaged', '#/submit/not*base64', /damaged/i],
     ['too long', `#/submit/${'A'.repeat(MAX_LINK_PAYLOAD + 1)}`, /far longer/i],
     ['a submission, not a request', `#/submit/${encodeSubmission(submission('car-1'))}`, /not a fill-up request/i],
-    ['from a newer version', `#/submit/${btoa(JSON.stringify({ v: 2, k: 'req', car: 'c' })).replace(/=+$/, '')}`, /newer version/i],
-    ['naming no car', `#/submit/${btoa(JSON.stringify({ v: 1, k: 'req', car: '../x' })).replace(/=+$/, '')}`, /does not name a car/i],
+    [
+      'from a newer version',
+      `#/submit/${btoa(JSON.stringify({ v: 2, k: 'req', car: 'c' })).replace(/=+$/, '')}`,
+      /newer version/i,
+    ],
+    [
+      'naming no car',
+      `#/submit/${btoa(JSON.stringify({ v: 1, k: 'req', car: '../x' })).replace(/=+$/, '')}`,
+      /does not name a car/i,
+    ],
   ])('a request that is %s says so, and offers the way out', async (_label, hash, message) => {
     const user = userEvent.setup();
     open({ store: makeStore({ author: SAM.uid }), user: SAM, hash });
@@ -520,7 +551,11 @@ describe('the owner reviews', () => {
   test('an approval that is refused says so and leaves the submission waiting', async () => {
     const pendingFillUps = new InMemoryRepository<PendingFillUpRecord>();
     const store = new FuelTrackerStore(
-      { vehicles: new InMemoryRepository<VehicleRecord>(), fillUps: new InMemoryRepository<FillUpRecord>(), pendingFillUps },
+      {
+        vehicles: new InMemoryRepository<VehicleRecord>(),
+        fillUps: new InMemoryRepository<FillUpRecord>(),
+        pendingFillUps,
+      },
       undefined,
       KYLE.uid,
     );
@@ -583,7 +618,9 @@ describe('the owner reviews', () => {
     const kyleStore = makeStore({ author: KYLE.uid });
     const civic = await kyleStore.addVehicle({ name: 'Civic' });
     await world.remoteFor(KYLE.uid).push(await kyleStore.exportSnapshot());
-    await world.sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true }).invite(civic, SAM.email);
+    await world
+      .sharingFor({ uid: KYLE.uid, name: 'Kyle', email: KYLE.email, emailVerified: true })
+      .invite(civic, SAM.email);
     const samRemote = world.sharingFor({ uid: SAM.uid, name: 'Sam', email: SAM.email, emailVerified: true });
     const [invite] = await samRemote.invitesForMe();
     if (invite === undefined) throw new Error('no invite');
@@ -606,9 +643,21 @@ describe('the owner reviews', () => {
   test.each([
     ['damaged', '#/incoming/%%%', /damaged/i],
     ['too long', `#/incoming/${'A'.repeat(MAX_LINK_PAYLOAD + 1)}`, /far longer/i],
-    ['a request, not a fill-up', `#/incoming/${encodeRequest({ vehicleId: 'c', vehicleName: 'C', ownerName: 'K' })}`, /not a fill-up link/i],
-    ['impossible', `#/incoming/${btoa(JSON.stringify({ v: 1, k: 'sub', id: 's', car: 'c', d: Date.now(), o: 1, g: 0, p: 1 })).replace(/=+$/, '')}`, /does not add up/i],
-    ['from a newer version', `#/incoming/${btoa(JSON.stringify({ v: 3, k: 'sub' })).replace(/=+$/, '')}`, /newer version/i],
+    [
+      'a request, not a fill-up',
+      `#/incoming/${encodeRequest({ vehicleId: 'c', vehicleName: 'C', ownerName: 'K' })}`,
+      /not a fill-up link/i,
+    ],
+    [
+      'impossible',
+      `#/incoming/${btoa(JSON.stringify({ v: 1, k: 'sub', id: 's', car: 'c', d: Date.now(), o: 1, g: 0, p: 1 })).replace(/=+$/, '')}`,
+      /does not add up/i,
+    ],
+    [
+      'from a newer version',
+      `#/incoming/${btoa(JSON.stringify({ v: 3, k: 'sub' })).replace(/=+$/, '')}`,
+      /newer version/i,
+    ],
   ])('a fill-up link that is %s is refused, and nothing is queued', async (_label, hash, message) => {
     const { store } = await kyleWithCivic();
     const user = userEvent.setup();
@@ -646,4 +695,3 @@ describe('the whole round trip', () => {
     await waitFor(async () => expect(await kyleStore.fillUps(car.id)).toHaveLength(1));
   });
 });
-

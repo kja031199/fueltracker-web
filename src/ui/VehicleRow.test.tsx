@@ -52,7 +52,10 @@ describe('a car’s row does one thing at a time', () => {
     expect(civic().getByText(/Someone you share Civic with/)).toBeInTheDocument();
 
     await user.click(civic().getByRole('button', { name: /^Request a fill-up for / }));
-    expect(civic().getByRole('button', { name: /^Done with the request link/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(civic().getByRole('button', { name: /^Done with the request link/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
     expect(civic().getByRole('button', { name: /^Share / })).toHaveAttribute('aria-expanded', 'false');
     expect(civic().queryByRole('button', { name: /^Done sharing / })).toBeNull();
     expect(civic().queryByText(/Someone you share Civic with/)).toBeNull();

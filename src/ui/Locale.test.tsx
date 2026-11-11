@@ -160,16 +160,13 @@ describe('hostile settings and browsers fall back rather than break the app', ()
     ['10 KB of text', 'x'.repeat(10_000)],
     ['a number', 42],
     ['null', null],
-  ] as const)(
-    'a stored currency that is %s is ignored for the locale’s own',
-    async (_label, stored) => {
-      browserLanguage('de-DE');
-      localStorage.setItem('fueltracker.currency', JSON.stringify(stored));
-      const store = await storeWithOneFillUp();
-      render(<App store={store} initialTab="dashboard" />);
-      expect(await card(/^Total Spent/)).toHaveAccessibleName(/1\.234,56 €/);
-    },
-  );
+  ] as const)('a stored currency that is %s is ignored for the locale’s own', async (_label, stored) => {
+    browserLanguage('de-DE');
+    localStorage.setItem('fueltracker.currency', JSON.stringify(stored));
+    const store = await storeWithOneFillUp();
+    render(<App store={store} initialTab="dashboard" />);
+    expect(await card(/^Total Spent/)).toHaveAccessibleName(/1\.234,56 €/);
+  });
 
   test.each(['', '!!!', undefined])('a browser language of %s reads as US English', async (language) => {
     browserLanguage(language);

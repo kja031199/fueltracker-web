@@ -36,7 +36,11 @@ const history = [
 
 /** The cards as the screen shows them: id and metric from the domain, words from `kpiText`. */
 const kpisFor = (entries: FuelEntryStats[], units: UnitPreferences = US, style: DisplayStyle = US_STYLE) =>
-  dashboardKPIs(computeFuelStatistics(entries)).map((kpi) => ({ ...kpiText(kpi, units, style), id: kpi.id, metric: kpi.metric }));
+  dashboardKPIs(computeFuelStatistics(entries)).map((kpi) => ({
+    ...kpiText(kpi, units, style),
+    id: kpi.id,
+    metric: kpi.metric,
+  }));
 
 const byId = (entries: FuelEntryStats[], id: string, units: UnitPreferences = US) =>
   kpisFor(entries, units).find((k) => k.id === id);

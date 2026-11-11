@@ -3,12 +3,7 @@ import { draftWith } from '../test/fixtures';
 // Before Dexie: it captures the IndexedDB global when the module loads.
 import 'fake-indexeddb/auto';
 import Dexie from 'dexie';
-import {
-  LEGACY_DATABASE_NAME,
-  databaseNameFor,
-  openAccountStore,
-  openSignedInAccount,
-} from './accountStore';
+import { LEGACY_DATABASE_NAME, databaseNameFor, openAccountStore, openSignedInAccount } from './accountStore';
 import { FuelTrackerDatabase } from './db';
 import { DexieRepository } from './dexieRepository';
 import { FuelTrackerStore } from './store';

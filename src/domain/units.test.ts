@@ -65,9 +65,7 @@ describe('economy — the non-linear one', () => {
     expect(economy.mpg.fromMPG(30)).toBe(30);
     // 30 US MPG ≈ 12.754 km/L and ≈ 7.840 L/100km (the reciprocal).
     expect(close(economy.kmPerLiter.fromMPG(30)!, (30 * 1.609344) / 3.785411784)).toBe(true);
-    expect(close(economy.litersPer100km.fromMPG(30)!, (100 * 3.785411784) / (30 * 1.609344))).toBe(
-      true,
-    );
+    expect(close(economy.litersPer100km.fromMPG(30)!, (100 * 3.785411784) / (30 * 1.609344))).toBe(true);
   });
 
   test('is undefined for non-positive or non-finite input', () => {
@@ -92,9 +90,7 @@ describe('economy — the non-linear one', () => {
     const worse = 20;
     const better = 40;
     expect(economy.kmPerLiter.fromMPG(better)!).toBeGreaterThan(economy.kmPerLiter.fromMPG(worse)!);
-    expect(economy.litersPer100km.fromMPG(better)!).toBeLessThan(
-      economy.litersPer100km.fromMPG(worse)!,
-    );
+    expect(economy.litersPer100km.fromMPG(better)!).toBeLessThan(economy.litersPer100km.fromMPG(worse)!);
   });
 
   test('L/100km is a true reciprocal — halving MPG doubles it', () => {

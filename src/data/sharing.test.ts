@@ -1,12 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import {
-  MAX_EMAIL_LENGTH,
-  Refused,
-  inviteKey,
-  membershipKey,
-  normalizeEmail,
-  type Account,
-} from './sharing';
+import { MAX_EMAIL_LENGTH, Refused, inviteKey, membershipKey, normalizeEmail, type Account } from './sharing';
 import { isRefusal } from './sync';
 import { parseLedger } from './shareLedger';
 import type { FillUpRecord, VehicleRecord } from './records';
@@ -31,9 +24,22 @@ function vehicle(id: string, deletedAt: number | null = null): VehicleRecord {
 
 function fillUp(id: string, vehicleId: string, enteredBy: string | null): FillUpRecord {
   return {
-    id, ...sync, vehicleId, date: 1_700_000_000_000, odometer: 10_000, gallons: 10, pricePerGallon: 3,
-    isFullTank: true, missedPreviousFillUp: false, fuelGrade: 'Regular', station: '', notes: '',
-    latitude: null, longitude: null, receiptImageData: null, enteredBy,
+    id,
+    ...sync,
+    vehicleId,
+    date: 1_700_000_000_000,
+    odometer: 10_000,
+    gallons: 10,
+    pricePerGallon: 3,
+    isFullTank: true,
+    missedPreviousFillUp: false,
+    fuelGrade: 'Regular',
+    station: '',
+    notes: '',
+    latitude: null,
+    longitude: null,
+    receiptImageData: null,
+    enteredBy,
   };
 }
 
@@ -144,7 +150,9 @@ describe('parseLedger', () => {
   });
 
   test('bounds the names it reads (#86)', () => {
-    const [entry] = parseLedger([{ ownerUid: 'o', vehicleId: 'v', ownerName: 'K'.repeat(900), vehicleName: 'C'.repeat(900) }]);
+    const [entry] = parseLedger([
+      { ownerUid: 'o', vehicleId: 'v', ownerName: 'K'.repeat(900), vehicleName: 'C'.repeat(900) },
+    ]);
     expect(entry?.ownerName).toHaveLength(200);
     expect(entry?.vehicleName).toHaveLength(200);
   });
@@ -316,12 +324,16 @@ describe('the in-memory world refuses what the rules refuse', () => {
       expect(before.pendingFillUps).toBeNull();
 
       // The owner's other car moves the account's marks, not this car's.
-      await w.remoteFor(OWNER.uid).push({ vehicles: [], fillUps: [fillUp('t2', 'truck', OWNER.uid)], pendingFillUps: [] });
+      await w
+        .remoteFor(OWNER.uid)
+        .push({ vehicles: [], fillUps: [fillUp('t2', 'truck', OWNER.uid)], pendingFillUps: [] });
       const quiet = await scoped.pull(before);
       expect(quiet.fillUps).toEqual([]);
       expect(quiet.highWater?.fillUps).toBeNull();
 
-      await w.remoteFor(OWNER.uid).push({ vehicles: [], fillUps: [fillUp('f2', 'civic', OWNER.uid)], pendingFillUps: [] });
+      await w
+        .remoteFor(OWNER.uid)
+        .push({ vehicles: [], fillUps: [fillUp('f2', 'civic', OWNER.uid)], pendingFillUps: [] });
       const fresh = await scoped.pull(before);
       expect((fresh.fillUps as FillUpRecord[]).map((row) => row.id)).toEqual(['f2']);
       expect(fresh.highWater?.fillUps).toBeGreaterThan(before.fillUps ?? 0);
@@ -342,7 +354,10 @@ describe('the in-memory world refuses what the rules refuse', () => {
       // older build may still carry one.
       const w = await joined();
       const [membership] = await w.sharingFor(PARTNER).memberships();
-      const next = await w.sharingFor(PARTNER).scoped(membership!).pull({ vehicles: 1e15, fillUps: null, pendingFillUps: null });
+      const next = await w
+        .sharingFor(PARTNER)
+        .scoped(membership!)
+        .pull({ vehicles: 1e15, fillUps: null, pendingFillUps: null });
       expect((next.vehicles as VehicleRecord[]).map((v) => v.id)).toEqual(['civic']);
     });
 
@@ -385,14 +400,19 @@ describe('the in-memory world refuses what the rules refuse', () => {
       const w = await joined();
       const [membership] = await w.sharingFor(PARTNER).memberships();
       const scoped = w.sharingFor(PARTNER).scoped(membership!);
-      await expect(scoped.push({ vehicles: [vehicle('civic')], fillUps: [], pendingFillUps: [] })).rejects.toBeInstanceOf(Refused);
+      await expect(
+        scoped.push({ vehicles: [vehicle('civic')], fillUps: [], pendingFillUps: [] }),
+      ).rejects.toBeInstanceOf(Refused);
     });
 
     test('an edit that keeps who entered it is accepted', async () => {
       const w = await joined();
       const [membership] = await w.sharingFor(PARTNER).memberships();
       const edited = { ...fillUp('f1', 'civic', OWNER.uid), odometer: 12_345, updatedAt: 9 };
-      await w.sharingFor(PARTNER).scoped(membership!).push({ vehicles: [], fillUps: [edited], pendingFillUps: [] });
+      await w
+        .sharingFor(PARTNER)
+        .scoped(membership!)
+        .push({ vehicles: [], fillUps: [edited], pendingFillUps: [] });
       const owner = await w.remoteFor(OWNER.uid).pull(null);
       expect((owner.fillUps as FillUpRecord[]).find((f) => f.id === 'f1')?.odometer).toBe(12_345);
     });

@@ -88,12 +88,13 @@ describe('developmentUsesProduction', () => {
     },
   );
 
-  it.each([`${PRODUCTION_PROJECT_ID}.web.app`, `${PRODUCTION_PROJECT_ID}.firebaseapp.com`, `${PRODUCTION_PROJECT_ID}--pr-7-abc.web.app`])(
-    'lets the deployed site at %s use production',
-    (hostname) => {
-      expect(developmentUsesProduction(production, { dev: false, hostname })).toBe(false);
-    },
-  );
+  it.each([
+    `${PRODUCTION_PROJECT_ID}.web.app`,
+    `${PRODUCTION_PROJECT_ID}.firebaseapp.com`,
+    `${PRODUCTION_PROJECT_ID}--pr-7-abc.web.app`,
+  ])('lets the deployed site at %s use production', (hostname) => {
+    expect(developmentUsesProduction(production, { dev: false, hostname })).toBe(false);
+  });
 
   it('lets a development build use any other project', () => {
     expect(developmentUsesProduction(development, { dev: true, hostname: 'localhost' })).toBe(false);

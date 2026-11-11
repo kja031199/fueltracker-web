@@ -10,8 +10,8 @@ export function StorageErrorScreen({ detail }: { readonly detail: string }): Rea
   return (
     <ScreenFrame>
       <p className="warning">
-        Local storage is unavailable, so nothing can be saved or loaded. Private browsing or a
-        blocked-storage setting is the usual cause. ({detail})
+        Local storage is unavailable, so nothing can be saved or loaded. Private browsing or a blocked-storage setting
+        is the usual cause. ({detail})
       </p>
     </ScreenFrame>
   );

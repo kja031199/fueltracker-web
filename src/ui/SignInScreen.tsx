@@ -33,12 +33,7 @@ interface Props {
   readonly notice?: string | null;
 }
 
-export function SignInScreen({
-  auth,
-  error,
-  configured = true,
-  notice = null,
-}: Props): ReactElement {
+export function SignInScreen({ auth, error, configured = true, notice = null }: Props): ReactElement {
   // One base per rendering, so a component shown twice never repeats an id (#95).
   const idBase = useId();
   const [busy, setBusy] = useState(false);
@@ -66,13 +61,12 @@ export function SignInScreen({
           </p>
         )}
         <p className="stack-sm">
-          Log every fill-up and this works out your real fuel economy, what you actually spend,
-          and which day of the week you tend to catch the cheapest price.
+          Log every fill-up and this works out your real fuel economy, what you actually spend, and which day of the
+          week you tend to catch the cheapest price.
         </p>
         <p className="stack">
-          Signing in with Google keeps your fuel log in your own account, so it survives clearing
-          your browser data and follows you to your phone. Your fill-ups are readable only by
-          you.
+          Signing in with Google keeps your fuel log in your own account, so it survives clearing your browser data and
+          follows you to your phone. Your fill-ups are readable only by you.
         </p>
 
         {configured ? (
@@ -94,8 +88,8 @@ export function SignInScreen({
         )}
 
         <p className="after muted">
-          The first sign-in on a device needs a connection. After that the app opens and works
-          offline, and syncs again when you are back.
+          The first sign-in on a device needs a connection. After that the app opens and works offline, and syncs again
+          when you are back.
         </p>
       </section>
     </ScreenFrame>

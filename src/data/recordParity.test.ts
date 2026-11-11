@@ -19,18 +19,48 @@ import { SCHEMA_VERSION, type FillUpRecord } from './records';
 const sync = { updatedAt: 500, deletedAt: null, schemaVersion: SCHEMA_VERSION };
 const VEHICLE = { id: 'v1', ...sync, name: 'Car', make: 'Honda', model: 'Civic', year: 2020, createdAt: 500 };
 const FILL_UP = {
-  id: 'f1', ...sync, vehicleId: 'v1', date: 1_700_000_000_000, odometer: 10_000, gallons: 10,
-  pricePerGallon: 3, isFullTank: true, missedPreviousFillUp: false, fuelGrade: 'Regular',
-  station: 'Shell', notes: '', latitude: null, longitude: null, receiptImageData: null, enteredBy: null,
+  id: 'f1',
+  ...sync,
+  vehicleId: 'v1',
+  date: 1_700_000_000_000,
+  odometer: 10_000,
+  gallons: 10,
+  pricePerGallon: 3,
+  isFullTank: true,
+  missedPreviousFillUp: false,
+  fuelGrade: 'Regular',
+  station: 'Shell',
+  notes: '',
+  latitude: null,
+  longitude: null,
+  receiptImageData: null,
+  enteredBy: null,
 };
 const PENDING = {
-  id: 'p1', ...sync, vehicleId: 'v1', submittedAt: 500, submitterName: 'Sam', date: 1_700_000_000_000,
-  odometer: 10_000, gallons: 10, pricePerGallon: 3, isFullTank: true, fuelGrade: 'Regular',
-  station: '', notes: '', latitude: null, longitude: null, receiptImageData: null,
+  id: 'p1',
+  ...sync,
+  vehicleId: 'v1',
+  submittedAt: 500,
+  submitterName: 'Sam',
+  date: 1_700_000_000_000,
+  odometer: 10_000,
+  gallons: 10,
+  pricePerGallon: 3,
+  isFullTank: true,
+  fuelGrade: 'Regular',
+  station: '',
+  notes: '',
+  latitude: null,
+  longitude: null,
+  receiptImageData: null,
 };
 
 function bothWays(raw: { vehicles?: unknown[]; fillUps?: unknown[]; pendingFillUps?: unknown[] }) {
-  const collections = { vehicles: raw.vehicles ?? [], fillUps: raw.fillUps ?? [], pendingFillUps: raw.pendingFillUps ?? [] };
+  const collections = {
+    vehicles: raw.vehicles ?? [],
+    fillUps: raw.fillUps ?? [],
+    pendingFillUps: raw.pendingFillUps ?? [],
+  };
   const file = parseJsonBackup(JSON.stringify({ format: 'fueltracker-backup', formatVersion: 1, ...collections }));
   const account = validateSnapshot(collections);
   return { file, account };

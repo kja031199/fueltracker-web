@@ -28,7 +28,7 @@
     {
       "name": "client: removeMember keeps the invitation",
       "file": "src/data/firebase/sharingRemote.ts",
-      "from": "    for (const invite of leftover) batch.delete(doc(this.db, 'invites', inviteKey(invite.ownerUid, invite.vehicleId, invite.email)));\n",
+      "from": "    for (const invite of leftover)\n      batch.delete(doc(this.db, 'invites', inviteKey(invite.ownerUid, invite.vehicleId, invite.email)));\n",
       "to": "    void leftover;\n"
     },
     {

@@ -111,7 +111,9 @@ describe('the tests a mutation names', () => {
 
   test('a mutation or a set naming one is stale', () => {
     const source = 'if (bad) throw';
-    expect(problemWith(mutation({ tests: ['src/gone.test.ts'] }), file(source), exists)).toMatch(/do not exist: src\/gone\.test\.ts/);
+    expect(problemWith(mutation({ tests: ['src/gone.test.ts'] }), file(source), exists)).toMatch(
+      /do not exist: src\/gone\.test\.ts/,
+    );
     expect(problemWithSet(set({ tests: ['src/gone.test.ts'] }), exists)).toMatch(/do not exist/);
   });
 });
@@ -131,19 +133,51 @@ describe('a set', () => {
 describe('the command a mutation is tested by', () => {
   test('is its own tests, then its set’s, stopping at the first failure', () => {
     expect(testCommand(set(), mutation({ tests: ['src/a.test.ts'] }))).toEqual([
-      'npx', 'vitest', 'run', '--bail', '1', '--exclude', OWN_CHECK, 'src/a.test.ts',
+      'npx',
+      'vitest',
+      'run',
+      '--bail',
+      '1',
+      '--exclude',
+      OWN_CHECK,
+      'src/a.test.ts',
     ]);
     expect(testCommand(set({ tests: ['src/b.test.ts'] }), mutation())).toEqual([
-      'npx', 'vitest', 'run', '--bail', '1', '--exclude', OWN_CHECK, 'src/b.test.ts',
+      'npx',
+      'vitest',
+      'run',
+      '--bail',
+      '1',
+      '--exclude',
+      OWN_CHECK,
+      'src/b.test.ts',
     ]);
   });
 
   test('is the rules project for the rules, and the main suite otherwise', () => {
     expect(testCommand(set(), mutation({ file: 'firestore.rules' }))).toEqual([
-      'npx', 'vitest', 'run', '--bail', '1', '--exclude', OWN_CHECK, '--project', 'rules',
+      'npx',
+      'vitest',
+      'run',
+      '--bail',
+      '1',
+      '--exclude',
+      OWN_CHECK,
+      '--project',
+      'rules',
     ]);
     expect(testCommand(set(), mutation())).toEqual([
-      'npx', 'vitest', 'run', '--bail', '1', '--exclude', OWN_CHECK, '--project', 'unit', '--project', 'dom',
+      'npx',
+      'vitest',
+      'run',
+      '--bail',
+      '1',
+      '--exclude',
+      OWN_CHECK,
+      '--project',
+      'unit',
+      '--project',
+      'dom',
     ]);
   });
 
@@ -160,8 +194,13 @@ describe('the emulator around the run', () => {
     const [cli, ...args] = insideEmulator(['sync', '--check']);
     expect(cli).toBe(FIREBASE);
     expect(args.slice(0, -1)).toEqual([
-      'emulators:exec', '--config', 'scripts/mutations/firebase.json',
-      '--only', 'firestore', '--project', 'fueltracker-rules-test',
+      'emulators:exec',
+      '--config',
+      'scripts/mutations/firebase.json',
+      '--only',
+      'firestore',
+      '--project',
+      'fueltracker-rules-test',
     ]);
     expect(args.at(-1)).toMatch(/'scripts\/mutations\/mutate\.ts' 'sync' '--check'$/);
   });

@@ -61,7 +61,6 @@ export interface Validated<T> {
 
 type Raw = Record<string, unknown>;
 
-
 function flag(value: unknown): boolean {
   // Strictly boolean. A truthy string would make `isFullTank: "no"` mean true,
   // which silently changes how the whole MPG chain is computed.
@@ -91,7 +90,9 @@ function receipt(value: unknown): Uint8Array | null {
 }
 
 /** The four fields every row must carry, or it cannot be reconciled at all. */
-function syncFields(raw: Raw): { id: string; updatedAt: number; deletedAt: number | null; schemaVersion: number } | string {
+function syncFields(
+  raw: Raw,
+): { id: string; updatedAt: number; deletedAt: number | null; schemaVersion: number } | string {
   const { id, updatedAt, deletedAt, schemaVersion } = raw;
   // An id that cannot be stored is not a cosmetic fault to repair: it is the
   // name of a document, and a row carrying one stops every later push (#26).
@@ -187,9 +188,7 @@ export function validateFillUp(value: unknown): FillUpRecord | string {
  * reading is what the statistics need, and the name is a courtesy.
  */
 function enteredBy(value: unknown): string | null {
-  return typeof value === 'string' && value !== '' && value.length <= TEXT_LIMITS.enteredBy
-    ? value
-    : null;
+  return typeof value === 'string' && value !== '' && value.length <= TEXT_LIMITS.enteredBy ? value : null;
 }
 
 export function validatePending(value: unknown): PendingFillUpRecord | string {
@@ -231,7 +230,12 @@ export function validatePending(value: unknown): PendingFillUpRecord | string {
  */
 function asTombstone<T extends { readonly updatedAt: number; readonly deletedAt: number | null }>(
   build: (row: T, at: number) => T,
-  common: { readonly id: string; readonly updatedAt: number; readonly deletedAt: number | null; readonly schemaVersion: number },
+  common: {
+    readonly id: string;
+    readonly updatedAt: number;
+    readonly deletedAt: number | null;
+    readonly schemaVersion: number;
+  },
   kept: Partial<T>,
 ): T {
   // The builders read only the fields a tombstone keeps, so the rest of `T`
@@ -240,10 +244,7 @@ function asTombstone<T extends { readonly updatedAt: number; readonly deletedAt:
   return { ...built, updatedAt: common.updatedAt, deletedAt: common.deletedAt };
 }
 
-function partition<T>(
-  rows: readonly unknown[],
-  validate: (value: unknown) => T | string,
-): Validated<T> {
+function partition<T>(rows: readonly unknown[], validate: (value: unknown) => T | string): Validated<T> {
   const records: T[] = [];
   const rejected: string[] = [];
   for (const row of rows) {

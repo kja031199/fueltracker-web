@@ -67,16 +67,10 @@ export function FillUpsScreen(): ReactElement {
     [fillUps],
   );
 
-  const visible = useMemo(
-    () => applyFilter(filter, filterable).map((entry) => entry.record),
-    [filter, filterable],
-  );
+  const visible = useMemo(() => applyFilter(filter, filterable).map((entry) => entry.record), [filter, filterable]);
 
   // Worked out once per list, not per render (#88).
-  const stations = useMemo(
-    () => [...new Set(fillUps.map((r) => r.station).filter((s) => s !== ''))].sort(),
-    [fillUps],
-  );
+  const stations = useMemo(() => [...new Set(fillUps.map((r) => r.station).filter((s) => s !== ''))].sort(), [fillUps]);
 
   if (vehicleId === null) {
     return (
@@ -118,7 +112,6 @@ export function FillUpsScreen(): ReactElement {
     setConfirmingId(null);
   }
 
-
   return (
     <div>
       <PendingReview />
@@ -129,9 +122,7 @@ export function FillUpsScreen(): ReactElement {
       <section className="card space-above" aria-labelledby={`${idBase}-filter-heading`}>
         <h2 className="card__title" id={`${idBase}-filter-heading`}>
           Search and filter
-          {isFilterActive(filter) && (
-            <span className="accent-blue"> · filters active</span>
-          )}
+          {isFilterActive(filter) && <span className="accent-blue"> · filters active</span>}
         </h2>
 
         <div className="field">
@@ -153,9 +144,7 @@ export function FillUpsScreen(): ReactElement {
           <select
             id={`${idBase}-filter-range`}
             value={filter.range}
-            onChange={(event) =>
-              setFilter({ ...filter, range: event.target.value as DashboardTimeRange })
-            }
+            onChange={(event) => setFilter({ ...filter, range: event.target.value as DashboardTimeRange })}
           >
             {DASHBOARD_TIME_RANGES.map((range) => (
               <option key={range} value={range}>
@@ -214,11 +203,7 @@ export function FillUpsScreen(): ReactElement {
         )}
 
         {isFilterActive(filter) && (
-          <button
-            className="button button--secondary"
-            type="button"
-            onClick={() => setFilter(EMPTY_FILTER)}
-          >
+          <button className="button button--secondary" type="button" onClick={() => setFilter(EMPTY_FILTER)}>
             Clear filters
           </button>
         )}
@@ -245,9 +230,7 @@ export function FillUpsScreen(): ReactElement {
                   cost={totalCost(record)}
                 >
                   {enteredByName !== null && record.enteredBy != null && enteredByName.has(record.enteredBy) && (
-                    <div className="note">
-                      Entered by {enteredByName.get(record.enteredBy)}
-                    </div>
+                    <div className="note">Entered by {enteredByName.get(record.enteredBy)}</div>
                   )}
                 </FillUpSummary>
                 <div className="row-actions space-above-sm">

@@ -121,7 +121,6 @@ const NO_SHARES: ShareOutcome = {
   clashed: [],
 };
 
-
 export function shareStateKey(membership: Pick<Membership, 'ownerUid' | 'vehicleId'>): string {
   return `share:${membershipKey(membership)}`;
 }
@@ -243,9 +242,7 @@ export async function syncAll(
   }
 
   const endedKeys = new Set(ended.map(membershipKey));
-  await sharing.ledger
-    .save(sharable.filter((membership) => !endedKeys.has(membershipKey(membership))))
-    .catch(() => {});
+  await sharing.ledger.save(sharable.filter((membership) => !endedKeys.has(membershipKey(membership)))).catch(() => {});
 
   return {
     own: ownResult,

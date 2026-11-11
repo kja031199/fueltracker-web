@@ -34,7 +34,10 @@ describe('which issues a pull request closes', () => {
 
   test('a mention is not a claim, and another repository’s issue is not this one’s', () => {
     expect(
-      issuesClaimed('Mentions #4', 'See issue #4, related to #6. Closes other/repo#9. Part of #101. Unfixed #3. Prefixes #2.'),
+      issuesClaimed(
+        'Mentions #4',
+        'See issue #4, related to #6. Closes other/repo#9. Part of #101. Unfixed #3. Prefixes #2.',
+      ),
     ).toEqual([]);
   });
 
@@ -56,7 +59,9 @@ describe('which issues a pull request closes', () => {
 
 describe('which issues the pull request added notes for', () => {
   test('issue numbers on added lines', () => {
-    expect(issuesNoted(diff(['- **A.** b. [#88](https://example/88) · [PR #112](https://example/112)']))).toEqual([88, 112]);
+    expect(issuesNoted(diff(['- **A.** b. [#88](https://example/88) · [PR #112](https://example/112)']))).toEqual([
+      88, 112,
+    ]);
   });
 
   test('a removed line is not a note', () => {

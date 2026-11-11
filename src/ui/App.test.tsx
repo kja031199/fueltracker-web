@@ -29,9 +29,7 @@ describe('first run', () => {
     // flag — being welcomed twice is worse than not being welcomed at all.
     cleanup();
     render(<App store={makeStore()} />);
-    await waitFor(() =>
-      expect(screen.queryByRole('heading', { name: /welcome/i })).not.toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.queryByRole('heading', { name: /welcome/i })).not.toBeInTheDocument());
   });
 
   test('a reader who already has vehicles is never onboarded', async () => {
@@ -129,8 +127,7 @@ describe('settings', () => {
     // claim changed rather than the test being loosened — a warning that is no
     // longer true trains people to ignore the ones that are.
     await renderSettings();
-    expect(screen.getByText(/clearing your browser data no longer loses your history/i))
-      .toBeInTheDocument();
+    expect(screen.getByText(/clearing your browser data no longer loses your history/i)).toBeInTheDocument();
   });
 
   test('still names the one thing a cleared browser can lose', async () => {
@@ -154,9 +151,7 @@ describe('navigation', () => {
     const vehicles = within(nav).getByRole('button', { name: 'Vehicles' });
     await user.click(vehicles);
     expect(vehicles).toHaveAttribute('aria-current', 'page');
-    expect(within(nav).getByRole('button', { name: 'Settings' })).not.toHaveAttribute(
-      'aria-current',
-    );
+    expect(within(nav).getByRole('button', { name: 'Settings' })).not.toHaveAttribute('aria-current');
   });
 });
 

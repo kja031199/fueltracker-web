@@ -273,39 +273,106 @@ body {
    palette's measured secondary colour. (A disabled button's opacity is
    exempt: WCAG does not hold disabled controls to the contrast minimum.) */
 
-.flush { margin: 0; }
-.flush-top { margin-top: 0; }
-.flush-bottom { margin-bottom: 0; }
-.stack-xs { margin: 0 0 4px; }
-.stack-sm { margin: 0 0 8px; }
-.stack { margin: 0 0 var(--gap); }
-.after-sm { margin: 8px 0 0; }
-.after { margin: var(--gap) 0 0; }
-.space-above-sm { margin-top: 8px; }
-.space-above { margin-top: var(--gap); }
-.space-below-sm { margin-bottom: 8px; }
-.space-below { margin-bottom: var(--gap); }
-.inline-gap { margin-left: 8px; }
+.flush {
+  margin: 0;
+}
+.flush-top {
+  margin-top: 0;
+}
+.flush-bottom {
+  margin-bottom: 0;
+}
+.stack-xs {
+  margin: 0 0 4px;
+}
+.stack-sm {
+  margin: 0 0 8px;
+}
+.stack {
+  margin: 0 0 var(--gap);
+}
+.after-sm {
+  margin: 8px 0 0;
+}
+.after {
+  margin: var(--gap) 0 0;
+}
+.space-above-sm {
+  margin-top: 8px;
+}
+.space-above {
+  margin-top: var(--gap);
+}
+.space-below-sm {
+  margin-bottom: 8px;
+}
+.space-below {
+  margin-bottom: var(--gap);
+}
+.inline-gap {
+  margin-left: 8px;
+}
 
-.muted { color: var(--text-secondary); }
-.fine { font-size: 0.9rem; }
-.note { color: var(--text-secondary); font-size: 0.9rem; }
-.bold { font-weight: 600; }
-.accent-blue { color: var(--accent-blue); }
-.accent-orange { color: var(--accent-orange); }
-.break-all { word-break: break-all; }
-.clickable { cursor: pointer; }
+.muted {
+  color: var(--text-secondary);
+}
+.fine {
+  font-size: 0.9rem;
+}
+.note {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+.bold {
+  font-weight: 600;
+}
+.accent-blue {
+  color: var(--accent-blue);
+}
+.accent-orange {
+  color: var(--accent-orange);
+}
+.break-all {
+  word-break: break-all;
+}
+.clickable {
+  cursor: pointer;
+}
 
-.list-plain { list-style: none; margin: 0; padding: 0; }
-.list-row { border-top: 1px solid var(--separator); padding: 10px 0; }
-.indent-list { margin: 4px 0 0; padding-left: 1.2em; }
-.row-between { display: flex; justify-content: space-between; gap: 8px; }
-.row-wrap { display: flex; gap: 8px; flex-wrap: wrap; }
-.align-center { align-items: center; }
+.list-plain {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.list-row {
+  border-top: 1px solid var(--separator);
+  padding: 10px 0;
+}
+.indent-list {
+  margin: 4px 0 0;
+  padding-left: 1.2em;
+}
+.row-between {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.row-wrap {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.align-center {
+  align-items: center;
+}
 
 /* Outranks `.field input`, which would otherwise make a checkbox 44px tall. */
 .field input.checkbox,
-.checkbox { min-height: auto; width: 20px; height: 20px; }
+.checkbox {
+  min-height: auto;
+  width: 20px;
+  height: 20px;
+}
 
 .kpi-grid {
   list-style: none;
@@ -315,7 +382,15 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: var(--gap);
 }
-.kpi-value { font-size: 1.5rem; font-weight: 700; }
+.kpi-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
 
-.empty--chart { padding: 24px 0; }
-.chart__svg { display: block; max-height: 200px; }
+.empty--chart {
+  padding: 24px 0;
+}
+.chart__svg {
+  display: block;
+  max-height: 200px;
+}

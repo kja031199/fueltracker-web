@@ -26,7 +26,7 @@ const MINUTE = 60 * 1000;
 const NOW = 1_700_000_000_000;
 const PERIOD = 30;
 
-describe('the administrator\'s value', () => {
+describe("the administrator's value", () => {
   test.each([
     ['30', 30],
     ['45', 45],

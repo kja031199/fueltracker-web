@@ -12,10 +12,7 @@ describe('readStamped', () => {
   test('the mark is the newest stamp, and the stamp is not part of a row', () => {
     const older = new Timestamp(1_700_000_000, 1_000);
     const newer = new Timestamp(1_700_000_005, 2_000);
-    const { rows, highWater } = readStamped([
-      doc({ id: 'a', syncedAt: newer }),
-      doc({ id: 'b', syncedAt: older }),
-    ]);
+    const { rows, highWater } = readStamped([doc({ id: 'a', syncedAt: newer }), doc({ id: 'b', syncedAt: older })]);
     expect(highWater).toBe(toMicros(newer));
     expect(rows.map((row) => row['id'])).toEqual(['a', 'b']);
     for (const row of rows) expect('syncedAt' in row).toBe(false);
@@ -27,7 +24,10 @@ describe('readStamped', () => {
   });
 
   test('a stamp that is not a server timestamp is ignored, not trusted', () => {
-    const { highWater } = readStamped([doc({ id: 'a', syncedAt: 9_999_999_999_999 }), doc({ id: 'b', syncedAt: 'now' })]);
+    const { highWater } = readStamped([
+      doc({ id: 'a', syncedAt: 9_999_999_999_999 }),
+      doc({ id: 'b', syncedAt: 'now' }),
+    ]);
     expect(highWater).toBeNull();
   });
 });

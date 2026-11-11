@@ -87,8 +87,7 @@ export function useAppData(store: FuelTrackerStore): AppData {
           choice !== null && vehicles.some((vehicle) => vehicle.id === choice) ? choice : (vehicles[0]?.id ?? null);
         // Fill-ups follow the selected car rather than being loaded wholesale,
         // since every statistic is computed per car (#53).
-        const fillUps =
-          selectedVehicleId === null ? [] : await store.fillUps(selectedVehicleId).catch(() => []);
+        const fillUps = selectedVehicleId === null ? [] : await store.fillUps(selectedVehicleId).catch(() => []);
         if (ticket < applied.current) return;
         applied.current = ticket;
         if (wanted.current === choice) wanted.current = selectedVehicleId;

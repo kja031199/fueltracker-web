@@ -14,10 +14,7 @@ import { parseTab } from './useTabRoute';
  */
 
 const current = (): string | null =>
-  screen
-    .getAllByRole('button')
-    .find((button) => button.getAttribute('aria-current') === 'page')
-    ?.textContent ?? null;
+  screen.getAllByRole('button').find((button) => button.getAttribute('aria-current') === 'page')?.textContent ?? null;
 
 async function openApp(): Promise<void> {
   render(<App store={makeStore()} />);

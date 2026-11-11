@@ -54,13 +54,23 @@ export function AddVehicleForm(): ReactElement {
           <label className="field__label" htmlFor={`${idBase}-vehicle-make`}>
             Make
           </label>
-          <input id={`${idBase}-vehicle-make`} maxLength={TEXT_LIMITS.make} value={make} onChange={(e) => setMake(e.target.value)} />
+          <input
+            id={`${idBase}-vehicle-make`}
+            maxLength={TEXT_LIMITS.make}
+            value={make}
+            onChange={(e) => setMake(e.target.value)}
+          />
         </div>
         <div className="field">
           <label className="field__label" htmlFor={`${idBase}-vehicle-model`}>
             Model
           </label>
-          <input id={`${idBase}-vehicle-model`} maxLength={TEXT_LIMITS.model} value={model} onChange={(e) => setModel(e.target.value)} />
+          <input
+            id={`${idBase}-vehicle-model`}
+            maxLength={TEXT_LIMITS.model}
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+          />
         </div>
         <div className="field">
           <label className="field__label" htmlFor={`${idBase}-vehicle-year`}>

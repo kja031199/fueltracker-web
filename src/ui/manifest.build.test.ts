@@ -13,10 +13,7 @@ import { join } from 'node:path';
  */
 const distPath = (name: string): string => join(process.cwd(), 'dist', name);
 
-const manifest = JSON.parse(readFileSync(distPath('manifest.webmanifest'), 'utf8')) as Record<
-  string,
-  unknown
->;
+const manifest = JSON.parse(readFileSync(distPath('manifest.webmanifest'), 'utf8')) as Record<string, unknown>;
 
 describe('the built web app manifest', () => {
   test('declares what an installed app needs', () => {

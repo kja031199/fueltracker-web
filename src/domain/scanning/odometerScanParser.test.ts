@@ -1,11 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { OdometerCandidate } from './odometerScanParser';
-import {
-  DEFAULT_MILES_PER_FILL,
-  isWarning,
-  parseOdometer,
-  preferredOdometer,
-} from './odometerScanParser';
+import { DEFAULT_MILES_PER_FILL, isWarning, parseOdometer, preferredOdometer } from './odometerScanParser';
 
 describe('picking the right number off a cluttered dashboard', () => {
   test('picks the history-consistent value among distractors', () => {
@@ -20,9 +15,7 @@ describe('picking the right number off a cluttered dashboard', () => {
 
   test('clock readouts never become candidates', () => {
     // "12:45" must not be read as 1245 — even when it is the only number.
-    expect(
-      parseOdometer(['12:45'], { previousOdometer: 1_000, typicalMilesPerFill: 300 }),
-    ).toBeNull();
+    expect(parseOdometer(['12:45'], { previousOdometer: 1_000, typicalMilesPerFill: 300 })).toBeNull();
   });
 
   test('temperature and percentage readouts are ignored', () => {
@@ -130,9 +123,7 @@ describe('hostile input', () => {
   test('excluded pump values are never chosen', () => {
     // On a pump photo, the gallons/price/total already claimed by the pump
     // parser must not be re-read as a mileage figure.
-    expect(
-      parseOdometer(['30.48', '8.712', '3.499'], { excluding: [30.48, 8.712, 3.499] }),
-    ).toBeNull();
+    expect(parseOdometer(['30.48', '8.712', '3.499'], { excluding: [30.48, 8.712, 3.499] })).toBeNull();
   });
 
   test('multi-decimal numbers are never candidates, even without exclusions', () => {

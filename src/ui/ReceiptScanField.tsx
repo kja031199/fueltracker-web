@@ -38,10 +38,9 @@ export function ReceiptScanField({
         }}
       />
       <p className="note flush">
-        Photograph a paper receipt and the gallons, price, date and station are filled in for
-        you — into empty fields only, so nothing you typed is overwritten. Pump displays are not
-        supported; their segment digits are not readable by this. Needs a connection the first
-        time.
+        Photograph a paper receipt and the gallons, price, date and station are filled in for you — into empty fields
+        only, so nothing you typed is overwritten. Pump displays are not supported; their segment digits are not
+        readable by this. Needs a connection the first time.
       </p>
       {note !== null && (
         <p className="warning space-above-sm" role="status">

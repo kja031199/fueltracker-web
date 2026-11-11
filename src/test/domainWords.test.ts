@@ -173,7 +173,7 @@ describe('the literal reader', () => {
   test('skips comments and regular expressions, but not division', () => {
     const source = [
       "// 'Fuel economy' in a comment",
-      "/* \"Gas price\" in a block */",
+      '/* "Gas price" in a block */',
       "const pattern = /'Total Spent'/g;",
       "const test = (x: string) => /[A-Z]{3}'/.test(x);",
       "const half = total / 2; const label = 'Kept';",

@@ -34,9 +34,12 @@ describe('interface files stay small', () => {
 
   // `test.each` over an empty table runs nothing, so it is skipped then, and
   // this file still checks every interface file against the limit above.
-  test.skipIf(Object.keys(ALLOWED).length === 0).each(Object.entries(ALLOWED))('%s is allowed over, but no further, and only while it needs to be', (file, allowance) => {
-    expect(allowance.reason.length).toBeGreaterThan(10);
-    expect(lineCount(file)).toBeLessThanOrEqual(allowance.lines);
-    expect(lineCount(file)).toBeGreaterThan(LIMIT);
-  });
+  test.skipIf(Object.keys(ALLOWED).length === 0).each(Object.entries(ALLOWED))(
+    '%s is allowed over, but no further, and only while it needs to be',
+    (file, allowance) => {
+      expect(allowance.reason.length).toBeGreaterThan(10);
+      expect(lineCount(file)).toBeLessThanOrEqual(allowance.lines);
+      expect(lineCount(file)).toBeGreaterThan(LIMIT);
+    },
+  );
 });

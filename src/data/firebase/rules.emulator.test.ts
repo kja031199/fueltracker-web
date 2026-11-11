@@ -56,8 +56,6 @@ import { syncOnce } from '../sync';
 import { FirestoreRemoteStore } from './remoteStore';
 import { InMemorySyncState } from '../syncState';
 
-
-
 const ALLOWED = allowedUidsInRules();
 
 /** The first allowed account. Every positive test signs in as this one. */
@@ -91,7 +89,7 @@ describe('firestore.rules', () => {
     await assertSucceeds(getDoc(doc(db, `users/${OWNER}/fillUps/f1`)));
   });
 
-  it('reads nobody\'s account document itself, the owner\'s included (#92)', async () => {
+  it("reads nobody's account document itself, the owner's included (#92)", async () => {
     // The app reads only what is under it. A rule that allowed this covered a
     // document that is never written, and was one more rule to keep right.
     const db = signedIn(env, OWNER).firestore();
@@ -193,29 +191,26 @@ describe('firestore.rules', () => {
     // Runs only when the deployment allows more than one account. With a single
     // entry there is no second allowed identity to test against, and the
     // uid-shaped-path test above covers the scoping question in that case.
-    it.runIf(SECOND !== undefined)(
-      'keeps two allowed accounts out of each other\'s data',
-      async () => {
-        // The strongest form of the scoping assertion, and only possible with
-        // two entries: both parties are through the door, so the allowlist
-        // cannot be what refuses this — only `request.auth.uid == uid` can.
-        const db = signedIn(env, SECOND!).firestore();
-        await assertFails(getDoc(doc(db, `users/${OWNER}/fillUps/f1`)));
-        await assertFails(
-          setDoc(doc(db, `users/${OWNER}/vehicles/v1`), {
-            id: 'v1',
-            updatedAt: 1,
-            deletedAt: null,
-            schemaVersion: 1,
-            name: 'Not yours',
-            make: '',
-            model: '',
-            year: 2020,
-            createdAt: 1,
-          }),
-        );
-      },
-    );
+    it.runIf(SECOND !== undefined)("keeps two allowed accounts out of each other's data", async () => {
+      // The strongest form of the scoping assertion, and only possible with
+      // two entries: both parties are through the door, so the allowlist
+      // cannot be what refuses this — only `request.auth.uid == uid` can.
+      const db = signedIn(env, SECOND!).firestore();
+      await assertFails(getDoc(doc(db, `users/${OWNER}/fillUps/f1`)));
+      await assertFails(
+        setDoc(doc(db, `users/${OWNER}/vehicles/v1`), {
+          id: 'v1',
+          updatedAt: 1,
+          deletedAt: null,
+          schemaVersion: 1,
+          name: 'Not yours',
+          make: '',
+          model: '',
+          year: 2020,
+          createdAt: 1,
+        }),
+      );
+    });
 
     it.runIf(SECOND !== undefined)('lets the second allowed account use its own tree', async () => {
       const db = signedIn(env, SECOND!).firestore();
@@ -324,7 +319,9 @@ describe('firestore.rules', () => {
     it('accepts a vehicle exactly as the app writes it', async () => {
       const { vehicle } = await realRecords();
       const db = signedIn(env, OWNER).firestore();
-      await assertSucceeds(setDoc(doc(db, `users/${OWNER}/vehicles/${vehicle.id}`), { ...vehicle, syncedAt: serverTimestamp() }));
+      await assertSucceeds(
+        setDoc(doc(db, `users/${OWNER}/vehicles/${vehicle.id}`), { ...vehicle, syncedAt: serverTimestamp() }),
+      );
     });
 
     it('accepts a fill-up exactly as the app writes it', async () => {
@@ -336,17 +333,13 @@ describe('firestore.rules', () => {
     it('accepts a tombstone, which carries no usable measurements', async () => {
       const { tombstone } = await realRecords();
       const db = signedIn(env, OWNER).firestore();
-      await assertSucceeds(
-        setDoc(doc(db, `users/${OWNER}/fillUps/${tombstone.id}`), forWire(tombstone)),
-      );
+      await assertSucceeds(setDoc(doc(db, `users/${OWNER}/fillUps/${tombstone.id}`), forWire(tombstone)));
     });
 
     it('accepts a submission exactly as the app writes it', async () => {
       const { pending } = await realRecords();
       const db = signedIn(env, OWNER).firestore();
-      await assertSucceeds(
-        setDoc(doc(db, `users/${OWNER}/pendingFillUps/${pending.id}`), forWire(pending)),
-      );
+      await assertSucceeds(setDoc(doc(db, `users/${OWNER}/pendingFillUps/${pending.id}`), forWire(pending)));
     });
 
     it('refuses a document filed under an id that disagrees with its own', async () => {
@@ -367,9 +360,7 @@ describe('firestore.rules', () => {
       // the database itself.
       const { fillUp } = await realRecords();
       const db = signedIn(env, OWNER).firestore();
-      await assertFails(
-        setDoc(doc(db, `users/${OWNER}/fillUps/legal-name`), { ...forWire(fillUp), id: 'a/b' }),
-      );
+      await assertFails(setDoc(doc(db, `users/${OWNER}/fillUps/legal-name`), { ...forWire(fillUp), id: 'a/b' }));
     });
 
     it('refuses an unknown extra field', async () => {
@@ -403,9 +394,7 @@ describe('firestore.rules', () => {
     ])('refuses %s', async (_label, override) => {
       const { fillUp } = await realRecords();
       const db = signedIn(env, OWNER).firestore();
-      await assertFails(
-        setDoc(doc(db, `users/${OWNER}/fillUps/${fillUp.id}`), { ...forWire(fillUp), ...override }),
-      );
+      await assertFails(setDoc(doc(db, `users/${OWNER}/fillUps/${fillUp.id}`), { ...forWire(fillUp), ...override }));
     });
 
     it('refuses notes longer than the bound', async () => {
@@ -496,14 +485,34 @@ describe('firestore.rules', () => {
     it('repairs a row stored too long by an older build, then uploads it', async () => {
       await env.clearFirestore();
       const vehicle: VehicleRecord = {
-        id: 'v1', updatedAt: 500, deletedAt: null, schemaVersion: 1,
-        name: 'Car', make: '', model: '', year: 2020, createdAt: 500,
+        id: 'v1',
+        updatedAt: 500,
+        deletedAt: null,
+        schemaVersion: 1,
+        name: 'Car',
+        make: '',
+        model: '',
+        year: 2020,
+        createdAt: 500,
       };
       const legacy: FillUpRecord = {
-        id: 'f1', updatedAt: 500, deletedAt: null, schemaVersion: 1, vehicleId: 'v1',
-        date: 1_700_000_000_000, odometer: 1000, gallons: 10, pricePerGallon: 3, isFullTank: true,
-        missedPreviousFillUp: false, fuelGrade: 'Regular', station: 'x'.repeat(201),
-        notes: 'n'.repeat(4001), latitude: null, longitude: null, receiptImageData: null,
+        id: 'f1',
+        updatedAt: 500,
+        deletedAt: null,
+        schemaVersion: 1,
+        vehicleId: 'v1',
+        date: 1_700_000_000_000,
+        odometer: 1000,
+        gallons: 10,
+        pricePerGallon: 3,
+        isFullTank: true,
+        missedPreviousFillUp: false,
+        fuelGrade: 'Regular',
+        station: 'x'.repeat(201),
+        notes: 'n'.repeat(4001),
+        latitude: null,
+        longitude: null,
+        receiptImageData: null,
       };
       // Written straight into the repositories, as an older build would have.
       const store = new FuelTrackerStore({
@@ -572,10 +581,7 @@ describe('firestore.rules', () => {
 
     it('the real remote reads back only what changed since its cursor', async () => {
       await env.clearFirestore();
-      const remote = FirestoreRemoteStore.over(
-        signedIn(env, OWNER).firestore() as unknown as Firestore,
-        OWNER,
-      );
+      const remote = FirestoreRemoteStore.over(signedIn(env, OWNER).firestore() as unknown as Firestore, OWNER);
       const first = await aFillUp();
       await remote.push({ vehicles: [], fillUps: [first], pendingFillUps: [] });
 
@@ -596,10 +602,7 @@ describe('firestore.rules', () => {
 
     it('two syncs through the real remote: the second downloads nothing new', async () => {
       await env.clearFirestore();
-      const remote = FirestoreRemoteStore.over(
-        signedIn(env, OWNER).firestore() as unknown as Firestore,
-        OWNER,
-      );
+      const remote = FirestoreRemoteStore.over(signedIn(env, OWNER).firestore() as unknown as Firestore, OWNER);
       const store = makeStore();
       await store.addVehicle({ name: 'Car' });
       const state = new InMemorySyncState();
@@ -638,12 +641,16 @@ describe('firestore.rules', () => {
 
     it('refuses a stamp a year ahead — the lock in #79', async () => {
       const row = await aFillUp();
-      await assertFails(setDoc(doc(ownDb(), `users/${OWNER}/fillUps/${row.id}`), wire(row, { updatedAt: Date.now() + 365 * DAY })));
+      await assertFails(
+        setDoc(doc(ownDb(), `users/${OWNER}/fillUps/${row.id}`), wire(row, { updatedAt: Date.now() + 365 * DAY })),
+      );
     });
 
     it('accepts one 29 days ahead: a fast clock, within what the app itself adopts', async () => {
       const row = await aFillUp();
-      await assertSucceeds(setDoc(doc(ownDb(), `users/${OWNER}/fillUps/${row.id}`), wire(row, { updatedAt: Date.now() + 29 * DAY })));
+      await assertSucceeds(
+        setDoc(doc(ownDb(), `users/${OWNER}/fillUps/${row.id}`), wire(row, { updatedAt: Date.now() + 29 * DAY })),
+      );
     });
 
     it('refuses taking a document’s stamp backwards', async () => {

@@ -73,8 +73,7 @@ export function dashboardKPIs(stats: FuelStatistics): KPI[] {
     {
       id: 'totalSpent',
       value: stats.totalSpent,
-      detail:
-        stats.averageMonthlySpend === null ? null : { kind: 'monthlySpend', amount: stats.averageMonthlySpend },
+      detail: stats.averageMonthlySpend === null ? null : { kind: 'monthlySpend', amount: stats.averageMonthlySpend },
       metric: 'spending',
     },
     { id: 'costPerDistance', value: stats.costPerMile, detail: null, metric: 'spending' },

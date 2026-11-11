@@ -84,14 +84,18 @@ describe('the docs never quote a pin (#99)', () => {
   // on the next bump without anything noticing. Say "the pinned version".
   const pins = [
     // The bare number, so `lychee 0.24.2` in prose is caught as well as the tag.
-    ...pinsIn(readFileSync('.github/workflows/checks.yml', 'utf8')).map((pin) => pin.version.replace(/^(?:[a-z-]*-)?v?/, '')),
+    ...pinsIn(readFileSync('.github/workflows/checks.yml', 'utf8')).map((pin) =>
+      pin.version.replace(/^(?:[a-z-]*-)?v?/, ''),
+    ),
     (JSON.parse(readFileSync('.github/firebase-cli/package.json', 'utf8')) as { dependencies: Record<string, string> })
       .dependencies['firebase-tools']!,
   ];
   const docs = [
     'README.md',
     'CLAUDE.md',
-    ...readdirSync('docs').filter((name) => name.endsWith('.md')).map((name) => `docs/${name}`),
+    ...readdirSync('docs')
+      .filter((name) => name.endsWith('.md'))
+      .map((name) => `docs/${name}`),
   ];
 
   test('there are pins and docs to check', () => {
@@ -101,6 +105,7 @@ describe('the docs never quote a pin (#99)', () => {
 
   test.each(docs)('%s', (file) => {
     const text = readFileSync(file, 'utf8');
-    for (const version of pins) expect(text, `${file} quotes ${version}`).not.toMatch(new RegExp(`\\bv?${version.replaceAll('.', '\\.')}\\b`));
+    for (const version of pins)
+      expect(text, `${file} quotes ${version}`).not.toMatch(new RegExp(`\\bv?${version.replaceAll('.', '\\.')}\\b`));
   });
 });
