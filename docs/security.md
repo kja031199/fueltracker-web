@@ -18,11 +18,13 @@ way a headers change takes this app down, and a failure that appears only on the
 deployed site. There is a test asserting it is not that value, with the reason
 in the assertion.
 
-The Content-Security-Policy ships as **`Content-Security-Policy-Report-Only`
-first**. The browser evaluates it and logs violations without blocking
-anything, so the real flows can be exercised before it is enforced. A policy
-written without being able to load the deployed site is a guess, and the
-failure mode of a wrong guess is being locked out of your own app.
+Each version of the Content-Security-Policy shipped as
+**`Content-Security-Policy-Report-Only` first**, and is enforced now. Report-only,
+the browser evaluates it and logs violations without blocking anything, so the
+real flows could be exercised before it was enforced. A policy written without
+being able to load the deployed site is a guess, and the failure mode of a wrong
+guess is being locked out of your own app — so a future tightening should go the
+same way.
 
 It is **now enforced** (#28), and the check is why. Running
 [csp-check.md](csp-check.md) against the deployed site refused two scripts, both

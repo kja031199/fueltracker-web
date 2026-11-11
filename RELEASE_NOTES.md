@@ -11,6 +11,16 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-11
 
+- **Nothing you see changes.** The documentation says what is true today, and
+  says each thing once.
+  *Technical:* stale statements fixed — the OCR check's scenario count, the
+  CSP described as report-only, the "lines of domain logic" figure, and
+  `docs/port.md`'s "not built" list, now split into "Left out on purpose" and
+  "Planned against, then built". The docs index lives only in
+  `docs/README.md` and the command list only in `docs/development.md` (now
+  with every script), each linked from the README; `docs.test.ts` keeps both
+  single. Part one of three on #100.
+  [#100](https://github.com/kja031199/fueltracker-web/issues/100) · [PR #153](https://github.com/kja031199/fueltracker-web/pull/153)
 - **Nothing you see changes, and the app can't quietly get bigger.** Each
   part of the app that a browser downloads now has a size limit, checked on
   every change.

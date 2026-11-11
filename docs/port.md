@@ -75,26 +75,14 @@ Stated up front rather than discovered later:
 | **Pump display scanning** | **Dropped on evidence.** Seven-segment digits defeat the recogniser even undegraded — confidence 36, no usable output. The pump parser stays, because it costs nothing and reads a receipt's fuel line. |
 | **Bounded image decode** | **Degraded.** iOS decodes an untrusted photo straight to a bounded size and never builds the full bitmap, which is what stops a decompression bomb. The web has no equivalent primitive, so the defence is a byte ceiling checked *before* any decode plus a bounded re-encode after. A large-but-legitimate-looking file that expands hugely remains a gap. |
 
-Gained in exchange: it runs on any device with a browser, costs nothing to publish, and needs no account.
+Gained in exchange: it runs on any device with a browser, costs nothing to publish, and installs as an app that works offline.
 
-## What was deliberately not built
+## Left out on purpose
 
 The table above is what the platform took away. This is the shorter, more
-honest list: things that were possible and were **chosen against**.
+honest list: things that were possible and were **chosen against**, or are not
+built yet.
 
-- **~~No sync and no accounts.~~ Built after all, and the entry above is kept
-  rather than deleted because the reasoning is still the honest account of what
-  it cost.** The founding decision was local-first, and sync reverses it: there
-  is now an account to lose access to, and a Google dependency where there was
-  none. What the original note got right is that it would be cheap when it came
-  — the four sync fields were stamped on every row from the first write, nothing
-  had to be migrated, and the merge rule was already written and tested. What it
-  got wrong is the bill: Firestore's free tier needs no card and stops serving
-  rather than charging, so the monthly bill never materialised. The privacy
-  claim at the top of this file is no longer structural — there is now a server
-  to trust, and `firestore.rules` is what makes it trustworthy.
-- **No multi-user sharing** — since built: sharing a car (#66) and fill-ups
-  sent by link (#3), below.
 - **No pump-display scanning.** Dropped on measurement, not on principle. A
   seven-segment pump display rendered *pristinely* — no glare, no angle, no
   blur — came back at confidence 36 with the output `GAL =, ( (CZ`. A scanner
@@ -111,7 +99,24 @@ honest list: things that were possible and were **chosen against**.
   [#143](https://github.com/kja031199/fueltracker-web/issues/143).
 - **No PDF export.** CSV and JSON cover the two real jobs — a spreadsheet and a
   restore — and a PDF is neither.
-- **The shareable submission link — since built** ([#3](https://github.com/kja031199/fueltracker-web/issues/3)).
+
+## Planned against, then built
+
+Kept rather than deleted, because the reasoning is still the honest account of
+what each one cost.
+
+- **Sync and accounts.** The founding decision was local-first, and sync reverses it: there
+  is now an account to lose access to, and a Google dependency where there was
+  none. What the original note got right is that it would be cheap when it came
+  — the four sync fields were stamped on every row from the first write, nothing
+  had to be migrated, and the merge rule was already written and tested. What it
+  got wrong is the bill: Firestore's free tier needs no card and stops serving
+  rather than charging, so the monthly bill never materialised. The privacy
+  claim at the top of this file is no longer structural — there is now a server
+  to trust, and `firestore.rules` is what makes it trustworthy.
+- **Sharing**: a car with another account (#66), and fill-ups sent by link
+  (#3), below.
+- **The shareable submission link** ([#3](https://github.com/kja031199/fueltracker-web/issues/3)).
   On iOS it waited on `CKShare` and a paid account; on the web a URL *is* the
   transport. It avoided the questions a public endpoint raises (scope,
   revocation, rate limiting) by not having one: the fill-up travels in the
