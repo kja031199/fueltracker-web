@@ -63,12 +63,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      LYCHEE_VERSION: v0.15.1
-      # SHA-256 of lychee-${LYCHEE_VERSION}-x86_64-unknown-linux-gnu.tar.gz
-      # (#46). This release publishes no checksum, so the pin is the hash of two
-      # downloads made hours apart that agreed: it cannot prove the first file
-      # was genuine, but it does make any later change to it fail this job.
-      LYCHEE_SHA256: 9afdf0f48064fdcd8a8815ca6d2d9fcd43a0ef4c2edf9da23d6f7bf46a764eb8
+      # The release's tag. Releases since 0.16 are tagged `lychee-v<version>`
+      # and their asset name carries no version, so the tag is the pin.
+      LYCHEE_VERSION: lychee-v0.24.2
+      # SHA-256 of that release's lychee-x86_64-unknown-linux-gnu.tar.gz (#46).
+      # Source: the release's published .sha256 for the asset, confirmed against
+      # a separate download. Bump it with the version: a different file should
+      # be a reviewed diff, never a silent one.
+      LYCHEE_SHA256: 1f4e0ef7f6554a6ed33dd7ac144fb2e1bbed98598e7af973042fc5cd43951c9a
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -80,12 +82,13 @@ jobs:
       - name: Install lychee
         run: |
           set -euo pipefail
-          tarball="lychee-${LYCHEE_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+          tarball="lychee-x86_64-unknown-linux-gnu.tar.gz"
           curl -sSfL -o "$tarball" \
             "https://github.com/lycheeverse/lychee/releases/download/${LYCHEE_VERSION}/$tarball"
           # Verified before extraction, so a mismatch fails the job here.
           echo "${LYCHEE_SHA256}  $tarball" | sha256sum --check --strict -
-          tar -xzf "$tarball" lychee
+          # The binary sits in a folder named after the asset.
+          tar -xzf "$tarball" --strip-components=1 lychee-x86_64-unknown-linux-gnu/lychee
           chmod +x lychee
           ./lychee --version
 

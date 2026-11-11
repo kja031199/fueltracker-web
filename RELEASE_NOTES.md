@@ -11,6 +11,15 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-11
 
+- **Nothing you see changes.** The checker for broken links in the
+  documentation is up to date.
+  *Technical:* lychee bumped nine minor versions to its latest release, the
+  second bump the weekly pin check asked for. Releases are now tagged
+  `lychee-v<version>` with a version-free asset name and a published
+  `.sha256`, which the pin now comes from (the old release published none),
+  confirmed against a separate download. Same options; it passes the docs and
+  still fails a broken file link or heading anchor.
+  [#99](https://github.com/kja031199/fueltracker-web/issues/99) · [PR #150](https://github.com/kja031199/fueltracker-web/pull/150)
 - **Nothing you see changes.** The scanner that checks every change for leaked
   passwords is up to date.
   *Technical:* gitleaks bumped to its latest release, the first bump the weekly

@@ -39,7 +39,8 @@ describe('reading the pins', () => {
   test('reads the real checks.yml', () => {
     const pins = pinsIn(readFileSync('.github/workflows/checks.yml', 'utf8'));
     expect(pins.map((pin) => pin.tool)).toEqual(['gitleaks', 'lychee']);
-    for (const pin of pins) expect(pin.version).toMatch(/^v?\d+\.\d+\.\d+$/);
+    // `8.30.1`, `v0.15.1`, or a release tag like `lychee-v0.24.2`.
+    for (const pin of pins) expect(pin.version).toMatch(/^(?:[a-z-]*-)?v?\d+\.\d+\.\d+$/);
   });
 });
 
@@ -82,7 +83,8 @@ describe('the docs never quote a pin (#99)', () => {
   // A version written in prose is a second copy of the pin, and it goes stale
   // on the next bump without anything noticing. Say "the pinned version".
   const pins = [
-    ...pinsIn(readFileSync('.github/workflows/checks.yml', 'utf8')).map((pin) => pin.version.replace(/^v/, '')),
+    // The bare number, so `lychee 0.24.2` in prose is caught as well as the tag.
+    ...pinsIn(readFileSync('.github/workflows/checks.yml', 'utf8')).map((pin) => pin.version.replace(/^(?:[a-z-]*-)?v?/, '')),
     (JSON.parse(readFileSync('.github/firebase-cli/package.json', 'utf8')) as { dependencies: Record<string, string> })
       .dependencies['firebase-tools']!,
   ];
