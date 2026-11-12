@@ -24,6 +24,12 @@
  * Screens used to receive both the store and data derived from it as props.
  * Now they read both from here, so what a screen shows and what it writes to
  * are the same thing.
+ *
+ * @trap #93 — The fuel log records a backup, never a screen: `saveBackup()`
+ * downloads and records it in one step, and a new way to ask for a backup calls
+ * it and adds nothing. `exportCsv()` records nothing. Screens read the reminder
+ * through `useBackupStatus()`, so recording one leaves `useFuelLog()`
+ * unchanged.
  */
 
 import type { ReactElement, ReactNode } from 'react';

@@ -34,6 +34,9 @@
  * Refusing to adopt means such a row keeps winning, so the refusals are counted
  * and surfaced rather than swallowed. Losing to a row we cannot outbid is bad;
  * losing to it silently is worse.
+ *
+ * @trap #14 — Safe only while `updatedAt` is never displayed — show `date` —
+ * and only while adoption stays bounded.
  */
 
 /**

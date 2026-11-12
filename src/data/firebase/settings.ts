@@ -19,6 +19,15 @@
  *    (`.gitleaks.toml`) is that allowlisting is never the fix.
  * 2. It keeps a fork pointed at its own project rather than silently writing
  *    into this one.
+ *
+ * @trap #45 — A development build refuses the production project:
+ * `developmentUsesProduction` checks `import.meta.env.DEV` *or* a local
+ * hostname, before Firebase is imported, and renders `WrongProjectScreen`. No
+ * override, deliberately. Uids are per project, so the dev uid has to be in the
+ * allowlist too (docs/deploying.md).
+ *
+ * @trap #8 — Never commit the web config, public as it is: its API key matches
+ * gitleaks' rule, and allowlisting a credential pattern is never the fix.
  */
 
 export interface FirebaseSettings {

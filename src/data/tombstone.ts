@@ -35,6 +35,12 @@
  * `schemaVersion` is carried over rather than restamped: a deletion is not a
  * migration, and relabelling a row this build did not fully understand would
  * be a lie about where it came from.
+ *
+ * @trap #25 — Three things depend on an empty tombstone together: this builder
+ * (and `asTombstone`, for one pulled or imported, #86),
+ * `preserveLocalReceipts`' exception for it, and `store.scrubTombstones()`.
+ * Keep the scrub idempotent — `isScrubbed` ignores `updatedAt` for that reason
+ * — and never move `deletedAt`.
  */
 
 import type { FillUpRecord, PendingFillUpRecord, SyncFields, VehicleRecord } from './records';

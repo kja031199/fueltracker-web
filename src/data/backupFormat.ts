@@ -20,6 +20,18 @@
  *
  * Everything here is pure — no store, no DOM, no clock — so the parsing can be
  * tested against hostile input without any of that in the way.
+ *
+ * @trap #12 — Only a JSON export counts as a backup: CSV has no vehicles,
+ * tombstones or receipt bytes.
+ *
+ * @trap #14 — CSV-imported rows are stamped with the fill-up's own date as
+ * `updatedAt`, so imported history loses every merge against the account. Known
+ * and unfixed.
+ *
+ * @trap #29 — A CSV cell is escaped for the parser *and* the spreadsheet:
+ * `guardCsvCell` prefixes an apostrophe, the pattern lets the guard escape
+ * itself, `unguardCsvCell` removes exactly one. Keep the pair reversible, on
+ * every cell, after trimming.
  */
 
 import type { FillUpRecord, Snapshot } from './records';
@@ -77,6 +89,10 @@ export function bytesToBase64(bytes: Uint8Array): string {
  * suite eight seconds to refuse that way, which is the harm in miniature.
  *
  * Unbounded by default, so callers that already know the size stay unchanged.
+ *
+ * @trap #21 — Check the bound before decoding, from the text length (four
+ * characters carry three bytes); after `atob` the allocation has happened.
+ * Carry the bound into any new decode path.
  */
 export function base64ToBytes(text: string, maxBytes: number = Number.POSITIVE_INFINITY): Uint8Array | null {
   if (decodedLengthOf(text) > maxBytes) return null;

@@ -51,6 +51,10 @@ export const volume: Record<VolumeUnit, VolumeSpec> = {
  * volume, so it converts the other way from a volume — the one place that is
  * written, where the form, the formatter and the weekday insight each used to
  * divide by `fromGallons(1)` themselves.
+ *
+ * @trap #93 — Convert a price through this and `pricePerGallonFrom`, never by
+ * dividing by `fromGallons(1)`: a price is per volume, so it converts the
+ * opposite way.
  */
 export function pricePerUnit(pricePerGallon: number, unit: VolumeUnit): number {
   return pricePerGallon / volume[unit].fromGallons(1);

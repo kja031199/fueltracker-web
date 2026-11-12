@@ -9,6 +9,19 @@ request. Every pull request that closes an issue adds its note here — the
 "Release notes" check refuses one that does not
 ([how it works](docs/development.md#release-notes)).
 
+## 2026-11-12
+
+- **Nothing you see changes.** The rules for working on sync, storage, the
+  security rules and the deploy now sit in the code they govern, not in one
+  long file.
+  *Technical:* the 54 "Rules and deploy" and "Data and sync" entries leave
+  `CLAUDE.md` (896 → 526 lines) as 62 `@trap #N —` paragraphs in the docblocks
+  and header comments of 38 files — modules, `firestore.rules` and the
+  workflows — each tagged with the issue that made the rule, so
+  `git grep -n '@trap'` lists them all. `cspWatch.ts` no longer calls the CSP
+  report-only.
+  [#100](https://github.com/kja031199/fueltracker-web/issues/100) · [PR #154](https://github.com/kja031199/fueltracker-web/pull/154)
+
 ## 2026-11-11
 
 - **Nothing you see changes.** The documentation says what is true today, and

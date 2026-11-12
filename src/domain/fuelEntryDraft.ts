@@ -34,6 +34,11 @@ export interface FuelEntryDraft {
  * A sanitised receipt is a couple of hundred KB. Anything past this ceiling at
  * the write boundary means the bounded image-intake path was bypassed, so the
  * blob is dropped rather than persisted unbounded.
+ *
+ * @trap #8 — Receipts have two ceilings, and both drop the photo, never the
+ * row: this one on every path that admits a receipt, and
+ * `MAX_SYNCED_RECEIPT_BYTES` (700 KB) for sync, against the 1 MiB document cap.
+ * An incoming row never *removes* a receipt the local copy has.
  */
 export const MAX_RECEIPT_BYTES = 4 * 1024 * 1024;
 

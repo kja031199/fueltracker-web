@@ -3,6 +3,16 @@
  * cars shared with this account and invitations waiting for it, kept fresh,
  * and the actions on them. Moved out of `fuelLog.tsx` (#93); only the fuel
  * log calls it.
+ *
+ * @trap #89 — The ledger fills the shared list only until the first sync
+ * answers; then the sync's list wins. Names for "entered by" go through
+ * `sharing.namesFor`, never a `members()` call in a screen effect.
+ *
+ * @trap #81 — Names are verified identities: a member by `verifiedName` (name
+ * and email), the owner as "(owner)" by uid, yourself as "you". A chosen name
+ * never stands alone for a sharer. `lastEditedBy`, an owner-side `enteredBy`
+ * rule and signed request links were declined — say so if a change seems to
+ * need them.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';

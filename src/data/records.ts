@@ -38,6 +38,10 @@ import type { FuelEntryStats } from '../domain/models';
  * any client writes it (deploy the rules first). `enteredBy` (#66) was added
  * that way. Bumping for it would have made every older build skip every row
  * a newer build had touched, which is far worse than dropping a name.
+ *
+ * @trap #66 — Bump only for a breaking change. Newer rows are skipped from the
+ * account *and* from a backup file (#86), set aside **before** validation so
+ * they read as newer, not damaged.
  */
 export const SCHEMA_VERSION = 1;
 

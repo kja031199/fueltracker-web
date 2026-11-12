@@ -5,6 +5,9 @@
  * They had been copied into five modules, and one name meant two things:
  * `finite` answered yes or no in three places, and gave back "the number, or
  * 0" in a fourth. Here each has one name that says which.
+ *
+ * @trap #91 — Don't write another `finite`, `text`, `isRaw` or `asRecord`
+ * helper in a decoder; `guards.test.ts` scans for one.
  */
 
 import { boundText } from '../domain/textLimits';

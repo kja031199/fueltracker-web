@@ -6,6 +6,14 @@
  * overwritten by a decision made before it, and a delete interrupted part way
  * was left part done. Each now runs here, and decides against rows it reads
  * here.
+ *
+ * @trap #85 — Inside `work`, use the repositories it is handed (`r`), never
+ * `this.repos`: `dexieRepositories` binds them with `tx.table(...)`, because
+ * Dexie's ambient transaction is lost after a few `await`s and the writes then
+ * commit one by one (`PrematureCommitError`, or nothing at all). Decide against
+ * rows read *inside*. In memory `work` just runs, so atomicity is tested on
+ * fake-indexeddb (`atomicWrites.test.ts`), and an injected fault goes inside
+ * the transaction too.
  */
 
 import type { Repositories } from './repository';

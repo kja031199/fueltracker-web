@@ -39,6 +39,14 @@
  * Cloud Storage would be the natural home for blobs, and is deliberately not
  * used: since 3 February 2026 it requires a linked billing account even at zero
  * usage, which would take this app off the free tier for the sake of an image.
+ *
+ * @trap #52 — Every write carries `syncedAt: serverTimestamp()`, and the rules
+ * demand it equal the request time: incremental sync reads by it. Every
+ * *positive* rules test includes it (`forWire` does), or it passes for the
+ * wrong reason. Records never carry it: `decode` drops it.
+ *
+ * @trap #91 — Both Firestore remotes write with `writeStamped` and read with
+ * `readStamped`, the one `BATCH_LIMIT` beside them.
  */
 
 import {

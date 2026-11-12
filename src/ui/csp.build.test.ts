@@ -20,6 +20,22 @@ import { PRODUCTION_PROJECT_ID } from '../data/firebase/settings';
  * production, only once the policy is enforced, and only for whoever loaded
  * the page. Catching it in CI is the difference between a failed check and a
  * white screen on someone's phone.
+ *
+ * @trap #28 — The CSP is enforced, and this file reads only the enforcing
+ * header — so reverting to report-only fails the whole file rather than passing
+ * quietly. `script-src` is `'self'` plus `https://apis.google.com`, which
+ * Firebase Auth injects (the live check refused sign-in twice without it);
+ * `'self'` holds for the rest only because the built page has no inline script,
+ * which this file enforces.
+ *
+ * @trap #82 — Exact hosts, no wildcards, no inline style, each pinned here. A
+ * future change is trialled as a `Content-Security-Policy-Report-Only` header
+ * beside the enforced one; `cspWatch` marks its refusals `(report-only)` so a
+ * report tells "would break" from "is broken".
+ *
+ * @trap #13 — `Cross-Origin-Opener-Policy: same-origin` severs `window.opener`
+ * and breaks `signInWithPopup`. The value is `same-origin-allow-popups`, and a
+ * test here asserts it is not the dangerous one.
  */
 
 const html = (): string => readFileSync('dist/index.html', 'utf8');

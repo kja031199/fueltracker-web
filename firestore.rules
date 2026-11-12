@@ -46,6 +46,37 @@ rules_version = '2';
 // Each document's fields are listed once, in its `…Keys()` function below
 // (#92), and `rulesLimits.test.ts` fails if a list differs from what the
 // client writes.
+//
+// @trap #33 — The sign-in allowlist below is uids, not emails, so adding a
+// person is a deploy. `rules.emulator.test.ts` parses the list out of this file
+// and fails if it is empty or still holds a placeholder. Steps:
+// docs/accounts.md.
+//
+// @trap #82 — `allowed()` also requires a Google sign-in provider, checked
+// after the uid list so the test's pattern still finds the list. The emulator's
+// default token claims a custom provider, so a rules test signs in through
+// `signedIn` (src/test/emulator.ts).
+//
+// @trap #79 — The merge stamp is bounded: `updatedAt` at most `maxAheadMs`
+// ahead of the request time and never below the stored document's, and every
+// number passes `finite`, because a bare number check accepts NaN and the
+// infinities. `maxAheadMs` equals `MAX_ACCEPTED_AHEAD_MS` (syncClock.ts), which
+// must stay above `MAX_ADOPTED_SKEW_MS` or honest devices are refused;
+// `rulesLimits.test.ts` checks both. The rules language has no exponent
+// notation.
+//
+// @trap #92 — A new field goes in one place, its document's `…Keys` function
+// (the optional one if older builds will not write it), checked by the single
+// `shape` helper — never a new hasOnly and hasAll pair. These rules deploy
+// before the build that writes it, which is why deploy.yml deploys rules before
+// hosting.
+//
+// @trap #92 — Every size bound is named — `label`, `sized` (ids and the invite
+// address) and `maxReceiptBytes`, which equals `MAX_SYNCED_RECEIPT_BYTES`
+// (rulesShape.test.ts) — and a test refuses a size check anywhere else, because
+// an inline bound is one the parity tests cannot see. A missing car is checked
+// with one `get`, where an error refuses, never `exists` then `get`. There is
+// no rule for the users document itself.
 service cloud.firestore {
   match /databases/{database}/documents {
 

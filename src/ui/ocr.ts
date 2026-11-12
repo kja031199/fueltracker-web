@@ -27,6 +27,21 @@
  * strokes with gaps, not glyphs, and a general text recogniser has no model for
  * them. Pump scanning is therefore not offered rather than offered badly; the
  * pump parser stays, because it costs nothing and reads receipt fuel lines.
+ *
+ * @trap #17 — Pass **all three** paths to `createWorker`: a missing one
+ * silently falls back to jsDelivr. `worker-src` is `'self'`.
+ *
+ * @trap #90 — One worker for a run of scans: kept while scans keep coming,
+ * terminated after `READER_IDLE_MS` without one, and by `releaseReader()` when
+ * the account closes. A worker that threw on a photo is dropped; a failed load
+ * is not remembered; released mid-scan, it finishes that scan first. Tests call
+ * `releaseReader()` after each, since the worker outlives a call.
+ *
+ * @trap #64 — tesseract.js reads a `Blob`, `File` or canvas, never an
+ * `ImageBitmap`: anything else becomes a zero-byte array and fails with "pix
+ * not read". `recognise(image: Blob)` refuses anything else. Keep `unavailable`
+ * (it did not load) and `unreadable` (it failed on the photo) apart: folding
+ * them sent a good load to "check your connection".
  */
 
 /**

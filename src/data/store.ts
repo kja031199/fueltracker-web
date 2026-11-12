@@ -13,6 +13,28 @@
  * A submission from another person goes through the same gate twice: once when
  * it is submitted, and again when it is approved, because the record could have
  * been altered in between.
+ *
+ * @trap #53 — Screens get `FillUpSummary` from `fillUps()`, without photo
+ * bytes; to edit, load the whole row with `fillUp(id)`, or the form saves the
+ * fill-up back without its photo. Read one vehicle with `listForVehicle` and
+ * count with `countLive` — never `list()` and a filter where an index answers
+ * it. A row in any state is `getMany([id])`.
+ *
+ * @trap #83 — `updateFillUp(id, draft)` takes no car: it keeps the stored
+ * `vehicleId` and throws `StaleEdit` if the fill-up or its car has gone,
+ * because a sync can change the selected car under an open form. Don't add a
+ * car parameter back.
+ *
+ * @trap #91 — The store's clock is sync's clock: `syncOnce` and `syncAll` take
+ * it from the store, so there is no clock parameter to get wrong, and the
+ * cursor state is required (a defaulted one meant a full read every sync). To
+ * simulate a reload in a test, build a new store over the same repositories
+ * with a fresh clock.
+ *
+ * @trap #3 — `receiveSubmission` is idempotent by the sender's id — it looks
+ * among live **and** tombstoned submissions — and is the only door into the
+ * review queue; tests queue through `submitted()` in `src/test/fixtures.ts`.
+ * `approvePendingFillUp` refuses a car that has gone.
  */
 
 import type { FuelEntryDraft } from '../domain/fuelEntryDraft';
