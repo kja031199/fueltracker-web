@@ -14,6 +14,21 @@
  * and render it in the unit the reader chose. Storage never changes with that
  * choice and neither does any ranking; conversion happens here, at the display
  * boundary, and nowhere else.
+ *
+ * @trap #94 — One display locale: numbers and dates in the browser's language
+ * (`displayLocale`), the currency from `loadCurrency`. Every default is
+ * `US_STYLE`, which reproduces the old output byte for byte, and `useDisplay()`
+ * without a provider is `US_STYLE`. Display only: the currency converts
+ * nothing, and a stored one must pass `isCurrencyCode` or `Intl` throws. Dates
+ * go through `formatDate(ms, locale)`, never the browser's own date methods
+ * (`oneCopy.test.ts`).
+ *
+ * @trap #94 — Counts go through `countOf(n, { one, other }, locale)`, with the
+ * form chosen by **English** plural rules because the words are English. Put
+ * the whole agreeing phrase in each form, never a second ternary.
+ *
+ * @trap #88 — Number formatting goes through `numberFormat`, which caches one
+ * `Intl.NumberFormat` per locale and options.
  */
 
 import type { DistanceUnit, EconomyUnit, VolumeUnit } from './units';

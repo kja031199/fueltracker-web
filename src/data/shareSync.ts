@@ -62,6 +62,10 @@
  * handed to the screens (`shares.memberships`); don't add a
  * `remote.memberships()` call to the sharing view. A screen reload after a
  * share sync needs rows written, not just a share synced.
+ *
+ * @trap #77 — Never let an unreadable ledger read as empty — no `.catch` that
+ * turns `load()` into nothing shared. A share is saved to it *before* its rows
+ * are pulled and leaves it only *after* they are forgotten.
  */
 
 import type { SyncTarget } from './replica';

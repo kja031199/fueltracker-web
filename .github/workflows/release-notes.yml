@@ -6,6 +6,9 @@ name: Release notes
 #
 # Its own workflow, not a job in checks.yml, so that editing a pull request's
 # title or description (`edited`) re-runs this alone.
+#
+# @trap #113 — Never put a pull request expression inside a `run:` script: pass
+# it through `env:`, as below. workflows.test.ts enforces it.
 
 on:
   pull_request:

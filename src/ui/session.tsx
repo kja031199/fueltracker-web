@@ -7,6 +7,10 @@
  * contexts instead: the reader's units, which they change in Settings, and the
  * session — who is signed in, how to sign out, whether anything syncs, and the
  * administrator's idle period.
+ *
+ * @trap #93 — `useUnits()` outside a provider is US with a setter that does
+ * nothing, so a screen rendered alone in a test needs no wrapper and shows
+ * exactly what is stored. Settings takes no props; it reads `useSession()`.
  */
 
 import type { ReactElement, ReactNode } from 'react';

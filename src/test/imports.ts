@@ -8,6 +8,10 @@ import { dirname, join, normalize } from 'node:path';
  * saw only `from '…'` in single quotes: a double-quoted import, a dynamic
  * `import('…')`, or a bare `import '…'` crossed the boundary unseen. One
  * reader for all of them, tested on each form it has to catch.
+ *
+ * @trap #93 — A boundary test reads imports through `importsOf`, never its own
+ * pattern. A new rule is a pure function of that list, tested on a planted
+ * list, then run over the files.
  */
 
 /** Comments out, so prose that mentions an import is not one. Strings are kept. */

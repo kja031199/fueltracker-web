@@ -11,6 +11,20 @@ request. Every pull request that closes an issue adds its note here — the
 
 ## 2026-11-12
 
+- **Nothing you see changes.** The guide for working on the app is a short
+  index again, and every rule it used to retell sits beside the code it is
+  about.
+  *Technical:* `CLAUDE.md` is 122 lines, down from 896 when #100 began: what
+  the app is, how to work, the nine invariants, and how to list the rules
+  (`git grep -n '@trap'`). The last rendering, testing and toolchain rules
+  moved into their modules, which makes 103 tagged rules in all; the two that
+  belong to no module are under "Testing rules" in `docs/development.md`.
+  `docs.test.ts` now holds `CLAUDE.md` to 160 lines and requires every
+  `@trap` to name its issue, with at least 103 of them; five recorded
+  mutations prove each guard can fail. Also fixed: `fixtures.ts` named a test
+  file that does not exist.
+  [#100](https://github.com/kja031199/fueltracker-web/issues/100) · [PR #155](https://github.com/kja031199/fueltracker-web/pull/155)
+
 - **Nothing you see changes.** The rules for working on sync, storage, the
   security rules and the deploy now sit in the code they govern, not in one
   long file.

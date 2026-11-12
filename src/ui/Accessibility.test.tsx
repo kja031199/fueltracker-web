@@ -15,6 +15,20 @@ import { sourcesUnder } from '../test/imports';
  * focus left on the page after a screen changed, ids that collide when a
  * component renders twice, and a chart table keyed by a label two rows can
  * share.
+ *
+ * @trap #95 — A button repeated per row says which row: an `aria-label` that
+ * starts with the visible word (WCAG 2.5.3), such as "Edit the fill-up of …"
+ * (`fillUpName`); `ConfirmButton` takes a `labelSuffix`. A label, not a
+ * visually hidden span, which is still page text and doubles every `getByText`.
+ * In tests, match these names by their start (`/^Share /`).
+ *
+ * @trap #95 — No fixed ids: every `id`, `htmlFor` and `aria-*` reference is
+ * `${idBase}-name` from one `useId()` per component, and this file fails on a
+ * fixed string in any spelling. A heading query that could also match the page
+ * title needs `level: 2`.
+ *
+ * @trap #95 — A list's key is its identity, never its label: two chart readings
+ * on one day share a label.
  */
 
 async function setUp(tab: 'fillups' | 'vehicles' | 'dashboard' = 'fillups'): Promise<FuelTrackerStore> {

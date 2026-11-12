@@ -12,6 +12,15 @@
  * lacks the role, deliberately; `firestore.indexes.json` is deployed once by
  * hand (docs/deploying.md). Until then `withIndexFallback` reads the whole car
  * and says so (`indexMissing`).
+ *
+ * @trap #66 — Membership lives in `vehicles/{id}/members`, never in the vehicle
+ * record: the owner's last-write-wins push would erase it.
+ *
+ * @trap #80 — Revoking holds on the server: accept is **one batch** (member,
+ * membership, invitation deleted), and the rules refuse a join that leaves the
+ * invitation. `removeMember` also withdraws a leftover invitation, looked up
+ * rather than deleted blind — deleting a missing one is refused and fails the
+ * batch. Deleting a car ends its sharing.
  */
 
 import {

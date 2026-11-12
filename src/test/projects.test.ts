@@ -25,6 +25,14 @@ import { buildMissing, emulatorMissing, prerequisiteError } from './prerequisite
  * `dist/` readers skipped, and the CI rules job ran a whole directory, pure
  * tests included. A group is now chosen by the file's **name**, and this file
  * holds the names to what the tests actually need.
+ *
+ * @trap #97 — The project chooses the environment, never a per-file docblock: a
+ * `.ts` test that needs `document` is named `.dom.test.ts`, and one that reads
+ * `dist/` or imports `test/emulator` carries the matching name. `build` and
+ * `rules` fail without their prerequisite rather than skip. Workflows run the
+ * npm scripts, never `vitest` with a path. A global setup's error goes through
+ * `prerequisiteError`, whose stack is the message: Vitest crashed
+ * source-mapping a real one.
  */
 
 interface ProjectTest {

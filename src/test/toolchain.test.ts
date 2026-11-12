@@ -9,6 +9,18 @@ import { describe, expect, test } from 'vitest';
  *
  * Each of these is drift that type checking cannot see, because the thing that
  * is wrong is the type checker's own premise.
+ *
+ * @trap #57 — The lint is oxlint with the two React hooks rules only, as
+ * errors, every category off: an allowlist, so an oxlint bump cannot add rules.
+ * Not ESLint: `typescript-eslint` needs TypeScript's JavaScript API, which
+ * TypeScript 7 lacks. A finding is fixed, or disabled on its line with the
+ * reason beside it.
+ *
+ * @trap #97 — Two TypeScript projects, joined in `tsconfig.json` and checked by
+ * `tsc -b` (`tsc --noEmit` on that root checks nothing): `tsconfig.app.json`
+ * for the app, with no test types, and `tsconfig.test.json` for the tests and
+ * `vite.config.ts`. App code that names `describe` or `process` is a type
+ * error.
  */
 
 const json = (path: string): Record<string, unknown> =>

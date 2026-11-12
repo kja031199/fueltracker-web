@@ -20,6 +20,10 @@
  * `syncOnce` never throws, and this never surfaces a crash. Being unable to
  * reach the account is the normal condition of an offline-first app; the screen
  * says so and the local data carries on working.
+ *
+ * @trap #94 — `DisplayProvider` wraps `FuelLogProvider` so this can read
+ * `useDisplay()` — through a ref, because `run`, whose identity the scheduler
+ * is keyed on, must never change with the locale.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';

@@ -10,6 +10,11 @@ import { sourcesUnder } from './imports';
  * frames put the title inside `<main>` and two outside it; one clipboard copy
  * checked for a missing clipboard differently from the other. Each now has a
  * home, and this refuses another copy anywhere else.
+ *
+ * @trap #93 — A page is `ScreenFrame`, a confirm-then-act `ConfirmButton`, a
+ * copy `useCopyToClipboard`, a fill-up in a list `FillUpSummary` (its grey line
+ * from `fillUpFacts`), a person `displayName`. Add to the shared one; never
+ * write another.
  */
 
 interface Rule {

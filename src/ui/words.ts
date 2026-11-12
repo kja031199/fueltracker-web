@@ -6,6 +6,11 @@
  * English, and `src/test/domainWords.test.ts` keeps it that way. Every label a
  * reader sees for one of those identifiers comes from here, so a translation
  * would replace this file and the phrasers beside it, never the domain.
+ *
+ * @trap #94 — A new label goes here, never into `domainWords.test.ts`'s
+ * `IDENTIFIERS`, which allows only the stored fuel grades (Swift's raw values,
+ * which cannot change) and the 'All' range id. `domain/scanning/` is exempt: it
+ * matches English printed on US pumps and receipts.
  */
 
 import type { DashboardTimeRange } from '../domain/dashboardTimeRange';
