@@ -11,6 +11,12 @@
  * An unset Variable reaches the build as an empty string, and every value is
  * parsed so that a missing or malformed one falls back to a safe default
  * rather than switching anything off (`idleMinutesFromConfig`).
+ *
+ * @trap #70 — The idle timeout is always on, and every bad value fails closed
+ * to 30 minutes — unset, empty, `0`, `off`, decimals; there is no "off", so a
+ * typo can never switch it off. It gates the session, not the data, which stays
+ * readable in DevTools: say so in any copy about it. `App`'s `idleMinutes` prop
+ * exists only for tests.
  */
 
 import { idleMinutesFromConfig } from '../domain/idleTimeout';

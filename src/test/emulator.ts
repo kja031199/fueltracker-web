@@ -6,6 +6,15 @@
  * Only the `*.emulator.test.ts` files import it, and they run only in the
  * `rules` project, whose global setup (`needsEmulator.ts`) stops the run when
  * no emulator is there — so nothing here has to cope with a missing one.
+ *
+ * @trap #82 — Every rules-test context goes through `signedIn(env, uid,
+ * claims)`, never `env.authenticatedContext` directly: the rules require a
+ * Google sign-in, and the emulator's default token claims `custom`, so a bare
+ * context is refused like a stranger.
+ *
+ * @trap #97 — Run a spike-style check against the rules with an **absolute**
+ * rules path — a relative one once silently loaded the app's own rules and
+ * "proved" the wrong file.
  */
 
 import { readFileSync } from 'node:fs';

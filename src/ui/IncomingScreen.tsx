@@ -35,6 +35,12 @@ interface Props {
  * answered only after one sync.
  *
  * The submitter's name is whatever they typed, so it is shown as a claim.
+ *
+ * @trap #81 — Never receive in an effect on mount: that let anyone who knew a
+ * car id fill the review list. Only **Queue for review** calls
+ * `receiveSubmission`, once — a ref and a disabled button, each alone enough.
+ * Names in a link are claims: "says they are …" here and on the request screen,
+ * "(unverified)" in `PendingReview`.
  */
 export function IncomingScreen({ payload, onReceived, onDone }: Props): ReactElement {
   const log = useFuelLog();

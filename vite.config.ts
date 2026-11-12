@@ -1,3 +1,19 @@
+/**
+ * The build: the app, its service worker, and the self-hosted OCR reader.
+ *
+ * @trap #17 — The OCR reader is copied to `tesseract/<version>/` by
+ * `tesseractAssets`. Its dev middleware tests a path with `Object.hasOwn`,
+ * never `in`, which matched `constructor` and threw (#82). After touching the
+ * scanner, the CSP or the service worker, run `node
+ * scripts/ocr-check/check.mjs`: its CSP failures happen inside a worker, where
+ * `cspWatch` cannot see them. Its probe is in `tsconfig.app.json`, so moving a
+ * module it imports fails the typecheck.
+ *
+ * @trap #63 — `runtimeCaching` matchers are copied into `sw.js` as source text.
+ * Use a RegExp, never a function that closes over a variable here: the first
+ * tesseract route used `base`, threw inside `sw.js`, never matched, and offline
+ * scanning failed. `ocrAssets.build.test.ts` checks the route is a RegExp.
+ */
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import type { Plugin } from 'vite';

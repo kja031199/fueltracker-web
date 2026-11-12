@@ -22,6 +22,11 @@
  * bytes) are accepted; 150 emoji (150 code points, 300 units) are refused.
  * So a plain `.length` comparison agrees with the server exactly, and the
  * form's `maxLength`, which also counts units, does too.
+ *
+ * @trap #50 — A new text field needs a `label()` in the rules, an entry here, a
+ * place in `recordText.ts`, and a `maxLength` on its input. Text is bounded at
+ * the draft gate, in `addVehicle`/`receiveSubmission`, in `importBackup` (file
+ * *and* pull), and in `FirestoreSharingRemote` both ways (#86).
  */
 export const TEXT_LIMITS = {
   name: 200,

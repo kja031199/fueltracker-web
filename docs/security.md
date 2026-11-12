@@ -143,6 +143,11 @@ for three reasons together:
    less current while reporting success. This is the concrete reason
    `npm audit fix --force` is not run here.
 
+**@trap #19 — Do not run `npm audit fix`**, here or in `.github/firebase-cli/`:
+it reports success while downgrading the package it claims to fix. None of the
+findings reaches a browser, which was checked by grepping the built chunks, not
+inferred from names.
+
 Revisit when `firebase` publishes a release that moves off the affected
 `@grpc/grpc-js`.
 

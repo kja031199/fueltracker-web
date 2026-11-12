@@ -29,6 +29,17 @@
  * cursor claims "this device holds everything up to here", which is only true
  * while those rows are on disk; stored anywhere that can outlive them, a
  * cleared database would be followed by a read that never fetches them again.
+ *
+ * @trap #60 — The cursor is exact integer microseconds, per collection, in the
+ * account's IndexedDB: float ms re-downloaded a document every sync, one cursor
+ * for three collections can skip a write, and `localStorage` can outlive the
+ * rows. Elapsed time uses `clock.wall()`, never the merge clock, which jumps
+ * ahead.
+ *
+ * @trap #91 — Known versions are keyed by the cursor's key and a NUL, never a
+ * printable separator, which could begin another cursor's key — a car id may
+ * contain it. A sync saves only what it read; unreadable versions mean a full
+ * read.
  */
 
 import type { Collection, PullCursor } from './remote';

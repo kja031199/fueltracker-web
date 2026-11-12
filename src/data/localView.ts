@@ -20,6 +20,10 @@
  * that row is sent by the next sync, which every save already schedules
  * (`afterWrite`). The merge itself never relies on this view — `importBackup`
  * looks up what is stored for each incoming row at the moment it writes.
+ *
+ * @trap #87 — Anything sync writes (merge, re-stamp, repair) must be
+ * `refresh`ed into the view by id, or that sync pushes a stale row. Never add a
+ * `store.exportSnapshot()` inside sync; `syncReads.test.ts` counts the reads.
  */
 
 import type { FillUpRecord, PendingFillUpRecord, Snapshot, SyncFields, VehicleRecord } from './records';

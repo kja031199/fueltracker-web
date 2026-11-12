@@ -135,6 +135,10 @@ export interface StatisticsWindow {
  *   rollup — comes from fill-ups dated inside the window, as before.
  *
  * With no window every figure is exactly what it always was.
+ *
+ * @trap #51 — Never filter fill-ups before computing a date range: pass the
+ * whole history and `{ from }`. A segment spans two rows, so filtering first
+ * drops the one that crosses into the range.
  */
 export function computeFuelStatistics(input: readonly FuelEntryStats[], window: StatisticsWindow = {}): FuelStatistics {
   const history = [...input].sort((a, b) => a.odometer - b.odometer);

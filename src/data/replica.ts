@@ -8,6 +8,11 @@
  * screens make, so nothing in the type kept a screen from calling them. The
  * store builds one of these over its own repositories and clock and hands it
  * to sync (`store.replica`); the store's type has none of them.
+ *
+ * @trap #91 — Sync functions take a `SyncTarget` and touch storage only through
+ * its `replica`; `replica.test.ts` fails to compile if one of these methods
+ * reappears on the store. `store.importBackup(snapshot)` is the file import and
+ * has **no** tie-break.
  */
 
 import type { ImportSummary, TieBreak } from './backup';

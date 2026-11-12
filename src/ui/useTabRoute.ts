@@ -22,6 +22,11 @@
  *   so a damaged link is still shown — and named as damaged — rather than
  *   silently dropped on the dashboard. Leaving a link uses `replace`, so Back
  *   does not reopen it.
+ *
+ * @trap #3 — Link routes are never corrected to the dashboard, and they render
+ * **before** the first-run screen. Leaving one uses `choose(tab, { replace:
+ * true })`, so Back neither reopens it nor re-receives it as "already
+ * received".
  */
 
 import { useCallback, useEffect, useState } from 'react';

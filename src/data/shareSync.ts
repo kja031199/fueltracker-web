@@ -52,6 +52,16 @@
  * device is reported as `clashed`: never synced, never recorded as held, and
  * still kept out of the account's own push until it is left, so it fails
  * closed. Nothing is deleted.
+ *
+ * @trap #84 — The three failure kinds hold for each shared car: a `rejected`
+ * share goes under `shares.rejected`, never `failed`, and every shared car's
+ * `SyncOutcome` comes back in `shares.outcomes` for the notice to add up.
+ *
+ * @trap #89 — Count sharing reads (`world.reads` in
+ * `testing/inMemorySharing.ts`). Memberships are read once per sync, here, and
+ * handed to the screens (`shares.memberships`); don't add a
+ * `remote.memberships()` call to the sharing view. A screen reload after a
+ * share sync needs rows written, not just a share synced.
  */
 
 import type { SyncTarget } from './replica';

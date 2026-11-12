@@ -241,6 +241,11 @@ const FUEL_LINE = /(?<![\d.])(\d+\.\d{3})\s*(?:GALLONS?|GAL|G)?\s*@\s*\$?\s*(\d+
  *
  * Two *different* fuel lines return `null`: picking one would be a guess, and
  * the ladder below then decides exactly as it did before this rung existed.
+ *
+ * @trap #65 — Don't reorder the trust ladder back to labels first, and don't
+ * relax `FUEL_LINE`'s three decimals on both sides: the first is what reads a
+ * warehouse-club receipt right, the second what keeps `2 @ 1.99` from becoming
+ * a fuel line.
  */
 function fuelLine(lines: readonly string[]): { gallons: number; price: number } | null {
   let found: { gallons: number; price: number } | null = null;

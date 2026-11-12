@@ -1,3 +1,11 @@
+# @trap #99 — CI setup lives here: Node from .nvmrc (the only place the version
+# is written; engines.node and @types/node follow it), the install, the npm
+# cache on both lockfiles, and with firebase-cli 'true' the pinned CLI, Java and
+# the cached emulator. Every job that runs app code uses it except the deploy
+# key job. A merge is built and tested once, by the deploy's build job: ci.yml's
+# test job runs on pull requests only. workflows.test.ts enforces all of it,
+# this file included.
+
 name: Set up the app
 description: >
   Node from .nvmrc, the app's dependencies from its lockfile, and — when asked —

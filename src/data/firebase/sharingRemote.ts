@@ -7,6 +7,11 @@
  * convenience, not the boundary. A forged invitation, a join without one, a
  * fill-up moved to a private car: each is refused by `firestore.rules`
  * whatever any client sends.
+ *
+ * @trap #89 — CI does not deploy the shared-car index — the deploy account
+ * lacks the role, deliberately; `firestore.indexes.json` is deployed once by
+ * hand (docs/deploying.md). Until then `withIndexFallback` reads the whole car
+ * and says so (`indexMissing`).
  */
 
 import {

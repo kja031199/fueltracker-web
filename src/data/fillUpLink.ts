@@ -34,6 +34,12 @@
  *
  * Each submission carries an id the submitter's device chose. Opening the same
  * link twice — it was pasted into two chats, or tapped twice — queues it once.
+ *
+ * @trap #3 — Keep the decoding order: length cap **before** decoding, base64url
+ * alphabet only, fatal UTF-8, every field type-checked, ids through
+ * `isStorableId`, numbers through `makeFuelEntryDraft`, a date no older than
+ * 1990 and at most a day ahead. Text is cut to `LINK_TEXT_LIMITS` both ways,
+ * and the form's `maxLength` matches.
  */
 
 import { isStorableId } from './recordId';

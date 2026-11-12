@@ -9,6 +9,24 @@ name: Deploy
 # Not a required check, and deliberately not in the branch ruleset: it runs
 # after merge, and a deploy that fails should not retroactively block the commit
 # that caused it. The four checks on `ci.yml` and `checks.yml` are the gate.
+#
+# @trap #76 — The deploy key lives only in the `deploy` job: environment
+# `production`, limited to main. That job runs no app-tree npm code — the CLI
+# installed with its scripts ignored, the build job's tested dist/ downloaded,
+# predeploy stripped into firebase.ci.json — and writes the key last.
+# workflows.test.ts enforces each part. Add no build, test or install step to
+# it, nor the shared setup action, whose steps those checks cannot see.
+#
+# @trap #36 — The deploy toolchain is pinned in .github/firebase-cli/ with its
+# own lockfile (workflows.test.ts enforces it, and SHA-pinned actions). npm's
+# audit "fix" there is a firebase-tools two majors backwards; see
+# docs/deploying.md.
+#
+# @trap #47 — CI has no .env.local. Vite inlines VITE_* at build time, so a
+# build without them succeeds and ships a bundle with no backend. This workflow
+# refuses to deploy if one is missing, and greps the served JS for the app id —
+# not the project id, a source constant since #45 and so in every bundle
+# (workflows.test.ts pins this).
 
 on:
   push:

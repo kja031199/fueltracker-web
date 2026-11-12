@@ -25,6 +25,18 @@
  * would upload a stale row over a newer remote one whenever two devices had
  * both changed, and last-write-wins would then settle on the wrong winner — the
  * one that happened to sync second, not the one edited later.
+ *
+ * @trap #42 — A refused sync is not an unreachable one. `refused` (the rules
+ * refused the pull; it never fixes itself) closes the app, so never widen it to
+ * ordinary failures; `rejected` (an upload refused after the pull worked)
+ * refuses the data, not the person (#50); `unreachable` means try later.
+ * Detected structurally (`cause.code`), because `instanceof FirestoreError`
+ * would pull the SDK in here (#40).
+ *
+ * @trap #91 — A failure carries a `problem` code and the cause's `detail`,
+ * never a sentence: the words are in `ui/syncMessages.ts`, and a refusal never
+ * shows the SDK's detail. Nothing in `src/data` touches the DOM or a canvas;
+ * `importCycles.test.ts` refuses a browser API here.
  */
 
 import type { ImportSummary } from './backup';
@@ -520,6 +532,10 @@ const ALL_COLLECTIONS: readonly Collection[] = ['vehicles', 'fillUps', 'pendingF
  * - `'same'` when they do not really differ: two deletions, or rows equal
  *   apart from a receipt photo, which sync omits when it is too large and is
  *   therefore not an edit.
+ *
+ * @trap #66 — Don't "simplify" the tie-break away — a strict `>` left two
+ * devices each keeping its own version for ever — and keep it a function of the
+ * two rows only, never of which is local, or devices disagree.
  */
 export function tieWinner(
   first: { readonly deletedAt: number | null },

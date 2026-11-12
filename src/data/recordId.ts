@@ -41,6 +41,9 @@
  * "submission x: …" — rather than every caller inventing its own wording for
  * the same fault. It keeps the offending value in the text, because "one row
  * was skipped" is not something anybody can act on.
+ *
+ * @trap #26 — Apply this at every door an id comes in by; `sendableRows`
+ * declines to *send* a bad stored row, never to keep it.
  */
 
 /** Firestore allows 1500 bytes; this is "longer than any id this app writes". */

@@ -32,6 +32,8 @@ export interface FuelEntry extends FuelEntryStats {
  * stored, and **written only here** (#93) — records, drafts, the form, the
  * CSV, the lists and the pump reader all call it, and
  * `src/test/oneTotalCost.test.ts` refuses another copy.
+ *
+ * @trap #93 — The only `gallons × price` in the source; never write another.
  */
 export function totalCost(entry: { readonly gallons: number; readonly pricePerGallon: number }): number {
   return entry.gallons * entry.pricePerGallon;

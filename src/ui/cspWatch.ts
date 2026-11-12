@@ -3,11 +3,11 @@
  *
  * ## Why this exists in the app rather than in a snippet
  *
- * The CSP is served **report-only** (#28). The policy is good, but nothing is
- * enforced and — with no `report-to` endpoint and no server to host one —
- * nothing is collected either: violations go to the console of whoever happens
- * to have DevTools open. Enforcing it safely means running the real flows
- * against the deployed site and seeing what would have been blocked.
+ * The CSP was first served **report-only** (#28), and is enforced now. With no
+ * `report-to` endpoint and no server to host one, nothing is collected:
+ * violations go to the console of whoever happens to have DevTools open.
+ * Enforcing it safely meant running the real flows against the deployed site
+ * and seeing what would have been blocked, and changing it still does.
  *
  * That check cannot be automated from the authoring environment: the deployed
  * origin, the Firebase auth domain and the OCR CDN are all unreachable from it,
@@ -38,6 +38,11 @@
  *
  * It stays useful after #28 is closed: the next time the policy gains an
  * origin, the same three lines re-run the check.
+ *
+ * @trap #39 — Changing the policy needs the live check, not reasoning: the
+ * deployed origin and the auth domain are unreachable from the authoring
+ * environment, and signing in needs a real Google account. `docs/csp-check.md`
+ * is the recipe.
  */
 
 import {
