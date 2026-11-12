@@ -1,6 +1,16 @@
 /**
  * The account, in memory, for tests (#96: moved out of `remote.ts`, where it
  * made a production module twice as long for code production never runs).
+ *
+ * @trap #8 — Tests never touch the network or a real device service:
+ * `StubAuthProvider` and the fakes in this folder exist for that.
+ *
+ * @trap #96 — A fake reads the way the real one does, or the tests prove a
+ * different program: the scoped pull returns the car's document on every pull,
+ * with a cursor of its own (`pullCar`), as `FirestoreScopedRemote.pull` does.
+ * Change a real remote's reads, change its fake, and pin the difference in
+ * `sharing.test.ts`. The only `InMemory*` classes in production code are
+ * `InMemoryRepository` and `InMemorySyncState`.
  */
 
 import type { SyncFields, Snapshot } from '../records';

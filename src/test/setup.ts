@@ -4,6 +4,11 @@
  * `jest-dom` only registers matchers when a DOM is present, so importing it
  * unconditionally would throw in the node-environment suites. The guard keeps
  * one setup file working for both.
+ *
+ * @trap #56 — A test that wants a tab passes `initialTab` or sets the hash
+ * first: the hash is reset after every test. Don't call `new URL()` in app code
+ * that tests reach: `Backup.test.tsx` stubs the global `URL` to capture
+ * downloads.
  */
 import { afterEach } from 'vitest';
 

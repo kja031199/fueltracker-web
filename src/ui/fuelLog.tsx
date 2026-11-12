@@ -30,6 +30,10 @@
  * it and adds nothing. `exportCsv()` records nothing. Screens read the reminder
  * through `useBackupStatus()`, so recording one leaves `useFuelLog()`
  * unchanged.
+ *
+ * @trap #88 — Sync status is not in `useFuelLog()`: read `useSyncStatus()`.
+ * `AppShell` must not read it; `RefusalGate` does, and takes the screens as
+ * `children`, so a status change re-renders only the gate.
  */
 
 import type { ReactElement, ReactNode } from 'react';

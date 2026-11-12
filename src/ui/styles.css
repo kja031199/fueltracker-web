@@ -8,6 +8,14 @@
  * The text colours are the palette's (`textPrimary`, `textSecondary`), which
  * `applyPalette` sets at runtime. These copies are only for the first paint,
  * before it runs, and `accessiblePalette.test.ts` fails if they drift (#93).
+ *
+ * @trap #93 — Inline `style` is only for a computed value, such as a metric's
+ * hue; spacing, lists and quiet text are the utility classes at the end of this
+ * file, and `inlineStyles.test.ts` fails on an all-literal style. Never fade
+ * text with `opacity` — use `.muted`: the text colours are measured palette
+ * values, and a faded one is measured by nothing. Edit the palette first, then
+ * the copies below. A utility that loses to a more specific selector needs a
+ * matching one (`.field input.checkbox`).
  */
 :root {
   --text-primary: rgb(28 28 30);

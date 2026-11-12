@@ -1,5 +1,5 @@
 {
-  "title": "#100 One home per fact",
+  "title": "#100 One home per fact, and a short manual",
   "tests": [
     "src/test/docs.test.ts"
   ],
@@ -21,6 +21,36 @@
       "file": "docs/development.md",
       "from": "npm run mutate        # every recorded mutation; `mutate:check` only checks they apply\n",
       "to": ""
+    },
+    {
+      "name": "CLAUDE.md no longer says how to list the rules",
+      "file": "CLAUDE.md",
+      "from": "```bash\ngit grep -n '@trap'\n```",
+      "to": "```bash\ngit grep -n\n```"
+    },
+    {
+      "name": "CLAUDE.md grows past 160 lines",
+      "file": "CLAUDE.md",
+      "from": "## Checks\n",
+      "to": "## Checks\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
+    },
+    {
+      "name": "a rule that names no issue",
+      "file": "src/data/sync.ts",
+      "from": " * @trap #42 — ",
+      "to": " * @trap — "
+    },
+    {
+      "name": "a rule tagged with no real issue number",
+      "file": "src/test/setup.ts",
+      "from": " * @trap #56 — ",
+      "to": " * @trap #0 — "
+    },
+    {
+      "name": "a rule untagged, so the grep no longer finds it",
+      "file": "docs/development.md",
+      "from": "- **@trap #37 — `userEvent.setup()`",
+      "to": "- **`userEvent.setup()`"
     }
   ]
 }

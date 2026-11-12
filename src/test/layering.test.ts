@@ -13,6 +13,11 @@ import { importsOf, sourcesUnder } from './imports';
  * reads every form through `importsOf`, and also keeps the libraries that make
  * a layer impure (React, Dexie, Firebase) out of `domain/`, and `ui/` out of
  * `data/`.
+ *
+ * @trap #93 — A pure function a component needs goes in `domain/` and is tested
+ * there, not inside the component; one that reads a record goes beside the
+ * record mappings (`data/recordMapping.ts`); a sentence about a data-layer code
+ * goes in `ui/*Messages.ts`.
  */
 
 const DOMAIN = sourcesUnder('src/domain');

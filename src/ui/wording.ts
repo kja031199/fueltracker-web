@@ -6,6 +6,12 @@
  * The domain now hands over values, and the screens phrase them here — which
  * is what would let them be translated. Numbers, money and dates are still
  * formatted by `domain/format.ts`, which has no words in it.
+ *
+ * @trap #94 — `domain/` returns numbers and the UI writes the words: the KPIs
+ * (`kpiText.ts`), the weekday insight (`insightText.ts`), chart summaries
+ * (`charts/chartSummary.ts`) and the fill-up and vehicle phrasing here. Each
+ * phraser defaults to US units and `US_STYLE`, reproducing the old strings byte
+ * for byte.
  */
 
 import type { UnitPreferences } from '../domain/units';

@@ -47,6 +47,10 @@
  * reason returns `null` and the caller applies its own fallback; a write
  * reports whether it stuck. `src/test/storageBoundary.test.ts` checks that no
  * other module touches web storage, so these rules hold everywhere.
+ *
+ * @trap #55 — A new key: ask whose it is. If it is about a fuel log, it is
+ * `account`. `storageBoundary.test.ts` fails if any other module touches web
+ * storage.
  */
 
 import { useCallback, useState } from 'react';

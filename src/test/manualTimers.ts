@@ -10,6 +10,15 @@ import type { SchedulerTimers } from '../ui/syncScheduler';
  * With these, a test fires the waiting sync when it chooses (`fire`), and
  * proves nothing was scheduled by counting (`pending`), not by sleeping.
  * Not `vi.useFakeTimers()`, which stalls Testing Library's own waiting.
+ *
+ * @trap #24 — Testing Library looks for Jest's fake timers, not Vitest's, so a
+ * blanket fake leaves `findBy*` and `waitFor` polling a timer that never fires,
+ * and the test hangs instead of failing. Fake only what the code uses, and
+ * before the render.
+ *
+ * @trap #97 — No test sleeps to prove nothing happened: count it (`pending()`,
+ * `world.reads`, a remote's own counter) or wait for something definite. A
+ * sleep passes on a slow machine for the wrong reason.
  */
 export interface ManualTimers extends SchedulerTimers {
   /** How many timers are waiting. */

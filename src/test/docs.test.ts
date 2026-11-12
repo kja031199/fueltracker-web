@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 
@@ -55,5 +56,45 @@ describe('the command list (#100)', () => {
   test('README.md shows only how to start, and links to the full list', () => {
     expect(readme).toContain('](docs/development.md)');
     expect(readme).not.toMatch(/npm run test:rules/);
+  });
+});
+
+describe('CLAUDE.md is an index, and the rules live beside the code (#100)', () => {
+  const claude = readFileSync('CLAUDE.md', 'utf8');
+
+  // Every tracked file that says `@trap`, except the files that talk *about*
+  // the tag: the manual that says how to find them, the release notes that
+  // record the move, this test, and the mutations that plant bad ones.
+  const NOT_RULES = new Set(['CLAUDE.md', 'RELEASE_NOTES.md', 'src/test/docs.test.ts']);
+  const grep = spawnSync('git', ['grep', '-n', '-F', '@trap'], { encoding: 'utf8' });
+  const hits = grep.stdout
+    .split('\n')
+    .filter((line) => line !== '')
+    .map((line) => {
+      const [file = '', at = '', ...rest] = line.split(':');
+      return { file, at, text: rest.join(':') };
+    })
+    .filter(({ file }) => !NOT_RULES.has(file) && !file.startsWith('scripts/mutations/sets/'));
+
+  // How many rules were moved out of CLAUDE.md. Raise it as rules are added;
+  // fewer means one was deleted along with the code it guarded, or untagged.
+  const MOVED = 103;
+
+  test('stays short: a long manual is one nobody reads', () => {
+    expect(claude.split('\n').length).toBeLessThanOrEqual(160);
+  });
+
+  test('says how to list the rules, as a command to run', () => {
+    expect(claude).toMatch(/^```bash\ngit grep -n '@trap'\n```$/m);
+  });
+
+  test('git grep finds the rules', () => {
+    expect(grep.status).toBe(0);
+    expect(hits.length).toBeGreaterThanOrEqual(MOVED);
+  });
+
+  test('every rule names the issue that made it', () => {
+    const untagged = hits.filter(({ text }) => !/@trap #[1-9]\d* — \S/.test(text));
+    expect(untagged.map(({ file, at }) => `${file}:${at}`)).toEqual([]);
   });
 });

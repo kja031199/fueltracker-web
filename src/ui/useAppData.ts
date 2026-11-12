@@ -5,6 +5,16 @@
  * person's fuel log — a few hundred rows at most — so loading it once and
  * reloading after a write is simpler than caching, and it means a change made
  * on one screen is never stale on another.
+ *
+ * @trap #88 — Keep the fuel log's context value stable: this and `useSync`
+ * return memoised objects, read everything in parallel, apply it in **one**
+ * `setShown`, and drop a load that finishes after a later one was shown. A
+ * value rebuilt each render re-rendered every screen, about ten commits per
+ * save. A list re-read after every sync is replaced only when it differs.
+ *
+ * @trap #88 — The selected car stays here, applied in the same `setShown` as
+ * its fill-ups: held as UI state outside, it would change a render early and
+ * show one car's name over another's figures.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';

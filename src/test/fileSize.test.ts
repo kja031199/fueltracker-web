@@ -10,6 +10,12 @@ import { sourcesUnder } from './imports';
  * the save, and three copies of the same number field. Past a few hundred
  * lines a component is usually more than one thing. This holds the line; an
  * exception is named with the change that will remove it.
+ *
+ * @trap #93 — Past 300 lines, split: a hook for state (`useFillUpForm`), a
+ * component per section (`ui/settings/`), a row with its own state
+ * (`VehicleRow`), the pure rules into `domain/`. An exception goes in `ALLOWED`
+ * with its most lines and the change that removes it, and fails once it is no
+ * longer needed.
  */
 
 export const LIMIT = 300;

@@ -10,6 +10,10 @@ import { useEffect } from 'react';
  * always inside `<main>` now, so the page's heading is inside a landmark and a
  * skip to the main content lands on it. Banners go `before` it and the tab bar
  * `after`, both outside `<main>`.
+ *
+ * @trap #93 — Keep the title inside `<main>`, banners in `before` and the tab
+ * bar in `after`. The `section` also sets `document.title` and ends the `h1`'s
+ * name ("FuelTracker — Vehicles", #95).
  */
 export function ScreenFrame({
   title = 'FuelTracker',

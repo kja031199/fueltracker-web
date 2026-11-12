@@ -1,3 +1,18 @@
+/**
+ * The signed-in app: the tab bar, each tab's screen, and which stay mounted.
+ *
+ * @trap #95 — Focus follows the screen: after a route change, not on arrival,
+ * focus moves to the page's `h1` (`tabIndex={-1}`), compared with the last
+ * route rather than counted, so StrictMode's double effect is not a change. The
+ * fill-up form focuses its heading on open (`focusHeading`) and the list's on
+ * close.
+ *
+ * @trap #93 — A tab is mounted the first time it is shown, then kept inside
+ * `<Activity>`, so it keeps a half-typed fill-up, its filter and its range. A
+ * hidden tab is still in the DOM — in tests, query by role, which skips hidden
+ * content — and still re-renders, at low priority. Don't go back to rendering
+ * only the shown tab: that threw the work away.
+ */
 import type { ReactElement } from 'react';
 import { Activity, useCallback, useEffect, useRef, useState } from 'react';
 import type { AuthUser } from '../data/auth';

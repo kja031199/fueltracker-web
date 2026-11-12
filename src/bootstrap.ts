@@ -31,6 +31,10 @@
  *
  * Everything that loads or renders is passed in, so the order is tested
  * without a browser (`bootstrap.test.ts`). `main.tsx` supplies the real ones.
+ *
+ * @trap #90 — Add no static Firebase import to `main.tsx` beyond `settings`: a
+ * test holds it to importing the Firestore modules only inside `loadRemotes`,
+ * which is what keeps the sign-in screen from waiting for them.
  */
 
 import type { AccountStore } from './data/accountStore';

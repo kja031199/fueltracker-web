@@ -30,4 +30,4 @@ how to run it; everything here is the detail behind it.
 What each update changed is in [`RELEASE_NOTES.md`](../RELEASE_NOTES.md).
 
 For an AI assistant working in this repository, [`CLAUDE.md`](../CLAUDE.md)
-holds the invariants and the traps.
+holds the invariants and says where every other rule lives.

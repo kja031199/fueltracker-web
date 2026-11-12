@@ -5,7 +5,11 @@
  * mostly byte for byte, and where they differed it was in defaults nobody had
  * chosen on purpose. One of each now, and a file that needs other defaults
  * says so in one line: `const draft = draftWith({ date: … })`.
- * `oneFixture.test.ts` refuses another definition.
+ * `fixtures.test.ts` refuses another definition.
+ *
+ * @trap #97 — Never write another `makeStore`, `draft` or `sharingFor`: copies
+ * drift, and one had quietly made every fill-up "entered by owner". The
+ * emulator suites take theirs from `emulator.ts`.
  */
 
 import { InMemoryRepository } from '../data/repository';

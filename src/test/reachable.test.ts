@@ -15,6 +15,11 @@ import { importsOf, sourcesUnder } from './imports';
  * It is file-sized on purpose. An unused *export* inside a used file is the
  * smaller cousin of this, and telling one apart from a helper exported for its
  * test needs a judgement a grep cannot make.
+ *
+ * @trap #96 — To keep an unreached file on purpose, add it to `KEPT` with the
+ * issue it waits on; the test fails once a kept file is wired in or deleted, so
+ * the list cannot go stale. Test-only helpers live in `src/test/`, never in a
+ * production module.
  */
 
 /** The page's entry point, as `index.html` loads it. */

@@ -15,6 +15,11 @@ import { describe, expect, test, vi } from 'vitest';
  * The tests run in order, so the second checks what the first left behind.
  * This file is in the `dom` project by its `.tsx` name, with no docblock: that
  * it has a `document` at all is the project choosing its environment.
+ *
+ * @trap #97 — Never clean up or restore by hand, and never assign to a
+ * prototype — spy on it, which is restored; `projects.test.ts` refuses all of
+ * these. A spy made in `beforeAll` or at module level is restored before the
+ * first test: make it in `beforeEach` or the test.
  */
 
 const ORIGINAL_TO_BLOB = HTMLCanvasElement.prototype.toBlob;

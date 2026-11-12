@@ -2,7 +2,8 @@
 
 Running it locally, and the checks every pull request goes through. If you are
 an AI assistant working in this repository, read
-[`CLAUDE.md`](../CLAUDE.md) as well — it holds the invariants and the traps.
+[`CLAUDE.md`](../CLAUDE.md) as well — it holds the invariants and says where
+every other rule lives.
 
 ## Development
 
@@ -218,6 +219,20 @@ It takes a couple of minutes, mostly scenario 4 waiting out the load bound. It
 is not in CI, by decision: CI covers the same ground through `csp.build.test.ts`,
 `ocr.test.ts` and `ocrAssets.build.test.ts`. **Run it after changing the scanner, the
 CSP or the service worker.**
+
+## Testing rules
+
+Each rule for writing a test lives beside the code it is about — the fixtures,
+the test projects, the timers, the fakes — and CLAUDE.md's grep, narrowed to
+`src/test` and `src/data/testing`, lists them. Two belong to no module:
+
+- **@trap #24 — Assert the mechanism, not a stopwatch.** `receiptBounds.test.ts`
+  once proved "the bound is checked before `atob`" with a 1000 ms budget; it
+  failed at 2673 ms in a full run because the worker was starved, not because
+  the payload was decoded. It spies on `atob` now, with a second test proving
+  the spy sees a real decode.
+- **@trap #37 — `userEvent.setup()` replaces `navigator.clipboard`**, so stub
+  the clipboard *after* calling it, or the spy silently records nothing.
 
 ## Mutation testing
 
